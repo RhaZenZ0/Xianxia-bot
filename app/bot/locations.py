@@ -504,8 +504,15 @@ def destination_groups(current: str, known: set[str] | list[str], realm_index: i
             where = "half a leg from here" if origin in leg or set(leg) == set(site_leg) else f"on the {' – '.join(leg)} road"
             rows.append((name, "🛤️", f"{ROAD_SITE_WORDS.get(str(data['road_site']), 'a place')} · {where}", 10 + near))
         elif data.get("realm_hub"):
+            # `20 + (n or 50)` put the city a player is *standing in* at 70
+            # (v1.0.13): a capital reached from inside its own shop is 0 hops
+            # away, 0 is falsy, and `or` handed it the missing-value number.
+            # The label one expression to the left already asks the right
+            # question - `if n is not None` - so the rule was known and broken
+            # in the same line. Reported from live play as a shop door that
+            # named the street it opens onto while the picker did not offer it.
             n = hops.get(name)
-            rows.append((name, "🌀", f"realm capital · {n} road hop{'s' if n != 1 else ''}" if n is not None else "realm capital", 20 + (n or 50)))
+            rows.append((name, "🌀", f"realm capital · {n} road hop{'s' if n != 1 else ''}" if n is not None else "realm capital", 20 + (50 if n is None else n)))
         elif name in hops:
             n = hops[name]
             rows.append((name, "🛣️", f"{n} road hop{'s' if n != 1 else ''} from here", 20 + n))

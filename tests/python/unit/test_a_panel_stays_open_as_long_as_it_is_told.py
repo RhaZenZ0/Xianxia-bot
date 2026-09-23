@@ -12,10 +12,20 @@ The number was a bare `timeout=900` written out in **five** files
 changing it meant finding all five - the same shape as the command tree's own
 tuple, one level down, and the reason this release made that a name too.
 
-`HUB_PANEL_IDLE_MINUTES` is the setting, **120** is the default, and `0` means a
-panel never expires. Zero is deliberately not the default: it costs one view
-held for the life of the process per panel ever opened, which is fine on a small
-server and is the operator's call rather than this file's.
+`HUB_PANEL_IDLE_MINUTES` is the setting and `0` means a panel never expires.
+Zero is deliberately not the default: it costs one view held for the life of the
+process per panel ever opened, which is fine on a small server and is the
+operator's call rather than this file's. The shipped default is deliberately
+*not* pinned here - which number ships is a decision the owner may take again
+(it went out at 120 in v1.0.12 and back to 15 in v1.0.13), and a gate that
+pinned it would fail exactly when that decision is made, which is the one time
+it should stay green.
+
+**What is pinned is that nothing restates the window.** The expired card spelled
+"fifteen" twice, so it was true of the default and of nothing else: raising the
+setting gave an operator a card telling their players the wrong number, which is
+a promise a setting can falsify - rc.56's panel naming a button that did not
+exist, one release later and one level down. It reads `panel_idle_minutes()`.
 
 **Injected, not read.** `hubs.py` and `runtime.py` are the same tier and
 `test_bot_package` refuses an import between them, so `surface.py` registers the
@@ -24,6 +34,17 @@ number the way it already registers the four gates - the shape
 module default is the old fifteen minutes, so a missed registration is the
 behaviour this release started from rather than a panel that never expires: a
 presentation default that failed towards *never* would leak.
+
+**Six, then seven.** The gate above swept production only, so it walked past a
+`timeout=900` pinned as a string in `test_gui_integrity.py` - a gate that cannot
+see the thing it forbids (rc.47), one directory over; that literal is gone. The
+seventh was not a literal at all: `scripts/playtest_discord.py` jumped a panel's
+clock **901 seconds**, an *encoding* of the deadline rather than the deadline, so
+no search for `900` could have found it. Raising the default left that step
+moving a panel an eighth of the way to its deadline and reporting that it would
+not expire. It is held here because the harness is the only thing that exercises
+this setting end to end, and a step written against one number proves that number
+rather than the setting.
 """
 from __future__ import annotations
 
@@ -87,7 +108,7 @@ class TheIdleWindowIsOneNumber(unittest.TestCase):
             hubs.register_panel_idle(-5)
             self.assertIsNone(hubs.panel_timeout(), "a negative window is never, not a crash")
         finally:
-            hubs.register_panel_idle(120)
+            hubs.register_panel_idle(15)
 
     def test_an_unregistered_window_is_the_old_fifteen_minutes(self):
         """Failing towards *never* would leak a view per panel, for ever."""
@@ -109,6 +130,39 @@ class TheIdleWindowIsOneNumber(unittest.TestCase):
             "nothing hands the hubs the configured window, so HUB_PANEL_IDLE_MINUTES reaches "
             "nothing and the setting is decoration"))
 
+    def test_the_expired_card_never_restates_the_window(self):
+        """A card spelling its own number is true of one setting and no other."""
+        source = (BOT / "hubs.py").read_text(encoding="utf-8")
+        card = next((node for node in ast.walk(ast.parse(source))
+                     if isinstance(node, ast.ClassDef) and node.name == "ExpiredPanelView"), None)
+        self.assertIsNotNone(card, "ExpiredPanelView not found in hubs.py; the gate is broken, not the tree")
+        init = next((node for node in card.body
+                     if isinstance(node, ast.FunctionDef) and node.name == "__init__"), None)
+        self.assertIsNotNone(init, "ExpiredPanelView has no __init__; the gate is broken, not the tree")
+        # Statements only, never the docstring: a gate that cannot tell prose
+        # from code is decoration (rc.52), and the prose here explains the rule.
+        body = init.body[1:] if (init.body and isinstance(init.body[0], ast.Expr)
+                                 and isinstance(init.body[0].value, ast.Constant)
+                                 and isinstance(init.body[0].value.value, str)) else init.body
+        spelled = ("fifteen", "thirty", "sixty", "ninety", "two hours", "an hour")
+        offenders = []
+        for node in body:
+            for child in ast.walk(node):
+                if isinstance(child, ast.Constant) and isinstance(child.value, str):
+                    text = child.value.lower()
+                    offenders += [word for word in spelled if word in text]
+        # assertFalse, not assertEqual: a list diff prints first and the finding
+        # last, and a message that has to be scrolled past is one nobody reads.
+        self.assertFalse(offenders, (
+            "the expired panel's card spells the idle window out, so it is true of one value of "
+            f"HUB_PANEL_IDLE_MINUTES and wrong for every other: {sorted(set(offenders))}"))
+        self.assertTrue(
+            any(isinstance(child, ast.Call) and isinstance(child.func, ast.Name)
+                and child.func.id == "panel_idle_minutes"
+                for node in body for child in ast.walk(node)),
+            "the expired panel's card never asks panel_idle_minutes(), so whatever number it "
+            "prints is not the window the panel actually waited")
+
     def test_the_setting_is_read_bounded_and_documented(self):
         with patch.dict(os.environ, ENV, clear=False):
             import importlib
@@ -124,6 +178,38 @@ class TheIdleWindowIsOneNumber(unittest.TestCase):
         self.assertIn("HUB_PANEL_IDLE_MINUTES", (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8"))
         self.assertIn("HUB_PANEL_IDLE_MINUTES",
                       (PROJECT_ROOT / "docs" / "CONFIGURATION.md").read_text(encoding="utf-8"))
+
+
+class TheHarnessWaitsTheConfiguredWindowOut(unittest.TestCase):
+    """The playtest's quiet step must read the window, not restate it."""
+
+    def setUp(self):
+        self.source = (PROJECT_ROOT / "scripts" / "playtest_discord.py").read_text(encoding="utf-8")
+        self.tree = ast.parse(self.source)
+        self.jumps = [node for node in ast.walk(self.tree)
+                      if isinstance(node, ast.Call)
+                      and isinstance(node.func, ast.Attribute)
+                      and node.func.attr == "advance_time"]
+        # A reader asserted before it is trusted (rc.57): a walk that silently
+        # finds nothing would make every assertion below vacuous.
+        self.assertTrue(self.jumps, "no advance_time call found in the harness; the gate is broken, not the tree")
+
+    def test_the_jump_is_not_a_number_of_its_own(self):
+        offenders = [f"advance_time({ast.unparse(node.args[0])}) at line {node.lineno}"
+                     for node in self.jumps
+                     if node.args and isinstance(node.args[0], ast.Constant)
+                     and isinstance(node.args[0].value, (int, float))]
+        self.assertEqual(offenders, [], (
+            "the harness jumps a panel's clock by a number of its own rather than by the window "
+            "panel_timeout() answers. 901 seconds was the seventh copy of the fifteen minutes this "
+            f"release removed - an encoding of it, which no search for the number finds: {offenders}"))
+
+    def test_the_quiet_step_asks_the_helper(self):
+        self.assertTrue(
+            any(isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                and node.func.id == "panel_timeout" for node in ast.walk(self.tree)),
+            "the harness never calls panel_timeout(), so the one step that waits a panel out is "
+            "written against whatever number it was authored with rather than the configured window")
 
 
 if __name__ == "__main__":  # pragma: no cover

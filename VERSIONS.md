@@ -6,6 +6,121 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.13** teaches the playtest sweep to tell a question it is being asked from a control the answer
+came with.
+
+The Discord harness presses every leaf of every hub and answers whatever the reply puts in front of
+it. Once v1.0.12 raised the player past the curriculum's ceiling, `/battle challenge` **resolved**
+for the first time in the harness's life - every earlier run pressed that leaf and not one of them
+ever began a battle - and it failed at once. A resolved challenge posts a battle panel, whose
+technique and recovery pickers are disabled for a cultivator with no Law techniques and nothing to
+drink, each carrying a single option that says so; the sweep took the first picker on the reply
+without asking whether anybody could use it. A real player could not click it either, which is what
+the simulator said and what the harness now believes. The skip lives in the one helper both
+answerers reach, so the scripted half gets it too, and a disabled *button* is still a failure -
+that one means the panel timed out. What it does not do is count a held-back leaf as covered: a leaf
+pressed only into a refusal has had only its refusal proved, which is the engine harness's own rule
+from rc.58 arriving on this side, and `docs/TODO.md` carries what closing it would take.
+
+It also finishes counting the fifteen minutes v1.0.12 removed from five files. The harness jumped a
+panel's clock **901 seconds** - not the number, an *encoding* of it, one second past a deadline
+stated somewhere else - so no search for it could have found it, and raising the default left the
+step moving a panel an eighth of the way to its deadline and reporting that it would not expire. It
+reads the window the run is configured with now, and the harness pins that window where it pins
+every other setting. Both bounds on it were measured: waiting a two-hour window out costs minutes
+of woken workers for no extra assurance, and a one-minute window never settles at all, because a
+view timer that near counts as runnable. Then an ordinary suite run found the eighth, spelled out
+this time as a marker inside a gate, which went red the moment the step was corrected - a check that
+pins how a rule is written fails exactly when the rule is fixed.
+
+It also opens the half of the menu a new cultivator could not see. Reported from live play - *"I
+can view only like half the menu"*, and at Body Tempering that was literally 109 of 248 leaves.
+**Nineteen status reads were held back from a realm-0 player**, while four separate statements in
+the tree say they never may be: rc.32's limit, v1.0.9's changelog, the gate's own docstring, and -
+most plainly - a comment in the authoring table reading *"Every page's own status stays"*, with
+eleven entries setting one to realm 1 or 2 **in the same block, directly beneath it**. Eight more
+were never listed and inherited a page floor. What hid it is that the five status reads named as
+examples are exactly the five that were written correctly, so the rule was checked against its own
+citations and never against the rest. It is a rule in the generator now rather than a list of
+zeroes, because a list is what drifted. Three pages also open at Body Tempering on the owner's
+call - what you were born with, the qi body the cultivation card already advertises, and a
+companion - taking a new cultivator from 109 visible leaves to 142. The deep end is untouched.
+
+It also fixes a quest that named the one command that could not finish it. Reported from live
+play: *"multiple successful hunts and it's not getting completed."* The beginner path's fourth stage
+asks for a `combat_win` and labels itself **/world -> Act -> Hunt** - and the hunt recorded no quest
+progress at all, while the only thing that reported that type was a finished battle. Three gates
+already held that every objective type has a reporter, that no reporter invents a type, and that
+none speaks before its command answers; all three are about the type, and the label a player reads
+was held by nothing. The hunt reports its win now, which unblocks three quests rather than one, and
+a new gate resolves every authored label to the live hub leaf it names and requires that command to
+report it - which found a second instance on its first run, a trade objective pointing at Browse
+when Browse is a read.
+
+And a travel picker dropped the street a shop door opens onto. `/travel` from inside an apothecary
+refused by naming the city - the one destination the engine allows from in there - which the picker
+did not offer. The engine had it all along; the ordering read `20 + (n or 50)`, where n is the hop
+count, the city you stand inside is zero hops away, and zero is falsy, so the only way out sorted
+behind every distant city and fell off the end of a 25-option select. The label one operand to the
+left already asked the right question.
+
+It also stops a city repeating one rumour five times. Reported from live play: `/city rumours` in
+Ashenwall City printed *"Xie Kormaq discovered Ironbanner City"* over and over, about a route
+charted from a gate in another city entirely. There was only ever **one** row - the writer is
+idempotent on its source key - but the page asked the history query once per place, and that
+query's relevance clause is an OR, so every row about the asking player came back for all eight
+places a city and its parts make. The page also performed neither of the two checks that query's
+own docstring names RAG as the owner of, so a teller could repeat something only the player was
+party to, or something an unwitnessed crime left behind that the world is not supposed to know. A
+rumour is public news about this city, told once - and the page stops asking about the player at
+all, which is where the copies came from. Fixing it turned an existing check red, because that
+check pinned the call's exact text including the argument that was the bug, under a name claiming
+it held the very viewpoint rule the call does not apply.
+
+And the ninth and tenth were in one line of prose, which is why every gate written for this number
+walked past them: the Reopen card itself said *"went quiet for fifteen minutes"* and *"another
+fifteen"*. So the release that made the window configurable made that card wrong for everybody - at
+the two hours it shipped, a panel waited two hours and told its owner fifteen. The card reads the
+configured window now, and the default goes back to **15**, which is what the card, the README and
+twenty-six releases of the harness had all been saying. `120` is still a comfortable
+page-and-come-back window for any operator who wants it; what the gate holds is that nothing
+restates the number, never which number ships.
+
+It also lets a GM see how many times a player has started over. `character.reset` has reported what
+an account has spent of its three restarts since v1.0.1, and that reply was the only place either
+number had ever appeared: a player learned how many were left by spending one, and a GM could not
+look it up anywhere. The record was never missing - one `event_log` row per reset, deliberately kept
+out of the sweep so the bound survives the action it bounds, carrying the abandoned life's name,
+path, root and realm - it simply had no reader in the whole of Python. It has one door now,
+`character.reset_status`, asked by `/admin player inspect` and by the dashboard's Player Editor.
+It is an engine query rather than a count in each surface because the row it filters on and the
+limit it is measured against are both the engine's, and a card holding its own copy of the limit
+reads "one left" on the day the engine refuses. It answers for an account with no character at all,
+which is exactly the state a GM asks about, and an engine that cannot be reached says "unknown"
+rather than zero - a zero there reads as "never reset". Writing the gate found the fault it forbids
+already in the first draft of the fix, which would have printed "2 of 0" from a partial answer.
+
+It also cuts the wait between cultivation sessions to **30 minutes**, from 180 - the knob that sets
+the pace of the whole game, since a realm is about a hundred sessions at every realm. Retuning it
+turned up that the number is written three times: the engine's table, `.env.example`, and compose's
+own `:-` fallback, which exists because the engine service takes an explicit environment allowlist
+and which is therefore the copy a deployed stack actually serves - so a pace changed in Go alone
+would have reached nobody running the compose stack. All three move together now and a gate holds
+them equal for every wait. Three gates also pinned the value rather than the rule and went red on
+the retune; one said in its own comment that it existed so ownership moving would not change the
+pace, which stopped being a reason three releases ago, and another bounded a day of closed-door
+cultivation at five hand-sat sessions - a count, which is a statement about the cooldown, in a
+comment that spends a paragraph explaining that its own predecessor was wrong for exactly that
+reason. An aptitude evolution and a dao-partnered
+session used to be paced with cultivation and share its key; they keep **180 minutes** and take keys
+of their own, because each is a costly gated climb - an evolution risks stability and a forced
+mutation, and the rung it reaches prices a whole life's cultivation - and ordinary cultivation
+getting faster is not a reason for the rare things to. Unsharing the number meant unsharing the key:
+three defaults behind one key are fine only while they agree, and once they differ no value of that
+key restores what shipped. A closed-door retreat stays the same share of active play by
+construction, so its absolute rate follows the new pace. An operator whose `.env`
+already sets the old value keeps it: an upgrade never edits `.env`.
+
 **1.0.12** runs the playtest for the first time in four releases, and it went red on a hundred steps.
 
 The Discord harness presses every leaf of every hub and holds one thing about each: it was drawn and
@@ -480,9 +595,13 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.0.12
+## Release status — v1.0.13
 
-- Current release: v1.0.12 - the Discord playtest can see the curriculum again and presses every
+- Current release: v1.0.13 - the playtest sweep tells a question it is being asked from a control
+  the answer came with, so a leaf that finally resolves is pressed rather than refused, and the
+  quiet step waits out whatever window is configured instead of the one it was written against.
+  Harness and documentation only; no schema, no production behaviour.
+- v1.0.12: the Discord playtest can see the curriculum again and presses every
   leaf, a GM lever addresses the player it was given rather than an id a float rounded off, and a
   hub panel stays open for as long as `HUB_PANEL_IDLE_MINUTES` says. No schema.
 - v1.0.11: a GM can grant a physique and can only set a root grade the ladder

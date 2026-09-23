@@ -4,13 +4,16 @@ Production and Docker install requirements.txt. The source archive's tests can
 also run in a minimal Python environment where aiosqlite is unavailable.
 """
 
+import ast
 import importlib.util
+import io
 import json
 import secrets
 import time
 import importlib.machinery
 import sqlite3
 import sys
+import tokenize
 import types
 from pathlib import Path
 from typing import Any
@@ -716,6 +719,46 @@ def install_discord_ui_shim() -> None:
     discord.Interaction = Interaction
     sys.modules["discord"] = discord
     sys.modules["discord.ui"] = ui
+
+
+def code_only(text: str) -> str:
+    """Python source with its comments and docstrings blanked.
+
+    A gate that cannot tell prose from code is decoration (v1.0.0-rc.52), and
+    the prose that trips one is almost always the paragraph explaining the very
+    rule it enforces: v1.0.1's checklist gate flagged the file it had just been
+    written for, because the comment describing the fix named the filename the
+    fix forbids, and v1.0.13's restart-allowance gate did the same on its first
+    run over a docstring that names `event_log`.
+
+    It lives here rather than in either gate because two copies of one reader
+    are free to drift apart, and only the copy that matters would be the one
+    left wrong. Line numbers are preserved, so an offender can still be
+    reported by position.
+    """
+    lines = text.splitlines(keepends=True)
+    try:
+        for token in tokenize.generate_tokens(io.StringIO(text).readline):
+            if token.type == tokenize.COMMENT:
+                row = token.start[0] - 1
+                lines[row] = lines[row][: token.start[1]] + "\n"
+    except tokenize.TokenError:
+        pass
+    stripped = "".join(lines)
+    try:
+        tree = ast.parse(stripped)
+    except SyntaxError:
+        return stripped
+    out = stripped.splitlines(keepends=True)
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        body = getattr(node, "body", [])
+        if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) \
+                and isinstance(body[0].value.value, str):
+            for row in range(body[0].lineno - 1, min(body[0].end_lineno, len(out))):
+                out[row] = "\n"
+    return "".join(out)
 
 
 def load_module_by_path(name: str, relative_path: str):

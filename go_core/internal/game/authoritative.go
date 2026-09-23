@@ -196,7 +196,11 @@ var authoritativeQueries = map[string]bool{
 	"secret_realm.status":      true,
 	// v1.0.0: the rotation on its own, for the GM dashboard, which is not an
 	// actor and wants the whole schedule rather than one cultivator's view.
-	"secret_realm.rotation":     true,
+	"secret_realm.rotation": true,
+	// v1.0.13: what one account has spent of its restart allowance, for the
+	// two GM surfaces that ask. Like the rotation it is not an actor's own
+	// view - the payload names whom it is about.
+	"character.reset_status":    true,
 	"exploration.event.status":  true,
 	"exploration.travel_status": true,
 	"merchant.status":           true,
@@ -784,6 +788,16 @@ func applyAuthoritativeQuery(databasePath, worldPath string, req ActionRequest) 
 		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
 	case "exploration.travel_status":
 		result, qerr := travelStatusQuery(conn, req.ActorID)
+		if qerr != nil {
+			return ActionResponse{}, qerr
+		}
+		v, _ := eventledger.CurrentActorVersion(conn, req.ActorID)
+		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
+	case "character.reset_status":
+		// The subject is the payload's, not the actor's: a GM is asking about
+		// somebody else, and the dashboard asks as nobody at all. No catalogue
+		// and no clock - the allowance is a constant and the count is rows.
+		result, qerr := characterResetStatusQuery(conn, req.Payload)
 		if qerr != nil {
 			return ActionResponse{}, qerr
 		}

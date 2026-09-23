@@ -3682,13 +3682,18 @@ fifteen minutes and swapped its controls for a **Reopen** button. The mechanism 
 holds a live view in memory until it times out - and fifteen minutes is wrong: a long time to hold a
 view open and a short time to read a page, go and do something, and come back to it.
 
-`HUB_PANEL_IDLE_MINUTES` is the setting, **120** the default, and `0` means a panel never expires.
-Zero is deliberately not the default: it costs one held view per panel ever opened, for the life of
-the process, which is fine on a small server and is the operator's call rather than presentation's.
-The module default is the old fifteen, so a **missed registration is the behaviour this started
-from** rather than a panel that never expires - a presentation default failing towards *never* would
-leak. It is injected, because `test_bot_package` puts `hubs` and `runtime` in one tier and refuses an
-import between them, which is the shape `feature_unlocks` and `describe_era` already use.
+`HUB_PANEL_IDLE_MINUTES` is the setting and `0` means a panel never expires. Zero is deliberately
+not the default: it costs one held view per panel ever opened, for the life of the process, which is
+fine on a small server and is the operator's call rather than presentation's. The module default is
+the old fifteen, so a **missed registration is the behaviour this started from** rather than a panel
+that never expires - a presentation default failing towards *never* would leak. It is injected,
+because `test_bot_package` puts `hubs` and `runtime` in one tier and refuses an import between them,
+which is the shape `feature_unlocks` and `describe_era` already use.
+
+**The shipped default went out at 120 and was put back to 15 in v1.0.13**, on the owner's call; why
+is under "The number that was not the number" below. What the gate holds is deliberately *not* which
+number ships - that is a decision, and a gate pinning it would fail exactly when the decision is
+taken again, which is the one time it should stay green - but that nothing restates it.
 
 **The number was written out five times** (`hubs.py` twice, `surface.py`, `admin/world_ops.py`,
 `commands/support.py`), and the gate forbids a panel view carrying its own.
@@ -3735,6 +3740,459 @@ the container ran 3.11 and the other machine 3.13. It is in `BUILTINS` beside `_
 `__name__` now. A gate that enumerates what the language provides has to be told when the language
 provides more, which is the same class as a fixture that cannot fail the way production fails: the
 environment was never part of what it was checked against.
+
+### A disabled control is not a question (v1.0.13)
+
+Once v1.0.12 raised the player past the curriculum's ceiling, `/battle challenge` **resolved** for
+the first time in the harness's life - every previous run's note for that leaf is the target picker's
+own prompt and no run ever began a battle - and it immediately failed with SimCord's *"That component
+is disabled - a real user could not interact with it"*. Which of the raised player's differences
+reached it is not recorded and is not the finding; that a leaf can be pressed for releases without
+ever resolving is.
+
+A resolved challenge starts a battle and posts a `BattleView`, whose `BattleTechniqueSelect` and
+`BattleRecoverySelect` are `disabled=not available`: a cultivator with no Law techniques and nothing
+to drink gets two dead pickers carrying one explanatory option each. `answer_generically` walks an
+action's input steps by taking the first select on the **result's** message - and a result may carry
+controls of its own, which is precisely what it could not tell apart. SimCord's refusal was correct
+in both directions: a real player could not click it either.
+
+**The tell was in the payload all along**, as `disabled`, and the sweep never read it. The skip is in
+`select_by_placeholder`, the one helper both answerers reach, rather than copied into each scan - and
+it reaches the scripted answerer too, which would have failed one step later and less legibly, with
+*"nothing to answer the picker 'Use a Law technique' with"*. A disabled **leaf button** is
+deliberately still a failure: that one means the panel timed out, which is a finding rather than a
+control explaining itself.
+
+**And this is rc.58's lesson arriving on the Discord side.** That release tightened the engine
+harness's coverage rule from *called* to **resolved**, because `law.technique` was driven only into a
+designed refusal and its capstone had been broken for twelve releases. The leaf sweep counts a leaf
+as covered when it was pressed and answered - and a leaf that has only ever been pressed into a
+refusal has had only its refusal proved. Nothing gates this: raising the realm is what reached it,
+and what the next such leaf needs is the same thing, a player who can actually do the thing.
+
+### The number that was not the number (v1.0.13)
+
+v1.0.12 took a bare `timeout=900` out of five production files and gated a panel view against
+carrying its own. Its drill then found a **sixth**, a literal pinned as a *string* in
+`test_gui_integrity.py`, which that gate had walked past because it swept production only - a gate
+that cannot see the thing it forbids (rc.47), one directory over. Both are in that release. The
+seventh and eighth are here, and they say different things.
+
+**The seventh was never spelled.** `scripts/playtest_discord.py`'s quiet step jumped the clock
+**901 seconds** - not the number at all but an *encoding* of it, one second past a deadline stated
+somewhere else - so no search for `900`, and no gate reading production for a literal, could ever
+have found it. Raising the default to 120 minutes left it moving a panel an eighth of the way to its
+deadline and then reporting that the panel would not expire.
+
+**The window is a setting, so the harness pins one and the step reads it back.** `PANEL_IDLE_MINUTES`
+sits at the top of `playtest_discord.py` with `HEALTH_PORT` and the workers' off switches - the
+environment block that is set before the bot is imported - and `quiet()` asks `panel_timeout()` what
+it came out as. That is the whole rule: the run states the window once, in the place a run states
+things, and no step restates it.
+
+**Both bounds on that number were measured, not chosen, and each is a rule of its own.** Too long and
+the *jump* is the cost: waiting a two-hour window out wakes every periodic worker for two hours
+of virtual time, and the step went from instant to minutes still running - for no proof the unit gate
+does not already give about the shipped default. Too short and the panel never settles: at one minute
+the run printed `BaseView.__timeout_task_impl: unknown wait (Future)` with *163 recognized waits
+parked*, which is rc.35's finding exactly - **a bot-owned wake near enough to count as runnable is a
+settle that never completes** - so the failure is not even in the step, it is in the `open_hub` before
+it. In between, the sweep's own constraint: **long enough that a page is never expired out from under
+itself**, because the leaf sweep opens a page once and presses every leaf on it, and an expired panel
+disables its controls - which the sweep reports as a failure, correctly, and which is the neighbouring
+finding in this same release. Fifteen is what the harness in fact ran against for twenty-six releases
+before the setting existed.
+
+**The eighth was spelled, and it was in a gate.** `test_playtest_gate.py` proves the harness still
+drives each loop by pinning a marker string per loop, and its marker for this one was the literal
+`advance_time(901)` - so correcting the step turned that gate red. Which is the v1.0.8 lesson
+exactly: **a gate that pins how a rule is *written* rather than that it holds fails precisely when
+the rule is corrected, which is the one time it should stay green** - the same call v1.0.9 and
+v1.0.10 each made for a hand-copy of the command tree's tuple, and v1.0.12 for the fifth. The marker
+is `advance_time(` now, which is what that list is actually for; whether the jump is read off the
+configured window belongs to `TheHarnessWaitsTheConfiguredWindowOut`, and a fact asserted in two
+places is free to disagree.
+
+**The ninth and tenth were in one line, and they are the only two a player ever read.**
+`ExpiredPanelView`'s card says *"This panel went quiet for fifteen minutes. Reopen it here; any tap
+keeps a panel alive another fifteen."* Every gate written for this number swept **code** - the
+`timeout=` keyword a view is built with - and this is prose inside an f-string, so none of them could
+see it. So v1.0.12 made the window configurable and, in the same release, made that card wrong for
+everybody: at the 120 it shipped, a panel waited two hours and told its owner it had waited fifteen.
+That is rc.56's finding exactly - a panel promising something the tree does not do - and the
+mechanism is the same one this file keeps recording: **a promise a setting can falsify is a promise
+nobody is holding.** The card reads `panel_idle_minutes()` now, and
+`test_the_expired_card_never_restates_the_window` walks `__init__`'s statements without its
+docstring (rc.52) for a spelled-out number.
+
+**Which is also why the default went back to 15** (on the owner's call, and this is the honest
+account of it): fifteen is what the card said, what the README said, and what the harness had run
+against for twenty-six releases, and 120 was one number changed against three restatements nobody
+had found yet. With the card derived, the default is free to be whatever an operator wants - so the
+gate holds the restating and deliberately not the number, and `docs/CONFIGURATION.md` says plainly
+that 120 is a comfortable page-and-come-back window for anyone who wants it.
+
+**A restated constant need not be spelled to be a copy**, and that is why the seventh was invisible
+while the eighth fell out of an ordinary run. The gates are narrow on purpose - `advance_time` may
+not take a numeric literal, the harness must call `panel_timeout()`, and the expired card may not
+spell a number of minutes - because the class is wider than any gate: what they can catch is a
+number written down where a window should be read.
+
+### The rule was checked against its own examples (v1.0.13)
+
+**Found by playing**, and reported as *"I can view only like half the menu"* - then, precisely:
+*"I cant see the options for temper"*, *"Same for beast"*, *"Same for dantian refine"*. The panel
+pasted with it is the proof: `/cultivation → Path` printing **2 actions** and
+*"🔒 6 more doors here open as you cultivate"*.
+
+At Body Tempering a character saw **109 of 248 leaves**. Half the menu was not a figure of speech.
+
+**Nineteen status reads were held back**, and all three statements of the rule forbidding that are
+in the tree. rc.32 set the limit the curriculum inherits - *"never a status read or the door into
+the system, because a road nobody can see is a road nobody learns exists"*. v1.0.9's CLAUDE.md
+section said **"Every status read stays open at realm 0, deliberately and against the temptation to
+count them as noise"**. `test_the_curriculum_opens_as_you_cultivate.py` quoted rc.32's limit **in
+its own docstring** and tested eleven other things.
+
+**And the fourth statement is the one worth seeing.** `author_feature_unlocks.py`'s `LEAVES` table
+carries the comment *"A status read is never the thing that overwhelms anybody… Every page's own
+status stays"* - and then, **in that same block, under that same comment**, eleven entries set one
+to 1 or 2: `territory status`, `war status`, `caravan status`, `boss status`, `hunter status`,
+`blackmarket status`, `fate status`, `bond status`, `crime status`, `family house status`,
+`artifact status`. Eight more - `dantian status`, `party status`, `formation status`,
+`merchant status`, `duel status`, `realmhub status`, `sect discipleship status`,
+`sect manor status` - were never listed at all and inherited a page floor of 2. The rule and its
+violation were adjacent lines.
+
+**Why nobody saw it is the whole finding.** The five status reads CLAUDE.md names as examples -
+`sect status`, `beast status`, `abode status`, `innerworld status`, `secretrealm status` - are
+**exactly the five that were written at 0**. The claim was checked against the cases it cites and
+never against *"and the rest"*, which is where all nineteen lived. That is rc.47's shape reached
+from a new direction: not a gate that cannot see what it forbids, but a *rule whose examples are
+drawn from the half that holds*.
+
+**The fix is a rule, not nineteen zeroes**, because a list is precisely what drifted.
+`is_status_read` is one predicate and `build()` forces 0 through it, so a number written beside a
+status read in the table is now ignored rather than obeyed - the twentieth one somebody adds cannot
+repeat this. `test_the_generator_forces_it_rather_than_listing_it` drives that behaviourally: it
+sets `dantian status` to 2 in the table and requires the built roster not to carry it.
+
+**Three pages open at realm 0**, on the owner's call, and each for its own reason rather than as a
+band. `cultivation / Path` is what you were born with - this tree already called that *identity,
+not a system*, and `aptitude root` was sitting at 0 beside six locked siblings, so the page said
+"here is your Common root and your Moon Serpent bloodline" and hid Temper, Harmonize, Evolve and
+Awaken. `cultivation / Qi Body` is **named on the card a realm-0 player reads every session** -
+`🩸 20/108 meridians` - so the curriculum advertised a number and hid the one lever that changes
+it. And `beast / Companions` was the one system the first hour had to be told about rather than
+shown: `beast status` was open and reported nothing, because everything that makes a beast exist
+was behind Qi Refining.
+
+Body Tempering now shows **142 of 248**. The deep end is untouched - the black market, caravans,
+boss raids, territory, war, a house, a personal world, Samsara and Perfection still wait at 3/4/5 -
+because the complaint was never that the game had too much in it.
+
+**What is deliberately not gated is which pages are open.** That is a decision the owner may take
+again, and a gate pinning `cultivation / Path` to realm 0 would fail exactly when it is taken -
+v1.0.8's lesson, and the same call the panel-idle window's gate makes one release over. What is
+held is the rule the examples hid: no leaf whose path ends in `status` may wait for a realm.
+
+**The drills.** Restoring `dantian status` and `war status` to realm 2 in the shipped content names
+both with their realms; letting `build()` read the table again prints *"the authoring script let a
+status read be gated by writing a number beside it"*; and blanking `is_status_read` prints *"the
+generator no longer recognises a status read; the gate is broken, not the tree"* - **before** the
+assertion it would have made vacuous.
+
+### The same rumour, once per room (v1.0.13)
+
+**Found by playing**, and the page is the report:
+
+> 🗣️ **Rumours in Ashenwall City** — as Landlady Bo Tan tells them
+> • **Xie Kormaq discovered Ironbanner City** — …charted a route to Ironbanner City.
+> • **Xie Kormaq discovered Ironbanner City** — …
+> • *(three more of the same)*
+
+**The writer is idempotent and was never the problem.** The discovery is recorded with
+`source_key=f"location_discovery:{user}:{location}"` and `record_world_history_event` is an
+`INSERT … ON CONFLICT(source_key) DO UPDATE`, so there is exactly **one row**. It was printed five
+times.
+
+`get_structured_world_history`'s relevance clause is an **OR** —
+`location=? OR related_user_id=? OR actor_key=? OR target_key=?` — and `city_rumours` called it
+**once per place**, with `user_id=` filled in:
+
+```python
+for place in [city, *parts]:
+    events.extend(await DB.get_structured_world_history(location=place, user_id=…, limit=6))
+```
+
+Ashenwall City has seven parts, so that is eight queries, and every row about the asking player
+came back from **all eight**. The row's own `location` is *Ironbanner City* — nowhere near
+Ashenwall — which is why it could appear at all: it was never matched on the place, only on the
+player.
+
+**The second half is why the fix is not a `set()`.** That function's docstring says it
+*"deliberately returns a superset. The RAG retriever performs the final viewpoint/visibility check
+so one code path owns knowledge safety"* — and the rumours page was a **second consumer that
+performed neither check**. `rag.py` merges into a dict keyed on `history_id` and drops `hidden` at
+its line 265; this page did neither. So the landlady could repeat a **`participant`** row the
+player alone was party to — which is exactly what was reported — and a **`hidden`** one:
+`npc_deeds` writes an unwitnessed robbery and an unwitnessed contraband drop at an NPC's own
+location, which is a city, and the tree's rule for those is that *the world really does not know*.
+Their prose is already anonymised, so what leaks is the event's existence rather than a culprit's
+name; it is still a row nothing was ever meant to surface.
+
+`rumours_a_city_has_heard` is the one selection now — public only, distinct by `history_id`, newest
+first, bounded — and the call stops naming the player, which is the whole of why the duplication
+existed. **A rumour is what the city has heard**, so a row about somewhere else, or one only the
+player was party to, is not one.
+
+**The gate holds the rule rather than the page.** It compiles the helper from its own source rather
+than booting the bot for one pure function, and asserts a plain public row survives before
+asserting anything else (rc.57). Four drills: asking about the player again prints
+`['line 1423: user_id=']` with the reason; dropping the visibility filter names the `participant`
+row; replacing the dedupe prints *"one row came back 8 times… which is exactly what a player saw
+printed five times"*; and blanking the helper fails the self-check first.
+
+**What is deliberately not changed is `get_structured_world_history`.** The OR is correct for RAG,
+which is what it was written for and which filters afterwards. Narrowing it there to fix a page
+would be a rule moved out of the one path that owns it — the opposite of what its docstring asks
+for.
+
+**And an existing gate was holding the fault in place, which the full suite is what found.**
+`test_city_life.py`'s `test_rumours_come_through_the_one_viewpoint_gate` asserted the call's exact
+literal text — **including the `user_id=interaction.user.id` that was the bug** — so correcting the
+page turned it red. It is the v1.0.8 lesson at its sharpest: a gate that pins how a rule is
+*written* rather than that it holds fails precisely when the rule is corrected, which is the one
+time it should stay green, and here the spelling it pinned was itself the defect. Its **name** made
+it worse: *"come through the one viewpoint gate"*, over a call that performs no viewpoint check at
+all — the one path that owns that check is RAG, which this page was not. It is
+`test_the_unfiltered_reader_never_feeds_rumours` now and keeps only the narrow thing it really
+held, because two statements of one rule are free to disagree and the weaker one is what produces
+the false verdict.
+
+### The quest named the one command that could not advance it (v1.0.13)
+
+**Found by playing**: *"Even though I've done multiple successful hunts after getting the quest
+it's not getting completed."* The journal read
+
+> ▫️ Come out of one fight standing - **/world → Act → Hunt** 0/1
+
+The objective's type is `combat_win`, and its **only** reporter in the tree was `_finish_battle` in
+`battle.py`. `/hunt` recorded **no quest progress at all** — not `combat_win`, not anything — so the
+beginner path's fourth stage named the one command that could not advance it.
+
+**Three gates stood here already and none could see it.**
+`test_quest_objective_reporters.py` holds that every type in `OBJECTIVE_TYPES` has a reporter — and
+`combat_win` had one, in `/battle`. It holds that no reporter names a type the vocabulary lacks, and
+that no reporter speaks before its command answers. **Every one of those is about the type.** The
+label is the only part a player ever reads, and the fact that decides whether they can finish the
+quest — that the command named and the command reporting are the same command — was held by nothing.
+That is rc.47's shape with the emphasis moved: not a gate blind to what it forbids, but a rule
+nobody wrote down, sitting beside three that look like they cover it.
+
+**The hunt reports `combat_win` now, rather than the label being re-pointed at `/battle`.** The
+stage's own description is *"find out what happens when something does not want you there"*; a
+failed hunt costs nothing (*"No permanent injury or item loss is applied"*) while a lost battle
+leaves a cultivator on zero vitality; and the first hour is not where that belongs. The report is
+written after the engine has decided the hunt landed (rc.28) and before the command answers, with
+the announcement after the reply (v1.0.5).
+
+**The drill found two more quests the same missing wire had stopped.** Taking the report back out
+names `beginner_road`, `errand_forging_cores` and `errand_formation_ward` — two household errands
+also asked for a hunt, so three quests were unfinishable, not one.
+
+**And the gate's first run found a second instance, authored the same way.** `beginner_town`'s
+`trade` objective was labelled **/economy → City Shops → Browse** — and Browse is a *read*.
+`shop_buy` and `shop_sell` are what report `trade`. The label is `Buy` now; that one is content,
+because a read must not claim to have traded.
+
+**Three of this gate's own runs were resolver mistakes, and each is worth the line.** A leaf name is
+ambiguous across hubs — **Enter** belongs to both `family` and `realm`, so a label-only key sent
+`/family → Enter` to the secret realm's door. It is ambiguous *within* a hub — `cultivation` carries
+**Cultivate** on its `Cultivate` page and again on `Body` — so the value is a set and any handler of
+that name reporting the type satisfies it. And a reporter need not sit in the handler: `/craft`'s
+lives in `_run_crafting`, so the scan closes over the module's own calls, which is v1.0.5's
+`_report_trade` lesson arriving from the other side.
+
+### The pace is written three times, and only one of them is served (v1.0.13)
+
+**Asked for**: the wait between cultivation sessions cut to thirty minutes. It was **180**, not the
+two hours it was remembered as, and rc.56 had already made it the engine's - so this should have
+been one number in one table. It is three, and the third is the one that decides what a running
+server actually serves.
+
+`actionCooldowns` in `cooldown_rules.go` is the statement a reader finds. `.env.example` carries a
+second, which `migrate_env.sh` copies into a new `.env`. And **`docker-compose.yml` carries a third
+as its own fallback** - `${CULTIVATE_COOLDOWN_MINUTES:-180}` - which exists because the engine
+service takes an explicit `environment:` allowlist and no `env_file`, the rc.39 finding that made
+`WORLD_TIME_SCALE` dead on arrival. Compose therefore always passes *something*, so the engine's own
+default is never reached on a composed stack: a pace changed in Go alone would have reached a
+`go run` and **no server anybody is running**, which is rc.43, rc.46, rc.49, rc.50, rc.51 and rc.59
+wearing a seventh hat. All three move together now, and
+`test_the_three_statements_of_a_default_agree` holds them equal for every wait rather than for this
+one.
+
+**Three gates pinned the value rather than the rule, and all three went red on a retune.**
+`test_the_defaults_are_what_python_used_to_send` said exactly what it was for - *"a live world must
+not change pace because ownership moved"* - and that reason was spent the release it was written in:
+ownership moved in rc.56 and the numbers have been the engine's ever since, leaving a gate whose
+only remaining effect was to fail when the owner exercised the ownership it was celebrating. The Go
+half did it too, asserting `cooldownSecondsFor(cooldownCultivate) == 180*60` inside a test about
+*ownership*; what it is really guarding is that the served wait is the table's rather than a
+handler's old five-minute fallback, which holds at any value, so it keeps the floor and drops the
+number. That is v1.0.8's rule, which v1.0.13 had already applied twice in this release - to the
+panel-idle window and to the rotation's allowlist entry - and this is the third and fourth.
+
+**The third is the one worth reading, because it had already been fixed once for this exact
+reason.** `TestSeclusionIsPacedLikeTheStageItFills` bounded a game day of seclusion at
+`1 <= sessions <= 5` of a hand-sat session, and the comment above it explains at length that the
+*previous* bound was wrong because *"a number that only held because the count it bounded, 1.2
+sessions a game day, happened to be 60% of active play at the shipped time scale"*. Its replacement
+made the same mistake one layer up: a session count is a statement about the cooldown, so
+`<= 5` only held while a session cost three hours. At thirty minutes six times as many sessions fit
+in the same real time and a day behind the door is worth seventeen of them - **the share unchanged
+and the count six times larger**, which is rc.56's derivation working rather than breaking. The
+band is computed from `seclusionSessionsPerGameDay` now, so what is held is that the payout really
+is the pace times that count; the share itself stays held across every scale next door, and is
+deliberately not restated here. A rule can be fixed, have the fix explained in a comment, and be
+broken again in the same statement by the same reasoning one level out.
+
+**And two of the three waits deliberately did not follow it down.** `cooldownAptitude` and
+`cooldownDaoDual` were *paced with* cultivation - three entries sharing `CULTIVATE_COOLDOWN_MINUTES`
+because Python had sent `max(300, cultivate)` for them since before rc.56 moved ownership - and on
+the owner's call they keep **180** while ordinary cultivation drops to 30. The reason is what each
+one is: an `aptitude.evolve` is a climb up the six-rung root ladder, 2d10 against `13 + idx`, costing
+stability on a failure and risking a forced mutation at margin <= -7, and since rc.55 the rung
+reached prices 0.88x-1.34x cultivation and -1 to +3 on every breakthrough for the rest of that life.
+A dao partnership is the same shape at two people's expense. Ordinary cultivation getting faster is
+not a reason for the rare, costly things to.
+
+**Unsharing the number meant unsharing the key, and that half cannot be skipped.** Three defaults
+behind one environment key is fine while they agree; the moment they do not, an operator who sets
+that key silently moves all three back together and **no value of it restores what shipped**. So
+`APTITUDE_COOLDOWN_MINUTES` and `DAO_DUAL_COOLDOWN_MINUTES` are keys of their own, with their own
+`.env.example` lines and their own compose passthroughs - and the gate refuses the bad shape by
+name: entries sharing one key must ship one default. Its drill prints
+`CULTIVATE_COOLDOWN_MINUTES is shipped as both 30 and 180 minutes`.
+
+**What moves with it, deliberately.** `seclusionSessionsPerGameDay` divides by this wait, because
+rc.56 made a retreat a *share* of active play rather than a count of sessions. So a retreat stays
+125% of active cultivation at thirty minutes exactly as at 180, and its absolute rate rises sixfold
+with the pace - which is the derivation working, not a second thing to tune. The calendar it turns
+into is in `docs/CONFIGURATION.md`: about a hundred sessions a realm, so roughly two real days of
+active cultivation where it used to be ten.
+
+**And the one thing this cannot reach is a server already running.** `.env` is never edited by an
+upgrade - that is what `migrate_env.sh` exists for, and it keeps values already set - so an operator
+whose `.env` carries the old `CULTIVATE_COOLDOWN_MINUTES=180` keeps three hours until they change it
+themselves. The new default is for a fresh install and for anyone who removes the line.
+
+### The allowance nobody could look up (`character.reset_status`, v1.0.13)
+
+**Asked for**, after a question this file could not answer: where a GM sees how many times a player
+has reset their character.
+
+`character.reset` has reported `resets_used` and `resets_remaining` in its own reply since v1.0.1,
+and **that reply was the only place either number has ever appeared**. A player learned how many
+chances were left by spending one - the confirm step is the generic red "Are you sure?" from
+`_DANGER_ACTION_WORDS` and names no count - and a GM could not look it up at all. The record was
+never the problem: `event_log` carries one `character_reset` row per reset, kept out of the sweep by
+`characterResetKeep` precisely so the bound survives the action it bounds, and its payload already
+held the abandoned life's name, path, root, realm and phase. It had **no Python reader anywhere in
+the tree** - the string occurs twice in `app/`, in the table list and the DDL that creates it - no
+dashboard view, no `/admin` panel and no API field. The thing was recorded, complete and legible,
+and nothing looked at it: the shape `/learn` (rc.43), the quest journal (rc.46) and the peach
+(rc.50) each had.
+
+**Why it is an engine query and not two SELECTs.** The obvious fix is a `COUNT(*)` in the bot's `DB`
+and another in the dashboard's own query session, which is how both planes read every other table.
+It is refused because of what the count is made of: the row it filters on is `characterResetEvent`
+and the bound it is read against is `characterResetAllowance`, **a Go string and a Go constant**, so
+that fix would put four new copies of two engine facts into presentation. A surface holding its own
+`3` reads correctly the day it is written and tells a GM *"one left"* on the day the engine refuses
+- rc.46's rule seen from behind the counter, and exactly what v1.0.11 took the spiritual-root ladder
+out of the browser to stop. The precedent is `secret_realm.rotation`, added for this same dashboard
+with this same reasoning written on it: *"three copies of one rule, and they had already parted
+company."*
+
+So `character.reset_status` is one door on `authoritativeQueries`, and neither surface knows how the
+answer is made. Three things about it are decisions rather than mechanics:
+
+- **The subject rides the payload, never the actor.** Every other read on that allowlist answers
+  about the caller; both callers here are asking about somebody else - Discord's actor is the GM who
+  typed the command, and the dashboard asks as actor 0, which is not a cultivator. An absent
+  `user_id` is therefore a refusal rather than a quiet answer about the wrong person.
+- **It reads no `characters` row**, and that is the case the lever exists for: an account that reset
+  and has not begun again has none, so a read joined to the sheet would answer "nobody" about
+  precisely the person a GM is looking up. The Discord side carries the same rule one level out -
+  `/admin player inspect` used to stop at *"That member has no cultivation character"*, and now
+  prints the restarts on that branch too.
+- **An engine that does not answer says so.** Both surfaces degrade to *"unknown"* and an em dash
+  rather than to a zero, because a zero here reads as *"never reset"* and a GM cannot tell it from
+  *"nobody replied"* - the `engine —` footer v1.0.8 found in this same dashboard shell.
+
+**The gate's own first run found a fault in the fix.** The rule it holds is that neither surface may
+supply a number of its own, and the Discord line was written
+`int(status.get("reset_allowance", 0))` - so a partial block would have printed **"2 of 0"**, a
+bound nothing enforces, from the very function written to stop that. It asks whether the field is
+absent now, which is v1.0.1's rule and is also the only correct question here, since `resets_used`
+of 0 is the commonest real answer there is.
+
+**And the gate's first run flagged the file it was written for**, because the docstring explaining
+why nothing may read `event_log` names `event_log`. That is rc.52 arriving in the same session
+again, and the reader that fixes it already existed in `test_playtest_gate.py` - so rather than a
+second copy, `code_only` moved to `tests/support.py` and both gates import it. v1.0.12's lesson:
+*never copy* has a cheaper answer than *parse the source* whenever the thing being copied could
+simply have a name.
+
+**What the load-bearing test measures is not the count.** A test asserting "2 of 3" passes just as
+well against a surface printing a 3 of its own, which is the rc.47 shape; so the Go gate holds the
+status against **a real reset's own reply** (`reset_allowance == resets_used + resets_remaining`, as
+the action accounted for them) and the Python gate makes a fake engine answer an allowance of
+**five**, a number this tree does not contain. Its drill prints *"the panel did not report the
+allowance the engine gave it, so it is carrying a copy"*.
+
+The harness drives it where it matters rather than anywhere: section 21c already resets QUITTER, so
+the read is taken at the one moment that account has no `characters` row, and it compares the read
+with that reset's own reply instead of with a number written down in the script. Its drill prints
+`['character.reset_status'] != []` from the coverage gate.
+
+**What is deliberately not built is the player's own view.** `/reset`'s confirm step still names no
+count, so a player still learns the number by spending one. That is a decision about how much a
+warning should say, not a wiring, and it is in `docs/TODO.md` with that reason.
+
+### Zero hops is a distance, not a missing value (v1.0.13)
+
+**Found by playing**, inside an apothecary: `/travel` refused with *"Travel failed: the shop door
+opens onto Azure Crown Imperial City"* — naming the one destination the engine allows from inside a
+shop, which the picker did not offer.
+
+**The engine was right and had the city all along.** `knownLocationsTx` says so in its own comment:
+standing in a shop *"the city is known, its roads, and every gate and district of it"*. What dropped
+it was one operand in the picker's ordering:
+
+```python
+rows.append((name, "🌀", …, 20 + (n or 50)))
+```
+
+`n` is the hop count; the city a player is standing **inside** is 0 hops away; `0 or 50` is 50. So
+the only legal way out of the shop sorted at 70, behind every road city, and fell off the end of a
+25-option Discord select. Measured from the Azure Crown Apothecary it was position 12 of 13 — and on
+a character who has discovered more of the world, off the list entirely.
+
+**The rule was known and broken in the same expression.** One operand to the left, the *label* asks
+`if n is not None` — the correct question. That is v1.0.1's own lesson, *"ask whether the field is
+absent, never whether it is falsy"*, which that release fixed in `playtest_engine.py` and recorded
+as a rule about **assertions**; the failure mode it named there was "green until the value happens
+to be zero". Here the same mistake was in production, deciding what a player is shown, and it was
+only ever wrong for the one place they were standing in.
+
+**The gate reads the operand, not the line**, and its own first run is why: looking for `"hops"`
+anywhere in the expression flagged `WORLD.shops.get(…) or {}`, because *shops* contains it. A needle
+is not a reader (rc.58). It reads statements without the docstring or the comment that explain the
+fix, since both quote the expression they forbid (rc.52), and it drives the real picker from a real
+shop in a real capital rather than a fixture city.
 
 ## Testing conventions
 

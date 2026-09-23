@@ -2156,6 +2156,19 @@ def panel_timeout() -> float | None:
     return None if _PANEL_IDLE_MINUTES <= 0 else float(_PANEL_IDLE_MINUTES * 60)
 
 
+def panel_idle_minutes() -> int:
+    """The same window in minutes, for the card that tells a player about it.
+
+    The expired card used to spell "fifteen" twice, which was true of the
+    default and of nothing else: an operator who raised the window got a card
+    telling them the wrong number, and a promise a setting can falsify is the
+    shape this tree keeps finding (rc.56's panel naming a button that does not
+    exist). It is never called when the window is 0, because a panel that never
+    expires never becomes this card.
+    """
+    return _PANEL_IDLE_MINUTES
+
+
 class HubReopenButton(discord.ui.Button):
     def __init__(self, expired: "ExpiredPanelView") -> None:
         self.expired_view = expired
@@ -2167,9 +2180,9 @@ class HubReopenButton(discord.ui.Button):
 
 
 class ExpiredPanelView(_LayoutHubBase):
-    """What a panel becomes after fifteen quiet minutes (v0.40.0): its title
-    and one Reopen button that rebuilds it in place, instead of a dead card
-    telling the player to run the command again."""
+    """What a panel becomes after `HUB_PANEL_IDLE_MINUTES` quiet minutes
+    (v0.40.0): its title and one Reopen button that rebuilds it in place,
+    instead of a dead card telling the player to run the command again."""
 
     is_layout_hub = False
 
@@ -2183,7 +2196,8 @@ class ExpiredPanelView(_LayoutHubBase):
         container = discord.ui.Container(accent_colour=_HUB_COLOURS.get(self.definition.name, 0x5865F2))
         icon = _hub_icon(self.definition.name)
         title = self.definition.title if self.definition.title.startswith(icon) else f"{icon} {self.definition.title}"
-        container.add_item(discord.ui.TextDisplay(f"## {title}\n-# Xianxia RP  ·  {self.owner_name}\n-# This panel went quiet for fifteen minutes. Reopen it here; any tap keeps a panel alive another fifteen."))
+        quiet = panel_idle_minutes()
+        container.add_item(discord.ui.TextDisplay(f"## {title}\n-# Xianxia RP  ·  {self.owner_name}\n-# This panel went quiet for {quiet} minutes. Reopen it here; any tap keeps a panel alive another {quiet}."))
         row = discord.ui.ActionRow()
         row.add_item(HubReopenButton(self))
         container.add_item(row)

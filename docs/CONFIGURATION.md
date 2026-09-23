@@ -71,11 +71,12 @@ un-prefixed line of theirs looks like an action.
 
 `HUB_PANEL_IDLE_MINUTES` is how long a hub panel may sit untouched before it
 goes quiet and offers a **Reopen** button instead of its own controls; any tap
-resets it. It was a bare fifteen minutes written into five files until v1.0.12 -
-a long time to hold a view open and a short time to read a page, go and do
-something, and come back to it - and the default is **120** now. `0` means a
-panel never expires, which costs one view held in memory per panel for the life
-of the process and is safe on a small server.
+resets it. It was a bare fifteen minutes written into five files until v1.0.12,
+so changing it meant finding all five; it is one number now. The default is
+still **15**, which is what the Reopen card itself says. Raise it if players
+find the wait short - `120` is a comfortable page-and-come-back window - and `0`
+means a panel never expires, which costs one view held in memory per panel for
+the life of the process and is safe on a small server.
 
 ### The patron's tribute (`/tribute`)
 
@@ -251,22 +252,27 @@ model contexts are unnecessary.
 
 The cooldowns (`CULTIVATE_COOLDOWN_MINUTES`, `EXPLORE_COOLDOWN_MINUTES`,
 `HUNT_COOLDOWN_MINUTES`, `PERFECT_QUEST_COOLDOWN_MINUTES`,
-`PERFECT_TRIAL_COOLDOWN_MINUTES`, `SECRET_REALM_COOLDOWN_MINUTES`) are real
+`PERFECT_TRIAL_COOLDOWN_MINUTES`, `SECRET_REALM_COOLDOWN_MINUTES`,
+`APTITUDE_COOLDOWN_MINUTES`, `DAO_DUAL_COOLDOWN_MINUTES`) are real
 minutes between uses of the corresponding action. Since v1.0.0-rc.56 they are
 read by the **Go engine**, which owns the waits, and compose passes them in —
 until then the bot sent each action's cooldown in the request payload, so the
 bound lived in the caller and the engine served whatever it was handed. A value
 that is not a positive number of minutes (or is longer than a week) is ignored
 and the engine's own default stands; an edit takes effect when the engine
-restarts. `CULTIVATE_COOLDOWN_MINUTES` also paces an aptitude evolution and a
-dao-partnered session, which have always been paced with cultivation.
+restarts. An aptitude evolution and a dao-partnered session used to be paced
+with cultivation and share its key; since v1.0.13 they hold at **180 minutes**
+under `APTITUDE_COOLDOWN_MINUTES` and `DAO_DUAL_COOLDOWN_MINUTES` of their own.
+Each is a costly, gated climb - an evolution risks stability and a forced
+mutation, and the rung it reaches prices a whole life's cultivation - so
+ordinary cultivation getting faster is deliberately not a reason for them to.
 `CULTIVATE_COOLDOWN_MINUTES`
 is the one that sets the pace of the whole game since v1.0.0-rc.5: a session is
 a share of the stage it fills (a twelfth of it), so a stage takes about a dozen
 sessions and a realm about a hundred at every realm, and this knob turns that
-into a calendar. At the default of 180 minutes a realm is roughly ten real days
-of active cultivation, less with closed-door seclusion running beside it and
-less again in the higher worlds, whose qi density is content
+into a calendar. At the default of **30 minutes** (180 until v1.0.13) a realm is
+roughly two real days of active cultivation, less with closed-door seclusion
+running beside it and less again in the higher worlds, whose qi density is content
 (`world_qi_density` in `content/world.json`). `UNEXPECTED_EVENT_CHANCE_PERCENT`
 is the chance an explore rolls an unexpected event. `WORLD_TIME_SCALE` is how
 many game minutes pass per real minute, 0 to 60. Since v1.0.0-rc.39 it is read

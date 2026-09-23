@@ -942,6 +942,31 @@ class ReadOnlyDashboardStore:
             log.warning("Could not read the secret realm rotation from the engine: %s", exc)
             return {}
 
+    async def restart_allowance(self, user_id: int) -> dict[str, Any]:
+        """What one account has spent of its restart allowance (v1.0.13).
+
+        Asked of the engine rather than read here, for the reason the rotation
+        above is: the two numbers are `characterResetAllowance` and the count of
+        `character_reset` rows in `event_log`, a Go constant and a Go string. A
+        dashboard holding its own copy of the bound tells a GM "one left" on the
+        day the engine refuses, which is what v1.0.11 took the spiritual-root
+        ladder out of the browser to stop. `event_log` has no other Python
+        reader anywhere in the tree, and a second raw reader of a Go-owned table
+        is how a count and the limit it is counted against part company.
+
+        The actor is 0: the dashboard is not a cultivator, and the subject rides
+        the payload. An engine that cannot be reached answers an empty block,
+        which the card draws as "no answer" rather than as zero - a placeholder
+        that looks like a value is the footer v1.0.8 found two views over.
+        """
+        if self._engine is None:
+            return {}
+        try:
+            return dict(await self._engine.action("character.reset_status", 0, {"user_id": int(user_id)}) or {})
+        except (GameEngineError, OSError) as exc:
+            log.warning("Could not read the restart allowance of %s from the engine: %s", user_id, exc)
+            return {}
+
     async def players(self, *, limit: int = 200) -> dict[str, Any]:
         limit = max(1, min(500, int(limit)))
         async with self._connect() as db:
@@ -1030,13 +1055,18 @@ class ReadOnlyDashboardStore:
             )
             alchemy = await self._fetchone(db, "SELECT pill_toxicity FROM alchemy_state WHERE user_id=?", (one,))
             fate = await self._fetchone(db, "SELECT points,lifetime_earned,lifetime_spent FROM character_fate WHERE user_id=?", (one,))
-            return {
+            detail = {
                 "player": row, "inventory": inventory, "cooldowns": cooldowns, "scene": scene or {}, "conditions": conditions,
                 "wallets": wallets, "root": root or {}, "bloodlines": bloodlines, "physique": physique or {},
                 "aptitude_catalogue": aptitude_catalogue,
                 "tribulations": tribulations, "perfection": perfection, "beasts": beasts, "equipment": equipment,
                 "abode": abode or {}, "guests": guests, "alchemy": alchemy or {}, "fate": fate or {},
             }
+        # Outside the query session on purpose: this one is an HTTP round trip
+        # to the engine, and a read session held open across it is a session
+        # somebody else's page is waiting for.
+        detail["resets"] = await self.restart_allowance(user_id)
+        return detail
 
     async def capabilities(self) -> dict[str, Any]:
         """Describe the dashboard/API contract and whether newer-system tables are present."""

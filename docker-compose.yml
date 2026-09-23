@@ -5,7 +5,7 @@ services:
       dockerfile: go_core/Dockerfile
     container_name: xianxia-game-engine
     labels:
-      xianxia.release: "1.0.12"
+      xianxia.release: "1.0.13"
     restart: unless-stopped
     # The engine drains in-flight requests on SIGTERM (default 20s, see
     # ENGINE_SHUTDOWN_GRACE_SECONDS). Docker's default grace is 10s, which
@@ -30,7 +30,9 @@ services:
       # owns them now, and reads them here for the same reason it reads the
       # clock's rate: this service takes an explicit allowlist, so a key it is
       # not given is a key it cannot read.
-      CULTIVATE_COOLDOWN_MINUTES: "${CULTIVATE_COOLDOWN_MINUTES:-180}"
+      CULTIVATE_COOLDOWN_MINUTES: "${CULTIVATE_COOLDOWN_MINUTES:-30}"
+      APTITUDE_COOLDOWN_MINUTES: "${APTITUDE_COOLDOWN_MINUTES:-180}"
+      DAO_DUAL_COOLDOWN_MINUTES: "${DAO_DUAL_COOLDOWN_MINUTES:-180}"
       EXPLORE_COOLDOWN_MINUTES: "${EXPLORE_COOLDOWN_MINUTES:-20}"
       HUNT_COOLDOWN_MINUTES: "${HUNT_COOLDOWN_MINUTES:-30}"
       SECRET_REALM_COOLDOWN_MINUTES: "${SECRET_REALM_COOLDOWN_MINUTES:-15}"
@@ -70,7 +72,7 @@ services:
     build: .
     container_name: xianxia-roleplay-bot
     labels:
-      xianxia.release: "1.0.12"
+      xianxia.release: "1.0.13"
     restart: unless-stopped
     env_file:
       - .env

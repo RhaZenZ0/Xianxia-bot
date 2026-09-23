@@ -23,7 +23,7 @@ import shutil
 import sys
 import unittest
 
-from tests.support import PROJECT_ROOT
+from tests.support import PROJECT_ROOT, code_only
 
 TODO_FILE = PROJECT_ROOT / "docs" / "TODO.md"
 VERSION = (PROJECT_ROOT / "VERSION").read_text(encoding="utf-8").strip()
@@ -326,7 +326,16 @@ class TheDiscordHalfIsAScriptInTheTree(unittest.TestCase):
                        '"Open Character Form"', '"player-homes"', '"quests"', '"menu"', "🔒 Enter — you are already inside",
                        '"Errand"', "typed_play_prefix", "typed_play_shorthand", '"cooldowns"', '"Realm Capitals"',
                        "Hearth-Return Talisman", "📜 Quest progress", '"Support"', '"Contribute"', '"Enter"', "Yes, Leave",
-                       "Choose destination", "advance_time(901)", '"Reopen"', "env.errors",
+                       "Choose destination", "advance_time(", '"Reopen"', "env.errors",
+                       # **The number left this list in v1.0.12.** It was
+                       # `advance_time(901)` - the *eighth* copy of the fifteen
+                       # minutes that release removed, and the only one written
+                       # into a gate. A marker that pins how a step is *spelled*
+                       # fails exactly when the step is corrected, which is the
+                       # one time it should stay green (v1.0.8). What this list
+                       # is for is that the loop is driven at all; whether the
+                       # jump is read off the configured window is held by
+                       # `TheHarnessWaitsTheConfiguredWindowOut`.
                        # v1.0.0-rc.59: the layout half. The sweep is what proves the
                        # re-parent reaches a server that already exists, so the three
                        # assertions that read it are pinned here by name.
@@ -390,30 +399,12 @@ class NothingOutsideTheGeneratorNamesTheChecklistFile(unittest.TestCase):
         just been written for - because the *comment* explaining the fix names
         the old filename. A gate that cannot tell prose from code is
         decoration (v1.0.0-rc.52), so the prose goes before the scan.
+
+        It moved to `tests/support.py` in v1.0.13, when a second gate needed
+        the same reader: two copies of one reader drift, and the copy left
+        wrong is never the one anybody is looking at.
         """
-        lines = text.splitlines(keepends=True)
-        try:
-            for token in tokenize.generate_tokens(io.StringIO(text).readline):
-                if token.type == tokenize.COMMENT:
-                    row = token.start[0] - 1
-                    lines[row] = lines[row][: token.start[1]] + "\n"
-        except tokenize.TokenError:
-            pass
-        stripped = "".join(lines)
-        try:
-            tree = ast.parse(stripped)
-        except SyntaxError:
-            return stripped
-        out = stripped.splitlines(keepends=True)
-        for node in ast.walk(tree):
-            if not isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
-                continue
-            body = getattr(node, "body", [])
-            if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) \
-                    and isinstance(body[0].value.value, str):
-                for row in range(body[0].lineno - 1, min(body[0].end_lineno, len(out))):
-                    out[row] = "\n"
-        return "".join(out)
+        return code_only(text)
 
     def test_the_pattern_matches_the_shape_it_forbids(self):
         # Asserted before it is trusted: a pattern that matches nothing makes

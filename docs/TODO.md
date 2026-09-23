@@ -16,6 +16,20 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.0.13)** — *A GM could not see how many times a player had started over.* The record
+  was never missing: one `event_log` row per `character.reset`, kept out of the reset's own sweep so
+  the bound survives the action it bounds, carrying the abandoned life's name, path, root, realm and
+  phase. It had no Python reader anywhere in the tree, no dashboard view and no `/admin` panel, and
+  the only place `resets_used`/`resets_remaining` had ever appeared was the reply to the reset
+  itself. `character.reset_status` is the one door; `/admin player inspect` and the dashboard's
+  Player Editor ask it. See CLAUDE.md, "The allowance nobody could look up".
+- **deferred (design)** — *A player still cannot see how many restarts they have left before spending one.*
+  `/reset`'s confirm step is the generic red "Are you sure?" built from `_DANGER_ACTION_WORDS` and
+  the command's description, so the count reaches them only in the reply to a reset they have
+  already made. The engine read added in v1.0.13 would serve it (it is actor-agnostic and the
+  player is entitled to their own number), but what a destructive confirmation should say is a
+  decision about the warning rather than a wiring, and widening one unasked is what this file exists
+  to refuse.
 - **fixed (v1.0.1)** — *A method you knew could not tell you what it needed.* Found by playing. A
   player bought an Inscription slip, read it, and had no way to learn that a Swift-Wind Talisman
   wants one `talisman_paper` and one `spirit_ink`. `character_recipes` had four writers and no
@@ -258,11 +272,13 @@ deferred half and not the half that says what was done about it.
   `UseNumber()` is the fix and **no reader changed** - `storage.ParseInt` has had a `case
   json.Number` since it was written and nothing could ever produce one. Found by the playtest, not by
   reading. See CLAUDE.md, "An id too big for a float".
-- **fixed (v1.0.12)** — *A hub panel went quiet after fifteen minutes.* Asked for in play.
-  `HUB_PANEL_IDLE_MINUTES` (default 120, `0` = never) replaces a bare `timeout=900` written out in
-  five files; injected into `hubs.py` because the layering refuses a `runtime` import there. The
-  module default is the old fifteen, so a missed registration preserves behaviour rather than leaking
-  a view per panel.
+- **fixed (v1.0.12)** — *A hub panel went quiet after fifteen minutes, and the number was written
+  out five times.* Asked for in play. `HUB_PANEL_IDLE_MINUTES` (`0` = never) replaces a bare
+  `timeout=900` in five files; injected into `hubs.py` because the layering refuses a `runtime`
+  import there. The default shipped at 120 and was put back to **15** in v1.0.13 on the owner's
+  call: the Reopen card says fifteen, so a default that disagreed with it made the card a lie. The
+  module default is the same fifteen, so a missed registration preserves behaviour rather than
+  leaking a view per panel.
 - **fixed (v1.0.12)** — *Four places parsed `surface.py` to recover the command tree's tuple, and a
   fifth wrote down how many there were.* The tuple was inline inside `register_command_surface`, so
   rc.43's "never copy it" could only be obeyed by reading the source - four ways, each with its own
@@ -476,3 +492,42 @@ deferred half and not the half that says what was done about it.
   known place, a carried item, an NPC present, a player present); `$ I give the pill to Li Feng`
   is a trade offer to Li Feng, and a line that names an NPC instead says what it lacks rather than
   guessing a cultivator.
+- **fixed (v1.0.13)** — *The sweep could not tell a question from a result.* Once the harness was
+  raised past the curriculum's ceiling, `/battle challenge` **resolved** for the first time in its
+  life and immediately failed with SimCord's *"That component is disabled - a real user could not
+  interact with it"*. A resolved challenge posts a `BattleView` whose technique and recovery selects
+  are `disabled=not available`, so a cultivator with no Law techniques and nothing to drink gets two
+  dead pickers carrying one explanatory option each - and `answer_generically` walks an action's
+  input steps by taking the first select on the **result's** message. The tell was in the payload all
+  along, as `disabled`, and the sweep never read it. The skip is in `select_by_placeholder`, the one
+  helper both answerers reach; a disabled **leaf button** is deliberately still a failure, because
+  that one means the panel timed out. See CLAUDE.md, "A disabled control is not a question".
+- **fixed (v1.0.13)** — *Two more copies of the fifteen minutes, and only one of them spelled.*
+  v1.0.12 removed a bare `timeout=900` from five production files and its drill then found a sixth
+  pinned as a string in `test_gui_integrity.py`; both are in that release. The seventh was not the
+  number at all but an
+  *encoding* of it - `advance_time(901)`, one second past a deadline stated somewhere else - so no
+  search for `900` and no gate reading production for a literal could have found it, and raising the
+  default to 120 minutes left the step moving a panel an eighth of the way to its deadline and then
+  reporting that it would not expire. The harness pins the window in its own environment block now
+  and the step reads it back, and both bounds on that number were measured rather than chosen:
+  waiting the shipped two hours out costs minutes of woken periodic workers for no extra assurance,
+  and a one-minute window never settles at all — a view timer that near counts as runnable, which is
+  rc.35's finding met from the other side. `TheHarnessWaitsTheConfiguredWindowOut` holds it:
+  `advance_time` may not take a numeric literal, and the harness must call `panel_timeout()`. An
+  ordinary suite run then found the **eighth**: `test_playtest_gate.py` pinned the literal
+  `advance_time(901)` as its marker that this loop is driven at all, so correcting the step turned
+  that gate red — a check that pins how a rule is *written* failing exactly when the rule is fixed,
+  which is v1.0.8's lesson, met for the fourth time in four releases — v1.0.9, v1.0.10 and v1.0.12
+  each retired a hand-copy of the command tree's tuple for the same reason.
+- **deferred (design)** — *The leaf sweep counts a leaf pressed into a designed refusal as covered.*
+  This is rc.58's finding on the Discord side, and it is the reason `/battle challenge` was green for
+  releases while no run had ever begun a battle: the sweep's contract is *"the reply is a result or a
+  designed refusal"*, and a leaf that has only ever been refused has had only its refusal proved.
+  rc.58 tightened the engine half from *called* to **resolved** with `REFUSAL_ONLY_OPERATIONS`, and
+  the Discord half cannot simply copy it. A refusal is the **correct** answer for most leaves under a
+  sweep — no sect, no beast, no lot, no partner — so the equivalent is not one allowlist but a
+  per-leaf statement of which ones must actually resolve, and the state each needs built first. That
+  is a roster and a decision, not a wiring, and inventing it unasked is what this file exists to
+  refuse. What v1.0.12 does instead is raise the player past the curriculum before the sweep, which
+  is what reached this one.

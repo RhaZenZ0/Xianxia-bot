@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v1.0.12
+# Xianxia RP Discord Bot v1.0.13
 
 *A cultivation RPG played entirely through Discord commands: deterministic rules in Go, an AI that
 narrates but never decides, self-hosted on your own hardware.*
@@ -267,7 +267,7 @@ paged when long, with the next steps it names as buttons under it; Refresh clear
 reply with its own buttons or a file lands beside the panel, which stays live underneath. The
 header carries a Here line saying what the place you stand in is and who is about; a chain of
 pickers is one message that changes; a red button asks once before it runs; a panel that goes quiet
-for fifteen minutes keeps a Reopen button. Battles and events have their own in-place panels.
+keeps a Reopen button, after a window the operator sets. Battles and events have their own in-place panels.
 
 The panels that outlive a process come back when it does. A scene thread, an event open for two
 days, an exploration encounter that has paused someone's expedition — Discord keeps those messages

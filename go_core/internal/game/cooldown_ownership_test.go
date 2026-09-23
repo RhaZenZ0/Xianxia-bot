@@ -74,16 +74,24 @@ func TestTheEngineServesItsOwnWait(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "cultivation cooldown remaining") {
 		t.Fatalf("a second session inside the wait: err=%v", err)
 	}
-	// Not merely "some wait": the engine's own three hours, to within the
-	// second the action took. A handler quietly falling back to the old
-	// five-minute floor would pass the line above and fail here.
+	// Not merely "some wait": the table's own, to within the second the action
+	// took. A handler quietly falling back to the old five-minute floor would
+	// pass the line above and fail here.
+	//
+	// It deliberately does not pin *which* number ships. It used to assert
+	// `want == 180*60`, so the owner retuning the pace turned an ownership
+	// test red - and a gate that pins how a rule is written rather than that
+	// it holds fails exactly when the decision behind it is taken again
+	// (v1.0.8, and v1.0.13's panel window made the same call). What is held is
+	// that the wait served is the one the table states, whatever that is; the
+	// floor below keeps the old five minutes from creeping back.
 	var remaining int64
 	if _, scanErr := fmt.Sscanf(err.Error(), "cultivation cooldown remaining: %d", &remaining); scanErr != nil {
 		t.Fatalf("cannot read the wait out of %q: %v", err.Error(), scanErr)
 	}
 	want := cooldownSecondsFor(cooldownCultivate)
-	if want != 180*60 {
-		t.Fatalf("the cultivate wait is %ds, want the shipped 180 minutes", want)
+	if want <= 300 {
+		t.Fatalf("the cultivate wait is %ds, at or under the five-minute floor the handlers used to fall back to", want)
 	}
 	if remaining < want-5 || remaining > want {
 		t.Fatalf("served a wait of %ds, want %ds", remaining, want)
@@ -137,11 +145,49 @@ func TestTheOperatorsKeyIsReadAndBounded(t *testing.T) {
 // The two keys that share a value share it deliberately: an aptitude
 // evolution and a dao-partnered session have always been paced with
 // cultivation, and Python sent the cultivate cooldown for both.
-func TestWhatIsPacedWithCultivationStaysPacedWithIt(t *testing.T) {
+// TestTheSlowClimbsNoLongerFollowTheCultivateWait replaces rc.56's
+// `TestWhatIsPacedWithCultivationStaysPacedWithIt`, which asserted the
+// opposite: that setting `CULTIVATE_COOLDOWN_MINUTES` moved the aptitude
+// evolution and the dao-partnered session with it, because all three shared
+// that key.
+//
+// v1.0.13 cut the cultivate wait to thirty minutes and, on the owner's call,
+// held those two at 180 - each is a gated climb with a real cost (an evolution
+// risks stability and a forced mutation, and the rung it reaches prices a
+// whole life's cultivation), and ordinary cultivation getting faster is not a
+// reason for the rare things to. Unsharing the number meant unsharing the key:
+// three defaults behind one key are fine only while they agree, and once they
+// differ there is no value of that key which restores what shipped.
+//
+// What is held is therefore **independence**, which is the property that can
+// regress silently. The first half proves each key reaches its own action; the
+// second is the one that matters, and fails the moment anybody points two of
+// them at one key again.
+func TestTheSlowClimbsNoLongerFollowTheCultivateWait(t *testing.T) {
 	t.Setenv("CULTIVATE_COOLDOWN_MINUTES", "90")
-	for _, action := range []string{cooldownCultivate, cooldownAptitude, cooldownDaoDual} {
-		if got := cooldownSecondsFor(action); got != 90*60 {
-			t.Fatalf("%s served %ds, want the cultivate wait", action, got)
+	t.Setenv("APTITUDE_COOLDOWN_MINUTES", "200")
+	t.Setenv("DAO_DUAL_COOLDOWN_MINUTES", "210")
+	for _, tc := range []struct {
+		action string
+		want   int64
+	}{{cooldownCultivate, 90}, {cooldownAptitude, 200}, {cooldownDaoDual, 210}} {
+		if got := cooldownSecondsFor(tc.action); got != tc.want*60 {
+			t.Fatalf("%s served %ds, want %d minutes from its own key", tc.action, got, tc.want)
+		}
+	}
+
+	// Only the cultivate key set: the other two must stand on their shipped
+	// default, untouched.
+	t.Setenv("APTITUDE_COOLDOWN_MINUTES", "")
+	t.Setenv("DAO_DUAL_COOLDOWN_MINUTES", "")
+	if got := cooldownSecondsFor(cooldownCultivate); got != 90*60 {
+		t.Fatalf("the cultivate wait is %ds, want the 90 minutes its key was set to", got)
+	}
+	for _, action := range []string{cooldownAptitude, cooldownDaoDual} {
+		if got := cooldownSecondsFor(action); got != slowProgressionWaitMinutes*60 {
+			t.Fatalf("%s served %ds with only CULTIVATE_COOLDOWN_MINUTES set, want its own %d minutes - "+
+				"it is following the cultivate key again, and no value of that key would restore what shipped",
+				action, got, slowProgressionWaitMinutes)
 		}
 	}
 }

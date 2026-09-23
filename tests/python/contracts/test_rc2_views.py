@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ast
 import json
+import re
 import unittest
 
 from tests.support import PROJECT_ROOT
@@ -51,9 +52,24 @@ class TheRotationIsVisible(unittest.TestCase):
 
     def test_the_engine_answers_the_rotation_as_a_query_of_its_own(self):
         """v1.0.0: `secret_realm.rotation`, so a caller that is not a
-        cultivator can ask the world for its schedule."""
+        cultivator can ask the world for its schedule.
+
+        It used to pin `\'"secret_realm.rotation":     true,\'` - the entry
+        *with gofmt's column padding on it* - so adding any longer key to that
+        map re-aligned the block and turned this red, which v1.0.13 is what
+        found. The rule is that the operation is on the read allowlist and
+        dispatched, and a gate that pins how a rule is written rather than that
+        it holds fails exactly when something legitimate changes beside it
+        (v1.0.8). The entry is read out of the map instead.
+        """
         authoritative = (GO / "authoritative.go").read_text(encoding="utf-8")
-        self.assertIn('"secret_realm.rotation":     true,', authoritative)
+        queries = authoritative.split("var authoritativeQueries")[1].split("\n}")[0]
+        # Asserted before it is trusted (rc.57): a split that found nothing
+        # would make the membership check below pass for the wrong reason.
+        self.assertIn('"secret_realm.status"', queries,
+                      "the query allowlist could not be read off authoritative.go; the gate is broken, not the tree")
+        self.assertTrue(re.search(r'"secret_realm\.rotation":\s+true,', queries),
+                        "secret_realm.rotation is not on the read allowlist")
         self.assertIn('case "secret_realm.rotation":', authoritative)
         rotation = (GO / "secret_realm_rotation.go").read_text(encoding="utf-8")
         for field in ("last_realm_name", "last_location", "next_realm_name", "next_location", "order"):
