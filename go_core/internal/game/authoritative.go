@@ -81,6 +81,7 @@ var authoritativeMutations = map[string]bool{
 	"exploration.event.leave":         true,
 	"exploration.travel":              true,
 	"exploration.hunt":                true,
+	"exploration.mine":                true,
 	"secret_realm.enter":              true,
 	"secret_realm.explore":            true,
 	"secret_realm.leave":              true,
@@ -527,7 +528,7 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			"perfection.start", "perfection.quest", "perfection.trial", "perfection.abandon",
 			"perfection.body_start", "perfection.body_quest", "perfection.body_trial", "perfection.body_abandon", "law.comprehend",
 			"law.technique", "sect.shadow", "condition.treat", "sense.inspect", "sense.conceal", "tribulation.prepare", "tribulation.attempt",
-			"exploration.explore", "exploration.event.act", "exploration.event.leave", "exploration.travel", "exploration.hunt",
+			"exploration.explore", "exploration.event.act", "exploration.event.leave", "exploration.travel", "exploration.hunt", "exploration.mine",
 			"secret_realm.enter", "secret_realm.explore", "secret_realm.leave", "craft.resolve", "recipe.learn", "forage.resolve",
 			"beast.tame", "beast.feed", "beast.train", "beast.evolve", "beast.active", "artifact.bond", "artifact.awaken",
 			"pvp.challenge", "pvp.respond", "pvp.act", "manual.study", "manual.technique", "crime.atone", "world_event.act", "world_event.engage",
@@ -635,6 +636,8 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 				mutation, err = explorationTravelAction(conn, catalog, req.ActorID, req.Payload)
 			case "exploration.hunt":
 				mutation, err = explorationHuntAction(conn, catalog, req.ActorID, req.Payload)
+			case "exploration.mine":
+				mutation, err = explorationMineAction(conn, catalog, req.ActorID, req.Payload)
 			case "secret_realm.enter":
 				mutation, err = secretRealmEnterAction(conn, catalog, req.ActorID, req.Payload)
 			case "secret_realm.explore":

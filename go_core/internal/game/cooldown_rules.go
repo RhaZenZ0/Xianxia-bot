@@ -30,6 +30,7 @@ const (
 	cooldownCultivate    = "cultivate"
 	cooldownExplore      = "explore"
 	cooldownHunt         = "hunt"
+	cooldownMine         = "mine"
 	cooldownSecretRealm  = "secret_realm"
 	cooldownAptitude     = "aptitude"
 	cooldownPerfectQuest = "perfection_quest"
@@ -87,9 +88,12 @@ type cooldownRule struct {
 // reader looking for "how long until I can cultivate again" finds it here and
 // nowhere else.
 var actionCooldowns = map[string]cooldownRule{
-	cooldownCultivate:    {cultivateWaitMinutes, "CULTIVATE_COOLDOWN_MINUTES"},
-	cooldownExplore:      {20, "EXPLORE_COOLDOWN_MINUTES"},
-	cooldownHunt:         {30, "HUNT_COOLDOWN_MINUTES"},
+	cooldownCultivate: {cultivateWaitMinutes, "CULTIVATE_COOLDOWN_MINUTES"},
+	cooldownExplore:   {20, "EXPLORE_COOLDOWN_MINUTES"},
+	cooldownHunt:      {30, "HUNT_COOLDOWN_MINUTES"},
+	// The seam beside the hunt (v1.1.0): the same wait, because a mine is
+	// the hunt's twin on the Act page and a player reads the two together.
+	cooldownMine:         {30, "MINE_COOLDOWN_MINUTES"},
 	cooldownSecretRealm:  {15, "SECRET_REALM_COOLDOWN_MINUTES"},
 	cooldownPerfectQuest: {60, "PERFECT_QUEST_COOLDOWN_MINUTES"},
 	cooldownPerfectTrial: {360, "PERFECT_TRIAL_COOLDOWN_MINUTES"},

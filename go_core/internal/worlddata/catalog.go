@@ -904,6 +904,12 @@ type Catalog struct {
 	// serves a Mortal scribe and a Celestial one, so there is no per-world
 	// resolution and the roster is a plain map of item id to how it is found.
 	ForageMaterials map[string]ForageMaterial `json:"forage_materials"`
+	// MineMaterials (v1.1.0): the seam's roster, the forage roster's twin. The
+	// world-tier ore itself is `@ore` through EventSites, exactly as the
+	// forage's herb is `@herb`; these are the tier-flat makings a dig turns up
+	// beside it, and they share ForageMaterial's shape so the tree has one
+	// idea of what a find chance looks like.
+	MineMaterials map[string]ForageMaterial `json:"mine_materials"`
 }
 
 // ForageMaterial is one entry of that roster. Chance is the base percentage
