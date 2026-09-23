@@ -26640,7 +26640,7 @@
       "tn": 16,
       "cost": {
         "spirit_herb": 3,
-        "twin_extremes_fruit": 1
+        "moonveil_herb": 1
       },
       "output": {
         "heart_calming_pill": 1
@@ -60211,6 +60211,12 @@
           "made_here": false
         },
         {
+          "item_id": "moonveil_herb",
+          "quantity": 6,
+          "price": 8,
+          "made_here": false
+        },
+        {
           "item_id": "heart_calming_pill_method",
           "quantity": 1,
           "price": 42,
@@ -60243,6 +60249,7 @@
       ],
       "buys": {
         "spirit_herb": 1,
+        "moonveil_herb": 2,
         "beast_core": 2,
         "recovery_pill": 4,
         "qi_pill": 4
@@ -61378,6 +61385,12 @@
           "made_here": false
         },
         {
+          "item_id": "moonveil_herb",
+          "quantity": 6,
+          "price": 8,
+          "made_here": false
+        },
+        {
           "item_id": "heart_calming_pill_method",
           "quantity": 1,
           "price": 42,
@@ -61410,6 +61423,7 @@
       ],
       "buys": {
         "spirit_herb": 1,
+        "moonveil_herb": 2,
         "beast_core": 2,
         "recovery_pill": 4,
         "qi_pill": 4
@@ -62424,6 +62438,12 @@
           "made_here": false
         },
         {
+          "item_id": "moonveil_herb",
+          "quantity": 6,
+          "price": 8,
+          "made_here": false
+        },
+        {
           "item_id": "heart_calming_pill_method",
           "quantity": 1,
           "price": 42,
@@ -62456,6 +62476,7 @@
       ],
       "buys": {
         "spirit_herb": 1,
+        "moonveil_herb": 2,
         "beast_core": 2,
         "recovery_pill": 4,
         "qi_pill": 4
@@ -63599,6 +63620,12 @@
           "made_here": false
         },
         {
+          "item_id": "moonveil_herb",
+          "quantity": 6,
+          "price": 8,
+          "made_here": false
+        },
+        {
           "item_id": "heart_calming_pill_method",
           "quantity": 1,
           "price": 42,
@@ -63631,6 +63658,7 @@
       ],
       "buys": {
         "spirit_herb": 1,
+        "moonveil_herb": 2,
         "beast_core": 2,
         "recovery_pill": 4,
         "qi_pill": 4

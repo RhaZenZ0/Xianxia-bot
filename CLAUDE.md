@@ -2531,7 +2531,10 @@ secret-realm room reward and one resolved off the world tier in `crafting_action
 already stated in `test_every_item_has_a_source.py`, which greps production for every item id and
 keeps `SOURCELESS_ITEMS` empty. Two statements of one rule are free to disagree and the weaker one
 produces the false findings, so the sweep was deleted and the test now holds that the real gate is
-still there - the same call v1.0.1 made about its table-level sweep.
+still there - the same call v1.0.1 made about its table-level sweep. **v1.0.15 found the fruit was
+not a false finding**: it is foraged only from the Spiritual World up, and the one method needing it
+was sold only in the Mortal World. Deleting the world-flat sweep was right; dismissing what it named
+was not. See "A method can be made where it is sold" below.
 
 ### Starting over without a GM (`character_reset.go`, v1.0.1)
 
@@ -4230,6 +4233,72 @@ anywhere in the expression flagged `WORLD.shops.get(…) or {}`, because *shops*
 is not a reader (rc.58). It reads statements without the docstring or the comment that explain the
 fix, since both quote the expression they forbid (rc.52), and it drives the real picker from a real
 shop in a real capital rather than a fixture city.
+
+### A method can be made where it is sold (v1.0.15)
+
+**Found by playing**, by a player who had just passed the Apprentice examination in Jadewood:
+
+> 🧰 missing materials: Twin Extremes Ice-Fire Fruit x1
+> Buy them at a hall of the trade (**/economy → City Shops → Here**) or gather them (**/craft →
+> Alchemy → Forage**).
+
+Neither half was true anywhere they could stand. The fruit sits on **no shelf in the game**, and
+correctly: it is `auction_interest: special`, and `test_every_shop_is_a_kept_interior_with_a_real_shelf`
+refuses auction-grade shelf stock. The forage roll offers it only at `worldTier >= 1`, the Spiritual
+World and up. Meanwhile `heart_calming_pill_method` is shelved **only in the Mortal World**, and
+`teachRankRecipesTx` hands the recipe to anybody passing the Apprentice examination wherever the
+hall stands. **The one world that sold the method was the one world that could never make it.** The
+price said the recipe was never meant either: 1,050 stones of fruit into a pill thirteen shops sell
+for 13 to 26, while every other Apprentice pill costs about what it makes.
+
+**v1.0.1 looked straight at it and let it go.** Its recipe-cost sweep failed on its first run naming
+`twin_extremes_fruit`, and was deleted because the fruit *"is sourced ... resolved off the world
+tier"* (see "A method that could not say what it needed" above). Deleting a world-flat copy of
+`test_every_item_has_a_source.py` was right; dismissing the finding was not. Three things answered
+"sourced" and all three were asking a question with no world in it: that gate greps production for
+the id and finds it in the rare pool; `_gatherable_items` in the content gate reads the rare pool
+off the Go source and flattens it across all four worlds; and the sweep itself. A source is a
+place, and what matters to the person holding the slip is whether it is *their* place.
+
+**The recipe is re-authored rather than the fruit placed**, and both halves of that are forced.
+Shelving the fruit breaks the shelf rule above; putting it in the Mortal forage pool hands every
+Mortal forager a fifteen-percent shot at a 1,050-stone treasure; and either leaves a pill that costs
+fifty times what it sells for. `Heart Calming Pill` asks for `spirit_herb ×3, moonveil_herb ×1` now -
+29 stones in, 21 out, the band `Qi Nourishing Pill` already sits in - and the four Mortal tier-1
+apothecaries (Greenriver, Jadewood, Moonfen, Riverguard) shelve `moonveil_herb` at the capital's
+price scaled a tier down and buy it back, so the hall that sells the slip sells both of its herbs.
+Moonveil is the Spiritual World's tier herb, a step above a town's common one, and the Apprentice
+examination already teaches the Moonveil Recovery Pill beside this. The fruit keeps its forage slot
+and its auction interest; it is simply no recipe's input any more, like `ice_spirit_blazing_grass`.
+
+**The gate counts only sources whose world the content states**: a shelf in that world, a
+guaranteed item in a room of a realm standing in that world, the world's own `tier_materials`, and
+the tier-flat `forage_materials`. **The forage rare pool is deliberately not counted** - it is a
+chance, so a method hanging on it is a lottery, and its world gate is Go code, so reading it here
+would be a second copy of an engine rule, which is exactly how `_gatherable_items` came to see one
+world where there are four. `test_a_method_can_be_made_where_it_is_sold.py` holds every world that
+shelves a method's slip to offering what the method needs, and holds the **first** examination to
+the worlds it is sat in. Only the first: Journeyman in the Mortal World teaches the Dawn Lotus
+Vitality Pill, which is knowledge ahead of the road rather than a dead end, and whether a hall
+should teach only what its own world can make is in `docs/TODO.md` as a decision.
+
+**The drill is kept inside the gate.** `test_the_gate_names_the_recipe_that_found_it` runs the
+checker against a copy of the content with the fruit put back and requires the exact finding, so the
+gate proves it can see the fault it was written for on every run rather than once (rc.47). Putting
+the fruit back in the real content file fails **two** tests - the slip rule and the examination rule
+(`['twin_extremes_fruit'] != []`) - and the reader is asserted before it is trusted (rc.57): the
+Mortal World must offer `spirit_herb`, `beast_core` and the grotto's `jade_life_herb`.
+
+**And the refusal reads the shelves.** `where_it_is_sold` names, for each material a player is
+short of, the hall of their own city that sells it, else the cities of their world that do, else -
+when their world sells it nowhere - that it does not and which worlds do; a thing no hall sells
+names the realm room that holds it. A household or an inner world belongs to no world, so there it
+lists worlds rather than assuming the Mortal one (rc.52's `world_of_location`). The lines are
+drawn by a helper that **never raises**, because it runs inside the reply to a refused craft and a
+failed inventory read must not cost the player the refusal itself (v1.0.10). The generic sentence
+under it gained the hunt, because both entry alchemy recipes want a beast core and no forage has
+ever turned one up. The drill removes the lines from the reply and the gate prints the reply
+without them.
 
 ## Testing conventions
 

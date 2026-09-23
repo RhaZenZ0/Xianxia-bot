@@ -16,6 +16,24 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.0.15)** — *The Heart Calming Pill could not be made in the only world that sold it.*
+  Reported from play, straight after the Apprentice examination in Jadewood: *"missing materials:
+  Twin Extremes Ice-Fire Fruit x1"*. The method's slip is shelved only in the Mortal World and the
+  examination teaches it anywhere; the fruit is on no shelf (auction-grade stock is refused by the
+  content gate) and is foraged only at `worldTier >= 1`. The recipe asks for a `moonveil_herb` now,
+  the Mortal World's four town apothecaries shelve it, and
+  `test_a_method_can_be_made_where_it_is_sold.py` holds every world that sells a method to offering
+  what it needs. The craft refusal names where each short material is sold, from where the player
+  stands. See CLAUDE.md, "A method can be made where it is sold".
+- **deferred (design)** — *A higher trade examination teaches methods its own world cannot supply.*
+  `teachRankRecipesTx` hands over every recipe of the trade at the rank passed, wherever the hall
+  stands, so the Journeyman examination sat in the Mortal World teaches the Dawn Lotus Vitality Pill
+  and the Golden-Edge Talisman, whose herb and ore are shelved from the Spiritual and Immortal
+  Worlds up. v1.0.15 holds only the first examination to its own world, because that is the one a
+  Mortal cultivator sits first and the one the report came from; from the second up it is knowledge
+  ahead of the road rather than a dead end, and the refusal now says which worlds sell what is
+  missing. Whether a hall should teach only what its own world can make is a decision about what an
+  examination is for, not a wiring.
 - **fixed (v1.0.14)** — *A reset was refused for ever once a character had done almost anything.*
   Reported from play as the refusal itself: *"has already left a mark the world keeps
   (world_history_events.related_user_id)"*. The first place a cultivator discovers writes a history

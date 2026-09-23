@@ -93,27 +93,33 @@ class ARecipeTellsYouWhatItNeeds(unittest.TestCase):
                           f"profession status no longer reads {needed}; a cost nobody prints is "
                           "the fault this test exists for")
 
-    def test_a_recipes_materials_are_not_re_proven_here(self):
-        """The obvious sixth test is deliberately absent, and this says why.
+    def test_a_recipes_materials_are_proven_per_world_elsewhere(self):
+        """Where a recipe's materials are proven, and the finding this file let go.
 
         A first version of this file swept `sells`, `forage_materials` and the
         recipe outputs and asserted every recipe cost was reachable. It failed
-        on its first run naming `jade_life_herb` and `twin_extremes_fruit` -
-        and both are *sourced*: the herb is a secret-realm room reward and the
-        fruit is resolved in `crafting_actions.go` off the world tier. The
-        sweep was simply a worse copy of a rule the tree already states, in
-        `test_every_item_has_a_source.py`, which greps production Go and
-        Python for every item id and keeps `SOURCELESS_ITEMS` empty.
+        on its first run naming `jade_life_herb` and `twin_extremes_fruit`, and
+        was deleted because both are *sourced*: the herb is a secret-realm room
+        reward and the fruit is resolved in `crafting_actions.go` off the world
+        tier. Deleting that sweep was right - it was a world-flat copy of
+        `test_every_item_has_a_source.py` - and **dismissing the fruit was
+        wrong** (v1.0.15). It is sourced at `worldTier >= 1` only, while the one
+        method that needed it was sold only in the Mortal World, so the finding
+        was real and the question was missing its world. A player found it by
+        passing the Apprentice examination in Jadewood.
 
-        Two statements of one rule are free to disagree, and the weaker one is
-        the one that produces false findings - the same reason v1.0.1 did not
-        ship its table-level sweep. So the rule stays in the one place, and
-        this test holds that it is still there rather than restating it.
+        The rule is now stated once, with the world in it, in
+        `test_a_method_can_be_made_where_it_is_sold.py`, and this holds that
+        both gates are still there rather than restating either.
         """
-        gate = PROJECT_ROOT / "tests" / "python" / "unit" / "test_every_item_has_a_source.py"
+        unit = PROJECT_ROOT / "tests" / "python" / "unit"
+        gate = unit / "test_every_item_has_a_source.py"
         self.assertTrue(gate.exists(), "the item-source gate is gone; recipe costs are now unheld")
         text = gate.read_text(encoding="utf-8")
         self.assertIn("SOURCELESS_ITEMS", text, "the item-source gate no longer names its allowlist")
+        per_world = unit / "test_a_method_can_be_made_where_it_is_sold.py"
+        self.assertTrue(per_world.exists(), "the per-world gate is gone; a method can be sold where it cannot be made")
+        self.assertIn("def unmakeable", per_world.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
