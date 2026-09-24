@@ -4597,6 +4597,27 @@ numbers, which the card no longer prints there; and the two law fixtures at real
 content floor. Each is the rule this file already states: a test pinned to a number the owner may
 retune goes red exactly when the owner retunes it.
 
+### What a deep review found (v1.2.1)
+
+Twenty-five reviewers, one pass each over the whole tree, then the owner's *"Fix all"*. Two things
+are worth keeping beside the fixes.
+
+**The beast bug is a promise a cap could falsify.** `beast.evolve` wanted `60 + 10 × stage` and the
+two clamps on loyalty said `MIN(100, …)`, three lines apart, and nothing held the requirement under
+the cap - so stage five asked for 110 and told the player so. `beastLoyaltyCap` is the one number
+now, with a SQL twin the two clamps spell, and `TestTheEvolutionRequirementNeverNamesANumberAboveTheCap`
+holds the refusal to the cap. It is rc.56's *"a promise a setting can falsify is a promise nobody
+is holding"*, with a constant for the setting.
+
+**Most of the rest is one rule found in a fifteenth place.** `abode.upgrade` charging the Mortal
+stone in every world is rc.43's caravan fare; the GM grant mirroring on the stone's name is rc.44's
+mirror rule; the household's support wait riding the payload is rc.48 and rc.56; two death paths
+writing `status='dead'` without `ReleaseNPCBondsTx` is rc.24's widowing; the restore's plain safety
+copy is v0.32.0's sealing; `ENGINE_SHUTDOWN_GRACE_SECONDS` passed by nothing is rc.39's compose
+allowlist. A rule stated in this file and enforced at the sites known when it was written does not
+reach the site written next, which is why `test_every_engine_key_reaches_the_engine.py` reads the
+keys off the Go source rather than off a list: the next one fails the day it is read.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

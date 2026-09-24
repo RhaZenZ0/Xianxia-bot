@@ -311,6 +311,7 @@ class QuestService:
         """Report one objective event. Returns the quest rows it touched; a row
         that just completed carries `just_completed=True` and `rewards_granted`."""
         changed: list[dict[str, Any]] = []
+        caught_up_seen: set[str] = set()
         catalog = await self.catalog()
         for row in await self.db.list_character_quests(int(user_id), status="active"):
             # v0.24.0: no definition lookup gates this any more, and no
@@ -329,6 +330,19 @@ class QuestService:
                     "target": target,
                 },
             ))
+            # Stages the engine grandfathered into the tutorial on this report
+            # (v1.2.0's catch-up), told the way a follow_on is (v1.2.1): the
+            # key was written and nothing read it.
+            for key in list(transition.get("caught_up") or []):
+                key = str(key)
+                if key in caught_up_seen:
+                    continue
+                caught_up_seen.add(key)
+                handed = catalog.get(key) or await self.definition(key) or {}
+                changed.append({
+                    "quest_key": key, "title": str(handed.get("title") or key),
+                    "caught_up": True, "objectives": list(handed.get("objectives") or []),
+                })
             if not transition.get("touched"):
                 continue
             refreshed = await self.db.list_character_quests(int(user_id))

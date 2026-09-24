@@ -166,11 +166,20 @@ func claimGraveResult(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 			rollback(conn)
 		}
 	}()
-	if _, err := conn.Execute(`UPDATE npc_graves
+	claimed, err := conn.Execute(`UPDATE npc_graves
         SET claimed_by_user_id=?,claimed_game_minute=?,updated_at=?
         WHERE npc_name=? AND claimed_game_minute IS NULL`,
-		[]any{userID, gameMinute, now, name}); err != nil {
+		[]any{userID, gameMinute, now, name})
+	if err != nil {
 		return nil, err
+	}
+	if claimed.RowsAffected == 0 {
+		// Somebody got here between the read above and this write (v1.2.1):
+		// the guard is what decides, and a claim that moved no row hands
+		// nothing over.
+		rollback(conn)
+		return map[string]any{"grave": true, "claimed": false, "already_claimed": true,
+			"npc_name": name, "location": where, "days_missing": days, "home_location": home}, nil
 	}
 	if item != "" {
 		if _, err := conn.Execute(`INSERT INTO inventory(user_id,item_id,quantity) VALUES(?,?,1)

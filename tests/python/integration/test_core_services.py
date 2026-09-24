@@ -26,6 +26,7 @@ class RecordingEngine:
     def __init__(self, db=None):
         self.calls = []
         self.db = db
+        self.quest_extra = {}
 
     async def authoritative_action(self, operation, actor_id, payload, *, action_id, expected_version=None):
         payload = dict(payload)
@@ -60,7 +61,7 @@ class RecordingEngine:
                 "last_summary": payload.get("summary", ""),
             }
         if operation == "quest.progress":
-            return {"touched": False, "complete": False, "progress": {}}
+            return {"touched": False, "complete": False, "progress": {}, **self.quest_extra}
         if operation == "combat.apply_damage":
             return {"vitality": 9, "vitality_max": 20}
         if operation == "cultivation.reward":
@@ -151,6 +152,29 @@ class CoreServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('class XianxiaInfoView', source)
         self.assertIn('self.add_view(XianxiaInfoView())', source)
         self.assertIn('NARRATOR_QUEUE', source)
+
+
+
+    async def test_a_caught_up_stage_is_reported_as_handed_over(self):
+        # v1.2.0's catch-up writes the stages it handed over into the result
+        # as `caught_up`; the service carries each once, as a row the
+        # announcement tells as a new quest (v1.2.1).
+        now = time.time()
+        async with self.db._connect() as conn:
+            await conn.execute(
+                """INSERT INTO character_quests(user_id,quest_key,status,progress_json,accepted_game_minute,
+                       commission,variant_index,created_at,updated_at)
+                   VALUES(7001,'beginner_household','active','{}',0,0,0,?,?)""", (now, now))
+            await conn.commit()
+        self.engine.quest_extra = {"caught_up": ["beginner_iron"]}
+        changed = await self.quests.progress(7001, "cultivate")
+        handed = [row for row in changed if row.get("caught_up")]
+        self.assertEqual([row["quest_key"] for row in handed], ["beginner_iron"])
+        # The beginner path is seeded from content by the bot at startup, so a
+        # bare fixture answers the key as the title; what is held here is that
+        # the stage reaches the caller at all, once, marked as handed over.
+        self.assertTrue(str(handed[0]["title"]).strip())
+        self.assertNotIn("just_completed", handed[0])
 
 
 if __name__ == "__main__":

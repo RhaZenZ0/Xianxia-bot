@@ -202,8 +202,9 @@ func TestComingHomeAndAskingGetsTheHeirloomOnce(t *testing.T) {
 		t.Fatalf("the sword hall handed over %v", gift["item_id"])
 	}
 
-	batch4SetCanonicalGameMinute(t, path, 9000)
-	second := batch4Result(t, batch4Apply(t, path, world, "family.support", 2, map[string]any{"cooldown_game_minutes": 100}))
+	// The wait is the engine's month now (v1.2.1), not the payload's hundred minutes.
+	batch4SetCanonicalGameMinute(t, path, 5000+familySupportCooldownGameMinutes)
+	second := batch4Result(t, batch4Apply(t, path, world, "family.support", 2, map[string]any{}))
 	if _, again := second["family_sendoff"]; again {
 		t.Fatal("the household handed out a second heirloom")
 	}
@@ -239,4 +240,24 @@ func TestTheGhostHouseholdsSupportTheirOwn(t *testing.T) {
 			t.Fatalf("%s support package is the plain default: %v", spec.archetype, items)
 		}
 	}
+}
+
+// The wait between two handouts is the engine's (v1.2.1). The payload used
+// to set it, so a caller sending 1 could draw the stipend every minute; the
+// field is still accepted on the wire (rc.48) and ignored.
+func TestTheSupportWaitIsNotTheCallers(t *testing.T) {
+	path := sendoffDB(t)
+	world := batch4WorldPath(t)
+	fid := sendoffFamily(t, path, "sword_hall_family", "test:sword", 3, 90)
+	batch4Exec(t, path, `INSERT INTO character_birth_family(user_id,family_id,birth_order,generation,last_support_game_minute) VALUES(42,?,1,1,-999999999)`, fid)
+	batch4Exec(t, path, `UPDATE characters SET location=? WHERE user_id=42`, birthFamilyHouseholdLocation(fid))
+	batch4SetCanonicalGameMinute(t, path, 5000)
+	batch4Result(t, batch4Apply(t, path, world, "family.support", 11, map[string]any{"cooldown_game_minutes": 1}))
+	batch4SetCanonicalGameMinute(t, path, 5000+familySupportCooldownGameMinutes-1)
+	raw, _ := json.Marshal(map[string]any{"cooldown_game_minutes": 1})
+	if _, err := ApplyWithWorld(path, world, ActionRequest{APIVersion: authoritativeAPIVersion, ActionID: "support-wait-12", Operation: "family.support", ActorID: 42, Payload: raw}); err == nil {
+		t.Fatal("a caller-supplied wait of one minute drew the stipend again inside the engine's month")
+	}
+	batch4SetCanonicalGameMinute(t, path, 5000+familySupportCooldownGameMinutes)
+	batch4Result(t, batch4Apply(t, path, world, "family.support", 13, map[string]any{}))
 }

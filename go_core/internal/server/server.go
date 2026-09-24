@@ -754,6 +754,19 @@ func (s *Server) dbRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = safetySource.Close()
+	// Sealed like every other backup (v1.2.1): the restore's own safety copy
+	// was the one backup written in the clear on a sealed deployment.
+	if s.backups.Key != "" {
+		sealed := safetyPath + backupcrypt.Suffix
+		if err := backupcrypt.EncryptFile(safetyPath, sealed, s.backups.Key); err != nil {
+			_ = os.Remove(safetyPath)
+			_ = os.Remove(sealed)
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "safety_backup_encrypt_failed", "message": err.Error()})
+			return
+		}
+		_ = os.Remove(safetyPath)
+		safetyPath = sealed
+	}
 	safetyStat, err := os.Stat(safetyPath)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "safety_backup_stat_failed", "message": err.Error()})

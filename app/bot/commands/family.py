@@ -37,7 +37,7 @@ import discord
 from discord import app_commands
 
 from ...ops.game_engine import GameEngineError
-from ...rules.worldtime import MINUTES_PER_MONTH, MINUTES_PER_YEAR
+from ...rules.worldtime import MINUTES_PER_YEAR
 from ...rules.birthfamily import family_tier_name, family_tutoring_line
 from ...rules.progression_systems import profession_rank
 from ..registry import registered_group_command
@@ -300,7 +300,7 @@ async def birth_family_support(interaction:discord.Interaction)->None:
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
-        envelope=await ENGINE.authoritative_action("family.support",interaction.user.id,{"cooldown_game_minutes":3*MINUTES_PER_MONTH},action_id=f"discord:{interaction.id}:family.support")
+        envelope=await ENGINE.authoritative_action("family.support",interaction.user.id,{},action_id=f"discord:{interaction.id}:family.support")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return

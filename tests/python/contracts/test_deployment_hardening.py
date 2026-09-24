@@ -359,6 +359,23 @@ class EnvPreflightTests(unittest.TestCase):
         self.assertLess(update.index("ROLLBACK_ARMED=1"), install)
 
 
+
+class TheResetScriptSpeaksToTheBotWithWhatTheImageHas(unittest.TestCase):
+    """reset_database.sh drove the bot's thread cleanup with wget inside the
+    bot container, and python:3.12-slim ships neither wget nor curl - so the
+    call failed silently, behind `|| true`, on every reset (v1.2.1)."""
+
+    def test_the_bot_container_is_not_asked_for_a_tool_it_lacks(self):
+        script = (PROJECT_ROOT / "reset_database.sh").read_text(encoding="utf-8")
+        dockerfile = (PROJECT_ROOT / "Dockerfile").read_text(encoding="utf-8")
+        for tool in ("wget", "curl"):
+            if tool in dockerfile:
+                continue
+            for block in re.findall(r"docker compose exec[^\n]*xianxia-bot(?:[^\n]*\\\n)*[^\n]*", script):
+                self.assertNotIn(tool, block, f"reset_database.sh runs {tool} in the bot container and the bot image does not install it")
+        self.assertIn("xianxia-bot python3", script.replace("\n", " ").replace("\\", ""), "the bot container is no longer asked through python3")
+
+
 if __name__ == "__main__":
     unittest.main()
 

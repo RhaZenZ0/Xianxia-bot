@@ -208,14 +208,22 @@ func simulateBirthFamilyGo(conn *storage.Conn, userID int64, raw json.RawMessage
 	out := map[string]any{"family_id": familyID, "years_advanced": years, "wealth": wealth, "influence": influence, "stability": stability, "tier": tier, "bloodline_purity": purity, "branch_count": branches, "retainer_count": retainers, "last_simulated_game_minute": anchor, "history": history}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "family", EventType: "family.simulate", EntityType: "birth_family", EntityID: fmt.Sprint(familyID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
+
+// familySupportCooldownGameMinutes is the wait between two handouts of the
+// household's support: one in-world month of thirty days.
+const familySupportCooldownGameMinutes = int64(43200)
+
 func familySupportActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p familySupportPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
 	}
-	if p.CooldownGameMinutes <= 0 {
-		p.CooldownGameMinutes = 43200
-	}
+	// The wait is the engine's (v1.2.1). The payload used to decide it - a
+	// bound that lives in the client is not a bound (rc.48, rc.56) - and any
+	// caller could send 1 and draw the stipend every minute. The wire field is
+	// still accepted so an older bot mid-upgrade is not refused; its value is
+	// ignored.
+	p.CooldownGameMinutes = familySupportCooldownGameMinutes
 	f, e := birthFamilyForUserGo(conn, userID)
 	if e != nil {
 		return authoritativeMutation{}, e
