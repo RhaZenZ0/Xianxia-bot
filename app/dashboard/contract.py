@@ -16,7 +16,12 @@ DASHBOARD_API_VERSION = 2
 # capability: the panel reads a payload field it already read, of a different
 # shape, and a GM has no era lever to gain - the clock is the engine's and
 # `/admin world advancetime` already moves it.
-DASHBOARD_REVIEWED_SCHEMA_VERSION = 60
+# Schema 61 (v1.1.0) reviewed, and it changes no card: `world_event_npcs`
+# gains `sect_name`/`can_recommend` and `world_event_nodes` gains
+# `reveals_sect`, stamped at spawn for a recruitment delegation. No dashboard
+# reader selects either table's columns by name, and a GM has no lever over a
+# running event's cast; the Discord event panel is what reads them.
+DASHBOARD_REVIEWED_SCHEMA_VERSION = 61
 
 DASHBOARD_GET_API_PATHS = frozenset({
     "/api/overview", "/api/capabilities", "/api/timeline", "/api/npcs", "/api/npc",

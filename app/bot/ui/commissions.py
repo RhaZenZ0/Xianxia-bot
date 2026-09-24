@@ -49,7 +49,13 @@ def offer_card(offer: Any, *, item_names: dict[str, str] | None = None) -> str:
     objectives = [str(o.get("label") or o.get("id") or "") for o in definition.get("objectives") or []]
     lines = [f"📜 **Commission: {definition.get('title', '')}**"]
     if str(definition.get("requires_sect") or ""):
-        lines.append(f"-# {definition['requires_sect']} · disciples only")
+        if rules.open_to_outsiders(definition):
+            # v1.1.0: the way into a sect for somebody in none. The amount is
+            # the engine's, stated in the completion reply from what it paid.
+            lines.append(f"-# {definition['requires_sect']} · open to those in no sect · "
+                         "finishing it earns standing with the sect, which eases its entrance trial")
+        else:
+            lines.append(f"-# {definition['requires_sect']} · disciples only")
     if objectives:
         lines.append("**Objectives**\n" + "\n".join(f"{i}. {text}" for i, text in enumerate(objectives, 1)))
     if hidden:
