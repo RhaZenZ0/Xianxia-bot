@@ -40,7 +40,7 @@ _ELEMENT_MARKS = {
 }
 
 
-def _qi_body_value(status: dict) -> str:
+def _qi_body_value(status: dict, *, channels: bool = True) -> str:
     """The qi body on the sheet (v1.0.0-rc.7): what the lower dantian holds and
     how fast it fills, how clean the middle dantian keeps it and what that
     costs, and how many channels carry it."""
@@ -55,9 +55,10 @@ def _qi_body_value(status: dict) -> str:
         line += f" • +{float(status.get('qi_regen', 0)):.1f}/game minute"
     line += f"\n⚗️ purity **{int(status.get('purity', 0))}%** of **{int(status.get('purity_ceiling', 0))}%** — techniques **x{float(status.get('skill_cost_mult', 1)):.2f}**"
     damaged = int(status.get("meridians_damaged", 0) or 0)
-    line += f"\n🩸 **{int(status.get('meridians_open', 0))}/{int(status.get('meridian_ceiling', 108))}** meridians"
-    if damaged:
-        line += f" • **{damaged} ruptured**"
+    if channels:
+        line += f"\n🩸 **{int(status.get('meridians_open', 0))}/{int(status.get('meridian_ceiling', 108))}** meridians"
+        if damaged:
+            line += f" • **{damaged} ruptured**"
     if str(status.get("dantian_state") or "intact") != "intact":
         line += f" • the vessel is **{status.get('dantian_state')}**"
     if death:
@@ -66,15 +67,17 @@ def _qi_body_value(status: dict) -> str:
 
 
 def _qi_body_field(status: dict, realm_index: int) -> str:
-    """The qi body's line, or where it opens (v1.2.0).
+    """The qi body's line, and where its levers open (v1.2.0, v1.3.0).
 
-    The Qi Body page waits for the Spiritual World, and the card used to name
-    the meridians every session anyway - "20/108 meridians" - which is
-    v1.0.13's own finding turned round: a card advertising a number whose
-    lever the curriculum hides. So the line waits with its page, read off the
-    same roster the panel reads (no literal realm here), and says where it
-    opens. A roster that names no Qi Body lever prints the line as it always
-    did.
+    The Qi Body page waits for the Spiritual World. v1.2.0 hid the whole line
+    below that floor, because a card naming "20/108 meridians" every session
+    advertised a number whose lever the curriculum hides (v1.0.13's finding
+    turned round). On the owner's call the pool and the purity are shown at
+    every realm - they price every technique a Body Tempering cultivator
+    uses, and nothing about them is a hidden lever - and only the channels,
+    which are the page's own lever, wait with the page and say where it
+    opens. The floor is read off the same roster the panel reads (no literal
+    realm here); a roster that names no Qi Body lever prints the line whole.
     """
     roster = WORLD.data.get("feature_unlocks") or {}
     locked = unlocks.locked_leaves(roster, realm_index)
@@ -82,7 +85,8 @@ def _qi_body_field(status: dict, realm_index: int) -> str:
              if path.split(" ")[0] in ("dantian", "meridian") and not unlocks.is_status_read(path)]
     if not waits:
         return _qi_body_value(status)
-    return f"-# the channels and the dantian open at **{WORLD.realm_name(min(waits))}** — the Spiritual World's game"
+    return (_qi_body_value(status, channels=False)
+            + f"\n-# the channels open at **{WORLD.realm_name(min(waits))}** — the Spiritual World's game")
 
 
 async def cultivation_status_fields(interaction: discord.Interaction, *, fallback: Any) -> list[HubStatusField]:

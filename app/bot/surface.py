@@ -20,7 +20,7 @@ from discord import app_commands
 
 from ..database import SCHEMA_VERSION
 from ..rules import feature_unlocks as unlocks
-from ..rules.advanced_runtime import BOSS_TEMPLATES
+from ..rules.advanced_runtime import BOSS_TEMPLATES, boss_lair
 from ..rules.progression_systems import ASCENSION_GATES
 from .admin.core import (
     admin_family_group,
@@ -1170,12 +1170,14 @@ async def _location_hidden_actions(interaction: discord.Interaction, c: dict) ->
         shut["realm_entrance"] = "no secret realm opens here"
     if not _public_sect_gate_here(here):
         shut["sect_gate"] = "the entrance trial is sat at a sect's gate — /world → City → Envoys names them"
-    if not any(str(boss.get("location") or "") == here for boss in BOSS_TEMPLATES.values()):
+    if not any(boss_lair(boss, WORLD.secret_realms)[0] == here for boss in BOSS_TEMPLATES.values()):
         shut["boss_lair"] = "no great beast keeps its lair here"
     shop = WORLD.shops.get(_shop_at(here)) or {}
     if str(shop.get("kind") or "") not in EXAM_HALL_KINDS:
         shut["exam_hall"] = "an examination is sat inside a hall of its trade"
-    if here.startswith(("abode:", "sect_abode:", "personal_world:")) or WORLD.auction_house_at(here) is not None:
+    if here.startswith("birth_family:"):
+        shut["property_ground"] = "a property is founded outside the household you were born into; step out into the town first"
+    elif here.startswith(("abode:", "sect_abode:", "personal_world:")) or WORLD.auction_house_at(here) is not None:
         shut["property_ground"] = "a property is founded on open ground or in a city"
     if here.startswith(("abode:", "personal_world:")):
         shut["manor_ground"] = "a manor is founded somewhere in the world, not inside a property"

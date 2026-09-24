@@ -272,6 +272,20 @@ func consumeInventoryTx(conn *storage.Conn, userID int64, costs map[string]int64
 	}
 	return missing, nil
 }
+
+// craftFailureRefund is the share of a failed craft's inputs that comes back:
+// half of each, rounded down, so one unit of anything is the stake. It is a
+// function so the refund and the reply cannot state the share differently.
+func craftFailureRefund(cost map[string]int64) map[string]int64 {
+	out := map[string]int64{}
+	for item, qty := range cost {
+		if back := qty / 2; back > 0 {
+			out[item] = back
+		}
+	}
+	return out
+}
+
 func addInventoryTx(conn *storage.Conn, userID int64, items map[string]int64) error {
 	for item, qty := range items {
 		if qty <= 0 {
@@ -443,8 +457,20 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	} else {
 		qkey, qlabel, xpbonus, qpoints, mult = craftQuality(margin, success)
 	}
+	// What a miss leaves you (v1.3.0). The inputs were consumed above whether
+	// or not the roll landed, and until now a failure kept all of them: the
+	// tutorial's forge cost three spirit iron and another dig on one miss in
+	// seven. Half of each input comes back, rounded down, so a single unit of
+	// anything is still spent - a craft that could be retried for free would
+	// be a roll with no stake.
+	returned := map[string]int64{}
 	if success {
 		if err := addInventoryTx(conn, userID, output); err != nil {
+			return authoritativeMutation{}, err
+		}
+	} else {
+		returned = craftFailureRefund(recipe.Cost)
+		if err := addInventoryTx(conn, userID, returned); err != nil {
 			return authoritativeMutation{}, err
 		}
 	}
@@ -570,6 +596,7 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 			}
 			return map[string]int64{}
 		}(),
+		"returned":             returned,
 		"profession_progress":  prog,
 		"exam_offered":         examOffered,
 		"profession_bonus":     level,

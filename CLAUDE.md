@@ -4625,6 +4625,42 @@ allowlist. A rule stated in this file and enforced at the sites known when it wa
 reach the site written next, which is why `test_every_engine_key_reaches_the_engine.py` reads the
 keys off the Go source rather than off a list: the next one fails the day it is read.
 
+### Ten decisions in one message (v1.3.0)
+
+The owner answered the open decisions of the last four releases at once, and each is recorded in
+`docs/TODO.md` as fixed. Four of them are worth a paragraph here, because each turned on something a
+reader would not guess.
+
+**A hall teaches what its world can make, and that leaves some ranks empty on purpose.**
+`rankRecipesWhereTheyCanBeMade` splits a rank's recipes on `worldOffers` - a shelf in that world, a
+guaranteed room item of a realm standing in it, the world's tier materials, the tier-flat forage
+makings, and deliberately not the forage rare pool, which is a chance. Measured off the shipped
+content, the Mortal World's third examinations teach nothing in three trades and the Spiritual
+World's Tier 3 Inscription teaches nothing at all. That is the rule choosing a certificate with
+nothing behind it over a method that cannot be made where its holder stands, which is what the
+report in v1.0.15 was about; the reply names what was withheld and that a slip, or a hall in a world
+that can, teaches it. The withheld methods are all sold as slips somewhere the makings are - that is
+what `test_a_method_can_be_made_where_it_is_sold.py` has held since v1.0.15 - so nothing became
+unlearnable.
+
+**The lair that named a realm is a floor of it.** `bossLair` resolves a template whose location is a
+secret realm's name to that realm's entrance, and opens it only to a leader holding the realm's
+inheritance - `inheritances` is written in the last room and survives every later run, where
+`secret_realm_runs` is one row per user overwritten on the next `enter`. The Python twin
+(`boss_lair`) draws Start where the engine will start it; the two boss tables are untouched, so
+v1.1.0's parity gate still holds them equal.
+
+**Half back, rounded down.** A refund of half is a mechanic the owner chose over a full refund and
+over none: a craft that could be retried for free would be a roll with no stake, and `craftFailureRefund`
+drops the odd unit so one of anything is always spent. The reply reads the engine's `returned` map
+rather than restating the share.
+
+**The drill that took the fix with it.** The refund's drill reverted the line with `sed` and
+restored the file with `git checkout` - which restores to HEAD, and the refund was uncommitted, so
+the drill quietly deleted the feature it had just proved. The test caught it on the next run, and
+the whole tree was staged before any further drill. A drill on an uncommitted change restores from
+the index or from a copy, never from HEAD.
+
 ### The deferred eight (v1.2.3)
 
 v1.2.1 recorded eight review claims its verifiers never reached rather than fixing them blind. Read
@@ -4685,9 +4721,8 @@ it was believed: it priced off sect value times a world factor with no eye on th
 Wind Gourd cost 9 at a market while a provisioner paid 45 for it, and a Stygian Tomb Token sold
 for 420 on a shelf while the market paid 840. `marketUnitPrice` holds both inside the shops'
 band, the rule `tradeRankSellPrice` already states for a keeper's counter. The upper-world
-send-off (`sendoffArchetypeFor`) is the one place this release reads content into a rule rather
-than off it, and `docs/TODO.md` records it as a decision the owner may replace with authored
-entries.
+send-off (`sendoffArchetypeFor`) was the one place this release read content into a rule rather
+than off it; v1.3.0 authors all thirty-three entries and the reading is gone.
 
 **And the sect trial reads its own tuning, on the owner's call.** `trial_modifier` in
 `app/rules/sect_recruitment.py` printed a sect's `base_tn`, its path bonuses, its root affinities,

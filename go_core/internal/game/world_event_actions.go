@@ -25,19 +25,19 @@ type worldEventActionRule struct {
 var worldEventActionRules = map[string]worldEventActionRule{
 	"observe":     {"Observe", "insight", 10, 1, 0, 0, 0},
 	"investigate": {"Investigate", "insight", 12, 2, 2, 0, 0},
-	"aid":         {"Aid Locals", "heart", 12, 2, 0, 2, 0},
-	"support":     {"Support Response", "heart", 13, 3, 0, 3, 0},
+	"aid":         {"Aid Locals", "will", 12, 2, 0, 2, 0},
+	"support":     {"Support Response", "presence", 13, 3, 0, 3, 0},
 	"interfere":   {"Interfere", "insight", 14, -1, 0, 0, 3},
 	"stabilize":   {"Stabilize", "spirit", 14, 3, 0, 2, 0},
-	"evacuate":    {"Evacuate", "heart", 12, 2, 0, 3, 0},
+	"evacuate":    {"Evacuate", "will", 12, 2, 0, 3, 0},
 	"defend":      {"Defend", "body", 14, 3, 0, 2, 0},
 	"gather":      {"Gather Resources", "insight", 12, 2, 0, 0, 0},
 	"compete":     {"Compete", "body", 14, 2, 0, 0, 0},
-	"negotiate":   {"Negotiate", "heart", 13, 2, 0, 1, 0},
+	"negotiate":   {"Negotiate", "presence", 13, 2, 0, 1, 0},
 	"infiltrate":  {"Infiltrate", "insight", 15, 2, 0, 0, 2},
 	"exploit":     {"Exploit Opportunity", "insight", 15, 1, 0, 0, 1},
 	"endure":      {"Endure", "body", 13, 2, 0, 0, 0},
-	"withdraw":    {"Withdraw", "heart", 0, 0, 0, 0, 0},
+	"withdraw":    {"Withdraw", "will", 0, 0, 0, 0, 0},
 }
 
 type worldEventActPayload struct {

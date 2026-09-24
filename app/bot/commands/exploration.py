@@ -858,7 +858,15 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
     profession_bonus = int(resolved.get("profession_bonus", 0))
     output = {str(k): int(v) for k, v in dict(resolved.get("output") or {}).items()}
     success = bool(resolved.get("success"))
-    outcome = f"Created **{WORLD.item_names(output)}**." if success else "The refinement fails and the ingredients are consumed."
+    returned = {str(k): int(v) for k, v in dict(resolved.get("returned") or {}).items() if int(v) > 0}
+    if success:
+        outcome = f"Created **{WORLD.item_names(output)}**."
+    elif returned:
+        # The engine hands half of each input back on a miss (v1.3.0) and
+        # says which; this prints that rather than restating the share.
+        outcome = f"The refinement fails. You salvage **{WORLD.item_names(returned)}**; the rest is spent."
+    else:
+        outcome = "The refinement fails and the ingredients are consumed."
     profession_row = dict(resolved.get("profession_progress") or {})
     level = int(profession_row.get("level", 0))
     mastery_line = (

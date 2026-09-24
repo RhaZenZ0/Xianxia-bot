@@ -6,6 +6,28 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.3.0** takes ten decisions the owner made in one message: a failed craft gives half of its makings back, a hall teaches only what its world can make, the Nine-Echo Sword Wraith can finally be fought, and the reset asks with the count in hand.
+
+A failed craft returns half of each input, rounded down, so one unit of anything is still the stake;
+the reply names what was salvaged. A trade hall teaches, of the rank passed, only the methods its
+own world can supply the makings of, and says which it withheld and where they are learned instead -
+a Mortal apothecary no longer hands a Journeyman the Dawn Lotus Vitality Pill, whose herb grows a
+world up. The Nine-Echo Sword Wraith's lair, which named a secret realm rather than a place, is a
+secret floor beneath the Sword Grave of Nine Echoes: the raid starts at the realm's entrance once
+the party's leader has walked the realm to its last room. `/reset`'s "Are you sure?" names how many
+restarts the account has left, read from the engine and never restated. The cultivation card shows
+the qi pool and its purity at every realm again, and only the channels wait for the page that opens
+them.
+
+It also authors a send-off for every one of the thirty-three upper-world houses a samsara rebirth
+can land in - an heirloom flying artifact, a handover line and the family trade each, keyed by the
+house's archetype - in place of the reading v1.2.3 made off the kind in each house's id. A property
+cannot be founded inside a birth household, and the panel hides Establish there. The two event nodes
+and five event-menu rows that rolled `heart`, an attribute no character has, roll presence or will,
+and the engine no longer accepts the word. And the Celestial Mandate talisman hall pays 96 for a
+Starfall Talisman, beside the other Celestial halls and under the 102 its makings cost, so the one
+recipe that turned a profit at the first rank does not.
+
 **1.2.3** settles the review's deferred claims, both tiers: fourteen held and are fixed, two were read and left as they are.
 
 A GM's Vacuum no longer stalls behind a half-written action. A Python write is two requests to the
@@ -825,9 +847,9 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.2.3
+## Release status — v1.3.0
 
-- Current release: v1.2.3 - the review's eight deferred claims settled: Vacuum refuses at once behind a half-written action, one array rule at both cultivation doors, one counter-attack TN, an undo undone again, a rank price under a merchant's wares, and a lot listed in its house's coin (see the changelog). Built on v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
+- Current release: v1.3.0 - ten of the owner's decisions: a failed craft returns half its makings, a hall teaches only what its world can make, the Nine-Echo Sword Wraith is a secret floor beneath its realm, `/reset` asks with the count, the Qi Body card shows the pool at every realm, thirty-three upper-world send-offs, no property inside a household, `heart` retired, the Starfall hall's buy line lowered (see the changelog). Built on v1.2.3 - the review's eight deferred claims settled: Vacuum refuses at once behind a half-written action, one array rule at both cultivation doors, one counter-attack TN, an undo undone again, a rank price under a merchant's wares, and a lot listed in its house's coin (see the changelog). Built on v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
   Apprentice to Tier 9 Sovereign with each trade's own word in front (Pill, Forge, Talisman, Array,
   Herb, Ore, Beast, Artifact, Treasure). No schema.
 - v1.2.1: a beast can always evolve, a homestead can be upgraded in any world, and a dozen smaller wires from a deep review (see the changelog).

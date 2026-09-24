@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 
 	"xianxia/core/internal/eventledger"
@@ -523,6 +524,28 @@ func formationAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "party", EventType: op, EntityType: "formation", EntityID: fmt.Sprint(result["formation_id"]), Payload: result}}, nil
 }
+
+// bossLair is where a raid is fought (v1.3.0). A template whose Location
+// names a catalogue place is fought there. One whose Location names a secret
+// realm - the Nine-Echo Sword Wraith's "Sword Grave of Nine Echoes" - is a
+// secret floor of that realm: the party stands at the realm's entrance, and
+// the floor opens only to a leader who has walked the realm to its last room,
+// which is what holding its inheritance means. Before this the raid could
+// never start, because nobody can stand at a realm's name.
+func bossLair(catalog worlddata.Catalog, t bossTemplateGo) (location, realmID string) {
+	ids := make([]string, 0, len(catalog.SecretRealms))
+	for id := range catalog.SecretRealms {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		if realm := catalog.SecretRealms[id]; realm.Name == t.Location {
+			return realm.Location, id
+		}
+	}
+	return t.Location, ""
+}
+
 func bossStartActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p bossStartPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
@@ -552,15 +575,26 @@ func bossStartActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if len(members) == 0 {
 		return authoritativeMutation{}, errors.New("party has no members")
 	}
+	lair, realmID := bossLair(catalog, t)
 	for _, m := range members {
-		if fmt.Sprint(m["life_status"]) != "alive" || fmt.Sprint(m["location"]) != t.Location {
-			return authoritativeMutation{}, fmt.Errorf("all party members must be alive at %s", t.Location)
+		if fmt.Sprint(m["life_status"]) != "alive" || fmt.Sprint(m["location"]) != lair {
+			return authoritativeMutation{}, fmt.Errorf("all party members must be alive at %s", lair)
+		}
+	}
+	if realmID != "" {
+		realm := catalog.SecretRealms[realmID]
+		held, e := boolRow(conn, `SELECT 1 FROM inheritances WHERE user_id=? AND inheritance_id=?`, []any{userID, realm.InheritanceID})
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		if !held {
+			return authoritativeMutation{}, fmt.Errorf("the floor beneath the %s opens only to somebody who has walked the realm to its end; enter it and clear its last room first", t.Location)
 		}
 	}
 	scale := .8 + .2*float64(len(members))
 	hp := int64(math.Round(float64(t.MaxHP) * scale))
 	now := nowSeconds()
-	c, e := conn.Execute(`INSERT INTO boss_encounters(party_id,template_key,location,boss_name,boss_hp,boss_hp_max,phase_index,round_index,status,version,started_game_minute,created_at,updated_at) VALUES(?,?,?,?,?,?,0,1,'active',0,?,?,?)`, []any{pid, p.TemplateKey, t.Location, t.Name, hp, hp, p.GameMinute, now, now})
+	c, e := conn.Execute(`INSERT INTO boss_encounters(party_id,template_key,location,boss_name,boss_hp,boss_hp_max,phase_index,round_index,status,version,started_game_minute,created_at,updated_at) VALUES(?,?,?,?,?,?,0,1,'active',0,?,?,?)`, []any{pid, p.TemplateKey, lair, t.Name, hp, hp, p.GameMinute, now, now})
 	if e != nil {
 		return authoritativeMutation{}, e
 	}

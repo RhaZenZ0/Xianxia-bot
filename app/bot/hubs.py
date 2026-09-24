@@ -549,6 +549,34 @@ def _hub_option_hint(action: "HubAction", spec: "HubInput") -> str:
 _PANEL_GATE: Any = None
 
 
+_CONFIRM_NOTES: dict[str, Any] = {}
+
+
+def register_confirm_note(path: str, provider: Any) -> None:
+    """One extra line under a destructive leaf's "Are you sure?" (v1.3.0).
+
+    `provider(interaction)` is async and answers a string, or "" for nothing
+    to add. It runs inside the confirm step, so a provider that raises would
+    cost the player the question itself; `_confirm_note` swallows that and
+    prints the warning without it. The one registered is `/reset`'s, which
+    names how many restarts the account has left before one is spent - the
+    number the engine reports and this never restates.
+    """
+    _CONFIRM_NOTES[str(path)] = provider
+
+
+async def _confirm_note(interaction: discord.Interaction, action: "HubAction") -> str:
+    provider = _CONFIRM_NOTES.get(str(action.path))
+    if provider is None:
+        return ""
+    try:
+        note = str(await provider(interaction) or "")
+    except Exception:
+        log.exception("confirm note for %s failed; asking without it", action.path)
+        return ""
+    return f"\n{note}" if note.strip() else ""
+
+
 def register_panel_gate(provider: Any) -> None:
     """Register the check that refuses a panel press.
 
@@ -1914,9 +1942,10 @@ async def _start_hub_action(
     """Open guided inputs or immediately run one canonical hub action. A
     destructive action asks once first (v0.40.0)."""
     if _is_danger_action(action) and not confirmed:
+        note = await _confirm_note(interaction, action)
         await _step_reply(
             interaction, hub_view,
-            f"⚠️ **{action.label}** — {action.description or 'this cannot be undone'}\nAre you sure?",
+            f"⚠️ **{action.label}** — {action.description or 'this cannot be undone'}{note}\nAre you sure?",
             HubConfirmView(hub_view, action),
         )
         return

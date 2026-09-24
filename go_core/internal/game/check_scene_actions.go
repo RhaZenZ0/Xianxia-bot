@@ -63,7 +63,7 @@ type effectSource struct{ Type, ID string }
 // still counts: a Soul Wound still hurts the treatment of a deviation.
 func canonicalAttribute(conn *storage.Conn, catalog worlddata.Catalog, userID, gameMinute int64, attr string, skip ...effectSource) (int64, error) {
 	attr = strings.ToLower(strings.TrimSpace(attr))
-	allowed := map[string]bool{"body": true, "agility": true, "spirit": true, "insight": true, "will": true, "presence": true, "heart": true}
+	allowed := map[string]bool{"body": true, "agility": true, "spirit": true, "insight": true, "will": true, "presence": true}
 	if !allowed[attr] {
 		return 0, fmt.Errorf("unknown attribute: %s", attr)
 	}

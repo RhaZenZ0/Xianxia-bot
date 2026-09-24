@@ -550,47 +550,19 @@ func pickMortalSamsaraTemplate(karma int64) (familyTemplate, error) {
 }
 
 // sendoffArchetypeFor is the household tradition a reborn life is sent off
-// with. A Mortal template's id is one of the thirteen `birth_family_sendoff`
-// archetypes; an upper-world template's is not (`spirit_forge_house`,
-// `immortal_body_lineage`), so until v1.2.3 a rebirth above the Mortal World
-// got no heirloom, no trade, no tutoring and no family manual - the send-off
-// answered nothing and nothing said so. The kind in the middle of the id names
-// the Mortal house it is the upper-world counterpart of.
+// with: the `birth_family_sendoff` entry keyed by the template's id or, as
+// every template is, by its archetype. v1.2.3 found the thirty-three
+// upper-world houses had no entry and read the Mortal counterpart off the
+// kind in each id; v1.3.0 authors all thirty-three in the content file, so
+// the reading is gone and an archetype the content does not carry is sent
+// off with nothing rather than with a guess.
 func sendoffArchetypeFor(catalog worlddata.Catalog, family BirthFamily) string {
 	for _, key := range []string{family.ID, family.Archetype} {
 		if _, ok := catalog.BirthFamilySendoff[key]; ok {
 			return key
 		}
 	}
-	return upperSendoffArchetype(family.Archetype)
-}
-
-// upperSendoffArchetype maps an upper-world house's kind onto the Mortal
-// archetype that teaches the same trade and keeps the same heirloom.
-func upperSendoffArchetype(archetype string) string {
-	// The kind sits between a world prefix (sometimes) and a house suffix, so
-	// it is matched rather than split out; "river" before "ward" because a
-	// river-ward house is a river house.
-	for _, m := range []struct{ kind, mortal string }{
-		{"river", "martial_household"},
-		{"caravan", "escort_martial_family"},
-		{"wayfarer", "escort_martial_family"},
-		{"forge", "weaponsmith_martial_family"},
-		{"body", "body_tempering_family"},
-		{"sword", "sword_hall_family"},
-		{"guard", "spear_guard_family"},
-		{"hidden", "hidden_weapon_family"},
-		{"frontier", "border_garrison_family"},
-		{"fallen", "fallen_martial_clan"},
-		{"successor", "fallen_martial_clan"},
-		{"cadet", "noble_martial_clan"},
-		{"medicine", "alchemy_family"},
-	} {
-		if strings.Contains(archetype, m.kind) {
-			return m.mortal
-		}
-	}
-	return archetype
+	return family.Archetype
 }
 
 func pickUpperSamsaraTemplate(world string, karma int64) (upperFamilyTemplate, error) {

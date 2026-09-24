@@ -29,7 +29,23 @@ STAGES = list(CONTENT["beginner_path"])
 
 class EveryHouseHasALessonToGive(unittest.TestCase):
     def test_every_archetype_the_sendoff_names_has_one(self):
-        self.assertEqual(sorted(LESSONS), sorted(SENDOFF))
+        """Every starter household - the thirteen a character is created into.
+
+        v1.3.0 gave the thirty-three upper-world houses a samsara rebirth can
+        land in send-offs of their own, and none of them a lesson: the lesson
+        is the beginner path's last stage, and the path is handed over at
+        creation only (`grantBeginnerPathTx` has one production caller), so
+        an upper-house rebirth never holds the stage and the Hearth's Lesson
+        refuses it honestly. Their lessons are content still to author
+        (`docs/TODO.md`). So the sendoff's Mortal subset is what must have
+        one, and every lesson must be a sendoff's.
+        """
+        from app.rules.birthfamily import FAMILY_ARCHETYPES
+
+        mortal = {str(a["id"]) for a in FAMILY_ARCHETYPES}
+        self.assertEqual(len(mortal), 13, "the starter households changed shape")
+        self.assertEqual(sorted(LESSONS), sorted(a for a in SENDOFF if a in mortal))
+        self.assertTrue(set(LESSONS) <= set(SENDOFF), "a lesson for a house with no send-off")
 
     def test_the_head_speaks_five_times_and_hands_over_two_things(self):
         for archetype, lesson in LESSONS.items():

@@ -123,6 +123,11 @@ func TestEveryUpperWorldHouseHasASendoff(t *testing.T) {
 			if _, ok := catalog.BirthFamilySendoff[key]; !ok {
 				t.Fatalf("%s / %s (%s) is sent off as %q, which no birth_family_sendoff entry carries: a rebirth there gets no heirloom, trade or tutoring", world, template.ID, template.Archetype, key)
 			}
+			// v1.3.0: the entry is the house's own, not a Mortal counterpart
+			// read off the id.
+			if key != template.Archetype {
+				t.Fatalf("%s / %s is sent off as %q rather than as itself; the upper-world send-offs are authored now", world, template.ID, key)
+			}
 			checked++
 		}
 	}

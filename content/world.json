@@ -26596,6 +26596,336 @@
       "description": "The Gate Without Asking Canon, copied out in a relative's hand. It leaves the house with you.",
       "legal_status": "clean",
       "market_excluded": true
+    },
+    "jadeflow_ward_oar": {
+      "name": "Jadeflow Ward Oar",
+      "description": "The oar the house's river wardens pole the Jadeflow with. Waxed and lacquered against the spirit current, it holds a rider a hand above the water and, for a house that has ridden the river for four generations, above the road.",
+      "sect_value": 19,
+      "base_price": 236,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a lacquered river-ward oar",
+      "market_excluded": true
+    },
+    "galevein_trade_banner": {
+      "name": "Galevein Trade Banner",
+      "description": "The house's own trade banner, cut from a merchant sail that crossed the Galevein pass a hundred times. The gale that fills it is the one it was sewn in, and it lifts a rider the way it lifts a caravan's mood.",
+      "sect_value": 34,
+      "base_price": 854,
+      "type": "flight",
+      "flight": 5,
+      "flight_name": "a wind-stiffened caravan banner",
+      "market_excluded": true
+    },
+    "vermilion_quench_hammer": {
+      "name": "Vermilion Quench Hammer",
+      "description": "A quench hammer from the Vermilion Furnace, its head still warm to the touch a year off the anvil. Struck on the ground it lifts its holder the height of the forge chimney and carries them steady.",
+      "sect_value": 22,
+      "base_price": 248,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a vermilion forge hammer",
+      "market_excluded": true
+    },
+    "stone_marrow_greaves": {
+      "name": "Stone-Marrow Greaves",
+      "description": "Greaves cut from the marrow stone the house tempers its children on. They weigh what a mountain weighs and lift their wearer anyway, which is the whole of the house's teaching in one object.",
+      "sect_value": 18,
+      "base_price": 231,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a pair of stone-marrow greaves",
+      "market_excluded": true
+    },
+    "cloudedge_courtyard_sword": {
+      "name": "Cloudedge Courtyard Sword",
+      "description": "The sword the courtyard's first form is drilled on, edge kept sharp by a generation of students. It rides the cloud edge the house is named for and cuts what stands in the way of the rider.",
+      "sect_value": 21,
+      "base_price": 244,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a cloudedge courtyard sword",
+      "market_excluded": true
+    },
+    "iron_spear_watch_haft": {
+      "name": "Iron Spear Watch Haft",
+      "description": "The haft of a watch-house spear, the head long since worn away and the wood polished by a century of hands on the wall. It lifts its holder the height of the wall it watched from.",
+      "sect_value": 20,
+      "base_price": 239,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a watch-house spear haft",
+      "market_excluded": true
+    },
+    "moonveil_covert_needle": {
+      "name": "Moonveil Covert Needle",
+      "description": "A sheath of moonveil silk holding a single covert needle. Thrown, it draws its holder after it through the dark, which is how the house leaves a room it was never in.",
+      "sect_value": 21,
+      "base_price": 245,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a moonveil-silk needle sheath",
+      "market_excluded": true
+    },
+    "northwind_signal_horn": {
+      "name": "Northwind Signal Horn",
+      "description": "The horn that calls the Northwind muster. Blown once it lifts the caller above the drift so the line can see them, and carries them the length of the frontier the house holds.",
+      "sect_value": 18,
+      "base_price": 233,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a frontier signal horn",
+      "market_excluded": true
+    },
+    "broken_halo_shard": {
+      "name": "Broken Halo Shard",
+      "description": "One shard of the halo array the house was named for before it fell. It still lifts a rider, unevenly, and the house could not sell it because nobody would buy a thing that remembers being whole.",
+      "sect_value": 15,
+      "base_price": 219,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a shard of the broken halo",
+      "market_excluded": true
+    },
+    "jade_crown_cadet_seal": {
+      "name": "Jade Crown Cadet Seal",
+      "description": "The jade seal a cadet of the Crown house carries to be let through the inner gates. Pressed to the ground it lifts its bearer with the dignity the house expects of them.",
+      "sect_value": 33,
+      "base_price": 850,
+      "type": "flight",
+      "flight": 5,
+      "flight_name": "a jade cadet seal",
+      "market_excluded": true
+    },
+    "hundred_herb_pannier": {
+      "name": "Hundred-Herb Pannier",
+      "description": "A cliff-gathering pannier woven from a hundred kinds of herb stalk, the house's own map of the Hundred Herb slopes folded into the lid. It lifts a gatherer to a ledge a rope will not reach.",
+      "sect_value": 33,
+      "base_price": 853,
+      "type": "flight",
+      "flight": 5,
+      "flight_name": "a hundred-herb gathering pannier",
+      "market_excluded": true
+    },
+    "tide_listening_shell": {
+      "name": "Tide-Listening Shell",
+      "description": "A shell from the Immortal River's bed, through which the house hears the tide turn a day before it does. Held to the ear it lifts its holder on the current it hears.",
+      "sect_value": 20,
+      "base_price": 281,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a tide-listening shell",
+      "market_excluded": true
+    },
+    "skyroad_wayfarer_staff": {
+      "name": "Skyroad Wayfarer Staff",
+      "description": "The staff a Skyroad wayfarer plants at the first step of a journey and rides the length of it. The clan cut this one from the sky-road's own guide-tree, and it knows the way home whatever the rider knows.",
+      "sect_value": 34,
+      "base_price": 896,
+      "type": "flight",
+      "flight": 5,
+      "flight_name": "a skyroad wayfarer's staff",
+      "market_excluded": true
+    },
+    "sunforge_ember_anvil": {
+      "name": "Sunforge Ember Anvil",
+      "description": "A hand anvil from the Sunforge, its ember never fully out. It lifts its bearer on the heat it keeps and carries them where the lineage's forgings are wanted.",
+      "sect_value": 35,
+      "base_price": 901,
+      "type": "flight",
+      "flight": 5,
+      "flight_name": "a sunforge ember anvil",
+      "market_excluded": true
+    },
+    "adamant_bone_bracer": {
+      "name": "Adamant-Bone Bracer",
+      "description": "A bracer of adamant bone from the lineage's own founder. It weighs like a boulder and lifts like a hawk, and the lineage hands it over as the last argument that the body can be made to do anything.",
+      "sect_value": 20,
+      "base_price": 278,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "an adamant-bone bracer",
+      "market_excluded": true
+    },
+    "heaven_edge_practice_blade": {
+      "name": "Heaven-Edge Practice Blade",
+      "description": "The blade the Heaven-Edge house drills its first heaven-cut on. It rides the edge of the sky the house takes its name from and has cut the way for every child that left it.",
+      "sect_value": 33,
+      "base_price": 891,
+      "type": "flight",
+      "flight": 5,
+      "flight_name": "a heaven-edge practice blade",
+      "market_excluded": true
+    },
+    "golden_lance_pennon": {
+      "name": "Golden Lance Pennon",
+      "description": "The pennon the Golden Lance flies when the house rides out. Loosed from its lance it lifts one rider and carries them where the house's word is wanted.",
+      "sect_value": 22,
+      "base_price": 287,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a golden lance pennon",
+      "market_excluded": true
+    },
+    "lunar_veil_mask": {
+      "name": "Lunar Veil Mask",
+      "description": "A mask of lunar-veil silk that shows the wearer as nobody at all. Put on, it lifts them away from where they were seen, which is how the house has kept its secrets for an age.",
+      "sect_value": 33,
+      "base_price": 892,
+      "type": "flight",
+      "flight": 5,
+      "flight_name": "a lunar-veil mask",
+      "market_excluded": true
+    },
+    "polar_gate_beacon": {
+      "name": "Polar Gate Beacon",
+      "description": "The beacon the Polar Gate lights when the frontier is crossed. Held aloft it lifts its bearer clear of the ice so the line can see them, and carries them the length of the gate's watch.",
+      "sect_value": 21,
+      "base_price": 282,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a polar gate beacon",
+      "market_excluded": true
+    },
+    "fallen_star_fragment": {
+      "name": "Fallen-Star Fragment",
+      "description": "A fragment of the star the house was founded around and lost. It still lifts a rider, in fits, and the successors could not sell it because it is the last thing that proves what they succeeded to.",
+      "sect_value": 17,
+      "base_price": 268,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a fragment of the fallen star",
+      "market_excluded": true
+    },
+    "ninefold_cadet_tablet": {
+      "name": "Ninefold Cadet Tablet",
+      "description": "The tablet a cadet of the Ninefold house carries to be admitted at the nine gates. Set on the ground it lifts its bearer with the composure the house demands.",
+      "sect_value": 34,
+      "base_price": 895,
+      "type": "flight",
+      "flight": 5,
+      "flight_name": "a ninefold cadet tablet",
+      "market_excluded": true
+    },
+    "jade_cauldron_ladle": {
+      "name": "Jade Cauldron Ladle",
+      "description": "The ladle the house's founder stirred the first jade cauldron with, the handle worn to the shape of a hand. Dipped to the ground it lifts a gatherer to the high herb ledges.",
+      "sect_value": 36,
+      "base_price": 902,
+      "type": "flight",
+      "flight": 5,
+      "flight_name": "a jade cauldron ladle",
+      "market_excluded": true
+    },
+    "star_river_rudder": {
+      "name": "Star-River Rudder",
+      "description": "The rudder of the house's star-river skiff, steered by every child who left the house. Set in the current of the Star-River it lifts its holder and carries them wherever the river remembers.",
+      "sect_value": 21,
+      "base_price": 325,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a star-river rudder",
+      "market_excluded": true
+    },
+    "constellation_wayfinder": {
+      "name": "Constellation Wayfinder",
+      "description": "A wayfinder disc set with the house's own constellation. Turned to the sky it lifts its bearer onto the star-road and knows the way the way the house knows it.",
+      "sect_value": 35,
+      "base_price": 938,
+      "type": "flight",
+      "flight": 5,
+      "flight_name": "a constellation wayfinder",
+      "market_excluded": true
+    },
+    "solar_crucible_tongs": {
+      "name": "Solar Crucible Tongs",
+      "description": "Tongs from the Solar Crucible, still bright with the fire they were drawn from. They lift their bearer on the heat they hold and carry them where the house's work is wanted.",
+      "sect_value": 37,
+      "base_price": 946,
+      "type": "flight",
+      "flight": 5,
+      "flight_name": "a pair of solar crucible tongs",
+      "market_excluded": true
+    },
+    "worldstone_footwraps": {
+      "name": "Worldstone Footwraps",
+      "description": "Footwraps woven with worldstone dust the house tempers its children on. They weigh what the world weighs and lift their wearer anyway, which is the house's argument in one object.",
+      "sect_value": 21,
+      "base_price": 323,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a pair of worldstone footwraps",
+      "market_excluded": true
+    },
+    "firmament_first_form_sword": {
+      "name": "Firmament First-Form Sword",
+      "description": "The sword the Firmament house drills its first form on, the edge kept by a hundred students. It rides the firmament the house is named for and cuts the way for its rider.",
+      "sect_value": 34,
+      "base_price": 937,
+      "type": "flight",
+      "flight": 5,
+      "flight_name": "a firmament first-form sword",
+      "market_excluded": true
+    },
+    "mandate_spear_pennant": {
+      "name": "Mandate Spear Pennant",
+      "description": "The pennant the Mandate Spear flies when the house takes the field. Struck from its spear it lifts one rider and carries them where the mandate is wanted.",
+      "sect_value": 33,
+      "base_price": 931,
+      "type": "flight",
+      "flight": 5,
+      "flight_name": "a mandate spear pennant",
+      "market_excluded": true
+    },
+    "lunar_shadow_veil": {
+      "name": "Lunar Shadow Veil",
+      "description": "A veil of lunar shadow that shows the wearer as absence. Drawn on, it lifts them out of the room they were seen in, which is how the house has never been found.",
+      "sect_value": 35,
+      "base_price": 939,
+      "type": "flight",
+      "flight": 5,
+      "flight_name": "a lunar-shadow veil",
+      "market_excluded": true
+    },
+    "froststar_watch_lantern": {
+      "name": "Froststar Watch Lantern",
+      "description": "The lantern the Froststar watch raises when the border is crossed. Lifted, it lifts its bearer above the frost so the line can see them, and carries them the length of the watch.",
+      "sect_value": 22,
+      "base_price": 328,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a froststar watch lantern",
+      "market_excluded": true
+    },
+    "ruined_constellation_shard": {
+      "name": "Ruined-Constellation Shard",
+      "description": "A shard of the constellation array the house was built around and lost. It still lifts a rider, unsteadily, and the successors could not sell it because it is what they succeeded to.",
+      "sect_value": 18,
+      "base_price": 312,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a shard of the ruined constellation",
+      "market_excluded": true
+    },
+    "mandate_crown_cadet_token": {
+      "name": "Mandate-Crown Cadet Token",
+      "description": "The token a cadet of the Mandate-Crown carries to pass the crown gates. Set down, it lifts its bearer with the bearing the crown expects of a minor house.",
+      "sect_value": 35,
+      "base_price": 940,
+      "type": "flight",
+      "flight": 5,
+      "flight_name": "a mandate-crown cadet token",
+      "market_excluded": true
+    },
+    "divine_herb_gourd": {
+      "name": "Divine Herb Gourd",
+      "description": "A gathering gourd grown on the house's own divine-herb terraces, the terrace map pressed into its skin. Set on the ground it lifts a gatherer to the ledges the terraces climb to.",
+      "sect_value": 37,
+      "base_price": 948,
+      "type": "flight",
+      "flight": 5,
+      "flight_name": "a divine-herb gathering gourd",
+      "market_excluded": true
     }
   },
   "recipes": {
@@ -58284,7 +58614,7 @@
         "stone_skin_talisman": 11,
         "crystal_ward_talisman": 30,
         "golden_edge_talisman": 60,
-        "starfall_talisman": 120,
+        "starfall_talisman": 96,
         "paper_crane_charm": 52,
         "void_stride_talisman": 770,
         "spirit_focus_talisman": 6
@@ -66997,7 +67327,7 @@
             ],
             "rank_bonus": 0,
             "tn": 12,
-            "attribute": "heart",
+            "attribute": "will",
             "item": "",
             "item_qty": 0,
             "cultivation": 5,
@@ -67511,7 +67841,7 @@
             ],
             "rank_bonus": 0,
             "tn": 14,
-            "attribute": "heart",
+            "attribute": "presence",
             "item": "",
             "item_qty": 0,
             "cultivation": 8,
@@ -68061,6 +68391,171 @@
       "item": "qin_ancestral_sword",
       "line": "Taken down off the ancestral rack in front of the whole household. The clan's name goes with it, and so do its enemies.",
       "trade": "Formation"
+    },
+    "river_ward_house": {
+      "item": "jadeflow_ward_oar",
+      "line": "Your aunt hands it over wet. The river taught this house its forms; take one of them with you.",
+      "trade": "Forging"
+    },
+    "spirit_caravan_house": {
+      "item": "galevein_trade_banner",
+      "line": "Signed out of the caravan ledger under your name. The road pays the house; pay it back.",
+      "trade": "Formation"
+    },
+    "spirit_forge_house": {
+      "item": "vermilion_quench_hammer",
+      "line": "Your mother sets it in your hand handle-first. Everything the furnace makes leaves through that door; so do you.",
+      "trade": "Forging"
+    },
+    "spirit_body_house": {
+      "item": "stone_marrow_greaves",
+      "line": "Strapped on by your grandfather, who does not explain. Walk until they feel light.",
+      "trade": "Alchemy"
+    },
+    "spirit_sword_house": {
+      "item": "cloudedge_courtyard_sword",
+      "line": "Taken off the courtyard rack while the seniors drill. The form goes with you; the rack stays.",
+      "trade": "Forging"
+    },
+    "spirit_guard_house": {
+      "item": "iron_spear_watch_haft",
+      "line": "Handed over at the gate as the watch changes. The wall stands whether you stand on it or not; go.",
+      "trade": "Forging"
+    },
+    "spirit_hidden_house": {
+      "item": "moonveil_covert_needle",
+      "line": "Left on your pillow by someone who was not there. The house does not say goodbye; it says be careful.",
+      "trade": "Inscription"
+    },
+    "spirit_frontier_house": {
+      "item": "northwind_signal_horn",
+      "line": "Off the muster wall, signed out by the captain. Sound it only for the house.",
+      "trade": "Formation"
+    },
+    "spirit_fallen_house": {
+      "item": "broken_halo_shard",
+      "line": "Your uncle takes it out of the strongbox that has nothing else in it. Bring it back to a house worth bringing it to.",
+      "trade": "Forging"
+    },
+    "spirit_cadet_house": {
+      "item": "jade_crown_cadet_seal",
+      "line": "Handed over by the steward with the household watching. The Crown remembers its cadets; give it a reason to.",
+      "trade": "Formation"
+    },
+    "spirit_medicine_house": {
+      "item": "hundred_herb_pannier",
+      "line": "Lashed on by your grandmother, who checks the straps twice. Come back with it full or do not come back.",
+      "trade": "Alchemy"
+    },
+    "immortal_river_house": {
+      "item": "tide_listening_shell",
+      "line": "Your father presses it into your palm without a word. Listen before you act; that is the whole of the house's teaching.",
+      "trade": "Forging"
+    },
+    "immortal_wayfarer_clan": {
+      "item": "skyroad_wayfarer_staff",
+      "line": "Planted in front of you in the clan yard. Every wayfarer's first road is the one away from here.",
+      "trade": "Formation"
+    },
+    "immortal_forge_lineage": {
+      "item": "sunforge_ember_anvil",
+      "line": "Set down in front of you still ticking with heat. The lineage forged you as carefully as this; act like it.",
+      "trade": "Forging"
+    },
+    "immortal_body_lineage": {
+      "item": "adamant_bone_bracer",
+      "line": "Buckled on by the eldest, who tests it with a blow. It held; so will you.",
+      "trade": "Alchemy"
+    },
+    "immortal_sword_house": {
+      "item": "heaven_edge_practice_blade",
+      "line": "Lifted off the rack where it has waited since your first form. The edge is yours now; the sky was always.",
+      "trade": "Forging"
+    },
+    "immortal_guard_house": {
+      "item": "golden_lance_pennon",
+      "line": "Struck from the lance in front of the company. Ride where the pennon rides; the house follows.",
+      "trade": "Forging"
+    },
+    "immortal_hidden_house": {
+      "item": "lunar_veil_mask",
+      "line": "Left folded on your bed with no note. The house was never here; neither, from now on, were you.",
+      "trade": "Inscription"
+    },
+    "immortal_frontier_house": {
+      "item": "polar_gate_beacon",
+      "line": "Taken down off the gate tower and signed for. Light it for the house or for nothing.",
+      "trade": "Formation"
+    },
+    "immortal_successor_house": {
+      "item": "fallen_star_fragment",
+      "line": "Your aunt takes it from the shrine that holds nothing else. Bring it back to a house that deserves the name.",
+      "trade": "Forging"
+    },
+    "immortal_cadet_house": {
+      "item": "ninefold_cadet_tablet",
+      "line": "Handed over by the steward under the ninefold seal. The house counts its cadets; be counted.",
+      "trade": "Formation"
+    },
+    "immortal_medicine_house": {
+      "item": "jade_cauldron_ladle",
+      "line": "Given by your grandmother with the ledge map tucked in the handle. Fill the cauldron before you fill your name.",
+      "trade": "Alchemy"
+    },
+    "celestial_river_house": {
+      "item": "star_river_rudder",
+      "line": "Unshipped from the skiff and handed over dripping. The river carried this house; carry the river.",
+      "trade": "Forging"
+    },
+    "celestial_wayfarer_house": {
+      "item": "constellation_wayfinder",
+      "line": "Set spinning in your palm by the road-master. Every wayfarer's first constellation is the one over home.",
+      "trade": "Formation"
+    },
+    "celestial_forge_house": {
+      "item": "solar_crucible_tongs",
+      "line": "Laid across your hands with the whole forge watching. The crucible made you; do not come back unmade.",
+      "trade": "Forging"
+    },
+    "celestial_body_house": {
+      "item": "worldstone_footwraps",
+      "line": "Wound on by the eldest, who ties them too tight. Walk until the world feels light.",
+      "trade": "Alchemy"
+    },
+    "celestial_sword_house": {
+      "item": "firmament_first_form_sword",
+      "line": "Taken from the rack in the firmament court. The form leaves with you; the court does not.",
+      "trade": "Forging"
+    },
+    "celestial_guard_house": {
+      "item": "mandate_spear_pennant",
+      "line": "Struck from the spear as the company stands to. Go where the mandate goes; the house is behind you.",
+      "trade": "Forging"
+    },
+    "celestial_hidden_house": {
+      "item": "lunar_shadow_veil",
+      "line": "Left on your pillow by nobody. The house does not say farewell; it says be unseen.",
+      "trade": "Inscription"
+    },
+    "celestial_frontier_house": {
+      "item": "froststar_watch_lantern",
+      "line": "Taken down from the watch tower and signed out. Raise it for the house or not at all.",
+      "trade": "Formation"
+    },
+    "celestial_successor_house": {
+      "item": "ruined_constellation_shard",
+      "line": "Your uncle takes it from the empty shrine and does not meet your eye. Bring it back to a house that has earned it.",
+      "trade": "Forging"
+    },
+    "celestial_cadet_house": {
+      "item": "mandate_crown_cadet_token",
+      "line": "Handed over by the steward under the crown seal. The Crown counts its minor houses; be worth the count.",
+      "trade": "Formation"
+    },
+    "celestial_medicine_house": {
+      "item": "divine_herb_gourd",
+      "line": "Slung over your shoulder by your grandmother, who checks the strap twice. Fill it before you fill your name.",
+      "trade": "Alchemy"
     }
   },
   "birth_family_lesson": {

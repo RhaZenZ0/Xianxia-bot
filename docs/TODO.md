@@ -60,13 +60,13 @@ deferred half and not the half that says what was done about it.
   dropped a control request whose body timed out; an upper-world rebirth got no send-off
   (`sendoffArchetypeFor`, below) and its sheet mirror was 0 outside the Mortal World; `mining.go`
   kept a literal world list. `review_second_tier_test.go` and `test_the_second_tier.py` hold them.
-- **deferred (v1.2.3)** — *Which Mortal house an upper-world house sends its child off as.* The
-  thirty-three upper-world samsara templates carry no `birth_family_sendoff` entry, so
-  `upperSendoffArchetype` maps each by the kind in its id (forge → weaponsmith, medicine → alchemy,
-  sword → sword hall, guard → spear guard, hidden → hidden weapon, frontier → border garrison,
-  fallen/successor → fallen clan, cadet → noble clan, river → martial household, caravan/wayfarer →
-  escort). It is a reading of the names, not authored content; authoring upper-world send-offs of
-  their own in `world.json` would replace it, and the mapping is deliberately one function.
+- **fixed (v1.3.0)** — *Which Mortal house an upper-world house sends its child off as.* v1.2.3 read
+  a Mortal counterpart off the kind in each of the thirty-three upper-world templates' ids; on the
+  owner's call all thirty-three houses have `birth_family_sendoff` entries of their own in
+  `world.json` - a heirloom flying artifact each (flight 5 above wealth 60, 3 below, the Mortal rule),
+  a handover line and the trade - keyed by the house's archetype, and the reading is gone. What the
+  upper houses still do not have is a `birth_family_lesson`, so `/family → Hearth → Lesson` says the
+  head of an upper house has nothing to teach; authoring thirty-three lessons is content.
 - **fixed (v1.2.0)** — *The first hour showed the whole game.* Player feedback: *"we need to simplify
   interface ... Cultivation, Breakthrough, Explore, Shop, Craft, Forge, Gather, Hunt, Mine, Quest until
   Foundation Establishment - these things are enough"* and *"I still forget where to go what to do"*.
@@ -79,11 +79,9 @@ deferred half and not the half that says what was done about it.
   Saint; on the owner's call v1.2.2 makes it the genre's Nine-Tier ladder, Tier 1 Apprentice to Tier 9
   Sovereign with each trade's own word in front, stated once (`PROFESSION_TIERS`,
   `PROFESSION_TIER_WORDS`) and held equal to the examinations' `rank_name`s.
-- **deferred (v1.2.0)** — *The tutorial's forge burns materials on a miss.* `craft.resolve` consumes
-  the inputs whether or not the roll lands (`crafting_actions.go`), and "Iron from the Seam" asks for a
-  Spirit-Iron Sword at TN 14, which a fresh crafter clears about six times in seven. A miss costs
-  three spirit iron and another dig. Whether a failed craft should return part of its inputs is a
-  mechanic, not a wiring, and is not decided here.
+- **fixed (v1.3.0)** — *The tutorial's forge burns materials on a miss.* On the owner's call a failed
+  craft returns half of each input, rounded down (`craftFailureRefund`), so one unit of anything is
+  the stake; the result carries `returned` and the reply names what was salvaged.
 - **deferred (v1.2.0)** — *The catch-up walks the content file's adjacency.* `catchUpBeginnerPathTx`
   hands over the stage after any completed stage in `beginner_path` as the file orders it, while the
   chain a player actually walks is `seed_json.follow_on`; a GM who re-points the chain in the
@@ -94,11 +92,9 @@ deferred half and not the half that says what was done about it.
 - **deferred (v1.2.0)** — *Forage's own wait is still its own literal.* `forageResolveAction` reads its
   cooldown from `alchemy_forage` with its own wording, not from `actionCooldowns`; the mine reads the
   table. One more entry and one regex-matching refusal, deferred as the separate fix it is.
-- **deferred (v1.2.0)** — *The Qi Body card hides a read.* Below Spirit Body Transformation the
-  cultivation card prints where the qi body opens rather than the pool, the purity and the channels -
-  v1.0.13's own finding turned round, a card advertising a number whose lever the curriculum hides.
-  The pool and the purity still price every technique a Body Tempering cultivator uses; whether that
-  half should stay visible is a decision.
+- **fixed (v1.3.0)** — *The Qi Body card hides a read.* On the owner's call the pool and the purity
+  are shown at every realm; only the channels, the page's own lever, wait with the page and say where
+  it opens.
 - **fixed (v1.1.0)** — *There was no road into a sect.* Reported in Discord: at a Major Sect
   Recruitment event a player was told by the Visiting Elder that they were impatient and would not be
   taken, and the next player asked *"What menu?"*. The event named no sect and its elder belonged to
@@ -135,19 +131,21 @@ deferred half and not the half that says what was done about it.
 - **deferred (engine)** — *`sect.discover` takes the sects from the caller.* The reconcile a read path
   runs sends the list of sects to mark discovered, and the engine writes what it is told. It writes no
   route, so it cannot put a place on a travel list, but it can satisfy the trial's "discovered" check.
-- **deferred (content)** — *The "Impress the Visiting Elder" node rolls an attribute nobody has.* It
-  and the Possessed Villager node roll `heart`, which `canonicalAttribute` accepts and no character is
-  created with, so both roll at +0.
-- **deferred (content)** — *The Nine-Echo Sword Wraith can never be fought.* Its lair in
-  `bossTemplatesGo` and `BOSS_TEMPLATES` is "Sword Grave of Nine Echoes", which is the name of a secret
-  realm and not a catalogue location, so `boss.start` can never find the whole party standing there.
-  The two tables are held equal now; where the lair belongs is a content decision.
+- **fixed (v1.3.0)** — *The "Impress the Visiting Elder" node rolled an attribute nobody has.* It and
+  the Possessed Villager node rolled `heart`, and so did five of the event action menu's rows
+  (`worldEventActionRules`: aid, support, evacuate, negotiate, withdraw). The elder is impressed on
+  presence, the villager resisted on will, the menu's rows split the same way, and `heart` is no
+  longer an attribute `canonicalAttribute` accepts, so the next node authored with it fails
+  `TestNoEventRollsAnAttributeNobodyHas` rather than rolling +0.
+- **fixed (v1.3.0)** — *The Nine-Echo Sword Wraith could never be fought.* Its lair names a secret
+  realm, and on the owner's call that is what it is: a secret floor beneath the Sword Grave of Nine
+  Echoes, fought at the realm's entrance by a party whose leader has walked the realm to its last
+  room (`bossLair`; the inheritance is the record). The two boss tables are untouched.
 - **deferred (engine)** — *Two place rules live only in Python.* `/world → City → Accept` checks the
   city board and `/sect → Territory → Claim` checks for a territory row here, and the engine checks
   neither; the panel hides both by the same Python rule, so the hide is right and the bound is not.
-- **deferred (decision)** — *A property may be founded inside a birth household.* `abode.establish`
-  refuses a property, a sect residence, a personal world and an auction floor, and not a household, so
-  the panel draws Establish there too.
+- **fixed (v1.3.0)** — *A property could be founded inside a birth household.* `abode.establish`
+  refuses `birth_family:` and the panel hides Establish there, naming why.
 - **deferred (cost)** — *Three place-only refusals are not hidden.* The ghost harvest's ground multiplier
   would need a Python copy of `deathQiGroundMultiplier`; and the black market's post and an array's
   departure would need a database read on every panel refresh. Each is hidden only inside a private
@@ -170,11 +168,10 @@ deferred half and not the half that says what was done about it.
   in the item's trade now adds 2 of the shop's coin per rank above Novice to what the keeper pays,
   never reaching the cheapest shelf price in that coin, and shelf prices are untouched. See CLAUDE.md,
   "A keeper pays a craftsman by rank".
-- **deferred (content)** — *The Starfall Talisman is a profit for anybody who can make it.* Found by
-  the same measurement, and older than v1.0.17: its inputs cost 102 on the Celestial World's shelves
-  and the Celestial Mandate talisman hall pays 120 for one at Novice, so any cultivator who knows the
-  method turns a profit on every craft, bounded only by shelf stock and the roll. Whether that is a
-  reward or a slip is a content decision; lowering that hall's `buys` line below 102 closes it.
+- **fixed (v1.3.0)** — *The Starfall Talisman was a profit for anybody who could make it.* On the
+  owner's call the Celestial Mandate talisman hall's `buys` line is 96, beside the other Celestial
+  halls, under the 102 its makings cost; `NoTalismanHallPaysMoreThanTheMakingsCost` holds every
+  hall that buys it.
 - **fixed (v1.0.15)** — *The Heart Calming Pill could not be made in the only world that sold it.*
   Reported from play, straight after the Apprentice examination in Jadewood: *"missing materials:
   Twin Extremes Ice-Fire Fruit x1"*. The method's slip is shelved only in the Mortal World and the
@@ -184,15 +181,13 @@ deferred half and not the half that says what was done about it.
   `test_a_method_can_be_made_where_it_is_sold.py` holds every world that sells a method to offering
   what it needs. The craft refusal names where each short material is sold, from where the player
   stands. See CLAUDE.md, "A method can be made where it is sold".
-- **deferred (design)** — *A higher trade examination teaches methods its own world cannot supply.*
-  `teachRankRecipesTx` hands over every recipe of the trade at the rank passed, wherever the hall
-  stands, so the Journeyman examination sat in the Mortal World teaches the Dawn Lotus Vitality Pill
-  and the Golden-Edge Talisman, whose herb and ore are shelved from the Spiritual and Immortal
-  Worlds up. v1.0.15 holds only the first examination to its own world, because that is the one a
-  Mortal cultivator sits first and the one the report came from; from the second up it is knowledge
-  ahead of the road rather than a dead end, and the refusal now says which worlds sell what is
-  missing. Whether a hall should teach only what its own world can make is a decision about what an
-  examination is for, not a wiring.
+- **fixed (v1.3.0)** — *A higher trade examination taught methods its own world cannot supply.* On
+  the owner's call a hall teaches only what its own world can make (`rankRecipesWhereTheyCanBeMade`,
+  off `worldOffers`), names what it withheld, and the slip or a hall in a world that can teaches the
+  rest. Measured off the shipped content: the Mortal World's third examinations teach nothing in
+  three trades and the Spiritual World's Tier 3 Inscription teaches nothing, because those ranks'
+  makings are shelved higher up; a certificate with nothing behind it is what the rule chooses over a
+  method that cannot be made.
 - **fixed (v1.0.14)** — *A reset was refused for ever once a character had done almost anything.*
   Reported from play as the refusal itself: *"has already left a mark the world keeps
   (world_history_events.related_user_id)"*. The first place a cultivator discovers writes a history
@@ -210,13 +205,10 @@ deferred half and not the half that says what was done about it.
   the only place `resets_used`/`resets_remaining` had ever appeared was the reply to the reset
   itself. `character.reset_status` is the one door; `/admin player inspect` and the dashboard's
   Player Editor ask it. See CLAUDE.md, "The allowance nobody could look up".
-- **deferred (design)** — *A player still cannot see how many restarts they have left before spending one.*
-  `/reset`'s confirm step is the generic red "Are you sure?" built from `_DANGER_ACTION_WORDS` and
-  the command's description, so the count reaches them only in the reply to a reset they have
-  already made. The engine read added in v1.0.13 would serve it (it is actor-agnostic and the
-  player is entitled to their own number), but what a destructive confirmation should say is a
-  decision about the warning rather than a wiring, and widening one unasked is what this file exists
-  to refuse.
+- **fixed (v1.3.0)** — *A player could not see how many restarts they had left before spending one.*
+  On the owner's call `/reset`'s "Are you sure?" names the count, read through `character.reset_status`
+  by a confirm-note provider (`register_confirm_note`); an engine that does not answer prints
+  "unknown", never a zero.
 - **fixed (v1.0.1)** — *A method you knew could not tell you what it needed.* Found by playing. A
   player bought an Inscription slip, read it, and had no way to learn that a Swift-Wind Talisman
   wants one `talisman_paper` and one `spirit_ink`. `character_recipes` had four writers and no

@@ -5,7 +5,7 @@ from __future__ import annotations
 import discord
 from discord import app_commands
 
-from ...rules.advanced_runtime import BOSS_TEMPLATES, boss_encounter_phase
+from ...rules.advanced_runtime import BOSS_TEMPLATES, boss_encounter_phase, boss_lair
 from ...ops.game_engine import GameEngineError
 from ..hubs import register_hub_option_hint
 from ..registry import registered_group_command
@@ -49,7 +49,13 @@ async def boss_list(interaction: discord.Interaction) -> None:
         return
     lines = ["👹 **Boss Encounters**"]
     for key, boss in BOSS_TEMPLATES.items():
-        lines.append(f"\n`{key}` — **{boss['name']}** • {boss['location']} • {len(boss['phases'])} phases • base HP {boss['max_hp']}")
+        lair, realm_id = boss_lair(boss, WORLD.secret_realms)
+        where = lair
+        if realm_id:
+            # A secret floor (v1.3.0): fought at the realm's entrance by a
+            # party whose leader has walked the realm to its last room.
+            where = f"{lair} — the floor beneath the {boss['location']}, open once you have walked that realm to its end"
+        lines.append(f"\n`{key}` — **{boss['name']}** • {where} • {len(boss['phases'])} phases • base HP {boss['max_hp']}")
     await reply_long(interaction, "\n".join(lines), ephemeral=False)
 
 
@@ -88,7 +94,7 @@ async def boss_template_autocomplete(interaction: discord.Interaction, current: 
     choices: list[tuple[int, str, app_commands.Choice[str]]] = []
     for key, boss in BOSS_TEMPLATES.items():
         name = str(boss.get("name", key))
-        location = str(boss.get("location", ""))
+        location = boss_lair(boss, WORLD.secret_realms)[0]
         if needle and needle not in name.casefold() and needle not in key.casefold() and needle not in location.casefold():
             continue
         marker = "here" if location == here else location

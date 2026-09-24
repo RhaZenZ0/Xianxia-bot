@@ -206,7 +206,9 @@ class ProfessionsAreAllLiveTests(unittest.TestCase):
 
 class BirthFamilySendoffTests(unittest.TestCase):
     """v1.0.0-rc.15: a household that can afford to does not send a child out
-    to walk. Thirteen archetypes, thirteen heirlooms, no two the same."""
+    to walk. Thirteen archetypes, thirteen heirlooms, no two the same - and
+    since v1.3.0 the thirty-three upper-world houses a samsara rebirth can
+    land in, each with its own."""
 
     SENDOFF = WORLD["birth_family_sendoff"]
 
@@ -216,7 +218,21 @@ class BirthFamilySendoffTests(unittest.TestCase):
         source = (PROJECT_ROOT / "go_core" / "internal" / "game" / "birth_family_actions.go").read_text(encoding="utf-8")
         found = set(re.findall(r'\{"([a-z_]+)", "(?:martial|ghost)",', source))
         self.assertEqual(len(found), 13, "the archetype table changed shape")
-        return found
+        # And the thirty-three upper-world houses a samsara rebirth can land
+        # in (v1.3.0), read off the same table the engine picks from.
+        upper = (PROJECT_ROOT / "go_core" / "internal" / "game" / "lifecycle_actions.go").read_text(encoding="utf-8")
+        houses = set(re.findall(r'\{"[a-z_]+", "([a-z_]+)", "[^"]+", "[^"]+", "(?:extended_household|martial_household|bloodline_clan)"', upper))
+        self.assertEqual(len(houses), 33, "the upper-world house table changed shape")
+        return found | houses
+
+    @staticmethod
+    def _wealth_of() -> dict[str, int]:
+        from app.rules.birthfamily import FAMILY_ARCHETYPES, UPPER_SAMSARA_FAMILIES
+
+        wealth_of = {str(a["id"]): int(a["wealth"]) for a in FAMILY_ARCHETYPES}
+        for houses in UPPER_SAMSARA_FAMILIES.values():
+            wealth_of.update({str(h["archetype"]): int(h["wealth"]) for h in houses})
+        return wealth_of
 
     def test_every_household_sends_its_child_out_with_something(self):
         self.assertEqual(set(self.SENDOFF), self._archetypes(), "an archetype with no send-off")
@@ -243,9 +259,7 @@ class BirthFamilySendoffTests(unittest.TestCase):
         # flight 5 above 60, flight 3 below it. A flight-3 heirloom goes quiet
         # once the owner's own realm reaches Core Formation; a flight-5 one
         # keeps carrying them to Ascension.
-        from app.rules.birthfamily import FAMILY_ARCHETYPES
-
-        wealth_of = {str(a["id"]): int(a["wealth"]) for a in FAMILY_ARCHETYPES}
+        wealth_of = self._wealth_of()
         for archetype, entry in self.SENDOFF.items():
             wealth = wealth_of[archetype]
             flight = int(WORLD["items"][str(entry["item"])]["flight"])
