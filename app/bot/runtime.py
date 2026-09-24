@@ -136,7 +136,11 @@ async def carried_item_autocomplete(interaction: discord.Interaction, current: s
     return out[:25]
 PRIVATE_LOCATION_EXITS: tuple[tuple[str, str, str], ...] = (
     ("birth_family:", "**/family → Leave**", "your birth household"),
-    ("sect_abode:", "**/abode → Leave**", "your sect residence"),
+    # `/abode → Leave` named here until v1.1.0, and `abode.leave` reads
+    # `cave_abodes` - a sect residence is a `sect_abodes` row, so it refused
+    # with "you are not inside a player-owned property". The residence's own
+    # leaf is the way out.
+    ("sect_abode:", "**/sect → Holdings → Abode** (Leave)", "your sect residence"),
     ("abode:", "**/abode → Leave**", "your own property"),
     ("personal_world:", "**/innerworld → Leave**", "your personal world"),
 )
@@ -223,7 +227,8 @@ def _explain_engine_error(exc: Exception) -> str:
             "\n\nYou're **indoors** — exploring and hunting only work out in the shared world. "
             "Step outside first, then try again:\n"
             "**/family → Leave** (birth household) · "
-            "**/abode → Leave** (your property or sect residence) · "
+            "**/abode → Leave** (your property) · "
+            "**/sect → Holdings → Abode** (Leave, a sect residence) · "
             "**/innerworld → Leave** (personal world)"
         )
     return text

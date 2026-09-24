@@ -47,6 +47,10 @@ def hidden_names() -> set[str]:
     names = {_literal("HOUSEHOLD_DOOR"), *_literal("HOUSEHOLD_INDOOR_ACTIONS")}
     for leaves in _literal("PROGRESSION_GATES").values():
         names |= set(leaves)
+    # Where you stand (v1.1.0): the third provider's table, held to the same
+    # two rules - a real leaf, and never a read.
+    for leaves in _literal("LOCATION_GATES").values():
+        names |= set(leaves)
     return names
 
 
@@ -66,7 +70,7 @@ class EveryHiddenNameIsARealDoor(unittest.TestCase):
     def test_both_providers_are_asked_and_registered_once(self):
         self.assertIn("register_hidden_actions(_hidden_actions)", SURFACE)
         self.assertEqual(SURFACE.count("register_hidden_actions("), 1)
-        for provider in ("_household_hidden_actions", "_progression_hidden_actions"):
+        for provider in ("_household_hidden_actions", "_progression_hidden_actions", "_location_hidden_actions"):
             self.assertIn(f"async def {provider}(", SURFACE)
             self.assertIn(provider, SURFACE.split("async def _hidden_actions(")[1])
 

@@ -1648,7 +1648,9 @@ def _travel_mode_line(result: dict) -> str:
         if mount:
             return f"\n🗡️ You ride **{mount}** above the road — a third of the walking hours, and little on the ground can reach you."
         return "\n☁️ You leave the ground and fly it — a third of the walking hours, and little on the ground can reach you."
-    return "\n🚶 You walk it. A flying artifact would cut the road to a third: **/economy → City Shops → Browse**."
+    # Here, not Browse (v1.1.0): the road ends on a street, and Browse is
+    # asked for inside a shop - the panel no longer draws it anywhere else.
+    return "\n🚶 You walk it. A flying artifact would cut the road to a third - a city's shops are listed with **/economy → City Shops → Here**."
 
 
 def _discord_arrival_display(result: dict) -> str:
