@@ -6,6 +6,51 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.2.0** makes the first hour a short list: cultivate, break through, explore, buy, craft, forge, gather, hunt, mine and quest, and everything else opens as you cultivate.
+
+Player feedback, three reports in a week: *"we need to simplify interface ... Cultivation, Breakthrough,
+Explore, Shop, Craft, Forge, Gather, Hunt, Mine, Quest until Foundation Establishment - these things are
+enough"*, *"Interface is overwhelming ... I still forget where to go what to do"*, and *"instant travels
+... I don't have to wait half hour"*. At Body Tempering a cultivator saw 142 of 248 leaves; they see 120
+of 250 now, and every system outside that list waits for Foundation Establishment at the earliest (the
+deeper floors at 3, 4 and 5 are untouched). Two things stay open against the list on the owner's call:
+a companion, because it is the one system the first hour has to be told about, and the body path, which
+is a way of cultivating rather than a system beside it. The main menu leaves off the hubs the curriculum
+has opened no lever on yet - Combat, Abode, Inner World and Secret Realms at Body Tempering - and names
+them in one line with the realm that opens the nearest, and it says what the tutorial asks for next at
+the top: the first objective still short on the active stage. A hub's slash command still works, and
+`/locked` still lists every door; hiding is advertising, never a bound.
+
+It also builds the seam. `/world → Act → Mine` (`exploration.mine`) is the ore half of gathering,
+forage's twin: the ore of the world you stand in through the same resolver the event sites use, a rare
+vein of the next world's ore, the tier-flat makings a seam gives up (`mine_materials`), a few spirit
+stones on a rich dig in the money of that world, and Mining as a trade in its own right, with the
+Forging houses' tradition riding the roll. Spirit iron - three of which every Forging entry method
+wants - came only from a shop counter or an Iron-Horn Boar before this.
+
+And the tutorial does not stop at the household's lesson. Two stages follow it: "Iron from the Seam"
+(mine spirit iron, come out of a hunt standing, forge a Spirit-Iron Sword, sell something to a keeper)
+and "The First Gate" (the first breakthrough, which is a new objective type), and the sect road follows
+them. Somebody who finished the lesson before this release is handed the next stage at their next quest
+report, wherever they are, rather than only at the lesson's door.
+
+And a road is walked in the telling. `TRAVEL_TIME_PERCENT` is the share of a road's length a
+traveller actually waits, default 0: the toll, the encounter and the discoveries along the road are
+untouched, and only the transit - the half hour between neighbouring towns during which every other
+command refused - is gone. An operator who wants the old pace sets it to 100.
+
+And the trades' ranks read as grades. *"Journeyman sounds medieval"*: the ladder is Unranked, Grade 1
+to Grade 5 and Saint, stated once in `PROFESSION_RANKS` and quoted by the examinations' titles - The
+Grade 1 Billet, The Grade 2 Edge, The Grade 3 Folding. Nothing stored changes; a rank is a level.
+
+And the qi body and the Laws are the Spiritual World's game. The meridians, the purity and the
+dantian's refining open at Spirit Body Transformation, where the card until then says so instead of
+naming a number whose lever it hides; the Laws wait for the same realm by their own content floor,
+`law_system.normal_min_realm_index`, which moved from 6 to 8.
+
+- **Schema 62** re-points the lesson's `follow_on` at "Iron from the Seam" on a running world, only
+  where it still names the sect road, so a chain a GM re-pointed is obeyed (migration 55's rule).
+
 **1.1.0** lets a new cultivator join a sect, and tells them how.
 
 Reported in Discord: at a Major Sect Recruitment event a player asked the Visiting Elder to take them,
@@ -706,9 +751,16 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.1.0
+## Release status — v1.2.0
 
-- Current release: v1.1.0 - a new cultivator can join a sect: a recruitment delegation speaks for a
+- Current release: v1.2.0 - the first hour is a short list: everything outside cultivate, break
+  through, explore, buy, craft, forge, gather, hunt, mine and quest (plus a companion and the body
+  path) waits for Foundation Establishment at the earliest; the menu leaves off the hubs with no lever
+  open yet and names the tutorial's next step; `/mine` is the ore half of gathering; the beginner path
+  gains "Iron from the Seam" and "The First Gate"; a road is walked in the telling
+  (`TRAVEL_TIME_PERCENT`, default 0); the trades' ranks are Unranked, Grade 1-5 and Saint; the qi body
+  and the Laws open at the Spiritual World. Schema 62.
+- v1.1.0: a new cultivator can join a sect: a recruitment delegation speaks for a
   real sect and its elder can sponsor, the envoys' hall and the delegation's trial put a sect's gate
   on the travel list, Recommendation and Trial open at realm 0, a sect's entry-level work is open to
   outsiders and pays standing with it, and a recommendation's bonus rides both trial rolls; and a

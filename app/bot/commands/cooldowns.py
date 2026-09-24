@@ -45,6 +45,7 @@ FAMILY_LABELS: dict[str, tuple[str, str, str]] = {
     "body_cultivate": ("🥋", "Temper the body", "**/cultivation → Body → Cultivate**"),
     "explore": ("🧭", "Explore", "**/world → Act → Explore**"),
     "hunt": ("🗡️", "Hunt", "**/world → Act → Hunt**"),
+    "mine": ("⛏️", "Mine", "**/world → Act → Mine**"),
     "secret_realm": ("🌀", "Enter a secret realm", "**/realm → Secret Realms → Explore**"),
     "perfect_quest": ("✨", "Perfection quest", "**/ascend → Perfection → Quest**"),
     "perfect_trial": ("⚔️", "Perfection trial", "**/ascend → Perfection → Trial**"),

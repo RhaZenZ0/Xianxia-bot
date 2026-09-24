@@ -1612,8 +1612,15 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 		return authoritativeMutation{}, err
 	}
 
-	arrivalGameMinute := p.GameMinute + travelMinutes
-	if roadConnection && travelMinutes > 0 {
+	// The road's length is what the toll and the harness read; the wait is
+	// the share of it TRAVEL_TIME_PERCENT keeps (v1.2.0, travel_pace.go), and
+	// only the wait puts a traveller in transit.
+	waitMinutes := int64(0)
+	if roadConnection {
+		waitMinutes = scaledTravelWait(travelMinutes)
+	}
+	arrivalGameMinute := p.GameMinute + waitMinutes
+	if roadConnection && waitMinutes > 0 {
 		if err := setRoadTransitTx(
 			conn,
 			userID,
@@ -1656,6 +1663,7 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 		"departure_game_minute":         p.GameMinute,
 		"arrival_game_minute":           arrivalGameMinute,
 		"travel_minutes":                travelMinutes,
+		"wait_minutes":                  waitMinutes,
 		"travel_mode":                   travelModeName,
 		"travel_mount":                  travelMount,
 		"travel_cost_spirit_stones":     travelCost,
@@ -1663,7 +1671,7 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 		"road_encounter_chance_percent": encounterChance,
 		"road_encounter":                roadEncounterOut,
 		"road_encounters":               roadEncounters,
-		"traveling":                     roadConnection && travelMinutes > 0,
+		"traveling":                     roadConnection && waitMinutes > 0,
 		"arrived_at":                    arrivedAt,
 		"arrival_gate":                  arrivalGate,
 		"left_by_gate":                  leftBy,

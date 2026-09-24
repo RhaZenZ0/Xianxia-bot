@@ -39,6 +39,7 @@ from discord import app_commands
 from ...ops.game_engine import GameEngineError
 from ...rules.worldtime import MINUTES_PER_MONTH, MINUTES_PER_YEAR
 from ...rules.birthfamily import family_tier_name, family_tutoring_line
+from ...rules.progression_systems import profession_rank
 from ..registry import registered_group_command
 from ..channels import _get_thread
 from ..character_state import record_quest_progress, announce_quest_progress
@@ -341,7 +342,7 @@ async def birth_family_tutor(interaction:discord.Interaction)->None:
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     level=int(result.get("level",0)); xp=int(result.get("xp",0)); trade=str(result.get("profession",""))
-    taught=(f"you now stand an **Apprentice** of {trade}" if level>=1 else f"**{xp} XP** toward Apprentice {trade}")
+    taught=(f"you now stand a **{profession_rank(1)}** {trade} crafter" if level>=1 else f"**{xp} XP** toward {profession_rank(1)} {trade}")
     await interaction.followup.send(
         f"🛠️ **{result.get('family_name','The household')}** teaches again — {result.get('tutor','')}: {taught}."
         f"\nThe house holds wealth **{int(result.get('wealth',0))}/100**; a richer house teaches better.",

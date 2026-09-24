@@ -116,7 +116,9 @@ class TheQiBodyOnTheSurface(unittest.TestCase):
     def test_the_sheet_carries_the_pool_the_purity_and_the_channels(self):
         surface, _, cards = _modules()
         status = {
-            "realm_index": 4, "stage": 2, "cultivation": 400, "cost": 7885, "insight_xp": 4,
+            # Realm 8: the qi body's page waits for the Spiritual World since
+            # v1.2.0, and below it the card names where it opens instead.
+            "realm_index": 8, "stage": 2, "cultivation": 400, "cost": 7885, "insight_xp": 4,
             "odds": {"tn": 18, "modifier": 13, "probability": 72, "movers": []},
             "stance": "circulate", "stance_label": "Circulate", "stance_mult": 1.0, "cooldown_remaining": 0,
             "qi": 6000, "qi_max": 12000, "qi_regen": 52.5, "purity": 61, "purity_ceiling": 63,

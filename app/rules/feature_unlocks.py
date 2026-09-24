@@ -19,7 +19,25 @@ shaped the same way.
 """
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+
+# A leaf whose path ends here is a page's own status read, and a status read
+# never waits for a realm (v1.0.13). Stated once, here, and imported by the
+# authoring script: it used to live in the script, and the menu (v1.2.0) needs
+# the same predicate to decide whether a hub still has a lever open on it.
+STATUS_LEAF = "status"
+
+
+def is_status_read(leaf: str) -> bool:
+    """Whether this leaf is a page's own status read, which never waits.
+
+    rc.32 states the limit the whole curriculum inherits: *"never a status
+    read or the door into the system, because a road nobody can see is a road
+    nobody learns exists."* A lever can wait for a realm; the readout that
+    says the system exists cannot, or a player meets an empty page rather than
+    a locked one.
+    """
+    return str(leaf).split()[-1:] == [STATUS_LEAF]
 
 
 def locked_leaves(roster: Mapping[str, object] | None, realm_index: int) -> dict[str, int]:
@@ -47,6 +65,71 @@ def locked_leaves(roster: Mapping[str, object] | None, realm_index: int) -> dict
         if needs > realm:
             out[str(path)] = needs
     return out
+
+
+def hidden_hubs(
+    roster: Mapping[str, object] | None,
+    realm_index: int,
+    pages: Mapping[str, Mapping[str, Sequence[str]]],
+) -> dict[str, int]:
+    """`hub -> the realm that first opens a lever on it`, for the hubs a
+    player at this realm has nothing to *do* in yet (v1.2.0).
+
+    Player feedback: *"Interface is overwhelming ... I still forget where to
+    go what to do."* Sixteen hubs on the menu, and at Body Tempering four of
+    them held nothing but status reads and a collapsed line. A hub is hidden
+    from the menu only when every leaf on every one of its pages is either a
+    status read or locked - a single open lever keeps it on the board, because
+    a hub with one thing to do is a hub worth opening. `pages` is the live
+    `{hub: {page: [leaf paths]}}` map rather than a copy, so a leaf that moves
+    hubs is carried by the move.
+
+    Fails the way `locked_leaves` fails: an absent roster locks nothing, so
+    nothing is hidden. And it is advertising, never a bound - the hub's own
+    slash command still opens it, and the menu names what it left off.
+    """
+    locked = locked_leaves(roster, realm_index)
+    if not locked:
+        return {}
+    out: dict[str, int] = {}
+    for hub, hub_pages in pages.items():
+        opens_at: int | None = None
+        any_lever = False
+        for leaves in hub_pages.values():
+            for leaf in leaves:
+                path = str(leaf).lstrip("/")
+                if is_status_read(path):
+                    continue
+                any_lever = True
+                needs = locked.get(path)
+                if needs is None:
+                    opens_at = None
+                    break
+                opens_at = needs if opens_at is None else min(opens_at, needs)
+            else:
+                continue
+            break
+        else:
+            if any_lever and opens_at is not None:
+                out[str(hub)] = int(opens_at)
+    return out
+
+
+def collapsed_menu_line(labels: Sequence[str], realm_name: "object" = None) -> str:
+    """The one line the menu prints for the hubs it left off (v1.2.0).
+
+    The road stays visible (rc.32): the hubs are named, the nearest realm that
+    opens one is named, and the line says their slash commands still work,
+    because hiding is advertising and never a bound. `/locked` is where the
+    doors themselves are listed, and the line names it.
+    """
+    names = [str(label) for label in labels if str(label)]
+    if not names:
+        return ""
+    where = f" — the nearest at **{realm_name}**" if realm_name else ""
+    listed = ", ".join(f"**{name}**" for name in names)
+    return (f"-# 🔒 {listed} open as you cultivate{where}. "
+            "Their slash commands still work; **/locked** lists every door.")
 
 
 def next_unlock_realm(locked: Mapping[str, int]) -> int | None:

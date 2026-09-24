@@ -47,11 +47,11 @@ class TheKeeperSaysWhyItPaidMore(unittest.TestCase):
         lift = _rank_lift()
         row = {"trade": "Alchemy", "trade_rank": 2, "base_price": 4, "price": 8}
         board = lift(row)
-        self.assertIn("Journeyman", board)
+        self.assertIn("Grade 2", board)
         self.assertIn("Alchemy", board)
         self.assertIn("4", board)
         sale = lift(row, sentence=True)
-        self.assertIn("Journeyman", sale)
+        self.assertIn("Grade 2", sale)
         self.assertIn("lifts it from 4", sale)
 
     def test_nothing_is_said_when_no_rank_raised_it(self) -> None:

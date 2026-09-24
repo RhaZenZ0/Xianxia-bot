@@ -212,6 +212,9 @@ func TestTheModifierReadsTheTradeAndTheStandingCap(t *testing.T) {
 }
 
 func TestAGraduateOfThePathIsHandedTheStageAtTheDoor(t *testing.T) {
+	// The last two stages of the path, whichever they are: since v1.2.0 they
+	// are "Iron from the Seam" and "The First Gate" rather than the lesson,
+	// and the door is the lesson's whatever the stage handed over is called.
 	defer gamerng.UseRoller(highDice)()
 	path := lessonDB(t)
 	householdFamily(t, path, 42, "home")

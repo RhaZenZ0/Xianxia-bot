@@ -705,7 +705,7 @@ class ProfessionRosterTests(unittest.TestCase):
     RECIPE_PROFESSIONS = {str(r["profession"]) for r in WORLD["recipes"].values() if r.get("profession")}
 
     def test_the_roster_is_the_one_in_the_code(self):
-        self.assertEqual(len(PROFESSIONS), 8, "the roster changed size; every test below iterates it")
+        self.assertEqual(len(PROFESSIONS), 9, "the roster changed size; every test below iterates it")
         self.assertEqual(len(set(PROFESSIONS)), len(PROFESSIONS), "a profession is listed twice")
 
     def test_every_profession_is_granted_somewhere(self):
@@ -1159,6 +1159,8 @@ def _gatherable_items() -> set:
             found |= set((room.get("items") or {}).keys())
     found |= _forage_rare_pool()
     found |= set(WORLD["forage_materials"])
+    # The seam's tier-flat makings (v1.2.0), forage's twin roster.
+    found |= set(WORLD.get("mine_materials") or {})
     return found
 
 

@@ -73,9 +73,14 @@ class TheStageEndsThePath(unittest.TestCase):
         deliberately one stage short. The lesson is still the last *stage* - what
         it may not be is the last thing that ever happens to a new cultivator.
         """
-        self.assertEqual(STAGES[-1]["quest_key"], "beginner_lesson")
-        self.assertEqual(STAGES[-2]["quest_key"], "beginner_home")
-        self.assertEqual(STAGES[-2]["follow_on"], "beginner_lesson")
+        # v1.2.0: the lesson is no longer the last stage - the trade ("Iron
+        # from the Seam") and the first gate follow it, and the last stage is
+        # what points at the sect. Held as relationships, not positions.
+        by_key = {s["quest_key"]: s for s in STAGES}
+        self.assertEqual(by_key["beginner_home"]["follow_on"], "beginner_lesson")
+        self.assertEqual(by_key["beginner_lesson"]["follow_on"], "beginner_iron")
+        self.assertEqual(by_key["beginner_iron"]["follow_on"], "beginner_gate")
+        self.assertEqual(STAGES[-1]["quest_key"], "beginner_gate")
         self.assertEqual(STAGES[-1]["follow_on"], "road_to_a_sect",
                          "the first hour ends by pointing at a sect, where the trial's odds are "
                          "finally worth taking")
@@ -83,10 +88,11 @@ class TheStageEndsThePath(unittest.TestCase):
                          "the sect road is a static quest, not a sixth stage")
 
     def test_the_stage_is_a_quest_the_forge_would_accept(self):
-        definition, errors = validate_quest_definition(STAGES[-1], WORLD, BUDGET)
+        lesson = next(s for s in STAGES if s["quest_key"] == "beginner_lesson")
+        definition, errors = validate_quest_definition(lesson, WORLD, BUDGET)
         self.assertEqual(errors, [])
         self.assertEqual([o["type"] for o in definition["objectives"]], ["family_lesson"])
-        self.assertIn("**/family → Hearth → Lesson**", STAGES[-1]["objectives"][0]["label"])
+        self.assertIn("**/family → Hearth → Lesson**", lesson["objectives"][0]["label"])
 
     def test_the_objective_is_in_the_vocabulary_and_reported_only_on_a_pass(self):
         """A failed lesson returns before the record is reached, so it cannot

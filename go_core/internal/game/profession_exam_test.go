@@ -114,7 +114,7 @@ func TestAnExaminationIsSatAtItsOwnHallAndAtTheRankYouHold(t *testing.T) {
 	catalog := crossingCatalog(t)
 
 	// No rank at all: there is nothing to certify.
-	if _, err := sitExam(t, path, catalog, "Forging", 100); err == nil || !strings.Contains(err.Error(), "has not reached Apprentice") {
+	if _, err := sitExam(t, path, catalog, "Forging", 100); err == nil || !strings.Contains(err.Error(), "has not reached the first rank") {
 		t.Fatalf("an unranked candidate: err=%v", err)
 	}
 	batch4Exec(t, path, `INSERT INTO profession_progress(user_id,profession,level,xp,successes,failures,quality_points,updated_at)

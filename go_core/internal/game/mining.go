@@ -90,7 +90,9 @@ func explorationMineAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 		return authoritativeMutation{}, err
 	}
 	if remaining > 0 {
-		return authoritativeMutation{}, fmt.Errorf("mine cooldown active: %d seconds remaining", remaining)
+		// Hunt's shape, so the bot's cooldown regex words it in hours and
+		// minutes rather than printing raw seconds.
+		return authoritativeMutation{}, fmt.Errorf("cooldown active: %d seconds", remaining)
 	}
 	siteKind := catalog.Locations[cr.Location].RoadSite
 	if siteKind == "shrine" {
@@ -160,7 +162,7 @@ func explorationMineAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	}
 
 	level := int64(0)
-	if pr, prErr := conn.Execute(`SELECT level FROM profession_progress WHERE user_id=? AND profession='Mining'`, []any{userID}); prErr == nil {
+	if pr, prErr := conn.Execute(`SELECT level FROM profession_progress WHERE user_id=? AND profession=?`, []any{userID, miningProfession}); prErr == nil {
 		if row := firstRowMap(pr); row != nil {
 			level = i64(row["level"])
 		}

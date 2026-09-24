@@ -48,9 +48,15 @@ def condition_definition(key: str) -> dict[str, Any]:
 
 
 PROFESSIONS = (
-    "Alchemy", "Forging", "Formation", "Inscription", "Foraging",
+    "Alchemy", "Forging", "Formation", "Inscription", "Foraging", "Mining",
     "Beast Taming", "Artifact Refining", "Appraisal",
 )
+
+# The rank ladder, stated once (v1.2.0). "Journeyman sounds medieval" - player
+# feedback, and the owner's call is a numbered grade with a title at the top:
+# Unranked before the first examination, Grade 1 to 5, and Saint. The content
+# file's `profession_exams[].rank_name` quotes these and a gate holds them equal.
+PROFESSION_RANKS = ("Unranked", "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Saint")
 
 
 
@@ -61,8 +67,7 @@ def profession_xp_needed(level: int) -> int:
 
 
 def profession_rank(level: int) -> str:
-    names = ("Novice", "Apprentice", "Journeyman", "Expert", "Master", "Grandmaster", "Saint")
-    return names[min(len(names) - 1, max(0, int(level)))]
+    return PROFESSION_RANKS[min(len(PROFESSION_RANKS) - 1, max(0, int(level)))]
 
 
 ASCENSION_GATES: dict[int, dict[str, Any]] = {

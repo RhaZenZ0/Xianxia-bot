@@ -108,7 +108,7 @@ func TestAFailedBreakthroughCanBeSeizedOnceForInsightXP(t *testing.T) {
 func TestInsightXPCanBePutIntoALaw(t *testing.T) {
 	path := setupCultivationDB(t)
 	world := batch4WorldPath(t)
-	batch4Exec(t, path, `UPDATE characters SET realm_index=7,insight_xp=3 WHERE user_id=42`)
+	batch4Exec(t, path, `UPDATE characters SET realm_index=8,insight_xp=3 WHERE user_id=42`)
 	if _, err := batch4ApplyErr(path, world, "law.comprehend", 42, 1, map[string]any{"law": "fire", "spend_insight": true}); err == nil || !strings.Contains(err.Error(), "costs 4 Insight XP") {
 		t.Fatalf("short of XP must refuse, got %v", err)
 	}

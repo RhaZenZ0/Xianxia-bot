@@ -10,6 +10,7 @@ from typing import Any
 import discord
 
 from ..ops.game_engine import GameEngineError
+from ..rules import feature_unlocks as unlocks
 from .hubs import HubStatusField
 from .locations import here_summary, npcs_present
 from . import seclusion
@@ -62,6 +63,26 @@ def _qi_body_value(status: dict) -> str:
     if death:
         line += f"\n👻 **{status.get('ghost_form_name') or 'Living Flesh'}** • corruption **{int(status.get('corruption', 0))}/100**"
     return line
+
+
+def _qi_body_field(status: dict, realm_index: int) -> str:
+    """The qi body's line, or where it opens (v1.2.0).
+
+    The Qi Body page waits for the Spiritual World, and the card used to name
+    the meridians every session anyway - "20/108 meridians" - which is
+    v1.0.13's own finding turned round: a card advertising a number whose
+    lever the curriculum hides. So the line waits with its page, read off the
+    same roster the panel reads (no literal realm here), and says where it
+    opens. A roster that names no Qi Body lever prints the line as it always
+    did.
+    """
+    roster = WORLD.data.get("feature_unlocks") or {}
+    locked = unlocks.locked_leaves(roster, realm_index)
+    waits = [realm for path, realm in locked.items()
+             if path.split(" ")[0] in ("dantian", "meridian") and not unlocks.is_status_read(path)]
+    if not waits:
+        return _qi_body_value(status)
+    return f"-# the channels and the dantian open at **{WORLD.realm_name(min(waits))}** — the Spiritual World's game"
 
 
 async def cultivation_status_fields(interaction: discord.Interaction, *, fallback: Any) -> list[HubStatusField]:
@@ -155,7 +176,7 @@ async def cultivation_status_fields(interaction: discord.Interaction, *, fallbac
         HubStatusField("🎲 Breakthrough", odds_line, inline=False),
         HubStatusField("🌤️ Today", today),
         HubStatusField("💪 Body", body_line),
-        HubStatusField("🫀 Qi Body", _qi_body_value(status), inline=False),
+        HubStatusField("🫀 Qi Body", _qi_body_field(status, int(status.get("realm_index", character.get("realm_index", 0)) or 0)), inline=False),
     ]
     # The doors, if they are shut (v1.0.0-rc.56). The card rendered nothing
     # about seclusion at all, so a secluded cultivator saw the ordinary sheet

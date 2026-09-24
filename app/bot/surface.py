@@ -12,6 +12,9 @@ check below fails at import if any of their roots is missing.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
+
 import discord
 from discord import app_commands
 
@@ -85,12 +88,15 @@ from .hubs import (
     HubPage,
     HubStatusField,
     _hub_icon,
+    _leaf_actions,
+    menu_shape,
     open_hub_in_place,
     panel_timeout,
     register_panel_idle,
     register_hubs,
     register_menu_builder,
     register_menu_facts,
+    register_menu_shape,
     register_hidden_actions,
     register_not_yet_unlocked,
     register_realm_namer,
@@ -100,7 +106,7 @@ from .hubs import (
 from .locations import here_summary
 from .registry import ACTIONS, EVENT_HANDLERS, registered_root_command
 from .runtime import DB, SETTINGS, WORLD, character_location_display, log, private_location_exit
-from .services import GUILD, SIM
+from .services import GUILD, QUESTS, SIM
 from .status_cards import _who_is_here, cultivation_status_fields, menu_facts_line
 
 
@@ -164,7 +170,7 @@ _MIGRATED_ROOTS = {
     "body", "bond", "boss", "bounty", "breakthrough", "caravan",
     "city", "civilization", "conceal", "condition", "craft", "crime", "cultivate",
     "dantian", "daoheart", "duel", "effects", "equipment", "era", "explore", "family",
-    "formation", "ghost", "grudges", "hunt", "hunter", "inheritances", "fate",
+    "formation", "ghost", "grudges", "hunt", "hunter", "inheritances", "fate", "mine",
     "innerworld", "inventory", "karma", "law", "learn", "lifespan", "manual", "market", "merchant", "shop", "trade", "blackmarket",
     "meridian", "npcinfo", "party", "perfect", "profession", "provenance", "reincarnate",
     "reputation", "reset", "rulers", "scene", "seclusion", "secretrealm", "sect", "sense",
@@ -312,8 +318,8 @@ _HUB_DEFINITIONS = (
             _hub_page("world", "Almanac", "What is true in the world right now: where you are and what you have discovered, the era and the calendar, its rulers, its laws, and the phenomena currently running.",
                       "era", "time", "rulers", "worldrules", "worldevents"),
             _hub_page("city", "City", "The city you are in: its gates and districts, the commission board, the sect envoys' hall, the rumours and the inn."),
-            _hub_page("explore", "Act", "What you can do with this place: explore it for events and discoveries, or hunt the spirit beasts that range here.",
-                      "hunt"),
+            _hub_page("explore", "Act", "What you can do with this place: explore it for events and discoveries, hunt the spirit beasts that range here, or break ore out of its seams.",
+                      "hunt", "mine"),
             _hub_page("scene", "Here", "This spot: the running scene and its in-world time, and the region's population, security and named NPC activity.",
                       "civilization"),
         ),
@@ -681,6 +687,60 @@ async def _menu_facts(interaction: discord.Interaction) -> str:
     return await menu_facts_line(interaction)
 
 
+# The live `{hub: {page: [leaf paths]}}` map the menu's collapse reads, built
+# once: the definitions are static, and the authoring script walks the same
+# registry the same way (`live_pages`).
+_HUB_PAGE_LEAVES: dict[str, dict[str, list[str]]] | None = None
+
+
+def _hub_page_leaves() -> dict[str, dict[str, list[str]]]:
+    global _HUB_PAGE_LEAVES
+    if _HUB_PAGE_LEAVES is None:
+        _HUB_PAGE_LEAVES = {
+            definition.name: {
+                page.label: [action.path.lstrip("/") for action in _leaf_actions(page)]
+                for page in definition.pages
+            }
+            for definition in _HUB_DEFINITIONS
+        }
+    return _HUB_PAGE_LEAVES
+
+
+async def _menu_shape(interaction: discord.Interaction) -> dict[str, Any]:
+    """Which hubs the menu leaves off for this player, and the tutorial's
+    next step (v1.2.0).
+
+    Player feedback: *"I still forget where to go what to do."* The menu is
+    the one page every player reads, so it says what the beginner path asks
+    for next - the first objective still short on the active stage - and it
+    leaves off the hubs the curriculum has opened no lever on yet, naming them
+    in one line so the road stays visible (rc.32). Somebody with no character
+    is shown everything: `/begin` is the whole of what they can do.
+    """
+    c = await DB.get_character(interaction.user.id)
+    if not c:
+        return {}
+    realm = int(c.get("realm_index") or 0)
+    roster = WORLD.data.get("feature_unlocks") or {}
+    hidden = unlocks.hidden_hubs(roster, realm, _hub_page_leaves())
+    tutorial = ""
+    for row in await DB.list_character_quests(interaction.user.id, status="active"):
+        definition = await QUESTS.definition(str(row.get("quest_key") or "")) or {}
+        if str(definition.get("source_key") or "") != "beginner_path":
+            continue
+        pinned = dict(row.get("terms") or {})
+        objectives = list(pinned.get("objectives") or definition.get("objectives") or [])
+        progress = dict(row.get("progress") or {})
+        for objective in objectives:
+            done = int(progress.get(str(objective.get("id")), 0) or 0)
+            if done < max(1, int(objective.get("count", 1) or 1)):
+                tutorial = f"🧭 Next: **{definition.get('title') or row.get('quest_key')}** — {objective.get('label') or objective.get('id')}"
+                break
+        if tutorial:
+            break
+    return {"hidden_hubs": hidden, "tutorial": tutorial}
+
+
 class MenuHubButton(discord.ui.Button):
     """One hub, one button (v1.0.0-rc.3)."""
 
@@ -712,11 +772,19 @@ class MenuView(_MenuBase):
 
     is_layout_hub = False
 
-    def __init__(self, *, owner_id: int, is_admin: bool, owner_name: str = "Cultivator", facts: str = "") -> None:
+    def __init__(
+        self, *, owner_id: int, is_admin: bool, owner_name: str = "Cultivator", facts: str = "",
+        hidden_hubs: Mapping[str, int] | None = None, tutorial: str = "",
+    ) -> None:
         super().__init__(timeout=panel_timeout())
         self.owner_id = int(owner_id)
         self.owner_name = str(owner_name)[:80]
         self.facts = str(facts or "")[:700]
+        # The hubs the curriculum has opened no lever on yet (v1.2.0), and the
+        # tutorial's next step. Both default to nothing, so a caller that asks
+        # for neither gets the sixteen-hub menu this started from.
+        self.hidden_hubs: dict[str, int] = {str(k): int(v) for k, v in dict(hidden_hubs or {}).items()}
+        self.tutorial = str(tutorial or "")[:300]
         self.message: discord.Message | None = None
         if not LAYOUT_COMPONENTS_AVAILABLE:
             self.add_item(MenuSelect(is_admin=is_admin))
@@ -725,16 +793,28 @@ class MenuView(_MenuBase):
         header = f"## 🧭 Xianxia RP — Main Menu\n-# {self.owner_name}"
         if self.facts:
             header += f"\n{self.facts}"
+        if self.tutorial:
+            header += f"\n{self.tutorial}"
         container.add_item(discord.ui.TextDisplay(header[:1900]))
         no_character = self.facts.startswith("🌱")
         last = _LAST_HUB.get(self.owner_id)
         for title, blurb, names in _MENU_GROUPS:
+            shown = [name for name in names if name not in self.hidden_hubs]
+            if not shown:
+                continue
             container.add_item(discord.ui.TextDisplay(f"**{title}**\n-# {blurb}"))
             row = discord.ui.ActionRow()
-            for name in names:
+            for name in shown:
                 style = discord.ButtonStyle.primary if name == last else discord.ButtonStyle.secondary
                 row.add_item(MenuHubButton(name, style=style))
             container.add_item(row)
+        if self.hidden_hubs:
+            nearest = min(self.hidden_hubs.values())
+            line = unlocks.collapsed_menu_line(
+                [_hub_label(name) for _, _, names in _MENU_GROUPS for name in names if name in self.hidden_hubs],
+                WORLD.realm_name(nearest),
+            )
+            container.add_item(discord.ui.TextDisplay(line[:1900]))
         footer = discord.ui.ActionRow()
         if no_character:
             footer.add_item(MenuBeginButton())
@@ -805,12 +885,17 @@ async def menu(interaction: discord.Interaction) -> None:
     member = interaction.user
     is_admin = isinstance(member, discord.Member) and member.guild_permissions.administrator
     facts = ""
+    shape: dict[str, Any] = {}
     if LAYOUT_COMPONENTS_AVAILABLE:
         try:
             facts = await _menu_facts(interaction)
         except Exception:
             log.exception("Menu facts unavailable")
-    view = MenuView(owner_id=member.id, is_admin=bool(is_admin), owner_name=getattr(member, "display_name", str(member)), facts=facts)
+        shape = await menu_shape(interaction)
+    view = MenuView(
+        owner_id=member.id, is_admin=bool(is_admin), owner_name=getattr(member, "display_name", str(member)), facts=facts,
+        hidden_hubs=shape.get("hidden_hubs"), tutorial=str(shape.get("tutorial") or ""),
+    )
     if LAYOUT_COMPONENTS_AVAILABLE:
         await interaction.response.send_message(view=view, ephemeral=False)
     else:
@@ -822,8 +907,12 @@ async def menu(interaction: discord.Interaction) -> None:
         view.message = None
 
 
-register_menu_builder(lambda owner_id, is_admin, owner_name, facts="": MenuView(owner_id=owner_id, is_admin=is_admin, owner_name=owner_name, facts=facts))
+register_menu_builder(lambda owner_id, is_admin, owner_name, facts="", shape=None: MenuView(
+    owner_id=owner_id, is_admin=is_admin, owner_name=owner_name, facts=facts,
+    hidden_hubs=(shape or {}).get("hidden_hubs"), tutorial=str((shape or {}).get("tutorial") or ""),
+))
 register_menu_facts(_menu_facts)
+register_menu_shape(_menu_shape)
 
 
 # The household's doors (v1.0.0-rc.32). Enter opens only from the family's
@@ -977,7 +1066,7 @@ LOCATION_GATES: dict[str, tuple[str, ...]] = {
     # The four prefixes every one of these handlers refuses inside, and the
     # places whose markets, posts, arrays and territory rows are all keyed on
     # a catalogue location a private room never is.
-    "private_room": ("explore", "hunt", "travel go", "realmhub go", "market buy", "market sell",
+    "private_room": ("explore", "hunt", "mine", "travel go", "realmhub go", "market buy", "market sell",
                      "blackmarket buy", "blackmarket sell", "array use", "territory claim"),
     "shop_counter": ("shop browse", "shop buy", "shop sell"),
     "auction_floor": ("auction leave", "auction bid", "auction sell", "auction browse"),
@@ -985,7 +1074,7 @@ LOCATION_GATES: dict[str, tuple[str, ...]] = {
     "inn_table": ("trade offer",),
     "city_board": ("city accept",),
     "protected_ground": ("battle challenge", "duel challenge"),
-    "shrine": ("hunt",),
+    "shrine": ("hunt", "mine"),
     "road_site": ("realmhub go",),
     "realm_entrance": ("secretrealm enter", "spatialkey"),
     "sect_gate": ("sect recruitment trial",),
@@ -1074,7 +1163,7 @@ async def _location_hidden_actions(interaction: discord.Interaction, c: dict) ->
     if WORLD.location_safe_zone(here):
         shut["protected_ground"] = "local formations suppress violence here"
     if str(place.get("road_site") or "") == "shrine":
-        shut["shrine"] = "no beast is hunted on a shrine's ground"
+        shut["shrine"] = "a shrine's ground is neither hunted nor dug"
     if str(place.get("road_site") or ""):
         shut["road_site"] = "a road-side site is left by its road, not by the realm gate"
     if not any(str(realm.get("location") or "") == here for realm in WORLD.secret_realms.values()):

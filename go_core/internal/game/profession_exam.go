@@ -214,7 +214,7 @@ func professionExamAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 		return authoritativeMutation{}, err
 	}
 	if level <= 0 {
-		return authoritativeMutation{}, fmt.Errorf("no hall examines a %s who has not reached Apprentice", strings.ToLower(trade))
+		return authoritativeMutation{}, fmt.Errorf("no hall examines a %s who has not reached the first rank", strings.ToLower(trade))
 	}
 	exam, authored := professionExamFor(catalog, trade, level)
 	if !authored {

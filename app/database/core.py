@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 61
+SCHEMA_VERSION = 62
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -2641,6 +2641,23 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                     'commission_heavenblade_immortal_sect_gate_watch','commission_ashen_lotus_pavilion_gate_watch',
                     'commission_celestial_mandate_academy_gate_watch','commission_void_serpent_cult_gate_watch')
                   AND seed_json IN ('', '{}')""",
+        ),
+    ),
+    (
+        62,
+        "the_first_hour_ends_at_the_first_gate",
+        (
+            # v1.2.0: the beginner path gained two stages after the household's
+            # lesson - "Iron from the Seam" (mine, hunt, forge, sell) and "The
+            # First Gate" (the first breakthrough) - and the sect road follows
+            # them. The seeding is insert-only, so on a running world the
+            # lesson's `follow_on` still names `road_to_a_sect`; this re-points
+            # it only where it still says so, which is migration 55's rule: a
+            # chain a GM re-pointed in the workbench is obeyed. Somebody who
+            # already finished the lesson is caught up at their next quest
+            # report (`catchUpBeginnerPathTx`, called from `questProgress`).
+            """UPDATE quest_definitions SET seed_json='{"follow_on": "beginner_iron"}'
+                WHERE quest_key='beginner_lesson' AND seed_json='{"follow_on": "road_to_a_sect"}'""",
         ),
     ),
 )

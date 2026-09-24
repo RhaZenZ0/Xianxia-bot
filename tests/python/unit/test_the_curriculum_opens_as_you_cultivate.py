@@ -92,18 +92,21 @@ class TheFirstHourIsNeverGated(unittest.TestCase):
         stages = CONTENT.get("beginner_path") or []
         self.assertTrue(stages, "no beginner_path in the content file")
         needed = {
-            # objective type -> the leaves that report it
+            # objective type -> the leaves the path's own labels name for it
+            # (v1.2.0: what the labels name, not every reporter - a fight in
+            # `/battle` also reports `combat_win`, and the path names the hunt)
             "cultivate": ("cultivate",),
             "scene_action": ("scene status",),
             "explore": ("explore",),
             "talk": ("talk",),
-            "trade": ("trade offer", "trade accept", "shop buy"),
+            "trade": ("shop buy", "shop sell"),
             "travel": ("travel go",),
-            "gather": ("alchemy forage",),
+            "gather": ("alchemy forage", "mine"),
             "craft": ("craft",),
-            "combat_win": ("battle challenge", "battle act"),
+            "combat_win": ("hunt",),
             "return_home": ("family enter",),
             "family_lesson": ("family lesson",),
+            "breakthrough": ("breakthrough",),
         }
         types = {str(o.get("type")) for s in stages for o in (s.get("objectives") or [])}
         self.assertTrue(types, "the beginner path declares no objectives")

@@ -1197,6 +1197,21 @@ async def run(url: str, token: str, db_path: str) -> Report:
     await step(report, "the hills", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Cloudspine Foothills", "reason": "playtest"}))
     await step(report, "cooldowns cleared", gm("admin.player.reset_cooldowns", {"user_id": PLAYER, "reason": "playtest"}))
     await step(report, "forage.resolve", act("forage.resolve", PLAYER, {}))
+    # The seam (v1.2.0): the ore half of gathering, forage's twin. A roll is
+    # reported either way; what is certain is the shape - the roll map whole,
+    # the world named, and a success carrying the world's own ore.
+    mined = await step(report, "exploration.mine in the hills", act("exploration.mine", PLAYER, {}))
+    if mined is not None:
+        roll = dict(mined.get("roll") or {})
+        report.add("PASS" if {"die1", "die2", "degree"} <= set(roll) and mined.get("world") else "FAIL",
+                   "the mine result carries the roll the reply prints and the world the seam is in",
+                   f"roll={roll} world={mined.get('world')} success={mined.get('success')}")
+        if mined.get("success"):
+            loot = dict(mined.get("loot") or {})
+            report.add("PASS" if loot else "FAIL", "a successful dig carries ore", f"loot={loot} rare={mined.get('rare_found')} stones={mined.get('stones')}")
+        else:
+            report.add("PASS", "the dig missed (a roll) and carried nothing", f"loot={mined.get('loot')}")
+    await step(report, "a second dig waits on the seam's cooldown", act("exploration.mine", PLAYER, {}), expect_error="cooldown")
     await step(report, "back to the town", gm("admin.player.teleport", {"user_id": PLAYER, "location": town, "reason": "playtest"}))
     # 80, not 40: the purge's flame only exists above `pillToxicitySaturated`
     # (v1.0.0-rc.58), and at exactly 40 there is no roll to drive. A light
@@ -1225,7 +1240,8 @@ async def run(url: str, token: str, db_path: str) -> Report:
                    f"detox={heavy.get('detox_power')} fire_resistance={heavy.get('fire_resistance')}")
 
     # -- a Law
-    await step(report, "stand at realm 6 for a Law", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 6, "phase": 1, "reason": "playtest"}))
+    # Realm 8: the Laws are the Spiritual World's since v1.2.0 (`law_system.normal_min_realm_index`).
+    await step(report, "stand at realm 8 for a Law", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 8, "phase": 1, "reason": "playtest"}))
     await step(report, "cooldowns cleared", gm("admin.player.reset_cooldowns", {"user_id": PLAYER, "reason": "playtest"}))
     grasped = await step(report, "law.comprehend the Sword", act("law.comprehend", PLAYER, {"law": "sword", "spend_insight": False}))
     if grasped is not None:
