@@ -137,7 +137,7 @@ class TheFourBalanceFixes(unittest.TestCase):
 
     def test_the_body_path_gathers_by_the_same_ground(self):
         head = GO_ACTIONS[GO_ACTIONS.index("func cultivationTrain("):GO_ACTIONS.index("func nextStage(")]
-        place = head.index("placeCultivationMultiplier(")
+        place = head.index("placeMultiplierForPath(")
         body_only = head.index("if !body {", place)
         self.assertLess(place, body_only, "the ground must be priced for both paths")
 

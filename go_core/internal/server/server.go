@@ -513,6 +513,20 @@ func (s *Server) dbMaintenance(w http.ResponseWriter, r *http.Request) {
 	defer conn.Close()
 	switch strings.ToLower(strings.TrimSpace(input.Action)) {
 	case "vacuum":
+		// The barrier drained every in-flight request, but a session between
+		// its execute and its commit holds the write lock with nothing in
+		// flight. VACUUM would sit out busy_timeout and fail, with that commit
+		// queued behind the barrier the whole time. Restore closes the
+		// sessions because it replaces the world; a compaction must not roll
+		// back somebody's half-written action, so it refuses at once instead
+		// and the commit goes through (v1.2.3).
+		if busy := s.sessions.InTransaction(); busy > 0 {
+			writeJSON(w, http.StatusConflict, map[string]any{
+				"error":   "sessions_busy",
+				"message": fmt.Sprintf("%d database session(s) have a transaction open; retry in a moment", busy),
+			})
+			return
+		}
 		_, _ = conn.Execute("PRAGMA wal_checkpoint(PASSIVE)", nil)
 		if err := conn.ExecScript("VACUUM; PRAGMA optimize;"); err != nil {
 			writeJSON(w, http.StatusConflict, map[string]any{"error": "vacuum_failed", "message": err.Error()})

@@ -421,7 +421,6 @@ async def explore(interaction: discord.Interaction) -> None:
                     "sects": discovered_sects,
                     "discovery_kind": "exploration",
                     "source_key": discovered_location,
-                    "game_minute": wt_discovery.total_minutes,
                 })
             except GameEngineError:
                 log.exception("Sect discovery could not be recorded for %s", discovered_location)

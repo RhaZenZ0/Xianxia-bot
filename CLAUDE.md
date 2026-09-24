@@ -4625,6 +4625,70 @@ allowlist. A rule stated in this file and enforced at the sites known when it wa
 reach the site written next, which is why `test_every_engine_key_reaches_the_engine.py` reads the
 keys off the Go source rather than off a list: the next one fails the day it is read.
 
+### The deferred eight (v1.2.3)
+
+v1.2.1 recorded eight review claims its verifiers never reached rather than fixing them blind. Read
+one at a time, six held and two did not, and the two are the ones worth writing down.
+
+**A compaction is not a restore.** The maintenance barrier drains requests in flight, and a Python
+write is two of them - an execute that opens the implicit `BEGIN` and a commit - so between the two
+a session's connection holds SQLite's write lock with nothing in flight for the barrier to see.
+VACUUM went in, sat out the whole ten-second `busy_timeout`, and failed *"database is locked"*, with
+the commit queued behind the barrier the entire time; the reproduction is the test (10.05 s and a
+409 against the old tree). Restore closes every session and VACUUM must not: a restore replaces the
+world, so a half-written action is discarded either way, while a compaction shrinks a file and
+rolling back somebody's action to do it would be a restore's cost for none of its reason. So
+`SessionManager.InTransaction` counts the sessions holding a transaction and the vacuum branch
+refuses at once with `sessions_busy` - an idle session holds no lock and is no reason to refuse -
+and the Discord handler tells that refusal from a failure and writes no audit row for it.
+
+**One rule at both cultivation doors.** A hand-sat session said *"the manor array and a qi storm are
+qi-path weather; the ground counts for both"* and then read a deployed array inside its ground
+helper, so a body session was priced on it; a retreat withheld the deployed array from the body path
+(a decision `authority2_test.go` names) and applied the manor to it. Each door was the other's
+opposite on one of the two arrays. The rule is one sentence now - a qi-gathering array, the manor's
+or a deployed one, is qi-path weather; the site and the abode's own array are ground - and
+`placeMultiplierForPath` takes the path so the ground helper can keep it. The test holds both
+halves, because a test of one door passes against a tree where the other still disagrees.
+
+**Two claims were read and left, and the reasons are the point.** `meridian.open` has no cooldown
+because its pace is its cost - a quarter of the insight pool, rising each channel - and a wait added
+beside a cost that already bounds it would be a mechanic invented to satisfy a symmetry. The Reopen
+button *does* skip the panel gate, and so does the Menu button, on purpose: rc.56 states that a
+hub's panel opens because it is where the way out is drawn, and each leaf inside it is checked
+again on the press. A claim that reads a designed asymmetry as a hole is the shape rc.49 named from
+the other side - being caught in something is not the same as being handed it.
+
+**The rank ceiling had a shelf it could not see.** `cheapestShelfPrice` walked the shops, and a
+travelling merchant's wares are a shelf that moves: Madam Wen sells a Spirit Focus Talisman at 15
+against a cheapest shop shelf of 17, so a Saint could buy from her and sell to the next counter at
+16, one coin a loop. Measured off the shipped content before it was believed, and the gate walks
+every merchant ware against every keeper who buys it.
+
+**The rest is one rule found in another place.** The undo chain was followed one link deep, so undo,
+redo, undo refused; it is walked to the original now and the chain's length says which way.
+`combat.turn`'s counter-attack TN had no `resonance` while `combat.technique`'s did, so an ordinary
+strike was easier to be hit on than a technique - `counterDefenceTN` is the one statement, held at
+both sites by AST. And `/auction sell` defaulted to the Mortal stone on every floor in the world,
+rc.44's currency class on the Python side; it reads the house's `default_currency`.
+
+**The second tier held almost entirely, and two of it are worth the paragraph.**
+`commission.resolve` took `outcome` off the payload and paid it - so a client sending `completed`
+collected the reward with nothing done. The only honest producer of a completion is
+`quest.progress`, which lands in `resolveCommissionTx` once every objective is reported, and the
+service's own docstring said so (*"Completion happens inside quest.progress, not here"*) while
+the engine beneath it disagreed. It refuses `completed` now, and **five tests had to move**,
+because they completed a commission by asking the action to - a fixture driving the door
+production never uses, which is the `npc_consignments` rule met in a test's choice of door
+rather than its schema. And a **market counter was a mint in both directions**, measured before
+it was believed: it priced off sect value times a world factor with no eye on the shelves, so a
+Wind Gourd cost 9 at a market while a provisioner paid 45 for it, and a Stygian Tomb Token sold
+for 420 on a shelf while the market paid 840. `marketUnitPrice` holds both inside the shops'
+band, the rule `tradeRankSellPrice` already states for a keeper's counter. The upper-world
+send-off (`sendoffArchetypeFor`) is the one place this release reads content into a rule rather
+than off it, and `docs/TODO.md` records it as a decision the owner may replace with authored
+entries.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

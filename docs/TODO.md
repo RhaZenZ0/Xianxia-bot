@@ -35,12 +35,38 @@ deferred half and not the half that says what was done about it.
   `ENGINE_SHUTDOWN_GRACE_SECONDS` was documented and passed by nothing; `search_catalog` treated `_`
   and `%` as wildcards; and a grave's claim ignored its own guarded UPDATE's row count. Each has a
   test; `test_every_engine_key_reaches_the_engine.py` is the gate for the compose class.
-- **deferred (review)** — *Unverified findings from the same review.* Recorded in the review report
-  rather than here: VACUUM without closing db-sessions, the manor/deployed-array bonus disagreeing
-  between body-mode training and seclusion, `meridian.open` with no cooldown, the counter-attack TN
-  differing between `combat.turn` and `combat.technique`, a third consecutive `undo_last` refusing,
-  the rank ceiling ignoring merchant wares, `/auction sell` defaulting to Mortal stones in every world,
-  and the Reopen button bypassing the panel gates. None was confirmed; each is a read away.
+- **fixed (v1.2.3)** — *The review's eight deferred claims, read.* Six held. VACUUM stalled ten
+  seconds behind a session's open transaction and failed (`SessionManager.InTransaction`, a
+  `sessions_busy` refusal; `server_vacuum_session_test.go` reproduced the stall). The sect manor's
+  array priced a body retreat and a deployed array priced a hand-sat body session, each the other
+  door's opposite (`placeMultiplierForPath`; one rule, qi-gathering arrays are qi-path weather).
+  `combat.turn`'s counter-attack left out the dual-cultivation resonance `combat.technique` counted
+  (`counterDefenceTN`, held at both sites by AST). Undo, redo, undo refused (the chain is walked to
+  the original, direction by its length). The rank sell ceiling read only the shops' shelves, and
+  Madam Wen's talisman at 15 undercut a shelf of 17 (`cheapestShelfPrice` reads merchant wares;
+  `TestAMerchantsWaresAreAShelfToo`). `/auction sell` defaulted to the Mortal stone on every floor
+  (the house's `default_currency`). Two were read and left: `meridian.open` is paced by its insight
+  cost, a quarter of the pool rising each channel, not by a wait; and Reopen takes the road the Menu
+  button takes, since a panel opens and every leaf is re-checked on the press.
+- **fixed (v1.2.3)** — *The review's second tier, read.* `commission.resolve` paid `completed` off the
+  payload (refused now; `resolveCommissionTx` from `quest.progress` is the one door that pays, and
+  the tests that completed one through the action go through it); `market.trade` priced off sect
+  value with no eye on the shops - a Wind Gourd 9 at market against a keeper's 45, a tomb token 840
+  against a shelf's 420 (`marketUnitPrice` holds both directions inside the shops' band;
+  `TestAMarketCounterStaysInsideTheShopsBand` walks the catalogue); a lot was appraised from
+  anywhere; `duel.py` refused "opponent's turn" ahead of the engine's breach check; Narrate-it met
+  no gate; `creation.py` printed a refusal as a wiring failure; `sect.discover` took the caller's
+  minute; `ai_router` spent a route slot before the shared budget could end the walk; `health.py`
+  dropped a control request whose body timed out; an upper-world rebirth got no send-off
+  (`sendoffArchetypeFor`, below) and its sheet mirror was 0 outside the Mortal World; `mining.go`
+  kept a literal world list. `review_second_tier_test.go` and `test_the_second_tier.py` hold them.
+- **deferred (v1.2.3)** — *Which Mortal house an upper-world house sends its child off as.* The
+  thirty-three upper-world samsara templates carry no `birth_family_sendoff` entry, so
+  `upperSendoffArchetype` maps each by the kind in its id (forge → weaponsmith, medicine → alchemy,
+  sword → sword hall, guard → spear guard, hidden → hidden weapon, frontier → border garrison,
+  fallen/successor → fallen clan, cadet → noble clan, river → martial household, caravan/wayfarer →
+  escort). It is a reading of the names, not authored content; authoring upper-world send-offs of
+  their own in `world.json` would replace it, and the mapping is deliberately one function.
 - **fixed (v1.2.0)** — *The first hour showed the whole game.* Player feedback: *"we need to simplify
   interface ... Cultivation, Breakthrough, Explore, Shop, Craft, Forge, Gather, Hunt, Mine, Quest until
   Foundation Establishment - these things are enough"* and *"I still forget where to go what to do"*.

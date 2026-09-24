@@ -108,7 +108,13 @@ func seclusionEnvironmentGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	env["abode_array_mult"] = abodeArray
 	env["base_mult"] = base
 	mult := base * abodeArray
-	if manor != nil {
+	// One split for both doors (v1.2.3): the ground - the site and the
+	// abode's own array - counts for both paths, and a qi-gathering array,
+	// the sect manor's or one somebody deployed here, is qi-path weather.
+	// Until v1.2.3 this door applied the manor to a body retreat while a
+	// hand-sat body session did not, and that session applied a deployed
+	// array while a body retreat did not.
+	if manor != nil && mode == "qi" {
 		level := clamp(i64(manor["qi_array_level"]), 0, manorFacilityMaxGo)
 		manorMult := 1.0 + 0.08*float64(level)
 		mult *= manorMult

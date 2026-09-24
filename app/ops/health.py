@@ -273,7 +273,13 @@ class HealthServer:
                     if length < 2 or length > 65536:
                         await self._respond(writer, 400, {"error": "invalid_body_size"})
                     else:
-                        body = await asyncio.wait_for(reader.readexactly(length), timeout=3.0)
+                        try:
+                            body = await asyncio.wait_for(reader.readexactly(length), timeout=3.0)
+                        except (asyncio.TimeoutError, asyncio.IncompleteReadError):
+                            # Until v1.2.3 this escaped to the outer handler,
+                            # which closed the socket without a status.
+                            await self._respond(writer, 400, {"error": "incomplete_body"})
+                            return
                         try:
                             payload = json.loads(body.decode("utf-8"))
                             action = str(payload.get("action") or "status")

@@ -402,7 +402,7 @@ func TestAnOutsiderMayTakeEntryLevelSectWorkAndEarnsStanding(t *testing.T) {
 	path := setupCommissionDB(t)
 	seedSectCommission(t, path, "commission_gate_roster", `{"outsider_standing": 25}`)
 	commissionMustApply(t, path, "commission.accept", 42, 1, map[string]any{"quest_key": "commission_gate_roster", "game_minute": 1000})
-	out := commissionMustApply(t, path, "commission.resolve", 42, 2, map[string]any{"quest_key": "commission_gate_roster", "outcome": "completed", "game_minute": 1100})
+	out := completeCommission(t, path, "commission_gate_roster", 1100)
 	standing, ok := out["sect_standing"].(map[string]any)
 	if !ok || storage.ParseInt(standing["delta"]) != 25 {
 		t.Fatalf("an outsider's finished sect work paid no standing: %v", out)
@@ -417,7 +417,7 @@ func TestOutsiderStandingIsCappedAndOnlyForTheWayIn(t *testing.T) {
 	path := setupCommissionDB(t)
 	seedSectCommission(t, path, "commission_greedy", `{"outsider_standing": 99}`)
 	commissionMustApply(t, path, "commission.accept", 42, 1, map[string]any{"quest_key": "commission_greedy", "game_minute": 1000})
-	commissionMustApply(t, path, "commission.resolve", 42, 2, map[string]any{"quest_key": "commission_greedy", "outcome": "completed", "game_minute": 1100})
+	completeCommission(t, path, "commission_greedy", 1100)
 	if got := storage.ParseInt(actionScalar(t, path, `SELECT score FROM faction_reputation WHERE user_id=42 AND faction_key='Azure Cloud Sect'`)); got != outsiderStandingCap {
 		t.Fatalf("a seed of 99 paid %d standing; the cap is %d", got, outsiderStandingCap)
 	}
@@ -427,7 +427,7 @@ func TestOutsiderStandingIsCappedAndOnlyForTheWayIn(t *testing.T) {
 	seedSectCommission(t, member, "commission_gate_roster", `{"outsider_standing": 25}`)
 	batch4Exec(t, member, `INSERT INTO sect_membership(user_id,sect_name,joined_at) VALUES(42,'Azure Cloud Sect',0)`)
 	commissionMustApply(t, member, "commission.accept", 42, 1, map[string]any{"quest_key": "commission_gate_roster", "game_minute": 1000})
-	out := commissionMustApply(t, member, "commission.resolve", 42, 2, map[string]any{"quest_key": "commission_gate_roster", "outcome": "completed", "game_minute": 1100})
+	out := completeCommission(t, member, "commission_gate_roster", 1100)
 	if _, ok := out["sect_standing"]; ok {
 		t.Fatal("a disciple was paid the outsider's standing")
 	}

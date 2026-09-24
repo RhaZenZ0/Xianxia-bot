@@ -618,6 +618,15 @@ func commissionResolveAction(conn *storage.Conn, catalog worlddata.Catalog, user
 			return authoritativeMutation{}, errors.New("you hold no commission")
 		}
 	}
+	// A commission is completed by doing it: quest.progress lands in
+	// resolveCommissionTx with "completed" once every objective has been
+	// reported, and that is the only door that pays. Until v1.2.3 this action
+	// took the outcome off the payload and paid it, so a client sending
+	// "completed" collected the reward with nothing done (rc.48: a bound that
+	// lives in the client is not a bound).
+	if outcome == "completed" {
+		return authoritativeMutation{}, errors.New("a commission is completed by doing it; you can only abandon or fail one here")
+	}
 	// A GM retire clears the slot without charging the player; the record
 	// still reads abandoned so the history is honest about what happened.
 	charge := !p.AdminRetire

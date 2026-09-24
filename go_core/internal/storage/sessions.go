@@ -81,6 +81,26 @@ func (m *SessionManager) Reap(maxIdle time.Duration) int {
 	return len(expired)
 }
 
+// InTransaction counts the sessions whose connection holds an open
+// transaction - a Python write between its execute and its commit. Such a
+// connection holds SQLite's write lock while no request is in flight, which is
+// the one thing the maintenance barrier cannot see (v1.2.3).
+func (m *SessionManager) InTransaction() int {
+	m.mu.Lock()
+	all := make([]*Session, 0, len(m.sessions))
+	for _, s := range m.sessions {
+		all = append(all, s)
+	}
+	m.mu.Unlock()
+	busy := 0
+	for _, s := range all {
+		if s.Conn.InTransaction() {
+			busy++
+		}
+	}
+	return busy
+}
+
 func (m *SessionManager) CloseAll() {
 	m.mu.Lock()
 	all := make([]*Session, 0, len(m.sessions))

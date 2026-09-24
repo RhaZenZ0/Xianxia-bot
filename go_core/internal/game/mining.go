@@ -55,8 +55,22 @@ const (
 	mineVeinStonesBase   = 4
 )
 
-// mineWorldTier orders the four worlds so a seam can name the ore one world up.
-var mineWorldTier = []string{"Mortal World", "Spiritual World", "Immortal World", "Celestial World"}
+// mineWorldTier orders the worlds so a seam can name the ore one world up. It
+// is read off the catalogue's own tier ranks (v1.2.3) rather than a literal
+// list; the content file is the one statement of which worlds there are.
+func mineWorldTier(catalog worlddata.Catalog) []string {
+	worlds := make([]string, 0, len(catalog.EventSites.TierRank))
+	for world := range catalog.EventSites.TierRank {
+		worlds = append(worlds, world)
+	}
+	sort.Slice(worlds, func(i, j int) bool {
+		if catalog.EventSites.TierRank[worlds[i]] != catalog.EventSites.TierRank[worlds[j]] {
+			return catalog.EventSites.TierRank[worlds[i]] < catalog.EventSites.TierRank[worlds[j]]
+		}
+		return worlds[i] < worlds[j]
+	})
+	return worlds
+}
 
 type minePayload struct {
 	GameMinute int64 `json:"game_minute"`
@@ -127,7 +141,8 @@ func explorationMineAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 		resourceBonus = 1
 	}
 	worldTier := int64(0)
-	for index, name := range mineWorldTier {
+	worlds := mineWorldTier(catalog)
+	for index, name := range worlds {
 		if name == worldName {
 			worldTier = int64(index)
 		}
@@ -146,8 +161,8 @@ func explorationMineAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	// One world up, rarely. Only where there is a world up: a Celestial seam
 	// has nothing above it.
 	rareFound := ""
-	if worldTier+1 < int64(len(mineWorldTier)) {
-		rareOre := catalog.EventSites.Material(mineWorldTier[worldTier+1], "@ore")
+	if worldTier+1 < int64(len(worlds)) {
+		rareOre := catalog.EventSites.Material(worlds[worldTier+1], "@ore")
 		if _, ok := catalog.Items[rareOre]; ok && rareOre != "" && rareOre != commonOre {
 			chance := minI64(40, mineRareOreChance+maxI64(0, resources-50)/4+maxI64(0, cr.RealmIndex)/3)
 			rareRoll, rollErr := gamerng.Intn(100)

@@ -102,6 +102,27 @@ func commissionApply(t *testing.T, path, op string, actor int64, seq int, payloa
 	return result, nil
 }
 
+// completeCommission lands a held commission through the one door that pays -
+// resolveCommissionTx, which quest.progress reaches once every objective is
+// reported. The action refuses "completed" from a caller (v1.2.3), so a test
+// that wants a commission paid goes the way production does.
+func completeCommission(t *testing.T, path, key string, gameMinute int64) map[string]any {
+	t.Helper()
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	out, err := resolveCommissionTx(conn, worlddata.Catalog{}, 42, key, "completed", gameMinute, true)
+	if err != nil {
+		t.Fatalf("complete %s: %v", key, err)
+	}
+	if err := conn.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
 func commissionMustApply(t *testing.T, path, op string, actor int64, seq int, payload map[string]any) map[string]any {
 	t.Helper()
 	result, err := commissionApply(t, path, op, actor, seq, payload)
@@ -272,8 +293,7 @@ func TestCommissionCompletionPaysTheLockedVariantAndNothingElse(t *testing.T) {
 	// The GM edits the definition after acceptance. The held row is the
 	// contract: the player is paid the rushed terms they took, not the new ones.
 	batch4Exec(t, path, `UPDATE quest_definitions SET rewards_json='{"spirit_stones":9000}' WHERE quest_key='commission_crate'`)
-	result := commissionMustApply(t, path, "commission.resolve", 42, 2,
-		map[string]any{"quest_key": "commission_crate", "outcome": "completed", "game_minute": 1200})
+	result := completeCommission(t, path, "commission_crate", 1200)
 	stones, insight := characterPurse(t, path, 42)
 	if stones != 24 || insight != 5 {
 		t.Fatalf("paid %d stones / %d insight, want the rushed terms 24 / 5", stones, insight)
@@ -436,8 +456,7 @@ func TestTheSameQuestCannotBeAcceptedTwice(t *testing.T) {
 	seedCommission(t, path, "commission_crate", nil)
 	commissionMustApply(t, path, "commission.accept", 42, 1,
 		map[string]any{"quest_key": "commission_crate", "game_minute": 1000})
-	commissionMustApply(t, path, "commission.resolve", 42, 2,
-		map[string]any{"quest_key": "commission_crate", "outcome": "completed", "game_minute": 1100})
+	completeCommission(t, path, "commission_crate", 1100)
 	// Even with the slot free and no cooldown, a finished commission is done.
 	if _, err := commissionApply(t, path, "commission.accept", 42, 3,
 		map[string]any{"quest_key": "commission_crate", "game_minute": 1200}); err == nil {
@@ -570,8 +589,7 @@ func TestUndisclosedTermsChangeNothingTheEngineDoes(t *testing.T) {
 	if i64(questRow(t, path, 42, "commission_bowl")["deadline_game_minute"]) != 1000+1440 {
 		t.Fatal("hiding the terms changed the deadline")
 	}
-	commissionMustApply(t, path, "commission.resolve", 42, 2,
-		map[string]any{"quest_key": "commission_bowl", "outcome": "completed", "game_minute": 1100})
+	completeCommission(t, path, "commission_bowl", 1100)
 	stones, insight := characterPurse(t, path, 42)
 	if stones != 24 || insight != 5 {
 		t.Fatalf("an undisclosed commission paid %d / %d, not the locked rushed terms 24 / 5", stones, insight)

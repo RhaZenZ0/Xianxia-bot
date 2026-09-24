@@ -62,12 +62,11 @@ func sectDiscoverAction(conn *storage.Conn, userID int64, raw json.RawMessage) (
 			perSectSource[strings.TrimSpace(name)] = key
 		}
 	}
-	gameMinute, err := requiredInt(p, "game_minute")
+	// What time it is was never the caller's to say (rc.48). The wire field
+	// is still accepted from an older bot and ignored (v1.2.3).
+	gameMinute, err := canonicalWorldGameMinute(conn)
 	if err != nil {
 		return nil, err
-	}
-	if gameMinute < 0 {
-		gameMinute = 0
 	}
 
 	// De-duplicate before touching the database: a caller that names the same

@@ -6,6 +6,42 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.2.3** settles the review's deferred claims, both tiers: fourteen held and are fixed, two were read and left as they are.
+
+A GM's Vacuum no longer stalls behind a half-written action. A Python write is two requests to the
+engine - an execute, which opens the transaction, and a commit - and between them nothing is in
+flight, so the maintenance barrier let VACUUM in while that session still held the write lock;
+VACUUM waited out the whole ten-second busy timeout and then failed, with the commit queued behind
+it. It refuses at once now and says a session is busy, and the commit goes through.
+
+It also makes a qi-gathering array qi-path weather at both doors: a body retreat was priced on the
+sect manor's array while a hand-sat body session was not, and a hand-sat body session was priced on
+a deployed array while a body retreat was not. Both of a player's combat turns defend against the
+counter-attack with one target number, where an ordinary strike had left out the dual-cultivation
+resonance a technique counted. A GM can undo an undo again: undo, redo, undo used to refuse. A
+keeper's rank price stops short of a travelling merchant's wares as well as the shops' shelves,
+which had let a talisman be bought from Madam Wen at 15 and sold back at 16. And `/auction sell`
+lists in the house's own coin unless told otherwise, where it defaulted to the Mortal stone on
+every floor in the world.
+
+And two claims were read and deliberately not changed: `meridian.open` has no cooldown because a
+quarter of the insight pool, rising each channel, is its pace; and an expired panel's Reopen button
+takes the same road the Menu button does - the panel opens, and every leaf inside it is checked
+again on the press.
+
+It also reads the review's second tier. A commission could be completed by asking: the action
+paid whatever outcome the client named, and it refuses "completed" now, since a commission is
+completed by doing it. A market counter sold a Wind Gourd for 9 that a provisioner paid 45 for,
+and paid 840 for a tomb token a shelf sells at 420; a market now sells for no less than any keeper
+pays and pays less than any shelf asks. A lot is appraised only on the floor it stands on. A duel
+whose turn holder has died can be ended by the living player, which a refusal in the bot had been
+standing in front of. Narrate-it meets the maintenance and seclusion gates. A refused character
+creation is told in the engine's words. A sect discovery is stamped with the engine's minute. A
+control request whose body never arrives is answered rather than dropped. And a rebirth above the
+Mortal World is sent off by its house with an heirloom, a trade and a tutor, where before it got
+none of them because no upper-world house carried a send-off entry; its purse mirror is right in
+every world.
+
 **1.2.2** names the trades' ranks the way the genre does: nine tiers, each a title, each trade its own word.
 
 The owner's call on v1.2.0's grades: the Nine-Tier ladder. Unranked before the first examination,
@@ -781,9 +817,9 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.2.2
+## Release status — v1.2.3
 
-- Current release: v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
+- Current release: v1.2.3 - the review's eight deferred claims settled: Vacuum refuses at once behind a half-written action, one array rule at both cultivation doors, one counter-attack TN, an undo undone again, a rank price under a merchant's wares, and a lot listed in its house's coin (see the changelog). Built on v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
   Apprentice to Tier 9 Sovereign with each trade's own word in front (Pill, Forge, Talisman, Array,
   Herb, Ore, Beast, Artifact, Treasure). No schema.
 - v1.2.1: a beast can always evolve, a homestead can be upgraded in any world, and a dozen smaller wires from a deep review (see the changelog).

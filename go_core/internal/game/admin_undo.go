@@ -352,14 +352,25 @@ func adminUndoLastAction(conn *storage.Conn, adminUserID int64, raw json.RawMess
 	var stmts []sqlStmt
 	undoneAction := action
 	if action == "admin.audit.undo_last" {
-		undoneID := i64(before["undone_audit_id"])
-		origRes, err := conn.Execute(`SELECT action,target,before_json,after_json FROM admin_audit_log WHERE audit_id=?`, []any{undoneID})
-		if err != nil {
-			return nil, err
-		}
-		origRow := firstRowMap(origRes)
-		if origRow == nil {
-			return nil, errors.New("the undone action's audit row no longer exists")
+		// Walk the chain of undos back to the action that was first undone.
+		// An undo_last's own before/after record only undone_audit_id and
+		// rows_affected - bookkeeping, not game state - so what a GM wants
+		// undone is the original, in the direction the chain's length says:
+		// one undo is undone by a redo, two by an undo again. Until v1.2.3
+		// only a chain of one was followed, so undo, redo, undo refused.
+		depth := 0
+		origRow := row
+		for fmt.Sprint(origRow["action"]) == "admin.audit.undo_last" {
+			undoneID := i64(decodeSnapshot(origRow["before_json"])["undone_audit_id"])
+			origRes, err := conn.Execute(`SELECT action,target,before_json,after_json FROM admin_audit_log WHERE audit_id=?`, []any{undoneID})
+			if err != nil {
+				return nil, err
+			}
+			origRow = firstRowMap(origRes)
+			if origRow == nil {
+				return nil, errors.New("the undone action's audit row no longer exists")
+			}
+			depth++
 		}
 		origAction := fmt.Sprint(origRow["action"])
 		fn, ok := reversibleAdminActions[origAction]
@@ -369,14 +380,12 @@ func adminUndoLastAction(conn *storage.Conn, adminUserID int64, raw json.RawMess
 		origBefore := decodeSnapshot(origRow["before_json"])
 		origAfter := decodeSnapshot(origRow["after_json"])
 		origTarget := fmt.Sprint(origRow["target"])
-		// Redo: restore the ORIGINAL action's "after" state, not undo_last's
-		// own before/after (which only ever record undone_audit_id/undone_action
-		// and rows_affected - bookkeeping, not game state).
-		stmts, err = fn(origBefore, origAfter, origTarget, true)
+		redo := depth%2 == 1
+		stmts, err = fn(origBefore, origAfter, origTarget, redo)
 		if err != nil {
 			return nil, err
 		}
-		undoneAction = origAction + " (redo)"
+		undoneAction = origAction + map[bool]string{true: " (redo)", false: " (undo again)"}[redo]
 	} else {
 		fn, ok := reversibleAdminActions[action]
 		if !ok {

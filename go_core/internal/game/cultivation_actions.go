@@ -324,7 +324,7 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 
 	// The ground, and what the sect built on it. The manor array and a qi
 	// storm are qi-path weather; the ground itself counts for both paths.
-	placeName, placeMult, err := placeCultivationMultiplier(conn, catalog, userID, c.Location, p.GameMinute)
+	placeName, placeMult, err := placeMultiplierForPath(conn, catalog, userID, c.Location, p.GameMinute, body)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

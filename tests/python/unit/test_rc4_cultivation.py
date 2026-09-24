@@ -108,7 +108,9 @@ class ARollSaysItsChance(unittest.TestCase):
 class ThePlaceMatters(unittest.TestCase):
     def test_the_engine_prices_the_ground_and_the_result_names_it(self):
         self.assertIn("func placeCultivationMultiplier(", GO_PLACE)
-        self.assertIn("placeCultivationMultiplier(conn, catalog, userID, c.Location, p.GameMinute)", GO_ACTIONS)
+        # The path-aware reading (v1.2.3): the ground is priced for both paths
+        # and a deployed qi array only for the qi one.
+        self.assertIn("placeMultiplierForPath(conn, catalog, userID, c.Location, p.GameMinute, body)", GO_ACTIONS)
         self.assertIn('"place_name": placeName, "place_mult": placeMult, "place_quality": placeQuality(placeMult)', GO_ACTIONS)
         self.assertIn("place_quality", CULTIVATION_SOURCE)
 

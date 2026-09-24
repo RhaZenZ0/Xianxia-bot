@@ -226,7 +226,6 @@ async def _sync_sect_discoveries(user_id: int, character: dict, *, game_minute: 
             "sects": sorted(reachable),
             "source_keys": reachable,
             "discovery_kind": "recruitment_route",
-            "game_minute": int(game_minute),
         }) or {})
     except GameEngineError:
         log.exception("Sect discovery reconcile failed for user %s", user_id)

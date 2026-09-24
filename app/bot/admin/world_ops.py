@@ -21,6 +21,7 @@ from ...rules.advanced_runtime import EQUIPMENT_DEFINITIONS
 from ...rules.birthfamily import karma_label
 from ...rules.game import World
 from ...ops.game_engine import GameEngineError
+from ...database.remote import RemoteDatabaseError
 from ...rules.worldtime import from_game_minutes
 from ..formatting import human_duration
 from ..hubs import HubDynamicOption, panel_timeout, register_hub_option_provider
@@ -539,7 +540,16 @@ async def admin_maintenance(interaction:discord.Interaction,action:app_commands.
             ephemeral=False)
         return
     if action.value=="vacuum":
-        await DB.vacuum()
+        try:
+            await DB.vacuum()
+        except RemoteDatabaseError as exc:
+            # The engine refuses rather than stalls when a database session
+            # is mid-transaction (v1.2.3); that is a wait, not a fault, and
+            # nothing changed, so no audit row.
+            if "sessions_busy" in str(exc):
+                await interaction.followup.send("⏳ VACUUM not run: a database session has a transaction open. Try again in a moment.", ephemeral=False)
+                return
+            raise
         # Every state-changing GM action writes its audit row (design rule 6);
         # these two were the only maintenance branches that did not (v1.2.1).
         await audit_admin(interaction, "admin.server.vacuum", target="database")
