@@ -14,6 +14,7 @@ from discord import app_commands
 from ...rules.black_market import access_reason as black_market_access_reason
 from ...ops.game_engine import GameEngineError
 from ..locations import _known_locations, _location_is_visible, _world_is_unlocked, location_autocomplete
+from ...rules.progression_systems import profession_rank
 from ...rules.trade_receipt import format_trade_receipt
 from ..auction_feed import announce_lot, refresh_lot
 from ..formatting import human_duration
@@ -577,7 +578,8 @@ async def shop_browse(interaction:discord.Interaction)->None:
     lines.append("")
     lines.append("**The keeper buys**")
     for line in list(shop.get("buys") or []):
-        lines.append(f"• {WORLD.item_name(str(line.get('item_id') or ''))} — {int(line.get('price') or 0)} {currency} each")
+        lines.append(f"• {WORLD.item_name(str(line.get('item_id') or ''))} — {int(line.get('price') or 0)} {currency} each"
+                     f"{_rank_lift(line)}")
     lines.append("")
     lines.append("Trade with **/economy → City Shops → Buy** and **Sell**. The door opens back onto the street with **/travel**.")
     await reply_long(interaction,"\n".join(lines))
@@ -645,13 +647,31 @@ async def shop_sell(interaction:discord.Interaction,item:str,quantity:app_comman
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     shelf=" It goes straight onto the shelf." if bool(result.get("on_the_shelf")) else ""
+    lift=_rank_lift(result,sentence=True)
     await _report_trade(interaction,str(result.get("item_id") or item))
     await interaction.followup.send(
         f"🏪 **{result.get('shop_name')}** buys **{WORLD.item_name(str(result.get('item_id') or item))} ×{int(result.get('quantity') or quantity)}** "
         f"for **{int(result.get('total') or 0)} {WORLD.currency_name(str(result.get('currency_id') or 'low_spirit_stone'))}** "
-        f"({int(result.get('unit_price') or 0)} each). Balance: **{int(result.get('balance') or 0)}**.{shelf}",
+        f"({int(result.get('unit_price') or 0)} each). Balance: **{int(result.get('balance') or 0)}**.{lift}{shelf}",
         ephemeral=False,
     )
+
+
+def _rank_lift(row:dict[str,Any],*,sentence:bool=False)->str:
+    """What a rank in the item's trade added to the keeper's price (v1.0.17).
+
+    The engine decides the price and names the trade and rank that raised it;
+    this only says so. Nothing is said when no rank raised it - a herb, or a
+    Novice's pill - because a line about a bonus of nothing is noise.
+    """
+    trade=str(row.get("trade") or "")
+    if not trade:
+        return ""
+    rank=profession_rank(int(row.get("trade_rank") or 0))
+    base=int(row.get("base_price") or 0)
+    if sentence:
+        return f" Your standing as a **{rank}** of {trade} lifts it from {base} each."
+    return f" · {rank} {trade} (anybody gets {base})"
 
 
 @shop_sell.autocomplete("item")

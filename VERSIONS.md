@@ -6,6 +6,31 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.17** pays a craftsman more for the goods of their own trade.
+
+A keeper pays about a third of the shelf price for anything handed over the counter, and until now
+the same third whoever handed it over, so a Saint alchemist's pill fetched exactly what a beggar's
+did, and a Qi Nourishing Pill sold back for less than the herbs it was made from. Now each rank above
+Novice in the trade that makes a thing - Alchemy for pills, Forging for blades, Inscription for
+talismans, Formation for arrays - adds two of the shop's coin to what the keeper pays for it: a
+Journeyman alchemist's Qi Nourishing Pill fetches 8 rather than 4. It never reaches the cheapest shelf
+price anywhere, so buying and reselling can never pay, and raw materials, which no trade makes, keep
+the ordinary price. Shelf prices are unchanged. The keeper's board shows your own price and the sale
+says which rank lifted it.
+
+**1.0.16** makes every treatment mend a condition, so a cultivator can always heal.
+
+Reported from play: six Heart-Calming Pills spent on a Qi Deviation at a 28% chance, six failures,
+and *"I can't heal injuries"*. A treatment was a roll that either mended a level or did nothing, and
+the pill went either way. Worse, it rolled Insight and Spirit while Qi Deviation, Meridian Damage and
+Dantian Damage each lower Spirit by their own severity (a Soul Wound lowers both), so the worse the
+condition, the less anybody could cure it: at the top severity a new cultivator's odds were
+nearly nil, and every Force deviation raised it a level. Every pill now lowers the severity - by one
+on a failed roll, two on a success, three on a strong success - so a condition costs at most as many
+pills as its severity. The roll is easier too: against 10 plus the severity rather than twice it,
+and the condition being treated no longer counts against its own cure. The reply says where the
+severity fell from and to.
+
 **1.0.15** lets an Apprentice alchemist make the Heart Calming Pill the Mortal World teaches them.
 
 Reported from play, by a player who had just passed the Apprentice examination in Jadewood and was
@@ -643,9 +668,15 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.0.15
+## Release status — v1.0.17
 
-- Current release: v1.0.15 - the Heart Calming Pill asks for a Moonveil Herb rather than a fruit
+- Current release: v1.0.17 - a rank in the trade that makes an item adds 2 of the shop's coin per rank
+  above Novice to what a keeper pays for it, never reaching the cheapest shelf price in that coin;
+  shelf prices and raw materials unchanged. No schema.
+- v1.0.16: every condition treatment lowers the severity (one level on a failed
+  roll, two on a success, three on a strong one), the roll is against 10 + severity, and the
+  condition being treated no longer counts against its own cure. No schema.
+- v1.0.15: the Heart Calming Pill asks for a Moonveil Herb rather than a fruit
   the Mortal World never offers, the Mortal World's town apothecaries shelve that herb, a refused
   craft names where each missing material is sold from where the player stands, and a gate holds
   that every world selling a method offers what the method needs. No schema.

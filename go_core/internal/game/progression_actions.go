@@ -19,6 +19,41 @@ import (
 // enough to buy the gate.
 const heartDemonResistanceScale = int64(10)
 
+// A treatment always mends (v1.0.16). The roll decides how much - one level
+// on a failure, two on a success, three on a strong one - and never whether.
+//
+// Before this the roll was Insight + Spirit against 10 + 2 x severity, a
+// failure mended nothing, and the pill was spent either way. Qi Deviation,
+// Meridian Damage and Dantian Damage each take their severity off Spirit (a
+// Soul Wound off both), so the stat the cure rolled was the one the ailment had
+// already lowered: a fresh cultivator had 15-28% against a severity-3 deviation
+// and 0-3% at severity 5, and every Force deviation raised it a level. It was
+// reported from play as six Heart-Calming Pills, six failures, and "I can't
+// heal injuries". A pill is medicine: swallowing one always does something, so
+// a condition at severity S costs at most S of them.
+const (
+	conditionTreatBaseTN = int64(10)
+	// A strong success mends one level more than a success, the rollCheck
+	// degree already named "Strong Success".
+	conditionTreatStrongMargin = int64(5)
+)
+
+// conditionTreatTN is the number a treatment is rolled against: one per level
+// of severity, where it was two.
+func conditionTreatTN(severity int64) int64 { return conditionTreatBaseTN + severity }
+
+// conditionTreatReduction is how many levels a treatment mends. It is never
+// zero: the roll decides how much, not whether.
+func conditionTreatReduction(success bool, margin int64) int64 {
+	switch {
+	case success && margin >= conditionTreatStrongMargin:
+		return 3
+	case success:
+		return 2
+	}
+	return 1
+}
+
 type conditionTreatPayload struct {
 	Condition  string `json:"condition"`
 	GameMinute int64  `json:"game_minute"`
@@ -53,45 +88,40 @@ func conditionTreatAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 	if _, err = conn.Execute(`UPDATE inventory SET quantity=quantity-1 WHERE user_id=? AND item_id=?`, []any{userID, item}); err != nil {
 		return authoritativeMutation{}, err
 	}
-	insight, err := canonicalAttribute(conn, catalog, userID, p.GameMinute, "insight")
+	// The ailment is left out of its own cure: see `canonicalAttribute`.
+	itself := effectSource{Type: "condition", ID: p.Condition}
+	insight, err := canonicalAttribute(conn, catalog, userID, p.GameMinute, "insight", itself)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	spirit, err := canonicalAttribute(conn, catalog, userID, p.GameMinute, "spirit")
+	spirit, err := canonicalAttribute(conn, catalog, userID, p.GameMinute, "spirit", itself)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	roll, err := rollCheck(insight+spirit, 10+severity*2)
+	roll, err := rollCheck(insight+spirit, conditionTreatTN(severity))
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	newSeverity := severity
+	reduction := conditionTreatReduction(roll["success"].(bool), roll["margin"].(int64))
+	newSeverity := maxI64(0, severity-reduction)
 	resolved := false
-	reduction := int64(0)
 	now := float64(time.Now().UnixNano()) / 1e9
-	if roll["success"].(bool) {
-		reduction = 1
-		if roll["margin"].(int64) >= 5 {
-			reduction = 2
+	if newSeverity == 0 {
+		resolved = true
+		_, err = conn.Execute(`UPDATE character_conditions SET state='resolved',severity=0,resolved_game_minute=?,updated_game_minute=?,updated_at=? WHERE condition_id=?`, []any{p.GameMinute, p.GameMinute, now, conditionID})
+		if err == nil {
+			_, err = conn.Execute(`DELETE FROM active_effects WHERE user_id=? AND source_type='condition' AND source_id=?`, []any{userID, p.Condition})
 		}
-		newSeverity = maxI64(0, severity-reduction)
-		if newSeverity == 0 {
-			resolved = true
-			_, err = conn.Execute(`UPDATE character_conditions SET state='resolved',severity=0,resolved_game_minute=?,updated_game_minute=?,updated_at=? WHERE condition_id=?`, []any{p.GameMinute, p.GameMinute, now, conditionID})
-			if err == nil {
-				_, err = conn.Execute(`DELETE FROM active_effects WHERE user_id=? AND source_type='condition' AND source_id=?`, []any{userID, p.Condition})
-			}
-		} else {
-			effect := conditionEffectGo(p.Condition, newSeverity)
-			ej, _ := json.Marshal(effect)
-			_, err = conn.Execute(`UPDATE character_conditions SET severity=?,effect_json=?,updated_game_minute=?,updated_at=? WHERE condition_id=?`, []any{newSeverity, string(ej), p.GameMinute, now, conditionID})
-			if err == nil {
-				_, err = conn.Execute(`UPDATE active_effects SET effect_json=?,name=?,starts_game_minute=?,created_at=? WHERE user_id=? AND source_type='condition' AND source_id=?`, []any{string(ej), name, p.GameMinute, now, userID, p.Condition})
-			}
+	} else {
+		effect := conditionEffectGo(p.Condition, newSeverity)
+		ej, _ := json.Marshal(effect)
+		_, err = conn.Execute(`UPDATE character_conditions SET severity=?,effect_json=?,updated_game_minute=?,updated_at=? WHERE condition_id=?`, []any{newSeverity, string(ej), p.GameMinute, now, conditionID})
+		if err == nil {
+			_, err = conn.Execute(`UPDATE active_effects SET effect_json=?,name=?,starts_game_minute=?,created_at=? WHERE user_id=? AND source_type='condition' AND source_id=?`, []any{string(ej), name, p.GameMinute, now, userID, p.Condition})
 		}
-		if err != nil {
-			return authoritativeMutation{}, err
-		}
+	}
+	if err != nil {
+		return authoritativeMutation{}, err
 	}
 	// The treatment does what the treatment item does. `recovery_pill` carries
 	// `use.instant.vitality_restore: 8` and is also the named treatment for the
@@ -120,7 +150,7 @@ func conditionTreatAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 			restored["vitality"], restored["qi"] = vit, qi
 		}
 	}
-	result := map[string]any{"condition": p.Condition, "name": name, "treatment_item": item, "roll": roll, "success": roll["success"], "reduction": reduction, "severity_before": severity, "severity_after": newSeverity, "resolved": resolved, "restored": restored}
+	result := map[string]any{"condition": p.Condition, "name": name, "treatment_item": item, "roll": roll, "success": roll["success"], "mended": reduction > 0, "reduction": reduction, "severity_before": severity, "severity_after": newSeverity, "resolved": resolved, "restored": restored}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "condition", EventType: "condition_treated", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 }
 
