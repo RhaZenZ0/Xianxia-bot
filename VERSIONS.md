@@ -6,6 +6,69 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.1.0** lets a new cultivator join a sect, and tells them how.
+
+Reported in Discord: at a Major Sect Recruitment event a player asked the Visiting Elder to take them,
+pressed him, and was told they were impatient and turned away; the answer given in the channel was
+"get a recommendation, do quests for a sect elder, then travel to the sect for intake", and the next
+question was "what menu?". None of that road existed. The event named no sect and its elder belonged
+to none, so the refusal was the narrator improvising. No road reaches any sect gate, so exploring
+never finds one, and the envoys' hall said the gates were on your map while writing nothing there.
+Recommendation and Trial waited for Qi Refining, so a new cultivator could not join a sect at all -
+while "A Road Toward a Sect", which the beginner path hands everybody, asked for exactly that and could
+never be finished. No sect work was open to anybody outside it, and a recommendation's bonus was never
+added to a trial roll.
+
+Now a recruitment delegation speaks for a real sect of its world and names it on the event's panel;
+its elder can sponsor you through **/sect → Recruitment → Recommendation**, and clearing the event's
+entrance trial shows you the sect's gate and puts it on your travel list. The envoys' hall in a realm
+capital's temple quarter really does put every public gate of its world on your travel list.
+Recommendation and Trial open at Body Tempering. A sect's gate keeper has one piece of entry-level
+work open to somebody in no sect, and finishing it earns standing with that sect, which lowers its
+trial's difficulty and makes a sponsor likelier to agree. A recommendation's bonus is now added to
+both trial rolls, as the panel always said. The quest names the menus it wants, no narrator can
+grant, promise or refuse membership in conversation, and the trial is always sat at the gate the
+sect names.
+
+It also stops drawing a button where the game would only refuse it because of where you stand.
+Inside your household, City Shops' Browse, Buy and Sell, exploring, hunting and travelling used to be
+drawn and then say no; so did an auction's bid off the floor, a trade offer outside an inn, a
+challenge on protected ground, and a dozen more. Each is now shown as a locked line saying why and
+where it works, and only where the game itself would refuse; City Shops' Here is always shown, since
+it is how you find a city's shops. A caravan can be dispatched from a city's gate or district, not
+only from its central street, and a sect residence's lock line names the way out that works.
+
+- **Schema 61** lets a world event speak for a sect. `world_event_npcs.sect_name` and `can_recommend`
+  and `world_event_nodes.reveals_sect` are stamped when a site spawns, so a content edit mid-event
+  cannot change whom a delegation speaks for; the quest's two labels are rewritten in a running
+  world, in the definition and in any copy a player already holds, and the twelve entry-level sect
+  commissions are opened to outsiders - leaving alone anything a GM has already edited.
+
+**1.0.17** pays a craftsman more for the goods of their own trade.
+
+A keeper pays about a third of the shelf price for anything handed over the counter, and until now
+the same third whoever handed it over, so a Saint alchemist's pill fetched exactly what a beggar's
+did, and a Qi Nourishing Pill sold back for less than the herbs it was made from. Now each rank above
+Novice in the trade that makes a thing - Alchemy for pills, Forging for blades, Inscription for
+talismans, Formation for arrays - adds two of the shop's coin to what the keeper pays for it: a
+Journeyman alchemist's Qi Nourishing Pill fetches 8 rather than 4. It never reaches the cheapest shelf
+price anywhere, so buying and reselling can never pay, and raw materials, which no trade makes, keep
+the ordinary price. Shelf prices are unchanged. The keeper's board shows your own price and the sale
+says which rank lifted it.
+
+**1.0.16** makes every treatment mend a condition, so a cultivator can always heal.
+
+Reported from play: six Heart-Calming Pills spent on a Qi Deviation at a 28% chance, six failures,
+and *"I can't heal injuries"*. A treatment was a roll that either mended a level or did nothing, and
+the pill went either way. Worse, it rolled Insight and Spirit while Qi Deviation, Meridian Damage and
+Dantian Damage each lower Spirit by their own severity (a Soul Wound lowers both), so the worse the
+condition, the less anybody could cure it: at the top severity a new cultivator's odds were
+nearly nil, and every Force deviation raised it a level. Every pill now lowers the severity - by one
+on a failed roll, two on a success, three on a strong success - so a condition costs at most as many
+pills as its severity. The roll is easier too: against 10 plus the severity rather than twice it,
+and the condition being treated no longer counts against its own cure. The reply says where the
+severity fell from and to.
+
 **1.0.15** lets an Apprentice alchemist make the Heart Calming Pill the Mortal World teaches them.
 
 Reported from play, by a player who had just passed the Apprentice examination in Jadewood and was
@@ -643,9 +706,21 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.0.15
+## Release status — v1.1.0
 
-- Current release: v1.0.15 - the Heart Calming Pill asks for a Moonveil Herb rather than a fruit
+- Current release: v1.1.0 - a new cultivator can join a sect: a recruitment delegation speaks for a
+  real sect and its elder can sponsor, the envoys' hall and the delegation's trial put a sect's gate
+  on the travel list, Recommendation and Trial open at realm 0, a sect's entry-level work is open to
+  outsiders and pays standing with it, and a recommendation's bonus rides both trial rolls; and a
+  button refused only because of where the player stands is drawn as a locked line saying where it
+  works. Schema 61.
+- v1.0.17: a rank in the trade that makes an item adds 2 of the shop's coin per rank
+  above Novice to what a keeper pays for it, never reaching the cheapest shelf price in that coin;
+  shelf prices and raw materials unchanged. No schema.
+- v1.0.16: every condition treatment lowers the severity (one level on a failed
+  roll, two on a success, three on a strong one), the roll is against 10 + severity, and the
+  condition being treated no longer counts against its own cure. No schema.
+- v1.0.15: the Heart Calming Pill asks for a Moonveil Herb rather than a fruit
   the Mortal World never offers, the Mortal World's town apothecaries shelve that herb, a refused
   craft names where each missing material is sold from where the player stands, and a gate holds
   that every world selling a method offers what the method needs. No schema.

@@ -168,6 +168,15 @@ async def announce_quest_progress(interaction: Any, changed: list[dict[str, Any]
                 standing = dict(commission.get("standing") or {})
                 if standing:
                     lines.append(f"-# Standing with {giver or 'them'} rises.")
+                # An outsider's work for a sect's gate (v1.1.0) pays standing
+                # with the sect itself - the number its entrance trial and a
+                # sponsor's roll both read. Stated from what the engine paid.
+                earned = dict(commission.get("sect_standing") or {})
+                if int(earned.get("delta") or 0) > 0:
+                    lines.append(
+                        f"🏯 Standing with the **{earned.get('sect')}** +{int(earned['delta'])} "
+                        f"(now {int(earned.get('score') or 0)}) — its entrance trial comes easier: "
+                        "**/sect → Recruitment → Trial** at its gate.")
             else:
                 lines.append(f"📜 **Quest complete: {title}**" + (" — " + ", ".join(parts) if parts else ""))
             # A chained quest handed the next one over in the same engine

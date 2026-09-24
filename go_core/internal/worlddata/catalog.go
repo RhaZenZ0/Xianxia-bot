@@ -415,6 +415,11 @@ type EventSiteNode struct {
 	Cultivation  int64   `json:"cultivation"`
 	SpiritStones int64   `json:"spirit_stones"`
 	Contribution int64   `json:"contribution"`
+	// RevealsSect (v1.1.0) marks the node whose clearing shows a cultivator
+	// where the delegation's sect takes applicants: the sect is recorded as
+	// discovered and its gate goes on their travel list. It is stamped onto the
+	// spawned node row as the sect's name, so the row is the record.
+	RevealsSect bool `json:"reveals_sect"`
 }
 
 // EventSiteNPC is one of the people an event needs: someone to report to,
@@ -430,6 +435,14 @@ type EventSiteNPC struct {
 	Want        string `json:"want"`
 	Fear        string `json:"fear"`
 	Descriptor  string `json:"descriptor"`
+	// SectMember and CanRecommend (v1.1.0) make a cast member one of the sect
+	// the event speaks for - a recruitment delegation's elder and disciple -
+	// and let the elder put his name to a candidate, exactly as a catalogue
+	// NPC carrying `sect_affiliation` and `can_recommend` does. Both are
+	// stamped onto the spawned row, so a content edit mid-event cannot change
+	// whom a running delegation speaks for.
+	SectMember   bool `json:"sect_member"`
+	CanRecommend bool `json:"can_recommend"`
 }
 
 // EventSiteTemplate is the roster one event category spawns.
@@ -652,6 +665,11 @@ type NPCDefinition struct {
 	// whereabouts are already decided by content must not also be walked by
 	// the civilization tick, or the two answers fight.
 	Circuit []string `json:"circuit"`
+	// SectAffiliation and CanRecommend (v1.1.0) are what let an NPC sponsor a
+	// cultivator's entry into a sect. The engine reads them now rather than
+	// taking a sponsor's sect, and the gate it reveals, from the caller.
+	SectAffiliation string `json:"sect_affiliation"`
+	CanRecommend    bool   `json:"can_recommend"`
 }
 
 // GeneratedTraits is the prose a person this world made for itself is given
@@ -712,7 +730,14 @@ type TechniqueSystemDefinition struct {
 type SectRecruitment struct {
 	Location string `json:"location"`
 	Examiner string `json:"examiner"`
+	// PublicRoute (v1.1.0) says whether the gate is told to anybody who asks -
+	// an envoy, a delegation - or found only through a sponsor. Absent means
+	// public, which is what the Python reader has always assumed.
+	PublicRoute *bool `json:"public_route"`
 }
+
+// Public reports whether a sect's gate is a public recruitment route.
+func (r SectRecruitment) Public() bool { return r.PublicRoute == nil || *r.PublicRoute }
 
 // SectTribute is what a sect's own disciples hand in (v1.0.0-rc.18).
 //

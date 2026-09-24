@@ -1395,39 +1395,52 @@ async def city_accept_quest_autocomplete(interaction: discord.Interaction, curre
 
 
 @registered_group_command(city_group, name="envoys", description="The sect envoys' hall of a capital: every sect's gate in this world, and the way there")
+@serialized_user_action
 async def city_envoys(interaction: discord.Interaction) -> None:
+    """The envoys name their gates, and the engine writes the way there.
+
+    Until v1.1.0 this recorded the sects and then told the player "their
+    routes are on your map now" - and wrote nothing a route could be read
+    from, so `/travel` refused the gate it had just named. No road reaches a
+    sect gate, so `/explore` never finds one either: this hall and a sponsor's
+    word are the doors, and both are the engine's `sect.recruitment.envoys` /
+    recommendation now. Which gates, and whether the player is standing in
+    the hall at all, are decided there; this draws what came back.
+    """
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
-    here = str(c.get("location") or "")
-    city = _city_of(here)
-    data = WORLD.locations.get(here) or {}
-    if not WORLD.locations.get(city, {}).get("realm_hub"):
-        await interaction.response.send_message("The sect envoys keep their halls in the realm capitals, in the temple quarter.", ephemeral=False)
-        return
-    hall = next((name for name in _city_parts(city) if WORLD.locations[name].get("district") == "temple"), "")
-    if data.get("district") != "temple":
-        await interaction.response.send_message(f"The envoys' hall is in **{hall or 'the temple quarter'}** - walk there with **/travel**.", ephemeral=False)
-        return
-    world = str(WORLD.locations.get(city, {}).get("world") or "")
-    sects = []
-    for sect_name in WORLD.sects:
-        rec = recruitment_definition(WORLD.sects, sect_name)
-        if rec and str(WORLD.locations.get(str(rec.get("location")), {}).get("world") or "") == world and rec.get("public_route", True):
-            sects.append((sect_name, rec))
-    if not sects:
-        await interaction.response.send_message("No sect keeps an envoy here.", ephemeral=False)
-        return
-    wt = await current_world_time()
     try:
-        await ENGINE.action("sect.discover", interaction.user.id, {"sects": [name for name, _ in sects], "discovery_kind": "envoys_hall", "source_key": hall, "game_minute": wt.total_minutes})
-    except GameEngineError:
-        log.exception("Sect discovery could not be recorded at the envoys' hall")
+        envelope = await ENGINE.authoritative_action(
+            "sect.recruitment.envoys", interaction.user.id, {},
+            action_id=f"discord:{interaction.id}:sect.recruitment.envoys")
+        result = dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    hall = str(result.get("hall") or "the temple quarter")
+    sects = [dict(row) for row in result.get("sects") or []]
+    if not sects:
+        await interaction.followup.send(f"No sect keeps an envoy in **{hall}**.", ephemeral=False)
+        return
     lines = [f"🏯 **The Sect Envoys' Hall — {hall}**", "Each envoy names their gate and the trial that opens it:"]
-    for name, rec in sects:
-        lines.append(f"• **{name}** — the {rec.get('trial_name')} at **{rec.get('location')}**, before {rec.get('examiner')}.")
-    lines.append("Their routes are on your map now. Open **Sect → Recruitment** to learn about a gate, and **/travel** to reach it.")
+    for row in sects:
+        name = str(row.get("sect_name") or "")
+        rec = recruitment_definition(WORLD.sects, name) or {}
+        fresh = " 🆕" if row.get("new_route") else ""
+        lines.append(
+            f"• **{name}** — the {rec.get('trial_name') or 'entrance trial'} at **{row.get('gate')}**, "
+            f"before {rec.get('examiner') or 'the examiner'}.{fresh}")
+    lines.append(
+        "Their gates are on your travel list now — **/travel** reaches any of them, and the trial is sat there "
+        "with **/sect → Recruitment → Trial**.")
+    progressed = []
+    if any(row.get("new_sect") for row in sects):
+        wt = await current_world_time()
+        progressed = await record_quest_progress(interaction.user.id, "sect_discovery", amount=1, game_minute=wt.total_minutes)
     await reply_long(interaction, "\n".join(lines))
+    await announce_quest_progress(interaction, progressed)
 
 
 RUMOUR_LIMIT = 8
@@ -1635,7 +1648,9 @@ def _travel_mode_line(result: dict) -> str:
         if mount:
             return f"\n🗡️ You ride **{mount}** above the road — a third of the walking hours, and little on the ground can reach you."
         return "\n☁️ You leave the ground and fly it — a third of the walking hours, and little on the ground can reach you."
-    return "\n🚶 You walk it. A flying artifact would cut the road to a third: **/economy → City Shops → Browse**."
+    # Here, not Browse (v1.1.0): the road ends on a street, and Browse is
+    # asked for inside a shop - the panel no longer draws it anywhere else.
+    return "\n🚶 You walk it. A flying artifact would cut the road to a third - a city's shops are listed with **/economy → City Shops → Here**."
 
 
 def _discord_arrival_display(result: dict) -> str:

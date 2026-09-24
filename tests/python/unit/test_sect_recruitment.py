@@ -61,7 +61,7 @@ class SectRecruitmentTests(unittest.TestCase):
         self.assertIn('name="trial"', source)
         self.assertIn("sect_recommender_autocomplete", source)
         self.assertIn("sect.recruitment.trial", source)
-        self.assertIn("Sect → Recruitment → Recommendation", source)
+        self.assertIn("**/sect → Recruitment → Recommendation**", source)
 
 
 if __name__ == "__main__":

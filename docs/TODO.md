@@ -16,6 +16,79 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.1.0)** — *There was no road into a sect.* Reported in Discord: at a Major Sect
+  Recruitment event a player was told by the Visiting Elder that they were impatient and would not be
+  taken, and the next player asked *"What menu?"*. The event named no sect and its elder belonged to
+  none, so the refusal was the narrator improvising from a role reading "Decides who is taken"; no
+  road reaches any of the twelve sect gates, so `/explore` never finds one; the envoys' hall said the
+  routes were on your map and wrote nothing; Recommendation and Trial opened at realm 1 on leaves only
+  a hub press can reach, so a realm-0 player could not join at all while `road_to_a_sect` - handed to
+  everybody by the beginner path - asked for exactly that and had no reachable reporter; no sect work
+  was open to an outsider; and the recommendation's "+N" was never added to a roll. The recommendation
+  and the trial also took their gate from the caller, which writes a road-less place onto a travel
+  list. All of it is the engine's now. See CLAUDE.md, "The door into a sect".
+- **fixed (v1.1.0)** — *A button was drawn where the engine would only refuse it because of where you
+  stand.* Reported from play as `/economy → City Shops → Browse` in the birth household. Every leaf
+  refused purely by place is a locked line naming why and where it works, asked with the engine's own
+  predicate; City Shops' Here is always drawn. See CLAUDE.md, "A button is drawn where it works".
+- **fixed (v1.1.0)** — *A caravan could not leave from a city's gate.* `caravan.dispatch` planned from
+  the raw location while travel uses `cityOf`, so it refused at every gate and district of the city it
+  was standing in - v1.0.9's household-door fault in a second handler.
+- **fixed (v1.1.0)** — *Two exits named a door that refused.* A sect residence's way out was printed as
+  `/abode → Leave`, and `abode.leave` reads `cave_abodes` while a residence is a `sect_abodes` row; and
+  `abode leave`/`abode focus` were hidden from anybody owning no property, which is every invited guest
+  standing inside somebody else's.
+- **deferred (decision)** — *A sect's trial tuning is authored and not read.* `recruitment.base_tn`,
+  `path_bonuses`, `root_affinities` and `family_archetype_bonus` are in the content and in the Python
+  notes a trial prints, and `sectTrialActionGo` reads none of them: the TNs are 15 and 14 for every
+  sect. Wiring them changes every sect's odds, which is a balance call rather than a wiring.
+- **deferred (engine)** — *A catalogue sponsor's position is checked by the bot.* `resolveRecommenderTx`
+  checks that a delegation's elder is standing where the player is, and leaves a catalogue sponsor to
+  the bot, because schedules and circuits are resolved in Python. A bound that lives in the client is
+  not a bound; moving it needs the schedule in Go.
+- **deferred (engine)** — *`sect.discover` takes the sects from the caller.* The reconcile a read path
+  runs sends the list of sects to mark discovered, and the engine writes what it is told. It writes no
+  route, so it cannot put a place on a travel list, but it can satisfy the trial's "discovered" check.
+- **deferred (content)** — *The "Impress the Visiting Elder" node rolls an attribute nobody has.* It
+  and the Possessed Villager node roll `heart`, which `canonicalAttribute` accepts and no character is
+  created with, so both roll at +0.
+- **deferred (content)** — *The Nine-Echo Sword Wraith can never be fought.* Its lair in
+  `bossTemplatesGo` and `BOSS_TEMPLATES` is "Sword Grave of Nine Echoes", which is the name of a secret
+  realm and not a catalogue location, so `boss.start` can never find the whole party standing there.
+  The two tables are held equal now; where the lair belongs is a content decision.
+- **deferred (engine)** — *Two place rules live only in Python.* `/world → City → Accept` checks the
+  city board and `/sect → Territory → Claim` checks for a territory row here, and the engine checks
+  neither; the panel hides both by the same Python rule, so the hide is right and the bound is not.
+- **deferred (decision)** — *A property may be founded inside a birth household.* `abode.establish`
+  refuses a property, a sect residence, a personal world and an auction floor, and not a household, so
+  the panel draws Establish there too.
+- **deferred (cost)** — *Three place-only refusals are not hidden.* The ghost harvest's ground multiplier
+  would need a Python copy of `deathQiGroundMultiplier`; and the black market's post and an array's
+  departure would need a database read on every panel refresh. Each is hidden only inside a private
+  room, where the answer needs no read.
+- **fixed (v1.0.16)** — *A condition could not be cured by the medicine made for it.* Reported
+  from play as six Heart-Calming Pills on a severity-3 Qi Deviation at 28%, six failures, and *"I
+  can't heal injuries"*. The treatment rolled Insight + Spirit against `10 + 2 × severity` through
+  `canonicalAttribute`, which counted the condition's own effect row - and Qi Deviation, Meridian
+  Damage and Dantian Damage take their severity off Spirit (Soul Wound off both), so the cure grew
+  harder exactly as the ailment grew worse; a failure mended nothing and still spent the pill. Every
+  treatment mends now (one level on a failure, two on a success, three on a strong success), the TN is
+  `10 + severity`, and the condition being treated is left out of its own roll. See CLAUDE.md, "A
+  treatment always mends".
+- **fixed (v1.0.17)** — *A keeper paid a Saint what it paid a beggar.* Reported from play as the Qi
+  Nourishing Pill selling for 11 and buying back for 4. The third itself is the authored rule and is
+  kept: across all 831 things a shop both sells and buys the buy-back is a median of 33% and never
+  above 40%, and nothing can be bought in one shop and sold in another for a profit. What the check
+  found was on the crafting side - three Mortal recipes (the Qi Nourishing Pill, the Spirit-Iron Sword,
+  the Spirit-Iron Lamellar) sold back for less than their own ingredients. On the owner's call a rank
+  in the item's trade now adds 2 of the shop's coin per rank above Novice to what the keeper pays,
+  never reaching the cheapest shelf price in that coin, and shelf prices are untouched. See CLAUDE.md,
+  "A keeper pays a craftsman by rank".
+- **deferred (content)** — *The Starfall Talisman is a profit for anybody who can make it.* Found by
+  the same measurement, and older than v1.0.17: its inputs cost 102 on the Celestial World's shelves
+  and the Celestial Mandate talisman hall pays 120 for one at Novice, so any cultivator who knows the
+  method turns a profit on every craft, bounded only by shelf stock and the roll. Whether that is a
+  reward or a slip is a content decision; lowering that hall's `buys` line below 102 closes it.
 - **fixed (v1.0.15)** — *The Heart Calming Pill could not be made in the only world that sold it.*
   Reported from play, straight after the Apprentice examination in Jadewood: *"missing materials:
   Twin Extremes Ice-Fire Fruit x1"*. The method's slip is shelved only in the Mortal World and the

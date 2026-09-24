@@ -84,7 +84,13 @@ PAGES: dict[str, int] = {
     # thing and then hid the door to it; and a companion is the one thing the
     # first hour had to be *told about* rather than shown.
     "sect / Sect": 2,
-    "sect / Recruitment": 1,
+    # Absent, and deliberately (v1.1.0): `sect / Recruitment` opened at 1, and
+    # its Recommendation and Trial take an argument, so a hub press is the only
+    # way a player can reach them - the typed shorthand reads two words and
+    # these are three. "Gating is advertising, never a bound" was false here:
+    # a Body Tempering cultivator could not join a sect at all, while
+    # `road_to_a_sect`, which the beginner path hands them, asks exactly that.
+    # A floor on a leaf nothing else can reach is a bound.
     "sect / Discipleship": 2,
     "sect / Holdings": 2,
     "sect / Territory": 4,
@@ -114,8 +120,8 @@ LEAVES: dict[str, int] = {
     # `character / Samsara` is gated at 5, but a reset is for the player who
     # has just decided this game is too much. It is never held back.
     "reset": 0,
-    # The hidden sect's door is its own karma gate, not a realm one, and the
-    # recruitment page it sits on opens at 1.
+    # The hidden sect's door is its own karma gate, not a realm one; the
+    # recruitment page it sits on opens at 0 since v1.1.0, and this does not.
     "sect shadow": 2,
     # Reads that are a page's own front door without being named `status`.
     # Each is the thing that tells a player the system is there at all.

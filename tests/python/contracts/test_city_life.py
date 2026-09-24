@@ -55,10 +55,18 @@ class TheBoard(unittest.TestCase):
 
 
 class TheHallTheRumoursAndTheInn(unittest.TestCase):
-    def test_the_envoys_hall_is_in_the_capitals_temple_quarter_and_puts_routes_on_the_map(self):
+    def test_the_envoys_hall_is_the_engines_and_puts_routes_on_the_map(self):
+        """This used to pin the hall's temple-quarter check and its
+        `"discovery_kind": "envoys_hall"` in the Python handler - which wrote
+        the sects and **no route**, so the hall said "their routes are on your
+        map now" and `/travel` then refused the gate it had just named (v1.1.0).
+        Where the hall is and what it writes are the engine's now, held by
+        `TestTheEnvoysHallPutsItsWorldsPublicGatesOnTheMap` in Go; what is held
+        here is the wire, and that the handler no longer decides either."""
         envoys = _body(EXPLORATION, "city_envoys")
-        self.assertIn('data.get("district") != "temple"', envoys)
-        self.assertIn('"discovery_kind": "envoys_hall"', envoys)
+        self.assertIn('ENGINE.authoritative_action(\n            "sect.recruitment.envoys"', envoys)
+        self.assertNotIn('"district"', envoys, "the hall's place is the engine's to decide")
+        self.assertNotIn('"sect.discover"', envoys, "a sect recorded without its gate is the old fault")
         self.assertIn("The sect envoys keep their hall here", EXPLORATION)
 
     def test_the_unfiltered_reader_never_feeds_rumours(self):

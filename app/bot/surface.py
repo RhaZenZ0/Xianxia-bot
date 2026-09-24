@@ -17,6 +17,7 @@ from discord import app_commands
 
 from ..database import SCHEMA_VERSION
 from ..rules import feature_unlocks as unlocks
+from ..rules.advanced_runtime import BOSS_TEMPLATES
 from ..rules.progression_systems import ASCENSION_GATES
 from .admin.core import (
     admin_family_group,
@@ -72,7 +73,7 @@ from .commands.scene import scene_group, scene_status, talk
 from .commands.secretrealm import secret_group, secret_status
 from .commands.sect import sect_group
 from .commands import cooldowns as _commands_cooldowns  # noqa: F401  (registers /cooldowns on import)
-from .commands.exploration import _city_of
+from .commands.exploration import _city_board, _city_inn, _city_of
 from .commands import locked as _commands_locked  # noqa: F401  (registers /locked on import)
 from .commands import sense as _commands_sense  # noqa: F401  (registers its root commands on import)
 from .commands import support as _commands_support  # noqa: F401  (registers /tribute on import)
@@ -98,7 +99,7 @@ from .hubs import (
 )
 from .locations import here_summary
 from .registry import ACTIONS, EVENT_HANDLERS, registered_root_command
-from .runtime import DB, SETTINGS, WORLD, character_location_display, log
+from .runtime import DB, SETTINGS, WORLD, character_location_display, log, private_location_exit
 from .services import GUILD, SIM
 from .status_cards import _who_is_here, cultivation_status_fields, menu_facts_line
 
@@ -840,10 +841,7 @@ def _action_paths(reason: str, *names: str) -> dict[str, str]:
     return {"/" + name: reason for name in names}
 
 
-async def _household_hidden_actions(interaction: discord.Interaction) -> dict[str, str]:
-    c = await DB.get_character(interaction.user.id)
-    if not c:
-        return {}
+async def _household_hidden_actions(interaction: discord.Interaction, c: dict) -> dict[str, str]:
     fam = await DB.get_birth_family(interaction.user.id)
     if not fam:
         return _action_paths("no birth household is recorded", HOUSEHOLD_DOOR, *HOUSEHOLD_INDOOR_ACTIONS)
@@ -887,7 +885,11 @@ PROGRESSION_GATES: dict[str, tuple[str, ...]] = {
                     "sect manor establish", "sect manor upgrade", "sect abode", "sect treasury", "sect contribute", "sect redeem",
                     "sect discipleship request", "sect discipleship accept", "sect discipleship reject", "sect discipleship leave"),
     "sect_outsider": ("sect recruitment recommendation", "sect recruitment trial"),
-    "abode": ("abode enter", "abode leave", "abode upgrade", "abode focus", "abode invite", "abode revoke", "abode guests", "abode thread"),
+    # `abode leave` and `abode focus` are not here since v1.1.0: they work for
+    # an invited guest who owns no home, and hiding them on "you have no
+    # property" hid the way out of somebody else's. Both are where you stand,
+    # and `LOCATION_GATES` asks that instead.
+    "abode": ("abode enter", "abode upgrade", "abode invite", "abode revoke", "abode guests", "abode thread"),
     "abode_owner": ("abode establish",),
     "innerworld": ("innerworld enter", "innerworld leave", "innerworld setrule"),
     "innerworld_owner": ("innerworld create",),
@@ -898,10 +900,7 @@ PROGRESSION_GATES: dict[str, tuple[str, ...]] = {
 }
 
 
-async def _progression_hidden_actions(interaction: discord.Interaction) -> dict[str, str]:
-    c = await DB.get_character(interaction.user.id)
-    if not c:
-        return {}
+async def _progression_hidden_actions(interaction: discord.Interaction, c: dict) -> dict[str, str]:
     uid = interaction.user.id
     realm = int(c.get("realm_index") or 0)
     phase = int(c.get("phase") or 1)
@@ -928,7 +927,8 @@ async def _progression_hidden_actions(interaction: discord.Interaction) -> dict[
         shut["sect_member"] = "you are in no sect — see Recruitment"
     else:
         shut["sect_outsider"] = "you already belong to a sect"
-    if not await DB.get_abode(uid):
+    abode = await DB.get_abode(uid)
+    if not abode:
         shut["abode"] = "you have no property yet — Establish one"
     else:
         shut["abode_owner"] = "you already hold a property"
@@ -948,16 +948,191 @@ async def _progression_hidden_actions(interaction: discord.Interaction) -> dict[
     hidden: dict[str, str] = {}
     for gate, reason in shut.items():
         hidden.update(_action_paths(reason, *PROGRESSION_GATES[gate]))
+    # `abode enter` is refused anywhere but the ground the property stands on
+    # (`current != base_location`), inside it included (v1.1.0).
+    if abode:
+        base = str(abode.get("base_location") or "")
+        if here != base:
+            why = ("you are already inside" if here == str(abode.get("location_key") or "")
+                   else f"your property stands at {base}; travel there")
+            hidden.update(_action_paths(why, "abode enter"))
     return hidden
 
 
-async def _hidden_actions(interaction: discord.Interaction) -> dict[str, str]:
-    """Every door the panel leaves off for this player, and why. Each provider
-    is asked on its own, so one failing lookup hides nothing from the others."""
+# Where you stand (v1.1.0). Reported from play: in the household,
+# `/economy → City Shops → Browse` answered "not inside a shop; find one by
+# exploring a city". Each gate below is the engine's own refusal for a leaf
+# that is refused *only* because of the place - a shop's counter, an auction
+# floor, an inn's long table, a sect's gate, protected ground, a private room -
+# and each is asked with the engine's own question, so the panel draws a
+# button exactly where it would work. The engine stays the refusal: this is
+# advertising, never a bound, and a leaf typed directly still reaches it.
+#
+# What is deliberately absent: a read or the door into a system (`shop here`
+# is how a player learns where a city's shops are, and never refuses), and a
+# refusal that depends on state rather than place - a merchant's stock, a beast
+# to tame, a trade to accept, the ghost ground's multiplier.
+LOCATION_GATES: dict[str, tuple[str, ...]] = {
+    # gate -> the leaves hidden while the gate is shut
+    # The four prefixes every one of these handlers refuses inside, and the
+    # places whose markets, posts, arrays and territory rows are all keyed on
+    # a catalogue location a private room never is.
+    "private_room": ("explore", "hunt", "travel go", "realmhub go", "market buy", "market sell",
+                     "blackmarket buy", "blackmarket sell", "array use", "territory claim"),
+    "shop_counter": ("shop browse", "shop buy", "shop sell"),
+    "auction_floor": ("auction leave", "auction bid", "auction sell", "auction browse"),
+    "auction_door": ("auction enter",),
+    "inn_table": ("trade offer",),
+    "city_board": ("city accept",),
+    "protected_ground": ("battle challenge", "duel challenge"),
+    "shrine": ("hunt",),
+    "road_site": ("realmhub go",),
+    "realm_entrance": ("secretrealm enter", "spatialkey"),
+    "sect_gate": ("sect recruitment trial",),
+    "boss_lair": ("boss start",),
+    "exam_hall": ("profession exam",),
+    "property_ground": ("abode establish",),
+    "manor_ground": ("sect manor establish",),
+    "crossing_ground": ("tribulation gate",),
+    "own_world": ("innerworld leave",),
+    "inside_property": ("abode leave", "abode focus"),
+    "seclusion_site": ("seclusion start",),
+}
+
+# The prefixes of a place that is somebody's own rather than the world's.
+# `exploration_actions.go` writes these four out at every handler that refuses
+# inside one; `private_location_exit` is their Python twin.
+PRIVATE_PREFIXES = ("birth_family:", "sect_abode:", "abode:", "personal_world:")
+
+
+def _shop_at(location: str) -> str:
+    """The shop a location is the interior of, or "": the twin of `shopAt`.
+
+    A roadside waystation carries a `shop` too, so it counts, as it does in
+    the engine.
+    """
+    key = str((WORLD.locations.get(location) or {}).get("shop") or "")
+    return key if key and key in WORLD.shops else ""
+
+
+def _auction_entrance_here(location: str) -> bool:
+    """Whether `auction.enter` would find a hall here: the house whose
+    entrance is this city, never from inside a shop - the engine's own two
+    lines, `cityOf` and the shop override."""
+    here = "" if (WORLD.locations.get(location) or {}).get("shop") else _city_of(location)
+    return bool(here) and any(str(h.get("entrance_location") or "") == here for h in WORLD.auction_houses.values())
+
+
+def _public_sect_gate_here(location: str) -> bool:
+    """Whether any sect sits its public entrance trial here: `sectGate`'s
+    rule - not hidden, and a gate the catalogue carries."""
+    if location not in WORLD.locations:
+        return False
+    for sect in WORLD.sects.values():
+        if sect.get("hidden"):
+            continue
+        if str((sect.get("recruitment") or {}).get("location") or "").strip() == location:
+            return True
+    return False
+
+
+EXAM_HALL_KINDS = frozenset(
+    str(exam.get("hall_kind") or "")
+    for ladder in (WORLD.data.get("profession_exams") or {}).values()
+    for exam in ladder
+    if exam.get("hall_kind")
+)
+
+
+async def _location_hidden_actions(interaction: discord.Interaction, c: dict) -> dict[str, str]:
+    uid = interaction.user.id
+    here = str(c.get("location") or "")
+    place = WORLD.locations.get(here) or {}
+    city = _city_of(here)
+    shut: dict[str, str] = {}
+    private = here.startswith(PRIVATE_PREFIXES)
+    if private:
+        way_out = private_location_exit(here)
+        command, description = way_out if way_out else ("the way you came", "a private place")
+        shut["private_room"] = f"you are inside {description}; step out with {command}"
+    if not _shop_at(here):
+        if any(str(shop.get("city") or "") == city for shop in WORLD.shops.values()):
+            shut["shop_counter"] = f"asked for inside a shop — find {city}'s with Here, then /travel in"
+        else:
+            shut["shop_counter"] = "no shops here; travel to a city and find one with Here"
+    if WORLD.auction_house_at(here) is None:
+        shut["auction_floor"] = "asked for on an auction floor — step inside one with Enter"
+    if not _auction_entrance_here(here):
+        shut["auction_door"] = ("step out of the shop first" if place.get("shop") and not place.get("road_site")
+                                else "no auction house opens onto this street")
+    if str(place.get("district") or "") != "inn":
+        inn = _city_inn(city)
+        shut["inn_table"] = (f"trades are struck at an inn's long table — {inn} in this city" if inn
+                             else "trades are struck at an inn's long table — find a city's inn")
+    if not _city_board(city):
+        shut["city_board"] = "nobody who posts work lives here — try a city's board"
+    if WORLD.location_safe_zone(here):
+        shut["protected_ground"] = "local formations suppress violence here"
+    if str(place.get("road_site") or "") == "shrine":
+        shut["shrine"] = "no beast is hunted on a shrine's ground"
+    if str(place.get("road_site") or ""):
+        shut["road_site"] = "a road-side site is left by its road, not by the realm gate"
+    if not any(str(realm.get("location") or "") == here for realm in WORLD.secret_realms.values()):
+        shut["realm_entrance"] = "no secret realm opens here"
+    if not _public_sect_gate_here(here):
+        shut["sect_gate"] = "the entrance trial is sat at a sect's gate — /world → City → Envoys names them"
+    if not any(str(boss.get("location") or "") == here for boss in BOSS_TEMPLATES.values()):
+        shut["boss_lair"] = "no great beast keeps its lair here"
+    shop = WORLD.shops.get(_shop_at(here)) or {}
+    if str(shop.get("kind") or "") not in EXAM_HALL_KINDS:
+        shut["exam_hall"] = "an examination is sat inside a hall of its trade"
+    if here.startswith(("abode:", "sect_abode:", "personal_world:")) or WORLD.auction_house_at(here) is not None:
+        shut["property_ground"] = "a property is founded on open ground or in a city"
+    if here.startswith(("abode:", "personal_world:")):
+        shut["manor_ground"] = "a manor is founded somewhere in the world, not inside a property"
+    if not place.get("world") or place.get("private"):
+        shut["crossing_ground"] = "a crossing is anchored in a public place the world itself knows"
+    if here != f"personal_world:{int(uid)}":
+        shut["own_world"] = "you are not inside your personal world"
+    if not here.startswith("abode:"):
+        shut["inside_property"] = "asked for inside a property you may use"
+    if not await _seclusion_site_here(uid, here):
+        shut["seclusion_site"] = ("closed-door seclusion wants protected ground, a residence, "
+                                  "your sect's manor or your household")
     hidden: dict[str, str] = {}
-    for provider in (_household_hidden_actions, _progression_hidden_actions):
+    for gate, reason in shut.items():
+        hidden.update(_action_paths(reason, *LOCATION_GATES[gate]))
+    return hidden
+
+
+async def _seclusion_site_here(uid: int, here: str) -> bool:
+    """`seclusionEnvironmentGo`'s five sites, asked in the same order. The
+    manor is the one read, and only for somebody on rough ground; a read that
+    fails answers yes, because a hide must fail towards showing."""
+    if here.startswith(("abode:", "birth_family:")) or here == f"sect_abode:{int(uid)}":
+        return True
+    if WORLD.location_safe_zone(here):
+        return True
+    try:
+        manor = await DB.get_member_sect_manor(uid)
+    except Exception:
+        log.exception("Could not read the sect manor for the seclusion hide")
+        return True
+    return bool(manor) and str(manor.get("base_location") or "") == here
+
+
+async def _hidden_actions(interaction: discord.Interaction) -> dict[str, str]:
+    """Every door the panel leaves off for this player, and why. The character
+    is read once and handed to each provider (each used to read its own); each
+    provider is asked on its own, so one failing lookup hides nothing from the
+    others."""
+    c = await DB.get_character(interaction.user.id)
+    if not c:
+        return {}
+    hidden: dict[str, str] = {}
+    for provider in (_household_hidden_actions, _progression_hidden_actions, _location_hidden_actions):
         try:
-            hidden.update(await provider(interaction))
+            hidden.update(await provider(interaction, c))
         except Exception:
             log.exception("Hidden-action provider %s failed", getattr(provider, "__name__", provider))
     return hidden

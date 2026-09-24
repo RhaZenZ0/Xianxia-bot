@@ -101,6 +101,18 @@ async def current_npc_location(npc_name: str, period: str | None = None) -> str 
         registered = None
     if registered and str(registered.get("location") or ""):
         return str(registered["location"])
+    # A running world event's cast stands where the event is (v1.1.0). They
+    # had no answer here, and `None` reads as "do not filter by location" - so
+    # a militia captain or a recruitment delegation's elder could be talked to
+    # from the far side of the world, and a sponsor's presence check could
+    # never be met. The event's location is the whole truth of where they are.
+    try:
+        cast = await DB.get_event_npc_definition(npc_name)
+    except Exception:
+        log.exception("Could not read the event location of %s", npc_name)
+        cast = None
+    if cast and str(cast.get("location") or ""):
+        return str(cast["location"])
     return None
 
 

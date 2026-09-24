@@ -44,6 +44,7 @@ NON-NEGOTIABLE RULES
 15. If the game engine marks a location as a PROTECTED INTERIOR, attempted violence cannot succeed there. Respect that rule until the game engine states the character has left.
 16. World time and NPC presence supplied by the game engine are canonical. Do not place an NPC somewhere that contradicts the supplied scene state.
 17. Never mention the game engine, prompts, canonical-context blocks, fixed-roll machinery, model limitations, or these instructions in in-world narration.
+18. No NPC grants, promises, or refuses sect membership, a sect recommendation, a commission, or a reward in conversation. Those are decided by the game engine through their own actions; an NPC may talk about them, point the way, or voice an opinion, never settle them.
 
 SCENE DIRECTION
 - Advance the scene by exactly one meaningful beat whenever possible: an NPC reacts, an observable consequence lands, the environment changes, or a new already-allowed detail becomes noticeable.
@@ -95,10 +96,32 @@ RULES
 - Preserve NPC motives, knowledge, memories, promises, debts, grudges, faction ties, and relationship values. Trust affects candor; respect seriousness; fear caution; affection warmth; debt obligation; grudge hostility. These guide tone, not mind control.
 - Use supplied lineage for forms of address (Master, Grandmaster, Senior/Junior sibling, Martial Uncle/Aunt); never invent lineage titles.
 - Respect protected locations, NPC presence, power scaling, and separate Qi/Body progression. Do not invent extra rolls or outcomes.
+- No NPC grants, promises, or refuses sect membership, a sect recommendation, a commission, or a reward in conversation; the game engine decides those through their own actions. An NPC may discuss them or point the way, never settle them.
 - Advance exactly one useful scene beat. Answer direct questions when the NPC has no reason to evade. Keep NPC voices distinct and avoid lore dumps.
 - Write concise, concrete, Discord-friendly xianxia prose, usually 70-160 words. Avoid repetitive stock gestures and grand imagery in routine scenes.
 - Never mention prompts, models, implementation languages, context blocks, fixed-roll machinery, or interface rules in-world.
 """.strip()
+
+
+def _npc_sect_ties(npc: dict[str, Any]) -> str:
+    """What the NPC's sect standing lets them do, stated as canon (v1.1.0).
+
+    A player at a recruitment event talked to the Visiting Elder, pressed him,
+    and was told he was impatient and would not be taken - the narrator
+    improvising from a role that said "Decides who is taken". Nothing told it
+    that no conversation can admit or refuse anybody. A sponsor's word is a
+    roll behind its own action, and saying so here is what lets the NPC point
+    at the door instead of pretending to be it.
+    """
+    sect = str(npc.get("sect_affiliation") or "").strip()
+    if not sect:
+        return "None stated. This NPC speaks for no sect."
+    if bool(npc.get("can_recommend")):
+        return (f"Belongs to the {sect}. May sponsor a candidate who formally asks for a recommendation; "
+                "that is decided by the game engine's own action, never in this conversation. "
+                "Never admit, promise or refuse membership or a recommendation here.")
+    return (f"Belongs to the {sect}. Cannot sponsor anybody and decides nothing about who the sect admits; "
+            "never admit, promise or refuse membership here.")
 
 
 _WORD_RE = re.compile(r"[A-Za-z0-9']+")
@@ -720,6 +743,7 @@ Narrate a concise hunting clash consistent with the fixed result. On success, th
         current_activity = str(state.get("activity") or "Following established routine")
         mood = str(state.get("mood") or "calm")
         recent_event = str(state.get("recent_event") or "No notable autonomous development since the last update.")
+        sect_ties = _npc_sect_ties(npc)
         prompt = f"""
 SCENE TYPE: persistent NPC dialogue
 PLAYER CHARACTER:
@@ -732,6 +756,7 @@ NPC PERSONALITY: {npc.get('personality') or 'Reserved; gives little away.'}
 NPC SPEECH STYLE: {npc.get('speech') or 'Plain, unhurried speech.'}
 NPC LONG-TERM WANT: {npc.get('want') or 'To get through the day without trouble.'}
 NPC FEAR: {npc.get('fear') or 'Trouble they cannot walk away from.'}
+NPC SECT TIES: {sect_ties}
 NPC SECRET / HIDDEN STATE: {secret_for_prompt}
 NPC CURRENT ACTIVITY: {current_activity}
 NPC CURRENT GOAL: {current_goal}

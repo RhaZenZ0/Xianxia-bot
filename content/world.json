@@ -49450,7 +49450,10 @@
         "insight_xp": 12
       },
       "source_type": "commission",
-      "source_key": "giver:Gate Elder Jian Mu"
+      "source_key": "giver:Gate Elder Jian Mu",
+      "seed": {
+        "outsider_standing": 25
+      }
     },
     {
       "quest_key": "commission_azure_inquisitor",
@@ -49584,7 +49587,10 @@
         "insight_xp": 12
       },
       "source_type": "commission",
-      "source_key": "giver:Furnace Examiner Huo Ren"
+      "source_key": "giver:Furnace Examiner Huo Ren",
+      "seed": {
+        "outsider_standing": 25
+      }
     },
     {
       "quest_key": "commission_furnace_apothecary_list",
@@ -49718,7 +49724,10 @@
         "insight_xp": 12
       },
       "source_type": "commission",
-      "source_key": "giver:Moon Warden Lin Yue"
+      "source_key": "giver:Moon Warden Lin Yue",
+      "seed": {
+        "outsider_standing": 25
+      }
     },
     {
       "quest_key": "commission_moon_bai_shuang",
@@ -49852,7 +49861,10 @@
         "insight_xp": 12
       },
       "source_type": "commission",
-      "source_key": "giver:Handler She Ruo"
+      "source_key": "giver:Handler She Ruo",
+      "seed": {
+        "outsider_standing": 25
+      }
     },
     {
       "quest_key": "commission_serpent_marsh_debt",
@@ -49986,7 +49998,10 @@
         "insight_xp": 12
       },
       "source_type": "commission",
-      "source_key": "giver:Blood Gatekeeper Yan Luo"
+      "source_key": "giver:Blood Gatekeeper Yan Luo",
+      "seed": {
+        "outsider_standing": 25
+      }
     },
     {
       "quest_key": "commission_blood_what_the_gorge_owes",
@@ -50120,7 +50135,10 @@
         "insight_xp": 12
       },
       "source_type": "commission",
-      "source_key": "giver:Lantern Registrar Wu Ming"
+      "source_key": "giver:Lantern Registrar Wu Ming",
+      "seed": {
+        "outsider_standing": 25
+      }
     },
     {
       "quest_key": "commission_lantern_broker",
@@ -55995,7 +56013,10 @@
         "insight_xp": 24
       },
       "source_type": "commission",
-      "source_key": "giver:Gate Warden Yu Lanxin"
+      "source_key": "giver:Gate Warden Yu Lanxin",
+      "seed": {
+        "outsider_standing": 25
+      }
     },
     {
       "quest_key": "commission_jade_meridian_sect_capital_errand",
@@ -56129,7 +56150,10 @@
         "insight_xp": 24
       },
       "source_type": "commission",
-      "source_key": "giver:Valley Warden Hao Zhen"
+      "source_key": "giver:Valley Warden Hao Zhen",
+      "seed": {
+        "outsider_standing": 25
+      }
     },
     {
       "quest_key": "commission_thousand_beast_valley_capital_errand",
@@ -56263,7 +56287,10 @@
         "insight_xp": 36
       },
       "source_type": "commission",
-      "source_key": "giver:Terrace Elder Xue Tianfeng"
+      "source_key": "giver:Terrace Elder Xue Tianfeng",
+      "seed": {
+        "outsider_standing": 25
+      }
     },
     {
       "quest_key": "commission_heavenblade_immortal_sect_capital_errand",
@@ -56397,7 +56424,10 @@
         "insight_xp": 36
       },
       "source_type": "commission",
-      "source_key": "giver:Ash Keeper Mo Ruyan"
+      "source_key": "giver:Ash Keeper Mo Ruyan",
+      "seed": {
+        "outsider_standing": 25
+      }
     },
     {
       "quest_key": "commission_ashen_lotus_pavilion_capital_errand",
@@ -56531,7 +56561,10 @@
         "insight_xp": 48
       },
       "source_type": "commission",
-      "source_key": "giver:Star Lecturer Wen Qianyu"
+      "source_key": "giver:Star Lecturer Wen Qianyu",
+      "seed": {
+        "outsider_standing": 25
+      }
     },
     {
       "quest_key": "commission_celestial_mandate_academy_capital_errand",
@@ -56665,7 +56698,10 @@
         "insight_xp": 48
       },
       "source_type": "commission",
-      "source_key": "giver:Pit Speaker Gu Heilong"
+      "source_key": "giver:Pit Speaker Gu Heilong",
+      "seed": {
+        "outsider_standing": 25
+      }
     },
     {
       "quest_key": "commission_void_serpent_cult_capital_errand",
@@ -67450,8 +67486,8 @@
             "name": "Pass the Recruitment Trial",
             "descriptor": "The elders are not watching the winners. They are watching how you lose.",
             "count": [
-              1,
-              3
+              3,
+              6
             ],
             "rank_bonus": 0,
             "tn": 14,
@@ -67460,7 +67496,8 @@
             "item_qty": 0,
             "cultivation": 10,
             "spirit_stones": 8,
-            "contribution": 3
+            "contribution": 3,
+            "reveals_sect": true
           },
           {
             "key": "impress",
@@ -67521,12 +67558,14 @@
           {
             "key": "elder",
             "title": "Visiting Elder",
-            "role": "Decides who is taken and who is thanked for coming",
+            "role": "Speaks for the sect that sent this delegation, and may put his name to a candidate who formally asks",
             "personality": "Composed, watchful, unreadable on purpose. Notices exactly what you think he missed.",
             "speech": "Few words, each one placed.",
             "want": "Find the one worth the sect's investment.",
             "fear": "Taking the wrong one again.",
-            "descriptor": "An elder seated slightly apart, watching the trial ground rather than the candidates."
+            "descriptor": "An elder seated slightly apart, watching the trial ground rather than the candidates.",
+            "sect_member": true,
+            "can_recommend": true
           },
           {
             "key": "disciple",
@@ -67536,7 +67575,8 @@
             "speech": "Chatty, drops useful things without meaning to.",
             "want": "Get through the list before the elder loses patience.",
             "fear": "Being blamed for the elder losing patience.",
-            "descriptor": "A disciple with a roster, calling names and losing his place."
+            "descriptor": "A disciple with a roster, calling names and losing his place.",
+            "sect_member": true
           }
         ]
       },
@@ -69277,10 +69317,6 @@
       "sect manor establish": 2,
       "sect manor upgrade": 2,
       "sect politics": 2,
-      "sect recruitment history": 1,
-      "sect recruitment recommendation": 1,
-      "sect recruitment recommendations": 1,
-      "sect recruitment trial": 1,
       "sect redeem": 2,
       "sect roster": 2,
       "sect shadow": 2,
@@ -69316,7 +69352,6 @@
       "realm / Spatial Keys": 1,
       "sect / Discipleship": 2,
       "sect / Holdings": 2,
-      "sect / Recruitment": 1,
       "sect / Sect": 2,
       "sect / Territory": 4,
       "sect / War": 4,

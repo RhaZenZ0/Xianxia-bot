@@ -57,6 +57,11 @@ GHOST = 900003
 # also refused anybody who had left a mark the world keeps; it releases those
 # now, so that is no longer why.)
 QUITTER = 900004
+# A fifth, who walks the road into a sect as somebody in none (v1.1.0): the
+# envoys' hall, the gate it puts on the travel list, and the entry-level work
+# that pays standing with the sect. Its own account because every other actor
+# is in a sect, holds a commission, or is needed later with neither.
+APPLICANT = 900005
 GM = 1
 
 # Operations this harness does not drive, each with its reason.
@@ -310,9 +315,9 @@ async def run(url: str, token: str, db_path: str) -> Report:
     #   primary   2d10 + body + 2*realm + phase/3   vs max(10, 15 - rep/25)
     #   secondary 2d10 + insight + spirit/2 + realm vs max(8, TN - 1)
     # and passes on both, or on a combined margin >= 2. (The content's
-    # base_tn 14, path bonus and recommendation bonus are not read; the TNs
-    # are 15 and 14, hardcoded, and a recommendation only unlocks a
-    # conditional pass.) No GM lever writes attributes or grants an effect;
+    # base_tn 14 and path bonus are not read - the TNs are 15 and 14,
+    # hardcoded; the engine's recommendation bonus rides both rolls since
+    # v1.1.0, and there is none here.) No GM lever writes attributes or grants an effect;
     # the one that moves the roll is the realm. A Sword Cultivator (body 2,
     # insight 1, spirit 2) at realm 7 stage 9 has, on the worst dice,
     #   primary margin   2 + 2 + 14 + 3 - 15 = 6
@@ -338,6 +343,53 @@ async def run(url: str, token: str, db_path: str) -> Report:
     membership = await step(report, "sect membership on file", db.get_sect_membership(PLAYER))
     if membership is not None and str(membership.get("sect_name")) != sect and outcome in {"pass", "conditional_pass"}:
         report.add("FAIL", "sect membership on file", f"membership={membership}")
+
+    # ---- 3b. the road into a sect, for somebody in none (v1.1.0) -----------
+    # No road reaches a sect gate, so exploring never finds one; the envoys'
+    # hall and a sponsor are the doors, and the engine writes the gate onto the
+    # travel list. A sect's entry-level work is open to somebody in no sect
+    # and pays standing with it - the number the trial's TN reads. Nothing
+    # here is a roll.
+    offers = await step(report, "family options for an applicant", act("character.family_options", APPLICANT, {"world_name": "Mortal World"}))
+    families = list((offers or {}).get("families") or [])
+    if families:
+        await step(report, "an applicant is created", act("character.create", APPLICANT, {
+            "discord_name": "Playtest Applicant", "name": "Playtest Wen", "concept": "wants a sect", "gender": "female",
+            "path": "Sword Cultivator", "family_choice_id": str(families[0].get("choice_id") or ""), "age_at_creation_years": 18}))
+    mortal_capital = next(name for name, loc in world["locations"].items() if loc.get("realm_hub") and loc.get("world") == "Mortal World")
+    hall = next(name for name, loc in world["locations"].items() if loc.get("district") == "temple" and loc.get("outside_location") == mortal_capital)
+    public_gates = {name: str(s["recruitment"]["location"]) for name, s in world["sects"].items()
+                    if not s.get("hidden") and (s.get("recruitment") or {}).get("public_route", True) is not False
+                    and world["locations"].get(str((s.get("recruitment") or {}).get("location") or ""), {}).get("world") == "Mortal World"}
+    await step(report, "the applicant on the capital's street", gm("admin.player.teleport", {"user_id": APPLICANT, "location": mortal_capital, "reason": "playtest"}))
+    await step(report, "the envoys keep their hall in the temple quarter", act("sect.recruitment.envoys", APPLICANT, {}), expect_error="the envoys' hall is in")
+    await step(report, "into the envoys' hall", gm("admin.player.teleport", {"user_id": APPLICANT, "location": hall, "reason": "playtest"}))
+    envoys = await step(report, "sect.recruitment.envoys", act("sect.recruitment.envoys", APPLICANT, {}))
+    if envoys is not None:
+        named = {str(r.get("sect_name")): str(r.get("gate")) for r in envoys.get("sects") or []}
+        report.add("PASS" if named == public_gates else "FAIL", "the envoys name every public gate of the world, and no other", f"{sorted(named)}")
+    gate = public_gates.get(sect, "")
+    walked = await step(report, "travel to the gate the envoys named", act_free("exploration.travel", APPLICANT, {"destination": gate, "mode": "known"}))
+    if walked is not None:
+        where = str((await db.get_character(APPLICANT) or {}).get("location"))
+        report.add("PASS" if where == gate else "FAIL", "the gate is on the travel list, and the road-less jump lands there", where)
+    await step(report, "put the applicant at the gate", gm("admin.player.teleport", {"user_id": APPLICANT, "location": gate, "reason": "playtest"}))
+    entry = next(c for c in world["commissions"] if c.get("requires_sect") == sect and (c.get("seed") or {}).get("outsider_standing"))
+    await step(report, "an outsider takes the gate's entry-level work", act("commission.accept", APPLICANT, {"quest_key": entry["quest_key"], "variant_index": 0}))
+    earned: dict[str, Any] = {}
+    for objective in entry.get("objectives") or []:
+        touched = await step(report, f"quest.progress {objective.get('type')}:{objective.get('target')}", engine.action("quest.progress", APPLICANT, {
+            "quest_key": entry["quest_key"], "objective_type": objective.get("type"), "amount": int(objective.get("count") or 1),
+            "target": objective.get("target")}))
+        for row in (touched or {}).get("changed") or [touched or {}]:
+            earned = dict((dict(row).get("commission") or {}).get("sect_standing") or earned)
+    reps = {str(r.get("faction_key")): int(r.get("score") or 0) for r in await db.get_reputations(APPLICANT)}
+    report.add("PASS" if reps.get(sect) == 25 else "FAIL", "finishing it pays standing with the sect itself", f"{sect}={reps.get(sect)} earned={earned}")
+    deeper = next(c for c in world["commissions"] if c.get("requires_sect") == sect and int(c.get("tier") or 1) >= 2)
+    await step(report, "the sect's deeper work stays with its disciples",
+               act("commission.accept", APPLICANT, {"quest_key": deeper["quest_key"], "variant_index": 0}), expect_error="that work is for disciples of")
+    await step(report, "the way in is taken once", act("commission.accept", APPLICANT, {"quest_key": entry["quest_key"], "variant_index": 0}),
+               expect_error="taken that quest before")
 
     # ---- 4. commissions from Qiao: complete, abandon, fail -----------------
     await step(report, "teleport to Steward Qiao", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Golden Pavilion Auction House", "reason": "playtest"}))
@@ -1730,8 +1782,11 @@ async def run(url: str, token: str, db_path: str) -> Report:
             key = str(wave.get("condition_key"))
             treated = await step(report, f"condition.treat the {key} the {wave.get('name')} left", act("condition.treat", PLAYER, {"condition": key}))
             if treated is not None:
-                report.add("PASS", f"the treatment of {key}, reported",
-                           f"success={treated.get('success')} severity {treated.get('severity_before')}->{treated.get('severity_after')} resolved={treated.get('resolved')}")
+                # Certain since v1.0.16: the roll decides how much a treatment
+                # mends, never whether, so a pill always lowers the severity.
+                before, after = present(treated.get("severity_before")), present(treated.get("severity_after"))
+                report.add("PASS" if 0 <= after < before else "FAIL", f"the treatment of {key} mends it, whatever the roll",
+                           f"success={treated.get('success')} severity {before}->{after} resolved={treated.get('resolved')}")
         if not failed:
             report.add("PASS", "no wave failed, so nothing was left to treat", "the dice passed all three")
     # The seam a survived tribulation leaves (v1.0.0-rc.44). The attempt above

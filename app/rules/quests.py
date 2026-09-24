@@ -21,8 +21,14 @@ QUEST_DEFINITIONS: dict[str, dict] = {
         "source_type": "system",
         "source_key": "sect_recruitment",
         "objectives": [
-            {"id": "sect_discovery", "type": "sect_discovery", "count": 1, "label": "Discover a sect"},
-            {"id": "sect_trial", "type": "sect_trial", "count": 1, "label": "Attempt a sect entrance trial"},
+            # The labels name the doors (v1.1.0). "Discover a sect" named none,
+            # and exploring - the obvious reading - never finds a sect gate,
+            # because no road reaches one. Migration 61 writes these exact
+            # strings into a running world; the two must stay identical.
+            {"id": "sect_discovery", "type": "sect_discovery", "count": 1,
+             "label": "Learn where a sect takes applicants - **/world → City → Envoys**"},
+            {"id": "sect_trial", "type": "sect_trial", "count": 1,
+             "label": "Sit the entrance trial at the sect gate - **/sect → Recruitment → Trial**"},
         ],
         "rewards": {"insight_xp": 35},
     },
