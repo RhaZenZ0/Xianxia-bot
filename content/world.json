@@ -68186,9 +68186,9 @@
     "Forging": [
       {
         "rank": 1,
-        "rank_name": "Grade 1",
+        "rank_name": "Tier 1 Forge Apprentice",
         "quest_key": "exam_forging_apprentice",
-        "title": "The Grade 1 Billet",
+        "title": "The Tier 1 Forge Apprentice's Billet",
         "description": "A smith who has not been watched at the anvil is a smith nobody will vouch for. Take a billet to a weaponsmith's hall and work it under the keeper's eye.",
         "opening": "The keeper clears a space at the second anvil, sets a billet down on it, and goes back to their own work without another word. The watching has already started.",
         "hall_kind": "weaponsmith",
@@ -68200,7 +68200,7 @@
             "id": "sit",
             "type": "profession_exam",
             "count": 1,
-            "label": "Sit the Grade 1 examination in Forging - **/craft → Profession → Exam**"
+            "label": "Sit the Tier 1 Forge Apprentice examination in Forging - **/craft → Profession → Exam**"
           }
         ],
         "rewards": {
@@ -68209,9 +68209,9 @@
       },
       {
         "rank": 2,
-        "rank_name": "Grade 2",
+        "rank_name": "Tier 2 Forge Adept",
         "quest_key": "exam_forging_journeyman",
-        "title": "The Grade 2 Edge",
+        "title": "The Tier 2 Forge Adept's Edge",
         "description": "Anyone can make a blade that looks like one. Stand at a weaponsmith's hall and put an edge on steel while the keeper decides whether it is work or decoration.",
         "opening": "The billet is better metal this time, and the keeper does not leave. They stand where they can see your hands and nothing else.",
         "hall_kind": "weaponsmith",
@@ -68223,7 +68223,7 @@
             "id": "sit",
             "type": "profession_exam",
             "count": 1,
-            "label": "Sit the Grade 2 examination in Forging - **/craft → Profession → Exam**"
+            "label": "Sit the Tier 2 Forge Adept examination in Forging - **/craft → Profession → Exam**"
           }
         ],
         "rewards": {
@@ -68232,9 +68232,9 @@
       },
       {
         "rank": 3,
-        "rank_name": "Grade 3",
+        "rank_name": "Tier 3 Forge Artisan",
         "quest_key": "exam_forging_expert",
-        "title": "The Grade 3 Folding",
+        "title": "The Tier 3 Forge Artisan's Folding",
         "description": "A hall does not certify its own competition lightly. Fold and temper at a weaponsmith's counter until the keeper admits the work is beyond them or is not.",
         "opening": "There is no billet waiting. The keeper asks what you intend to make, listens, and then says: show me.",
         "hall_kind": "weaponsmith",
@@ -68246,7 +68246,7 @@
             "id": "sit",
             "type": "profession_exam",
             "count": 1,
-            "label": "Sit the Grade 3 examination in Forging - **/craft → Profession → Exam**"
+            "label": "Sit the Tier 3 Forge Artisan examination in Forging - **/craft → Profession → Exam**"
           }
         ],
         "rewards": {
@@ -68257,9 +68257,9 @@
     "Alchemy": [
       {
         "rank": 1,
-        "rank_name": "Grade 1",
+        "rank_name": "Tier 1 Pill Apprentice",
         "quest_key": "exam_alchemy_apprentice",
-        "title": "The Grade 1 Decoction",
+        "title": "The Tier 1 Pill Apprentice's Decoction",
         "description": "A pill hall will not take your word for what you can brew. Stand at an apothecary's counter and raise one decoction while the keeper watches the flame.",
         "opening": "The keeper sets out a cracked furnace, the one they give everybody, and a measure of herbs that will forgive exactly one mistake.",
         "hall_kind": "apothecary",
@@ -68271,7 +68271,7 @@
             "id": "sit",
             "type": "profession_exam",
             "count": 1,
-            "label": "Sit the Grade 1 examination in Alchemy - **/craft → Profession → Exam**"
+            "label": "Sit the Tier 1 Pill Apprentice examination in Alchemy - **/craft → Profession → Exam**"
           }
         ],
         "rewards": {
@@ -68280,9 +68280,9 @@
       },
       {
         "rank": 2,
-        "rank_name": "Grade 2",
+        "rank_name": "Tier 2 Pill Adept",
         "quest_key": "exam_alchemy_journeyman",
-        "title": "The Grade 2 Furnace",
+        "title": "The Tier 2 Pill Adept's Furnace",
         "description": "Heat is the whole art and nobody can be told it. Work an apothecary's own furnace under its keeper until the pill comes out whole.",
         "opening": "They open the good furnace for you. That is either respect or a trap, and you will not know which until the flame takes.",
         "hall_kind": "apothecary",
@@ -68294,7 +68294,7 @@
             "id": "sit",
             "type": "profession_exam",
             "count": 1,
-            "label": "Sit the Grade 2 examination in Alchemy - **/craft → Profession → Exam**"
+            "label": "Sit the Tier 2 Pill Adept examination in Alchemy - **/craft → Profession → Exam**"
           }
         ],
         "rewards": {
@@ -68303,9 +68303,9 @@
       },
       {
         "rank": 3,
-        "rank_name": "Grade 3",
+        "rank_name": "Tier 3 Pill Artisan",
         "quest_key": "exam_alchemy_expert",
-        "title": "The Grade 3 Toxicity",
+        "title": "The Tier 3 Pill Artisan's Toxicity",
         "description": "An expert is somebody whose pills do not poison the person who swallows them. Sit the third examination at an apothecary's counter.",
         "opening": "The keeper asks you first what happens to somebody who takes two of what you are about to make. Then they hand you the herbs.",
         "hall_kind": "apothecary",
@@ -68317,7 +68317,7 @@
             "id": "sit",
             "type": "profession_exam",
             "count": 1,
-            "label": "Sit the Grade 3 examination in Alchemy - **/craft → Profession → Exam**"
+            "label": "Sit the Tier 3 Pill Artisan examination in Alchemy - **/craft → Profession → Exam**"
           }
         ],
         "rewards": {
@@ -68328,9 +68328,9 @@
     "Inscription": [
       {
         "rank": 1,
-        "rank_name": "Grade 1",
+        "rank_name": "Tier 1 Talisman Apprentice",
         "quest_key": "exam_inscription_apprentice",
-        "title": "The Grade 1 Stroke",
+        "title": "The Tier 1 Talisman Apprentice's Stroke",
         "description": "Ink does not forgive a shaking hand. Draw one talisman through, start to finish, at a talisman hall while its keeper reads the strokes.",
         "opening": "The paper is cheap and the ink is not. The keeper counts out exactly enough of both.",
         "hall_kind": "talisman",
@@ -68342,7 +68342,7 @@
             "id": "sit",
             "type": "profession_exam",
             "count": 1,
-            "label": "Sit the Grade 1 examination in Inscription - **/craft → Profession → Exam**"
+            "label": "Sit the Tier 1 Talisman Apprentice examination in Inscription - **/craft → Profession → Exam**"
           }
         ],
         "rewards": {
@@ -68351,9 +68351,9 @@
       },
       {
         "rank": 2,
-        "rank_name": "Grade 2",
+        "rank_name": "Tier 2 Talisman Adept",
         "quest_key": "exam_inscription_journeyman",
-        "title": "The Grade 2 Sequence",
+        "title": "The Tier 2 Talisman Adept's Sequence",
         "description": "One stroke is a stroke; a sequence is a talisman. Sit the second examination at a talisman hall counter.",
         "opening": "The keeper names a sequence you have not drawn before and watches to see whether you ask them to repeat it.",
         "hall_kind": "talisman",
@@ -68365,7 +68365,7 @@
             "id": "sit",
             "type": "profession_exam",
             "count": 1,
-            "label": "Sit the Grade 2 examination in Inscription - **/craft → Profession → Exam**"
+            "label": "Sit the Tier 2 Talisman Adept examination in Inscription - **/craft → Profession → Exam**"
           }
         ],
         "rewards": {
@@ -68374,9 +68374,9 @@
       },
       {
         "rank": 3,
-        "rank_name": "Grade 3",
+        "rank_name": "Tier 3 Talisman Artisan",
         "quest_key": "exam_inscription_expert",
-        "title": "The Grade 3 Seal",
+        "title": "The Tier 3 Talisman Artisan's Seal",
         "description": "A seal binds or it does not, and a hall's reputation rides on the difference. Sit the third examination at a talisman hall.",
         "opening": "They clear the whole counter. Whatever you draw here, they will be selling under their own name afterwards.",
         "hall_kind": "talisman",
@@ -68388,7 +68388,7 @@
             "id": "sit",
             "type": "profession_exam",
             "count": 1,
-            "label": "Sit the Grade 3 examination in Inscription - **/craft → Profession → Exam**"
+            "label": "Sit the Tier 3 Talisman Artisan examination in Inscription - **/craft → Profession → Exam**"
           }
         ],
         "rewards": {
@@ -68399,9 +68399,9 @@
     "Formation": [
       {
         "rank": 1,
-        "rank_name": "Grade 1",
+        "rank_name": "Tier 1 Array Apprentice",
         "quest_key": "exam_formation_apprentice",
-        "title": "The Grade 1 Flags",
+        "title": "The Tier 1 Array Apprentice's Flags",
         "description": "A formation misplaced by a handspan is a formation that does nothing. Set your flags at an array workshop while the keeper paces the lines.",
         "opening": "The workshop floor is marked with a hundred old chalk lines. The keeper wipes one section clean and points at it.",
         "hall_kind": "array",
@@ -68413,7 +68413,7 @@
             "id": "sit",
             "type": "profession_exam",
             "count": 1,
-            "label": "Sit the Grade 1 examination in Formation - **/craft → Profession → Exam**"
+            "label": "Sit the Tier 1 Array Apprentice examination in Formation - **/craft → Profession → Exam**"
           }
         ],
         "rewards": {
@@ -68422,9 +68422,9 @@
       },
       {
         "rank": 2,
-        "rank_name": "Grade 2",
+        "rank_name": "Tier 2 Array Adept",
         "quest_key": "exam_formation_journeyman",
-        "title": "The Grade 2 Node",
+        "title": "The Tier 2 Array Adept's Node",
         "description": "Anyone can lay flags. A journeyman knows which one carries the load. Sit the second examination at an array workshop.",
         "opening": "The keeper lays out a disk with one node deliberately wrong and asks you to raise it anyway.",
         "hall_kind": "array",
@@ -68436,7 +68436,7 @@
             "id": "sit",
             "type": "profession_exam",
             "count": 1,
-            "label": "Sit the Grade 2 examination in Formation - **/craft → Profession → Exam**"
+            "label": "Sit the Tier 2 Array Adept examination in Formation - **/craft → Profession → Exam**"
           }
         ],
         "rewards": {
@@ -68445,9 +68445,9 @@
       },
       {
         "rank": 3,
-        "rank_name": "Grade 3",
+        "rank_name": "Tier 3 Array Artisan",
         "quest_key": "exam_formation_expert",
-        "title": "The Grade 3 Array",
+        "title": "The Tier 3 Array Artisan's Array",
         "description": "An expert raises something that holds with the keeper leaning on it. Sit the third examination at an array workshop.",
         "opening": "There is no instruction at all. The keeper sits down on a crate at the edge of the floor and waits.",
         "hall_kind": "array",
@@ -68459,7 +68459,7 @@
             "id": "sit",
             "type": "profession_exam",
             "count": 1,
-            "label": "Sit the Grade 3 examination in Formation - **/craft → Profession → Exam**"
+            "label": "Sit the Tier 3 Array Artisan examination in Formation - **/craft → Profession → Exam**"
           }
         ],
         "rewards": {

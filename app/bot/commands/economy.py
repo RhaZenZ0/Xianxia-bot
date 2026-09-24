@@ -667,11 +667,11 @@ def _rank_lift(row:dict[str,Any],*,sentence:bool=False)->str:
     trade=str(row.get("trade") or "")
     if not trade:
         return ""
-    rank=profession_rank(int(row.get("trade_rank") or 0))
+    rank=profession_rank(int(row.get("trade_rank") or 0), trade)
     base=int(row.get("base_price") or 0)
     if sentence:
-        return f" Your standing as a **{rank}** of {trade} lifts it from {base} each."
-    return f" · {rank} {trade} (anybody gets {base})"
+        return f" Your standing as a **{rank}** lifts it from {base} each."
+    return f" · {rank} (anybody gets {base})"
 
 
 @shop_sell.autocomplete("item")

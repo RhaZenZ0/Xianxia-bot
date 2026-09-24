@@ -105,7 +105,7 @@ async def beast_tame(interaction: discord.Interaction, encounter_id: int) -> Non
         await interaction.followup.send(
             f"🐉 **Spirit-Beast Bond — {species}**\n{roll_line(result)}\n"
             f"The beast accepts an **equality contract** at loyalty **{beast.get('loyalty', 30)}**.{active_line}\n"
-            f"🪢 Beast Taming: **{profession_rank(int(beast_progress.get('level', 0)))}** Lv.{int(beast_progress.get('level', 0))}."
+            f"🪢 Beast Taming: **{profession_rank(int(beast_progress.get('level', 0)), 'Beast Taming')}** Lv.{int(beast_progress.get('level', 0))}."
         )
     else:
         await interaction.followup.send(
@@ -171,7 +171,7 @@ async def beast_train(interaction: discord.Interaction, beast_id: int) -> None:
     await interaction.followup.send(
         f"🐉 **{row['name']}** completes a training cycle. Loyalty **{row['loyalty']}**, "
         f"intelligence **{row['intelligence']}**.{pen_note}\n"
-        f"🪢 Beast Taming: **{profession_rank(int(beast_progress.get('level', 0)))}** "
+        f"🪢 Beast Taming: **{profession_rank(int(beast_progress.get('level', 0)), 'Beast Taming')}** "
         f"Lv.{int(beast_progress.get('level', 0))}.",
         ephemeral=False,
     )
@@ -199,7 +199,7 @@ async def beast_evolve(interaction: discord.Interaction, beast_id: int) -> None:
     beast_progress = dict(resolved.get("profession_progress") or {})
     await interaction.followup.send(
         f"🧬 **{row['name']} evolves.** Evolution Stage **{row['evolution_stage']}**, Rank **{row['rank']}**. The strain reduces loyalty to **{row['loyalty']}**.\n"
-        f"🪢 Beast Taming: **{profession_rank(int(beast_progress.get('level', 0)))}** Lv.{int(beast_progress.get('level', 0))}.",
+        f"🪢 Beast Taming: **{profession_rank(int(beast_progress.get('level', 0)), 'Beast Taming')}** Lv.{int(beast_progress.get('level', 0))}.",
         ephemeral=False,
     )
 

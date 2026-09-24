@@ -269,17 +269,21 @@ class TheRanksAreOneLadder(unittest.TestCase):
     def test_every_examination_quotes_the_ladder(self):
         from app.rules.progression_systems import PROFESSION_RANKS, profession_rank
         self.assertEqual(PROFESSION_RANKS[0], "Unranked")
-        self.assertEqual(PROFESSION_RANKS[-1], "Saint")
+        self.assertEqual(len(PROFESSION_RANKS), 10, "Unranked and nine tiers")
+        self.assertEqual(profession_rank(9, "Forging"), "Tier 9 Forge Sovereign")
+        self.assertEqual(profession_rank(40, "Alchemy"), "Tier 9 Pill Sovereign", "a level past the ladder reads as its top")
+        self.assertEqual(profession_rank(1, "No Such Trade"), "Tier 1 Apprentice", "an unknown trade gets the bare tier, never a wrong word")
+        self.assertEqual(profession_rank(0, "Forging"), "Unranked")
         for trade, exams in (CONTENT.get("profession_exams") or {}).items():
             for exam in exams:
                 rank = int(exam["rank"])
                 with self.subTest(trade=trade, rank=rank):
-                    self.assertEqual(exam["rank_name"], profession_rank(rank))
-                    self.assertIn(profession_rank(rank), exam["title"])
-                    self.assertIn(profession_rank(rank), exam["objectives"][0]["label"])
+                    self.assertEqual(exam["rank_name"], profession_rank(rank, trade))
+                    self.assertIn(profession_rank(rank, trade), exam["title"])
+                    self.assertIn(profession_rank(rank, trade), exam["objectives"][0]["label"])
 
     def test_no_production_file_spells_a_retired_rank(self):
-        retired = ("Journeyman", "Apprentice")
+        retired = ("Journeyman", "Grade 1")
         offenders = []
         for path in sorted((APP).rglob("*.py")):
             text = code_only(path.read_text(encoding="utf-8"))

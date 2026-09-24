@@ -6,6 +6,16 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.2.2** names the trades' ranks the way the genre does: nine tiers, each a title, each trade its own word.
+
+The owner's call on v1.2.0's grades: the Nine-Tier ladder. Unranked before the first examination,
+then Tier 1 Apprentice up through Adept, Artisan, Expert, Master, Grandmaster, Sage and Emperor to
+Tier 9 Sovereign, and the trade's own word in front - a Pill Apprentice, a Forge Sovereign, a
+Talisman Sage, an Array Master, and Herb, Ore, Beast, Artifact and Treasure for the gathering and
+appraising trades. A rank is a level and nothing stored changes; what changed is how a level is
+read, in `PROFESSION_TIERS` and `PROFESSION_TIER_WORDS`, quoted by the examinations' names (The
+Tier 1 Forge Apprentice's Billet) and by every surface that prints a trade. No schema.
+
 **1.2.1** fixes what a deep review of the tree and one report from play found: a beast can always evolve, a homestead can be upgraded in any world, and a dozen smaller wires.
 
 Reported from play: *"I can't evolve my beast it says loyalty should be 110, but I can't go over
@@ -771,9 +781,13 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.2.1
+## Release status — v1.2.2
 
-- Current release: v1.2.1 - a beast can always evolve, a homestead can be upgraded in any world, and a dozen smaller wires from a deep review (see the changelog). Built on v1.2.0 - the first hour is a short list: everything outside cultivate, break
+- Current release: v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
+  Apprentice to Tier 9 Sovereign with each trade's own word in front (Pill, Forge, Talisman, Array,
+  Herb, Ore, Beast, Artifact, Treasure). No schema.
+- v1.2.1: a beast can always evolve, a homestead can be upgraded in any world, and a dozen smaller wires from a deep review (see the changelog).
+- v1.2.0: the first hour is a short list: everything outside cultivate, break
   through, explore, buy, craft, forge, gather, hunt, mine and quest (plus a companion and the body
   path) waits for Foundation Establishment at the earliest; the menu leaves off the hubs with no lever
   open yet and names the tutorial's next step; `/mine` is the ore half of gathering; the beginner path

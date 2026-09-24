@@ -669,7 +669,7 @@ async def mine(interaction: discord.Interaction) -> None:
     family_trade = str(resolved.get("family_trade") or "Forging")
     bonus_bits = f" • Household {family_trade.lower()} lore **+{family_bonus}**" if family_bonus else ""
     rank_line = (
-        f"\n⛏️ Mining: **{profession_rank(level)}** Lv.{level} "
+        f"\n⛏️ Mining: **{profession_rank(level, 'Mining')}** Lv.{level} "
         f"• XP {int(mine_progress.get('xp', 0))}/{profession_xp_needed(level)}"
     )
     if not success:
@@ -863,7 +863,7 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
     profession_row = dict(resolved.get("profession_progress") or {})
     level = int(profession_row.get("level", 0))
     mastery_line = (
-        f"\n🛠️ Profession: **{profession_rank(level)}** (Level {level}) • "
+        f"\n🛠️ Profession: **{profession_rank(level, profession)}** (Level {level}) • "
         f"XP {profession_row.get('xp',0)}/{profession_xp_needed(level)}"
     )
     quality_label = str(resolved.get("quality_label") or "")
@@ -1077,7 +1077,7 @@ async def alchemy_status(interaction: discord.Interaction) -> None:
         abode_bonus = int(abode.get("alchemy_level", 0)) * 2
     lines = [
         f"⚗️ **Alchemy — {c['name']}**",
-        f"Mastery: **{profession_rank(int(profession.get('level', 0)))}** • Level **{int(profession.get('level', 0))}** • XP **{int(profession.get('xp', 0))}**",
+        f"Mastery: **{profession_rank(int(profession.get('level', 0)), 'Alchemy')}** • Level **{int(profession.get('level', 0))}** • XP **{int(profession.get('xp', 0))}**",
         f"Refinements: **{int(state.get('successful_refinements',0))}/{int(state.get('total_refinements',0))}** successful • Flawless **{int(state.get('flawless_refinements',0))}**",
         f"Pill toxicity: **{pill_toxicity}/100 — {band}**\n{band_text}",
         f"Local facilities: player property **+{abode_bonus}** • sect manor **+{manor_bonus}**",
@@ -1138,7 +1138,7 @@ async def alchemy_forage(interaction: discord.Interaction) -> None:
             f"🌿 **Forage — {forage_location}**\n{roll_line(roll)}\n"
             f"Regional spirit resources: **{int(resolved.get('spirit_resources',0))}/100**.{bonus_bits} "
             "You find no usable harvest this time."
-            f"\n🧺 Foraging: **{profession_rank(level)}** Lv.{level} "
+            f"\n🧺 Foraging: **{profession_rank(level, 'Foraging')}** Lv.{level} "
             f"• XP {int(forage_progress.get('xp',0))}/{profession_xp_needed(level)}"
         )
         return
@@ -1169,7 +1169,7 @@ async def alchemy_forage(interaction: discord.Interaction) -> None:
         f"🌿 **Forage — {forage_location}**\n{roll_line(roll)}\n"
         f"Regional spirit resources: **{int(resolved.get('spirit_resources',0))}/100**.{bonus_bits}\n"
         f"Harvested: **{WORLD.item_names(awarded)}**.{rare_line}{makings_line}\n"
-        f"🧺 Foraging: **{profession_rank(level)}** Lv.{level} "
+        f"🧺 Foraging: **{profession_rank(level, 'Foraging')}** Lv.{level} "
         f"• XP {int(forage_progress.get('xp',0))}/{profession_xp_needed(level)}"
     )
     await announce_quest_progress(interaction, progressed)

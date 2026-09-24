@@ -49,8 +49,10 @@ deferred half and not the half that says what was done about it.
   built. See CLAUDE.md, "The first hour is a short list".
 - **fixed (v1.2.0)** — *A road put a cultivator in transit for a real half hour.* `TRAVEL_TIME_PERCENT`,
   default 0; the old pace is 100. The toll, the encounter and the road-side discoveries are untouched.
-- **fixed (v1.2.0)** — *"Journeyman sounds medieval."* The rank ladder is Unranked, Grade 1-5 and Saint,
-  stated once (`PROFESSION_RANKS`) and held equal to the examinations' `rank_name`s.
+- **fixed (v1.2.2)** — *"Journeyman sounds medieval."* v1.2.0 made the ladder Unranked, Grade 1-5 and
+  Saint; on the owner's call v1.2.2 makes it the genre's Nine-Tier ladder, Tier 1 Apprentice to Tier 9
+  Sovereign with each trade's own word in front, stated once (`PROFESSION_TIERS`,
+  `PROFESSION_TIER_WORDS`) and held equal to the examinations' `rank_name`s.
 - **deferred (v1.2.0)** — *The tutorial's forge burns materials on a miss.* `craft.resolve` consumes
   the inputs whether or not the roll lands (`crafting_actions.go`), and "Iron from the Seam" asks for a
   Spirit-Iron Sword at TN 14, which a fresh crafter clears about six times in seven. A miss costs

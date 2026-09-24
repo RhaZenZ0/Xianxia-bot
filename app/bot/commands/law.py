@@ -462,7 +462,7 @@ async def profession_status(interaction: discord.Interaction) -> None:
         level = int(row.get("level", 0)); xp = int(row.get("xp", 0))
         trade = str(row["profession"])
         lines.append(
-            f"\n**{trade} — {profession_rank(level)}** (Level {level})\n"
+            f"\n**{trade} — {profession_rank(level, trade)}** (Level {level})\n"
             f"XP **{xp}/{profession_xp_needed(level)}** • Successes {row.get('successes',0)} • Failures {row.get('failures',0)} • Quality {row.get('quality_points',0)}"
         )
         for line in by_trade.pop(trade, []):
@@ -470,7 +470,7 @@ async def profession_status(interaction: discord.Interaction) -> None:
     # A method in a trade with no progress row yet is still one you know, and
     # leaving it out is how the old page managed to show nothing at all.
     for trade, entries in sorted(by_trade.items()):
-        lines.append(f"\n**{trade} — {profession_rank(0)}** (Level 0)")
+        lines.append(f"\n**{trade} — {profession_rank(0, trade)}** (Level 0)")
         lines.extend(entries)
     if known:
         lines.append(
