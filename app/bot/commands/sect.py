@@ -282,19 +282,33 @@ async def sect_recommender_autocomplete(interaction: discord.Interaction, curren
     if not c:
         return []
     wt = await current_world_time()
+    here = str(c.get("location") or "")
     needle = current.casefold().strip()
-    out: list[app_commands.Choice[str]] = []
+    sponsors: dict[str, str] = {}
     for name, npc in WORLD.npcs.items():
         if not bool(npc.get("can_recommend")) or not npc.get("sect_affiliation"):
             continue
         npc_location = await current_npc_location(name, wt.period)
-        if npc_location != str(c.get("location") or ""):
+        if npc_location != here:
             continue
-        if needle and needle not in name.casefold() and needle not in str(npc.get("sect_affiliation")).casefold():
+        sponsors[name] = str(npc.get("sect_affiliation"))
+    # A recruitment delegation's elder is a sponsor too (v1.1.0), and he is in
+    # no catalogue: the engine stamped his sect onto the cast row at spawn.
+    # This picker is the only way the hub can ask him - its command takes no
+    # argument - so a sponsor missing here is a sponsor nobody can reach.
+    try:
+        cast = await DB.list_active_event_npcs(here)
+    except Exception:
+        log.exception("Could not read the event cast at %s", here)
+        cast = []
+    for row in cast:
+        if int(row.get("can_recommend") or 0) and str(row.get("sect_name") or ""):
+            sponsors.setdefault(str(row.get("name")), str(row.get("sect_name")))
+    out: list[app_commands.Choice[str]] = []
+    for name, sect_name in sorted(sponsors.items()):
+        if needle and needle not in name.casefold() and needle not in sect_name.casefold():
             continue
-        out.append(app_commands.Choice(
-            name=f"{name} — {npc.get('sect_affiliation')}"[:100], value=name[:100]
-        ))
+        out.append(app_commands.Choice(name=f"{name} — {sect_name}"[:100], value=name[:100]))
     return out[:25]
 
 
@@ -317,7 +331,13 @@ async def sect_recruitment_status(interaction: discord.Interaction) -> None:
         lines.append(f"🧭 Newly recognized from discovered routes: **{', '.join(newly)}**")
     lines.append("\n**Known sects**")
     if not known:
-        lines.append("• None yet. Explore the world, meet sect-affiliated NPCs, and listen for recruitment routes.")
+        # v1.1.0: this used to say "explore the world", and no road reaches a
+        # sect gate, so exploring never found one. These are the doors that do.
+        lines.append(
+            "• None yet. The envoys' hall in a realm capital's temple quarter names every public gate of its world "
+            "(**/world → City → Envoys**); a sect's recruitment delegation at a world event can sponsor you "
+            "(**/sect → Recruitment → Recommendation**)."
+        )
     for sect_name in known:
         sect = WORLD.sects[sect_name]
         rec = recruitment_definition(WORLD.sects, sect_name) or {}
@@ -333,8 +353,18 @@ async def sect_recruitment_status(interaction: discord.Interaction) -> None:
                 f"• **{row['sect_name']}** via **{row['npc_name']}** • entrance bonus **+{int(row.get('bonus',0))}**"
             )
     else:
-        lines.append("• None. Speak with a local sect-affiliated NPC before asking them to sponsor you.")
+        lines.append(
+            "• None. A sponsor standing where you are can put their name to you "
+            "(**/sect → Recruitment → Recommendation**): **+N on both trial rolls**."
+        )
+    # A route recognised here is a sect discovered (v1.1.0): the quest that
+    # asks for one had no reporter a player could reach. Recorded before the
+    # page is sent, told after it (v1.0.5).
+    progressed = []
+    if newly:
+        progressed = await record_quest_progress(interaction.user.id, "sect_discovery", amount=1, game_minute=wt.total_minutes)
     await reply_long(interaction, "\n".join(lines), ephemeral=False)
+    await announce_quest_progress(interaction, progressed)
 
 
 @registered_group_command(sect_recruitment_group, name="info", description="Inspect the public recruitment story for a sect you have discovered")
@@ -389,18 +419,34 @@ async def sect_recruitment_recommendation(interaction: discord.Interaction, npc:
         await interaction.response.send_message(f"**{npc}** is dead and recommends nobody.",ephemeral=False);return
     if npc_location!=str(c.get('location') or ''):
         await interaction.response.send_message(f"**{npc}** is currently at **{npc_location or 'an unknown location'}**, not **{await character_location_display(c)}**.",ephemeral=False);return
-    memory=await DB.get_npc_memory(interaction.user.id,npc)
-    if not memory.strip():
-        await interaction.response.send_message(f"Speak with **{npc}** first; a recommendation requires established personal history.",ephemeral=False);return
+    # v1.1.0: a "speak with them first" check stood here and never fired -
+    # `get_npc_memory` answers a sentence, never "", for somebody you have not
+    # met - and it is gone rather than fixed: asking is the conversation.
     family=await DB.get_birth_family(interaction.user.id); reps=await DB.get_reputations(interaction.user.id); rep=next((int(x.get('score',0)) for x in reps if str(x.get('faction_key'))==sect_name),0)
     _,notes=recommendation_modifier(c,faction_reputation=rep,family=family,sect_alignment=str(WORLD.sects[sect_name].get('alignment','Neutral')))
+    # Whom the sponsor speaks for and the gate their word reveals are the
+    # engine's (v1.1.0): it used to write whatever `location` this sent onto
+    # the travel list, where a road-less place is an instant jump.
     try:
-        e=await ENGINE.authoritative_action("sect.recruitment.recommendation",interaction.user.id,{"npc_name":npc,"sect_name":sect_name,"location":str(rec.get('location') or ''),"details":{"modifier_notes":notes}},action_id=f"discord:{interaction.id}:sect.recruitment.recommendation"); r=dict(e.get('result') or {})
+        e=await ENGINE.authoritative_action("sect.recruitment.recommendation",interaction.user.id,{"npc_name":npc,"details":{"modifier_notes":notes}},action_id=f"discord:{interaction.id}:sect.recruitment.recommendation"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
         await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
+    sect_name=str(r.get('sect_name') or sect_name); gate=str(r.get('gate') or '')
     roll=dict(r.get('roll') or {}); roll_text=f"2d10 {int(roll.get('modifier',0)):+d} = **{int(roll.get('total',0))}** vs TN **{int(roll.get('tn',0))}**"
-    tail=f"📜 Recommendation secured: +{int(r.get('recommendation_bonus',0))}." if r.get('success') else "The recommendation was not granted."
-    await interaction.response.send_message(f"{roll_text}\n{tail}",ephemeral=False)
+    if r.get('success'):
+        lines=[f"📜 **{npc}** puts their name to you for the **{sect_name}**: **+{int(r.get('recommendation_bonus',0))} on both entrance-trial rolls**."]
+        if gate:
+            lines.append(f"🗺️ **{gate}** is on your travel list — **/travel** there, then sit the trial with **/sect → Recruitment → Trial**.")
+    else:
+        lines=[
+            f"**{npc}** will not vouch for you yet. You may ask again after a world day.",
+            f"Standing with the **{sect_name}** makes a sponsor likelier to agree: whoever keeps its gate has entry-level work open to those in no sect (**/npc → People → Talk** there).",
+        ]
+    progressed=[]
+    if r.get('new_sect'):
+        progressed=await record_quest_progress(interaction.user.id,"sect_discovery",amount=1,game_minute=(await current_world_time()).total_minutes)
+    await interaction.response.send_message("\n".join([roll_text,*lines]),ephemeral=False)
+    await announce_quest_progress(interaction,progressed)
 
 
 @registered_group_command(sect_recruitment_group, name="recommendations", description="List active NPC sect recommendations")
@@ -435,7 +481,9 @@ async def sect_recruitment_trial(interaction: discord.Interaction, sect_name: st
     if rejection or rejection2:
         await interaction.response.send_message(f"🚫 **Entrance refused before examination.** {rejection or rejection2}",ephemeral=False);return
     try:
-        e=await ENGINE.authoritative_action("sect.recruitment.trial",interaction.user.id,{"sect_name":sect_name,"examiner":profile.examiner,"location":profile.location,"trial_name":profile.trial_name,"primary_details":primary_notes,"secondary_details":secondary_notes},action_id=f"discord:{interaction.id}:sect.recruitment.trial"); r=dict(e.get('result') or {})
+        # The gate and the examiner are the engine's, read off the catalogue
+        # (v1.1.0); this sends neither.
+        e=await ENGINE.authoritative_action("sect.recruitment.trial",interaction.user.id,{"sect_name":sect_name,"trial_name":profile.trial_name,"primary_details":primary_notes,"secondary_details":secondary_notes},action_id=f"discord:{interaction.id}:sect.recruitment.trial"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
         await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
     outcome=str(r.get('outcome','fail')); p=dict(r.get('primary') or {}); q=dict(r.get('secondary') or {})

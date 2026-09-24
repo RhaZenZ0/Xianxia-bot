@@ -60,6 +60,14 @@ def authored_objectives() -> list[tuple[str, str, str]]:
                 walk(value, quest)
 
     walk(CONTENT, "")
+    # The static quests too (v1.1.0). `road_to_a_sect` is handed to everybody
+    # who finishes the beginner path and lives in `app/rules/quests.py`, not in
+    # the content file - so this gate never read its labels, which named no
+    # command at all until they were given hub paths.
+    from app.rules.quests import QUEST_DEFINITIONS
+
+    for key, definition in QUEST_DEFINITIONS.items():
+        walk(definition, key)
     return out
 
 
@@ -166,6 +174,12 @@ class AQuestNamesACommandThatCanAdvanceIt(unittest.TestCase):
                            "no quest reporters found in app/bot/commands; the gate is broken, not the tree")
         self.assertGreater(len(self.leaves), 100,
                            "the hub registry came back with no leaves; the gate is broken, not the tree")
+
+    def test_the_static_quests_are_read(self):
+        """Asserted before it is trusted (rc.57): the road into a sect is the
+        quest this reader was widened for."""
+        quests = {quest for _, _, quest in self.objectives}
+        self.assertIn("road_to_a_sect", quests, "QUEST_DEFINITIONS was not walked; the gate is broken, not the tree")
 
     def test_the_command_a_label_names_reports_the_objectives_type(self):
         offenders, checked = [], 0

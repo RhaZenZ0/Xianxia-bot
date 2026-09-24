@@ -69,6 +69,20 @@ func SpawnWorldEventNodes(conn *storage.Conn, catalog worlddata.Catalog, eventKe
 	if tierRank < 1 {
 		tierRank = 1
 	}
+	// A template that marks a node or a cast member as the sect's (v1.1.0 -
+	// the Sect Recruitment delegation) speaks for a real sect of this world,
+	// and the rows are stamped with it here so a content edit mid-event cannot
+	// change whom a running delegation speaks for. The columns are migration
+	// 61's; in the boot window before it has run the event stays generic
+	// rather than failing the tick that spawned it.
+	recruiting := ""
+	if templateNamesASect(template) {
+		recruiting = recruitingSectFor(catalog, eventKey, location)
+	}
+	nodeSects, err := tableHasColumns(conn, "world_event_nodes", "reveals_sect")
+	if err != nil {
+		return 0, err
+	}
 	spawned := int64(0)
 	for _, n := range template.Nodes {
 		key := strings.TrimSpace(n.Key)
@@ -90,7 +104,20 @@ func SpawnWorldEventNodes(conn *storage.Conn, catalog worlddata.Catalog, eventKe
 		if rank < 1 {
 			rank = 1
 		}
-		if _, err := conn.Execute(`INSERT INTO world_event_nodes(
+		reveals := ""
+		if n.RevealsSect {
+			reveals = recruiting
+		}
+		if nodeSects {
+			if _, err := conn.Execute(`INSERT INTO world_event_nodes(
+            event_key,node_key,node_type,name,descriptor,rank,total,remaining,cleared_by,tn,attribute,
+            item_id,item_qty,cultivation,spirit_stones,contribution,reveals_sect,created_at,updated_at
+        ) VALUES(?,?,?,?,?,?,?,?,0,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(event_key,node_key) DO NOTHING`,
+				[]any{eventKey, key, n.Type, n.Name, n.Descriptor, rank, total, total, n.TN, n.Attribute,
+					itemID, qty, n.Cultivation, n.SpiritStones, n.Contribution, reveals, now, now}); err != nil {
+				return 0, err
+			}
+		} else if _, err := conn.Execute(`INSERT INTO world_event_nodes(
             event_key,node_key,node_type,name,descriptor,rank,total,remaining,cleared_by,tn,attribute,
             item_id,item_qty,cultivation,spirit_stones,contribution,created_at,updated_at
         ) VALUES(?,?,?,?,?,?,?,?,0,?,?,?,?,?,?,?,?,?) ON CONFLICT(event_key,node_key) DO NOTHING`,
@@ -100,7 +127,7 @@ func SpawnWorldEventNodes(conn *storage.Conn, catalog worlddata.Catalog, eventKe
 		}
 		spawned++
 	}
-	cast, err := spawnWorldEventCastTx(conn, catalog, eventKey, location, template, now)
+	cast, err := spawnWorldEventCastTx(conn, catalog, eventKey, location, template, recruiting, now)
 	if err != nil {
 		return 0, err
 	}
@@ -112,9 +139,13 @@ func SpawnWorldEventNodes(conn *storage.Conn, catalog worlddata.Catalog, eventKe
 // events of the same category field different officers, and walked forward
 // until one is free - the name index is unique across live events, so a cast
 // member is always an unambiguous person to address.
-func spawnWorldEventCastTx(conn *storage.Conn, catalog worlddata.Catalog, eventKey, location string, template worlddata.EventSiteTemplate, now float64) (int64, error) {
+func spawnWorldEventCastTx(conn *storage.Conn, catalog worlddata.Catalog, eventKey, location string, template worlddata.EventSiteTemplate, recruiting string, now float64) (int64, error) {
 	if !tableExistsTx(conn, "world_event_npcs") || len(template.NPCs) == 0 {
 		return 0, nil
+	}
+	castSects, err := tableHasColumns(conn, "world_event_npcs", "sect_name", "can_recommend")
+	if err != nil {
+		return 0, err
 	}
 	pool := catalog.EventSites.NamePool
 	spawned := int64(0)
@@ -142,17 +173,49 @@ func spawnWorldEventCastTx(conn *storage.Conn, catalog worlddata.Catalog, eventK
 				}
 			}
 		}
-		res, err := conn.Execute(`INSERT INTO world_event_npcs(
+		var res storage.Result
+		if castSects {
+			sect, sponsor := "", int64(0)
+			if recruiting != "" && (person.SectMember || person.CanRecommend) {
+				sect = recruiting
+				if person.CanRecommend {
+					sponsor = 1
+				}
+			}
+			res, err = conn.Execute(`INSERT INTO world_event_npcs(
+            event_key,npc_key,name,title,role,personality,speech,want,fear,descriptor,location,sect_name,can_recommend,created_at
+        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(event_key,npc_key) DO NOTHING`,
+				[]any{eventKey, key, name, title, person.Role, person.Personality, person.Speech,
+					person.Want, person.Fear, person.Descriptor, location, sect, sponsor, now})
+		} else {
+			res, err = conn.Execute(`INSERT INTO world_event_npcs(
             event_key,npc_key,name,title,role,personality,speech,want,fear,descriptor,location,created_at
         ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(event_key,npc_key) DO NOTHING`,
-			[]any{eventKey, key, name, title, person.Role, person.Personality, person.Speech,
-				person.Want, person.Fear, person.Descriptor, location, now})
+				[]any{eventKey, key, name, title, person.Role, person.Personality, person.Speech,
+					person.Want, person.Fear, person.Descriptor, location, now})
+		}
 		if err != nil {
 			return 0, err
 		}
 		spawned += res.RowsAffected
 	}
 	return spawned, nil
+}
+
+// templateNamesASect reports whether an event template marks anything as the
+// sect's - a node whose clearing reveals it, or a cast member who belongs to it.
+func templateNamesASect(template worlddata.EventSiteTemplate) bool {
+	for _, n := range template.Nodes {
+		if n.RevealsSect {
+			return true
+		}
+	}
+	for _, person := range template.NPCs {
+		if person.SectMember || person.CanRecommend {
+			return true
+		}
+	}
+	return false
 }
 
 func hashString(s string) uint64 {
@@ -180,12 +243,23 @@ type worldEventSiteNode struct {
 	Cultivation  int64
 	SpiritStones int64
 	Contribution int64
+	// RevealsSect is the sect this node shows the way to when cleared, stamped
+	// at spawn (v1.1.0); "" for every node that reveals nothing.
+	RevealsSect string
 }
 
 func loadWorldEventNodeTx(conn *storage.Conn, eventKey, nodeKey string) (worldEventSiteNode, error) {
 	var n worldEventSiteNode
+	sects, err := tableHasColumns(conn, "world_event_nodes", "reveals_sect")
+	if err != nil {
+		return n, err
+	}
+	revealsColumn := "''"
+	if sects {
+		revealsColumn = "reveals_sect"
+	}
 	res, err := conn.Execute(`SELECT node_id,node_key,node_type,name,descriptor,rank,total,remaining,tn,attribute,
-        item_id,item_qty,cultivation,spirit_stones,contribution FROM world_event_nodes WHERE event_key=? AND node_key=? LIMIT 1`,
+        item_id,item_qty,cultivation,spirit_stones,contribution,`+revealsColumn+` FROM world_event_nodes WHERE event_key=? AND node_key=? LIMIT 1`,
 		[]any{eventKey, nodeKey})
 	if err != nil {
 		return n, err
@@ -200,6 +274,10 @@ func loadWorldEventNodeTx(conn *storage.Conn, eventKey, nodeKey string) (worldEv
 		Total: storage.ParseInt(r[6]), Remaining: storage.ParseInt(r[7]), TN: storage.ParseInt(r[8]),
 		Attribute: fmt.Sprint(r[9]), ItemID: fmt.Sprint(r[10]), ItemQty: storage.ParseInt(r[11]),
 		Cultivation: storage.ParseInt(r[12]), SpiritStones: storage.ParseInt(r[13]), Contribution: storage.ParseInt(r[14]),
+		RevealsSect: strings.TrimSpace(fmt.Sprint(r[15])),
+	}
+	if n.RevealsSect == "<nil>" {
+		n.RevealsSect = ""
 	}
 	return n, nil
 }
@@ -350,6 +428,18 @@ func worldEventEngageAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 			out["cultivation_awarded"] = awarded
 			out["spirit_stones"] = reward.SpiritStones
 			out["items"] = reward.Items
+		}
+		// The delegation's trial, passed (v1.1.0): the sect it speaks for is
+		// known now and its gate is on the cultivator's travel list. The trial
+		// that makes somebody a disciple is still sat at that gate.
+		if node.RevealsSect != "" {
+			shown, e := revealSectRouteTx(conn, catalog, userID, node.RevealsSect, "event_trial", "event:"+eventKey, p.GameMinute, now)
+			if e != nil {
+				return authoritativeMutation{}, e
+			}
+			if shown != nil {
+				out["sect_revealed"] = shown
+			}
 		}
 	}
 	out["remaining"] = remaining

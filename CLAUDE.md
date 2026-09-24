@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 60; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 61; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -4377,6 +4377,125 @@ turned a profit at Novice before this release, which is in `docs/TODO.md` as a c
 `tradeSellQuoteTx` the sale uses, because a board showing what *anybody* gets would disagree with the
 sale it advertises - rc.46's rule. Both carry `base_price`, `trade` and `trade_rank`, and the bot only
 says which rank lifted the price (`_rank_lift`); it decides nothing.
+
+### The door into a sect (`sect_doors.go`, schema 61, v1.1.0)
+
+Reported in Discord: at a **Major Sect Recruitment** world event a player talked to the Visiting
+Elder, pressed him, and was told they were impatient and would not be taken. The owner answered
+*"get a recommendation, do quests for an elder of a sect, then travel to the sect for intake"* - and
+the next player asked **"What menu?"**. Every link of that road was broken, and each one is a shape
+this file already names.
+
+- **The event recruited nobody.** It named no sect; its elder had no `sect_affiliation` and a role
+  reading *"Decides who is taken"*, under a panel saying "Use **Talk**". The refusal was the routine
+  narrator improvising, and nothing told it that no conversation can admit anybody.
+- **No road reaches a sect gate.** All twelve are authored with no `roads` and nothing's roads lead
+  to them, so `/explore` - which charts one road out from what is known - can never find one. The
+  envoys' hall recorded the sects, said *"their routes are on your map now"*, and wrote nothing a
+  route could be read from; `/travel` then refused the gate it had just named. The single path that
+  wrote a gate onto a travel list was a successful NPC recommendation.
+- **A realm-0 player could not join at all.** Recommendation and Trial opened at realm 1, and both
+  take an argument, so a hub press is the only way to reach them - the typed shorthand reads two
+  words and these are three. v1.0.9 says *"gating is advertising, never a bound"*, and **a
+  curriculum floor on a leaf nothing else can reach is a bound.** Meanwhile `road_to_a_sect`, which
+  the beginner path hands everybody as `beginner_lesson`'s `follow_on`, asked for exactly that; its
+  only `sect_discovery` reporter was the impossible explore path, so it could never complete.
+- **The owner's route did not exist.** All twenty-four elder commissions were members-only and
+  nothing raised standing with a sect before joining it; and the recommendation's "+N", shown in four
+  places, was never added to a trial roll - `sectTrialActionGo`'s comment said it only unlocked the
+  conditional pass.
+
+**The gate was the caller's, which is why this could not be fixed in Python.** The recommendation
+wrote whatever `location` its payload named into `character_location_discoveries`, and the trial took
+its gate from the payload too - and a known, road-less location is an instant jump on `/travel`. So a
+forged payload could put any place in the world on a player's map; making the event a prominent door
+would have made that door prominent. `revealSectRouteTx` is the one statement of the knowledge, and
+the gate it writes is always read off the catalogue (`sectGate`). An older bot's payload is still
+accepted, and a sect it names is heard only to refuse a mismatch - rc.48's rolling-deploy rule.
+
+**Which sect a delegation speaks for is a hash, not a roll.** `recruitingSectFor`: the sect whose gate
+the event stands on, else the public, non-hidden sects whose gate is in the event's world, sorted and
+picked by `hashString(eventKey+":recruiting")`. Gates carry no coordinates, so there is no "nearest"
+for the content to measure. It is **stamped at spawn** into `world_event_npcs.sect_name` /
+`can_recommend` and `world_event_nodes.reveals_sect`, so a content edit mid-event cannot change whom a
+delegation speaks for, and every insert and read guards on the columns: in the compose stack the
+engine is healthy before db-init migrates, and a site spawned in that window is left generic rather
+than failing the tick. The trial node's count went from `[1,3]` to `[3,6]` - at severity 3 it held
+one unit, so only the first player per event could ever have been shown the gate.
+
+**Outsider standing is 25, and that number is the smallest that does anything.** The trial's TN is
+`max(10, 15 - rep/25)` and the recommendation adds `rep/20`, so 25 moves both one step. It is declared
+as `seed_json` `{"outsider_standing": 25}` on the twelve tier-1 sect commissions, capped at 25 by the
+engine, paid only on a `commission_` key with a `requires_sect` to somebody in no sect, and each is
+taken once (`commission.accept` refuses a key held before), so it cannot snowball. The Forge cannot
+draft it: the validator builds no `seed` and Forge keys are `forge_`/`quest_` - the `household_standing`
+precedent. `rules.open_to_outsiders` mirrors the prefix so the offer ladder never offers what the
+engine refuses (rc.46), and `test_the_door_into_a_sect.py` reads the Go constant to hold them equal.
+A disciple of another sect is still refused: that is a rival asking to do sect business.
+
+**The rest follows from those.** A running event's cast answers `current_npc_location` - `None` there
+reads as "do not filter by location", so a militia captain was talkable from across the world and a
+sponsor's presence check could never be met. The recommendation picker lists the cast, because it is
+the only way the hub can ask the elder. Both system prompts say no NPC grants, promises or refuses
+membership, a recommendation, a commission or a reward, and `/talk` passes `NPC SECT TIES:`. And
+migration 61 rewrites the quest's two labels in a running world - in the definition *and* in terms a
+player already pinned - leaving a label a GM has edited alone.
+
+**The v1.0.9 floor now reaches one quest further.** `test_the_quest_the_beginner_path_hands_over_is_not_held_back`
+walks the beginner path's `follow_on` chain out of the path and requires every objective of what it
+hands over to have one reporter open at realm 0; its drill puts the trial back at realm 1 and names
+it. `test_a_quest_names_a_command_that_can_advance_it.py` reads `QUEST_DEFINITIONS` now too, which is
+how the new labels are held to commands that report them.
+
+**Three of the Go drills broke the build instead of failing a test**, each by leaving a variable
+unused - and a drill that does not compile proves nothing about the test it was aimed at. They were
+rewritten as a disabled condition (`if member == nil && false`), which is the shape rc.49 says a grep
+cannot see and only behaviour can. The harness drives the whole road as its own fifth cultivator,
+`APPLICANT`: the hall refused from the street, every public gate named and no other, the road-less
+jump landing at the gate, the entry-level work taken and finished for +25, the deeper work refused,
+the way in taken once.
+
+### A button is drawn where it works (`LOCATION_GATES`, v1.1.0)
+
+Reported from play: in the birth household, `/economy → City Shops → Browse` answered *"not inside a
+shop; find one by exploring a city"*. Asked to hide every such button, the owner chose all of them,
+and to keep City Shops **Here** - it never refuses, and it is the door that says where a city's shops
+are.
+
+**No new machinery.** rc.32's hidden-actions provider gained a third member, `_location_hidden_actions`,
+driven by `LOCATION_GATES` in `PROGRESSION_GATES`' shape, and each hide prints the existing
+`🔒 Label — reason` line. `_hidden_actions` reads the character once and hands it to all three - each
+used to read its own. What it hides is the leaves refused **only because of where the player stands**:
+a shop's counter (`shopAt`), an auction floor (`catalogHouseAt`) and its door (`cityOf`, blanked in a
+shop), an inn's long table, protected ground, a shrine, a road-side site, a realm entrance, a sect
+gate, a boss lair, an examination hall, the four private prefixes, your own world and property, and
+the five seclusion sites. Each asks the engine's own question, found by reading each handler rather
+than by guessing, and the engine stays the refusal: a leaf typed directly still reaches it.
+
+**What is not hidden is a decision each time.** A read or the door into a system (`shop here`, the
+city's reads, `auction appraise`); a refusal that depends on state rather than place (a merchant's
+stock, a beast to tame, a trade to accept); and the three place rules that would need a copy of an
+engine formula or a read per refresh - the ghost ground's multiplier, the black market's post, an
+array's departure - each hidden only inside a private room, where the answer needs no read.
+
+**The twins are computed a third time.** `test_a_button_is_drawn_where_it_works.py` rewrites
+`cityOf`, `shopAt`, the auction door and `sectGate` from the Go, off the raw content file, and holds
+the Python twins to them over all 477 locations - v1.0.9's rule, because two wrong halves agreeing is
+exactly what a test against the Python alone would pass. **One of its drills stayed green**: dropping
+`sectGate`'s hidden check changed nothing, because the one hidden sect carries no recruitment at all -
+rc.53's `!ok`, belt-and-braces against today's content. A planted hidden sect with a gate on a real
+street is what holds it now.
+
+**Reading every handler found four faults the hides would have inherited.** `caravan.dispatch` planned
+from the raw location while travel uses `cityOf`, so it refused at every gate and district of the city
+it stood in - v1.0.9's household door in a second handler, fixed in the engine with a Go test from a
+real gate. `PRIVATE_LOCATION_EXITS` named `/abode → Leave` as the way out of a sect residence, and
+`abode.leave` reads `cave_abodes` while a residence is a `sect_abodes` row. `PROGRESSION_GATES["abode"]`
+hid `abode leave` and `abode focus` from anybody owning no property - every invited guest standing in
+somebody else's; they are asked by place now, and `abode enter` says where the property stands. And
+the Nine-Echo Sword Wraith's lair, in both boss tables, is the name of a secret realm rather than a
+place, so that raid can never be started; the two tables had no parity test and have one now, and the
+lair is a content decision in `docs/TODO.md`.
 
 ## Testing conventions
 

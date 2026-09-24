@@ -17,13 +17,14 @@ const worldEventNodesDDL = `CREATE TABLE world_event_nodes (
     remaining INTEGER NOT NULL DEFAULT 0,cleared_by INTEGER NOT NULL DEFAULT 0,tn INTEGER NOT NULL DEFAULT 12,
     attribute TEXT NOT NULL DEFAULT 'insight',item_id TEXT NOT NULL DEFAULT '',item_qty INTEGER NOT NULL DEFAULT 0,
     cultivation INTEGER NOT NULL DEFAULT 0,spirit_stones INTEGER NOT NULL DEFAULT 0,contribution INTEGER NOT NULL DEFAULT 1,
-    created_at REAL NOT NULL,updated_at REAL NOT NULL,UNIQUE(event_key,node_key));`
+    created_at REAL NOT NULL,updated_at REAL NOT NULL,reveals_sect TEXT NOT NULL DEFAULT '',UNIQUE(event_key,node_key));`
 
 const worldEventNPCsDDL = `CREATE TABLE world_event_npcs (
     event_key TEXT NOT NULL,npc_key TEXT NOT NULL,name TEXT NOT NULL,title TEXT NOT NULL DEFAULT '',
     role TEXT NOT NULL DEFAULT '',personality TEXT NOT NULL DEFAULT '',speech TEXT NOT NULL DEFAULT '',
     want TEXT NOT NULL DEFAULT '',fear TEXT NOT NULL DEFAULT '',descriptor TEXT NOT NULL DEFAULT '',
-    location TEXT NOT NULL DEFAULT '',created_at REAL NOT NULL,PRIMARY KEY(event_key,npc_key));
+    location TEXT NOT NULL DEFAULT '',created_at REAL NOT NULL,sect_name TEXT NOT NULL DEFAULT '',
+    can_recommend INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(event_key,npc_key));
 CREATE UNIQUE INDEX idx_world_event_npcs_name ON world_event_npcs(name);`
 
 const worldEventParticipationDDL = `CREATE TABLE world_event_participation (

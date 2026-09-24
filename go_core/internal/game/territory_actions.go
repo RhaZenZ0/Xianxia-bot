@@ -301,7 +301,13 @@ func caravanDispatchActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	if !strings.EqualFold(strings.TrimSpace(fmt.Sprint(c["life_status"])), "alive") {
 		return authoritativeMutation{}, errors.New("only a living incarnation can dispatch a caravan")
 	}
-	origin := fmt.Sprint(c["location"])
+	// A caravan leaves from the city the cultivator is standing in (v1.1.0).
+	// This planned from the raw location while every other road in the game
+	// plans from `cityOf`, so a dispatch from a gate, a district or a shop -
+	// which is where a walk into a city ends - found no road and refused, at
+	// 429 of the catalogue's 477 places. The same fault v1.0.9 found in the
+	// household door, in a second place.
+	origin := cityOf(catalog, fmt.Sprint(c["location"]))
 	if p.Destination == "" || p.Destination == origin {
 		return authoritativeMutation{}, errors.New("choose a different destination")
 	}

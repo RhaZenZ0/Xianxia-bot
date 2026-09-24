@@ -66,7 +66,9 @@ class TheReplySaysHowTheyWent(unittest.TestCase):
         self.assertIn("You ride **{mount}**", line)
         # The walking line is the pointer to a flying artifact, and it is
         # shown to exactly the cultivators who cannot yet leave the ground.
-        self.assertIn("/economy → City Shops → Browse", line)
+        # It names Here, not Browse (v1.1.0): the road ends on a street, and
+        # Browse is drawn only inside a shop.
+        self.assertIn("/economy → City Shops → Here", line)
 
 
 class TheSwordIsStillASword(unittest.TestCase):

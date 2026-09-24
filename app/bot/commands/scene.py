@@ -275,7 +275,8 @@ async def talk(
     if bool(npc_data.get("can_recommend")) and npc_data.get("sect_affiliation"):
         recommendation_hint = (
             f"\n\n🏯 **Sect connection:** {npc} is affiliated with **{npc_data.get('sect_affiliation')}**. "
-            "After speaking with them, you may use **Sect → Recruitment → Recommendation** to ask for formal sponsorship."
+            "Conversation decides nothing about who a sect takes; ask for formal sponsorship with "
+            "**/sect → Recruitment → Recommendation** - a roll, worth a bonus on both entrance-trial rolls."
         )
     commission_card, commission_view = ("", None)
     if commission_offer is not None:

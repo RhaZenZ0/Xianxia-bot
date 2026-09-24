@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 60
+SCHEMA_VERSION = 61
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -2591,6 +2591,58 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             "CREATE INDEX IF NOT EXISTS idx_world_eras_world_active ON world_eras(world, active, era_id)",
         ),
     ),
+    (
+        61,
+        "a_sect_takes_applicants_where_it_is_found",
+        (
+            # v1.1.0: a Major Sect Recruitment world event named no sect, its
+            # Visiting Elder belonged to none, and a player who talked to him
+            # was told they were impatient - by a narrator improvising from a
+            # role that said "Decides who is taken". A delegation speaks for a
+            # real sect of its world now, stamped onto the rows at spawn so a
+            # content edit mid-event cannot change whom it speaks for: the
+            # elder and the disciple carry the sect, the elder may sponsor, and
+            # the trial node names the sect whose gate clearing it reveals.
+            # Both tables are migration 42's and 43's, not the base DDL's, so
+            # these columns are this migration's alone (rc.57). The engine
+            # guards on them, so a site spawned before this runs is generic.
+            "ALTER TABLE world_event_npcs ADD COLUMN sect_name TEXT NOT NULL DEFAULT ''",
+            "ALTER TABLE world_event_npcs ADD COLUMN can_recommend INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE world_event_nodes ADD COLUMN reveals_sect TEXT NOT NULL DEFAULT ''",
+            # "A Road Toward a Sect" is handed to everybody who finishes the
+            # beginner path, and its two labels named no menu - "Discover a
+            # sect", "Attempt a sect entrance trial" - while every other stage
+            # names its hub path. The seeding is insert-only, so the new labels
+            # reach a running world here: in the definition, and in the terms a
+            # player already holding the quest had pinned. A label a GM has
+            # already edited does not match and is left alone.
+            """UPDATE quest_definitions
+                  SET objectives_json=replace(replace(objectives_json,
+                      '"Discover a sect"', '"Learn where a sect takes applicants - **/world → City → Envoys**"'),
+                      '"Attempt a sect entrance trial"', '"Sit the entrance trial at the sect gate - **/sect → Recruitment → Trial**"')
+                WHERE quest_key='road_to_a_sect'""",
+            """UPDATE character_quests
+                  SET terms_json=replace(replace(terms_json,
+                      '"Discover a sect"', '"Learn where a sect takes applicants - **/world → City → Envoys**"'),
+                      '"Attempt a sect entrance trial"', '"Sit the entrance trial at the sect gate - **/sect → Recruitment → Trial**"')
+                WHERE quest_key='road_to_a_sect'""",
+            # A sect's entry-level work opens to somebody in no sect, and
+            # finishing it pays standing with that sect - the owner's route
+            # into a sect, which the code did not have. The content file says
+            # so for new worlds; a running world's rows are insert-only, so it
+            # is said here too, and only where nobody has set a seed already
+            # (migration 55's rule: a GM's edit is obeyed).
+            """UPDATE quest_definitions SET seed_json='{"outsider_standing": 25}'
+                WHERE quest_key IN (
+                    'commission_azure_gate_roster','commission_furnace_second_ash',
+                    'commission_moon_terrace_watch','commission_serpent_feeding_day',
+                    'commission_blood_red_water','commission_lantern_names_register',
+                    'commission_jade_meridian_sect_gate_watch','commission_thousand_beast_valley_gate_watch',
+                    'commission_heavenblade_immortal_sect_gate_watch','commission_ashen_lotus_pavilion_gate_watch',
+                    'commission_celestial_mandate_academy_gate_watch','commission_void_serpent_cult_gate_watch')
+                  AND seed_json IN ('', '{}')""",
+        ),
+    ),
 )
 
 
@@ -4852,6 +4904,13 @@ class Database:
             "descriptor": record.get("descriptor") or "",
             "event_key": record.get("event_key") or "",
             "event_cast": True,
+            # v1.1.0: a recruitment delegation's elder and disciple belong to
+            # the sect it speaks for, stamped at spawn, and the elder may
+            # sponsor an applicant - so they answer the two fields a catalogue
+            # sponsor carries, and everything that already reads those
+            # (the /talk hint, the recommendation picker) reaches them too.
+            "sect_affiliation": record.get("sect_name") or "",
+            "can_recommend": bool(record.get("can_recommend")),
         }
 
     async def world_event_site_progress(self, event_key: str) -> dict[str, Any]:

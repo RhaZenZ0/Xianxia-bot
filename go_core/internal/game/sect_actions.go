@@ -89,8 +89,8 @@ func sectRecommendationActionGo(conn *storage.Conn, catalog worlddata.Catalog, u
 	}
 	p.NPCName = strings.TrimSpace(p.NPCName)
 	p.SectName = strings.TrimSpace(p.SectName)
-	if p.NPCName == "" || p.SectName == "" {
-		return authoritativeMutation{}, errors.New("npc_name and sect_name are required")
+	if p.NPCName == "" {
+		return authoritativeMutation{}, errors.New("npc_name is required")
 	}
 	c, e := loadMechanicsCharacter(conn, userID)
 	if e != nil {
@@ -99,6 +99,20 @@ func sectRecommendationActionGo(conn *storage.Conn, catalog worlddata.Catalog, u
 	if c.LifeStatus != "alive" {
 		return authoritativeMutation{}, errors.New("a deceased incarnation cannot seek a sect recommendation")
 	}
+	// Whom the sponsor speaks for, and the gate their word reveals, are the
+	// engine's (v1.1.0). Both used to be the caller's: the sect was taken on
+	// trust and `location` was written straight onto the travel list, where a
+	// road-less place is an instant jump. A caller naming a sect is still
+	// heard - an older bot sends one - but only to refuse a mismatch.
+	sponsored, e := resolveRecommenderTx(conn, catalog, p.NPCName, c, nowSeconds())
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	if p.SectName != "" && p.SectName != sponsored {
+		return authoritativeMutation{}, fmt.Errorf("%s speaks for the %s, not the %s", p.NPCName, sponsored, p.SectName)
+	}
+	p.SectName = sponsored
+	gate := sectGate(catalog, p.SectName)
 	if m, _ := sectMembershipRow(conn, userID); m != nil {
 		return authoritativeMutation{}, errors.New("already belongs to a public sect")
 	}
@@ -135,7 +149,7 @@ func sectRecommendationActionGo(conn *storage.Conn, catalog worlddata.Catalog, u
 		bonus = clampI64(2+roll.Margin/3, 1, 6)
 	}
 	now := nowSeconds()
-	route := false
+	route, newSect := false, false
 	recID := int64(0)
 	if roll.Success {
 		_, _ = conn.Execute(`UPDATE sect_recommendations SET status='superseded',updated_at=? WHERE user_id=? AND sect_name=? AND status='active'`, []any{now, userID, p.SectName})
@@ -144,20 +158,23 @@ func sectRecommendationActionGo(conn *storage.Conn, catalog worlddata.Catalog, u
 			return authoritativeMutation{}, e
 		}
 		recID = ins.LastInsertID
-		_, _ = conn.Execute(`INSERT OR IGNORE INTO character_sect_discoveries(user_id,sect_name,discovery_kind,source_key,discovered_game_minute,created_at) VALUES(?,?, 'npc_recommendation', ?, ?, ?)`, []any{userID, p.SectName, p.NPCName, p.GameMinute, now})
-		if p.Location != "" {
-			ins, _ := conn.Execute(`INSERT OR IGNORE INTO character_location_discoveries(user_id,location,discovery_kind,discovered_game_minute,created_at) VALUES(?,?,'npc_recommendation',?,?)`, []any{userID, p.Location, p.GameMinute, now})
-			route = ins.RowsAffected > 0
+		shown, e := revealSectRouteTx(conn, catalog, userID, p.SectName, "npc_recommendation", p.NPCName, p.GameMinute, now)
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		if shown != nil {
+			route = shown["new_route"] == true
+			newSect = shown["new_sect"] == true
 		}
 	}
 	details := map[string]any{"roll": rollMapGo(roll), "route_revealed": route}
 	for k, v := range p.Details {
 		details[k] = v
 	}
-	if e = recordSectAttemptGo(conn, userID, p.SectName, "recommendation", p.NPCName, p.Location, map[bool]string{true: "pass", false: "fail"}[roll.Success], roll.Total, roll.TN, bonus, p.GameMinute, details, now); e != nil {
+	if e = recordSectAttemptGo(conn, userID, p.SectName, "recommendation", p.NPCName, gate, map[bool]string{true: "pass", false: "fail"}[roll.Success], roll.Total, roll.TN, bonus, p.GameMinute, details, now); e != nil {
 		return authoritativeMutation{}, e
 	}
-	out := map[string]any{"success": roll.Success, "roll": rollMapGo(roll), "recommendation_id": recID, "recommendation_bonus": bonus, "route_revealed": route, "sect_name": p.SectName, "npc_name": p.NPCName}
+	out := map[string]any{"success": roll.Success, "roll": rollMapGo(roll), "recommendation_id": recID, "recommendation_bonus": bonus, "route_revealed": route, "new_sect": newSect, "gate": gate, "sect_name": p.SectName, "npc_name": p.NPCName}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "sect", EventType: "sect.recruitment.recommendation", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 
@@ -297,8 +314,20 @@ func sectTrialActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if firstRowMap(r) == nil {
 		return authoritativeMutation{}, errors.New("sect has not been discovered")
 	}
-	if c.Location != p.Location {
-		return authoritativeMutation{}, errors.New("character is not at the sect trial location")
+	// The gate is the catalogue's, never the caller's (v1.1.0): "standing at
+	// the gate" used to be whatever location the payload named. It is still
+	// accepted on the wire, so an older bot mid-upgrade is not refused, and
+	// ignored.
+	gate := sectGate(catalog, p.SectName)
+	if gate == "" {
+		return authoritativeMutation{}, errors.New("that sect holds no public entrance trial")
+	}
+	if c.Location != gate {
+		return authoritativeMutation{}, fmt.Errorf("the entrance trial is sat at %s; you are at %s", gate, c.Location)
+	}
+	p.Location = gate
+	if examiner := strings.TrimSpace(catalog.Sects[p.SectName].Recruitment.Examiner); examiner != "" {
+		p.Examiner = examiner
 	}
 	r, _ = conn.Execute(`SELECT result,game_minute FROM sect_recruitment_attempts WHERE user_id=? AND sect_name=? AND attempt_type='trial' ORDER BY attempt_id DESC LIMIT 1`, []any{userID, p.SectName})
 	if x := firstRowMap(r); x != nil && fmt.Sprint(x["result"]) == "fail" && p.GameMinute-i64(x["game_minute"]) < 1440 {
@@ -320,11 +349,16 @@ func sectTrialActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	// Canonical, not caller-supplied: the primary (martial) and secondary
 	// (spiritual) trial components derive from the character's own
 	// attributes and cultivation depth, with existing sect standing making
-	// the baseline slightly easier. A recommendation grants leeway on the
-	// outcome threshold below, not a further modifier bump, so it isn't
-	// double-counted.
-	primaryMod := c.Attributes["body"] + c.RealmIndex*2 + c.Phase/3
-	secondaryMod := c.Attributes["insight"] + c.Attributes["spirit"]/2 + c.RealmIndex
+	// the baseline slightly easier.
+	//
+	// A recommendation is worth its bonus on both rolls (v1.1.0). Four screens
+	// have said "+N to the trial checks" since recommendations existed, while
+	// this function added nothing and used the recommendation only to open the
+	// conditional pass below - the one thing a sponsor did was the thing no
+	// player was told. It now does both: the bonus rides the rolls, and a near
+	// miss with a sponsor behind you is still a conditional pass.
+	primaryMod := c.Attributes["body"] + c.RealmIndex*2 + c.Phase/3 + recBonus
+	secondaryMod := c.Attributes["insight"] + c.Attributes["spirit"]/2 + c.RealmIndex + recBonus
 	baseTN := maxI64(10, 15-repScore/25)
 	primary, e := roll2d10Go(primaryMod, baseTN)
 	if e != nil {
@@ -393,7 +427,7 @@ func sectTrialActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if e = recordSectAttemptGo(conn, userID, p.SectName, "trial", p.Examiner, p.Location, outcome, primary.Total+secondary.Total, primary.TN+secondary.TN, recBonus, p.GameMinute, details, now); e != nil {
 		return authoritativeMutation{}, e
 	}
-	out := map[string]any{"outcome": outcome, "primary": rollMapGo(primary), "secondary": rollMapGo(secondary), "recommendation_bonus": recBonus, "sect_name": p.SectName}
+	out := map[string]any{"outcome": outcome, "primary": rollMapGo(primary), "secondary": rollMapGo(secondary), "recommendation_bonus": recBonus, "sect_name": p.SectName, "gate": gate}
 	if granted != nil {
 		out["granted_manual"] = granted
 	}

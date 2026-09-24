@@ -125,7 +125,9 @@ class PlayerFacingCommandHintTests(unittest.TestCase):
         source = defining[0].read_text(encoding="utf-8")
         start = re.search(r"^PRIVATE_LOCATION_EXITS", source, re.M).start()
         block = source[start : start + 500]
-        for command in ("/family → Leave", "/abode → Leave", "/innerworld → Leave"):
+        # A sect residence has its own way out since v1.1.0: `/abode → Leave`
+        # reads `cave_abodes` and refused a `sect_abodes` row.
+        for command in ("/family → Leave", "/abode → Leave", "/sect → Holdings → Abode", "/innerworld → Leave"):
             self.assertIn(command, block, f"{command} missing from the exit table")
 
 

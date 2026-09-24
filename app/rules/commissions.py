@@ -75,14 +75,52 @@ def standing_band(value: int) -> str:
     return STANDING_BANDS[-1][1]
 
 
-def sect_allows(required: str, player_sect: str) -> bool:
+# A sect's entry-level work is open to somebody in no sect when its seed says
+# so (v1.1.0). The prefix is the engine's `sectCommissionPrefix`: only an
+# authored commission key may carry it, so a Forge draft - keyed `forge_` or
+# `quest_` - can never open sect work to outsiders or pay standing for it,
+# whatever a GM later writes into its seed. The engine refuses exactly what this
+# refuses; `test_the_door_into_a_sect.py` holds the two prefixes equal.
+SECT_COMMISSION_PREFIX = "commission_"
+
+
+def open_to_outsiders(definition: dict[str, Any] | None) -> bool:
+    """Whether the engine will let somebody in no sect take this sect's work.
+
+    The amount of standing it pays - and its cap - are the engine's and are
+    deliberately not read here: the card says standing is earned, and the
+    completion reply says how much, from what the engine actually paid.
+    """
+    row = dict(definition or {})
+    if not str(row.get("quest_key") or "").startswith(SECT_COMMISSION_PREFIX):
+        return False
+    if not str(row.get("requires_sect") or "").strip():
+        return False
+    seed = row.get("seed")
+    if not isinstance(seed, dict):
+        return False
+    try:
+        return int(seed.get("outsider_standing") or 0) > 0
+    except (TypeError, ValueError):
+        return False
+
+
+def sect_allows(required: str, player_sect: str, *, outsiders_welcome: bool = False) -> bool:
     """A sect commission is sect business. No standing, realm or tier substitutes
     for membership - an outsider is not refused for being unworthy, they are
-    refused for not being a disciple."""
+    refused for not being a disciple.
+
+    Except the way in (v1.1.0): a sect's entry-level work may be open to
+    somebody in **no** sect, which is how an applicant earns the standing that
+    eases its trial. A disciple of another sect is still refused - that is a
+    rival asking to do sect business, not an applicant."""
     required = str(required or "").strip()
     if not required:
         return True
-    return required.casefold() == str(player_sect or "").strip().casefold()
+    player = str(player_sect or "").strip()
+    if required.casefold() == player.casefold():
+        return True
+    return bool(outsiders_welcome) and not player
 
 
 def realm_band_allows(band: str, realm_index: int) -> bool:
@@ -240,14 +278,16 @@ def choose_offer(
         if str(row.get("quest_key")) not in set(taken_keys)
         and int(row.get("tier", 1) or 1) <= ceiling
         and realm_band_allows(str(row.get("realm_band") or ""), realm_index)
-        and sect_allows(str(row.get("requires_sect") or ""), player_sect)
+        and sect_allows(str(row.get("requires_sect") or ""), player_sect,
+                        outsiders_welcome=open_to_outsiders(row))
     ]
     if not candidates:
         # Distinguish "you are not one of us" from "nothing today": a sect board
         # with work on it that this player cannot take should say so, or they
         # will keep asking.
         blocked_by_sect = any(
-            not sect_allows(str(row.get("requires_sect") or ""), player_sect)
+            not sect_allows(str(row.get("requires_sect") or ""), player_sect,
+                            outsiders_welcome=open_to_outsiders(row))
             for row in pool if str(row.get("quest_key")) not in set(taken_keys)
         )
         return Offer(kind="nothing", giver=giver, standing=band, last_outcome=last_outcome,

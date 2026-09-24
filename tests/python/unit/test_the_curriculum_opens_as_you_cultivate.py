@@ -118,6 +118,38 @@ class TheFirstHourIsNeverGated(unittest.TestCase):
             + "\n  ".join(offenders),
         )
 
+    def test_the_quest_the_beginner_path_hands_over_is_not_held_back(self):
+        """The floor above, one quest further (v1.1.0).
+
+        `beginner_lesson` hands over `road_to_a_sect` as its `follow_on`, so
+        every player who finishes the first hour holds it - and its trial sat
+        behind a realm-1 floor on a leaf nothing but the hub can reach, since
+        the command takes an argument and the typed shorthand reads two words.
+        A quest the curriculum makes unreachable is the illegible opening the
+        floor exists to prevent, one link down the chain.
+        """
+        from app.rules.quests import QUEST_DEFINITIONS
+
+        stages = {str(s.get("quest_key")): s for s in CONTENT.get("beginner_path") or []}
+        handed = [str(s.get("follow_on") or "") for s in stages.values()]
+        beyond = [key for key in handed if key and key not in stages]
+        self.assertIn("road_to_a_sect", beyond,
+                      "the beginner path no longer hands over the road into a sect; the gate is broken, not the tree")
+        doors = {
+            # objective type -> every leaf that reports it; one ungated is enough
+            "sect_discovery": ("city envoys", "sect recruitment recommendation", "sect recruitment status"),
+            "sect_trial": ("sect recruitment trial",),
+        }
+        offenders = []
+        for key in beyond:
+            for objective in QUEST_DEFINITIONS.get(key, {}).get("objectives") or []:
+                leaves = doors.get(str(objective.get("type")), ())
+                if leaves and all(leaf in LEAVES for leaf in leaves):
+                    offenders.append(f"{key}: {objective.get('type')!r} is reported only by "
+                                     + ", ".join(f"{leaf!r} (realm {LEAVES[leaf]})" for leaf in leaves))
+        self.assertEqual(offenders, [], "a quest the beginner path hands over has no door open at realm 0:\n  "
+                         + "\n  ".join(offenders))
+
     def test_the_way_out_is_never_gated(self):
         """`/reset` is the door for somebody who has just decided this game is
         too much - which is precisely the player this release is for."""

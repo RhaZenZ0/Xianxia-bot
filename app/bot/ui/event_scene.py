@@ -18,6 +18,7 @@ from typing import Any
 import discord
 
 from ...ops.game_engine import GameEngineError
+from ..character_state import announce_quest_progress, record_quest_progress
 from ..channels import _event_archive_minutes, _report_game_ui_error, _resolve_text_channel, event_scene_parent, world_event_channel
 from ..registry import EVENT_HANDLERS, VIEW_RESTORERS
 from ..runtime import DB, ENGINE, SETTINGS, WORLD, _explain_engine_error, character_location_display, current_world_time, log, reply_long
@@ -246,6 +247,13 @@ class EventSceneView(discord.ui.View):
                 +(f"📍 **{self.location}**\n" if self.location else "")+f"⏳ Closes <t:{int(self.expires_at)}:R>")
         if description:
             header += f"\n\n> {description}"
+        roster=list(cast or [])
+        delegation=_delegation_sect(roster, list(site or []))
+        if delegation:
+            # v1.1.0: a recruitment event named no sect, so a player could not
+            # tell whom the elder spoke for, and nothing on the panel said
+            # which door the scene actually was.
+            header += f"\n\n🏯 This delegation speaks for the **{delegation}**."
         embed=discord.Embed(title=f"🌌 {self.title}", description=header[:4000], color=colour)
 
         site=list(site or []); progress=dict(progress or {})
@@ -273,6 +281,8 @@ class EventSceneView(discord.ui.View):
                 payout=self._node_payout(n)
                 if payout:
                     bits.append(payout)
+                if str(n.get("reveals_sect") or ""):
+                    bits.append(f"clearing it shows you the {n['reveals_sect']}'s gate")
                 lines.append(f"{mark} "+" · ".join(bits))
             embed.add_field(name=label, value="\n".join(lines)[:1024], inline=False)
 
@@ -283,10 +293,19 @@ class EventSceneView(discord.ui.View):
                 inline=False,
             )
 
-        roster=list(cast or [])
         if roster:
-            lines=[f"• **{p.get('name')}** — {p.get('role') or p.get('title') or 'present'}" for p in roster[:6]]
+            lines=[]
+            for p in roster[:6]:
+                line=f"• **{p.get('name')}** — {p.get('role') or p.get('title') or 'present'}"
+                if int(p.get("can_recommend") or 0) and str(p.get("sect_name") or ""):
+                    line+=" · may sponsor you"
+                lines.append(line)
             lines.append("Use **Talk** to speak with any of them.")
+            if any(int(p.get("can_recommend") or 0) and str(p.get("sect_name") or "") for p in roster):
+                # Talk is conversation, and no narrator can grant, promise or
+                # refuse membership in it (v1.1.0). The sponsorship is a roll,
+                # asked for through the one door that makes it.
+                lines.append("A sponsor's word is asked for formally: **/sect → Recruitment → Recommendation**.")
             embed.add_field(name="🧑 Who is here", value="\n".join(lines)[:1024], inline=False)
 
         people=list(participants or [])
@@ -456,7 +475,19 @@ class EventSceneView(discord.ui.View):
             lines.append(f"Site progress: **{int(site.get('percent',0))}%** — {int(site.get('cleared',0))}/{int(site.get('total',0))} handled.")
             if site.get("resolved"):
                 lines.append("✅ **The whole site is cleared.**")
+        revealed=dict(outcome.get("sect_revealed") or {})
+        progressed=[]
+        if revealed.get("gate"):
+            # The engine wrote the gate onto the travel list in the same
+            # transaction as the take (v1.1.0); this only says so.
+            lines.append(
+                f"🏯 The **{revealed.get('sect_name')}** takes applicants at **{revealed.get('gate')}**, and the way there "
+                f"is on your travel list — **/travel**, then **/sect → Recruitment → Trial**.")
+            if revealed.get("new_sect"):
+                wt=await current_world_time()
+                progressed=await record_quest_progress(interaction.user.id,"sect_discovery",amount=1,game_minute=wt.total_minutes)
         await interaction.response.send_message("\n".join(lines),ephemeral=False)
+        await announce_quest_progress(interaction,progressed)
 
     async def _event_cast(self) -> list[dict[str, Any]]:
         """The people this event brought with it."""
@@ -630,6 +661,17 @@ class EventSceneView(discord.ui.View):
 
     async def on_timeout(self) -> None:
         for item in self.children:item.disabled=True
+
+
+def _delegation_sect(cast: list[dict[str, Any]], site: list[dict[str, Any]]) -> str:
+    """The sect a recruitment delegation speaks for, or "" for any other
+    event. Stamped onto the rows by the engine at spawn (schema 61), so this
+    reads the rows and decides nothing."""
+    for row in (*cast, *site):
+        sect=str(row.get("sect_name") or row.get("reveals_sect") or "")
+        if sect:
+            return sect
+    return ""
 
 
 async def _event_scene_location(event_key: str | None, fallback_user_id: int | None = None) -> str | None:
