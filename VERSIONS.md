@@ -6,6 +6,19 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.16** makes every treatment mend a condition, so a cultivator can always heal.
+
+Reported from play: six Heart-Calming Pills spent on a Qi Deviation at a 28% chance, six failures,
+and *"I can't heal injuries"*. A treatment was a roll that either mended a level or did nothing, and
+the pill went either way. Worse, it rolled Insight and Spirit while Qi Deviation, Meridian Damage and
+Dantian Damage each lower Spirit by their own severity (a Soul Wound lowers both), so the worse the
+condition, the less anybody could cure it: at the top severity a new cultivator's odds were
+nearly nil, and every Force deviation raised it a level. Every pill now lowers the severity - by one
+on a failed roll, two on a success, three on a strong success - so a condition costs at most as many
+pills as its severity. The roll is easier too: against 10 plus the severity rather than twice it,
+and the condition being treated no longer counts against its own cure. The reply says where the
+severity fell from and to.
+
 **1.0.15** lets an Apprentice alchemist make the Heart Calming Pill the Mortal World teaches them.
 
 Reported from play, by a player who had just passed the Apprentice examination in Jadewood and was
@@ -643,9 +656,12 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.0.15
+## Release status — v1.0.16
 
-- Current release: v1.0.15 - the Heart Calming Pill asks for a Moonveil Herb rather than a fruit
+- Current release: v1.0.16 - every condition treatment lowers the severity (one level on a failed
+  roll, two on a success, three on a strong one), the roll is against 10 + severity, and the
+  condition being treated no longer counts against its own cure. No schema.
+- v1.0.15: the Heart Calming Pill asks for a Moonveil Herb rather than a fruit
   the Mortal World never offers, the Mortal World's town apothecaries shelve that herb, a refused
   craft names where each missing material is sold from where the player stands, and a gate holds
   that every world selling a method offers what the method needs. No schema.

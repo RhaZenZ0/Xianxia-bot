@@ -4300,6 +4300,54 @@ under it gained the hunt, because both entry alchemy recipes want a beast core a
 ever turned one up. The drill removes the lines from the reply and the gate prints the reply
 without them.
 
+### A treatment always mends (v1.0.16)
+
+**Found by playing**, and the report is six screenshots of the same line: *"2d10 (3+5) +2 = 10 vs TN
+16 — Hard Failure · 28% chance. The treatment fails. The medicine is consumed, but the condition does
+not worsen"*, then *"I consumed 5 pills. Failure, Failure and Failure. I can't heal injuries."*
+
+`condition.treat` rolled Insight + Spirit against `10 + 2 × severity`, and the attribute came through
+`canonicalAttribute` - which sums **every** active effect, including the row the condition being
+treated had written itself. Qi Deviation, Meridian Damage and Dantian Damage each take their severity
+off Spirit, and a Soul Wound takes it off Insight and Spirit both. So the stat the cure rolled was the
+one the ailment had already lowered, and the TN climbed two a level on top: a fresh cultivator
+(Insight + Spirit of 3 to 5) had 15-28% against a severity-3 deviation and 0-3% at severity 5, a
+Soul Wound was worse, and each Force deviation raises the one they hold a level. The `+2` in the
+screenshot is exactly the sheet's 5 less the deviation's own 3 - and it is what the drill prints
+when the skip is taken back out. A failure mended nothing and the pill was spent anyway, so a
+condition was a sink with no floor.
+
+**Nothing else lowers a condition's severity** - no rest, no tick, no healer; only this action and
+the GM's Clear - which is why a treatment that can fail forever is a condition a player keeps
+forever.
+
+**The roll decides how much, never whether.** `conditionTreatReduction` is one level on a failure,
+two on a success, three on a strong success (the degree `rollCheck` already names), so a condition
+costs at most its severity in pills and the worst dice still mend. The TN is `10 + severity`
+(`conditionTreatTN`). And the ailment is left out of its own cure: `canonicalAttribute` takes an
+optional `skip ...effectSource`, and the treatment skips `("condition", <key>)`, the same pair its
+resolve branch deletes by. **Only that row** - a Soul Wound still dulls the mind treating a deviation,
+because a cultivator carrying two injuries should find the second harder to mend.
+
+**A trailing variadic rather than a second function, and the gate is why.**
+`modifier_vocabulary_test.go` reads the `allowed` map inside the function literally named
+`canonicalAttribute` to know which attributes are fetched; moving the body into a
+`canonicalAttributeExcept` would have made `presence` and `heart` look unread and turned a refactor
+into a red gate. A variadic keeps all twenty-four callers and the gate exactly as they were.
+
+**The Python gate caught itself on its first drill.** `test_a_treatment_always_mends.py` refuses a
+reply that branches on the roll, and its first version looked for the text `"success"` in
+`ast.unparse(node.test)` - which quotes with `'`, so against the broken reply it matched nothing and
+passed. It reads the string constants in the test now. That is rc.52's rule in its most literal
+form: a gate that reads spelling rather than structure passes on the spelling it did not expect.
+
+**The same report carried a second question, and the answer was not a change.** The Qi Nourishing
+Pill sells for 11 and buys back for 4. Across all 831 things a shop both sells and buys, the buy-back
+is a median third and never above 40%, and no item can be bought in one shop and sold in another
+for a profit - so it is the authored rule, and on the owner's call it stays. What the check did find
+is recorded in `docs/TODO.md`: made from shop-bought materials, crafting always costs more than
+buying the result, and three Mortal recipes sell back for less than their own ingredients.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

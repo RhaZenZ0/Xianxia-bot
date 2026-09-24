@@ -16,6 +16,24 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.0.16)** — *A condition could not be cured by the medicine made for it.* Reported
+  from play as six Heart-Calming Pills on a severity-3 Qi Deviation at 28%, six failures, and *"I
+  can't heal injuries"*. The treatment rolled Insight + Spirit against `10 + 2 × severity` through
+  `canonicalAttribute`, which counted the condition's own effect row - and Qi Deviation, Meridian
+  Damage and Dantian Damage take their severity off Spirit (Soul Wound off both), so the cure grew
+  harder exactly as the ailment grew worse; a failure mended nothing and still spent the pill. Every
+  treatment mends now (one level on a failure, two on a success, three on a strong success), the TN is
+  `10 + severity`, and the condition being treated is left out of its own roll. See CLAUDE.md, "A
+  treatment always mends".
+- **deferred (design, the owner's call)** — *A keeper pays back about a third of the shelf price.*
+  Reported from play as the Qi Nourishing Pill selling for 11 and buying back for 4. That is the
+  authored rule, not a slip: across all 831 things a shop both sells and buys the buy-back is a median
+  of 33% and never above 40%, and nothing can be bought in one shop and sold in another for a profit.
+  What the check did find is on the crafting side: made from shop-bought materials, every Mortal
+  recipe costs more than buying the result (the Qi pill's inputs are 17 against 13 on the shelf), and
+  three - the Qi Nourishing Pill, the Spirit-Iron Sword and the Spirit-Iron Lamellar - sell back for
+  less than their own ingredients. Crafting to sell pays only with foraged or hunted materials. Left
+  as it is on the owner's call; raising what keepers pay for crafted goods is the lever if it changes.
 - **fixed (v1.0.15)** — *The Heart Calming Pill could not be made in the only world that sold it.*
   Reported from play, straight after the Apprentice examination in Jadewood: *"missing materials:
   Twin Extremes Ice-Fire Fruit x1"*. The method's slip is shelved only in the Mortal World and the
