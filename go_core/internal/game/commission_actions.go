@@ -48,6 +48,40 @@ var commissionOutcomes = map[string]commissionOutcomeRule{
 	"abandoned": {Trust: -5, Respect: -3, Grudge: 4, CooldownMinutes: commissionCooldownMinutes},
 }
 
+// An outsider's work for a sect's gate (v1.1.0). Every sect elder's
+// commission used to be refused to anybody not already a disciple, and nothing
+// in the game raised a cultivator's standing with a sect before they joined -
+// so "do a few quests for an elder, then go to the intake" was a route the
+// owner described and the code did not have. A sect's entry-level work may now
+// be declared open to somebody in no sect (`seed_json.outsider_standing`), and
+// finishing it pays that much standing with the sect, which already lowers the
+// entrance trial's target (`15 - rep/25`) and helps a sponsor vouch
+// (`rep/20`).
+//
+// Three rules keep it from being a standing tap, and they are the
+// `household_standing` precedent's: only an authored commission may pay it
+// (the `commission_` prefix - the Quest Forge writes `forge_`/`quest_` keys and
+// its validator builds no `seed`), only to the sect the commission belongs to,
+// and never more than the cap. A commission is taken once per key, and each
+// sect has one entry-level commission, so the whole route is worth one step.
+const (
+	sectCommissionPrefix = "commission_"
+	outsiderStandingCap  = int64(25)
+)
+
+// commissionOutsiderStanding is the standing an outsider earns by completing
+// this commission, or 0 when it is not open to outsiders at all.
+func commissionOutsiderStanding(questKey, requiresSect, seedJSON string) int64 {
+	if !strings.HasPrefix(questKey, sectCommissionPrefix) || strings.TrimSpace(requiresSect) == "" {
+		return 0
+	}
+	seed := map[string]any{}
+	if strings.TrimSpace(seedJSON) != "" {
+		_ = json.Unmarshal([]byte(seedJSON), &seed)
+	}
+	return clampI64(i64(seed["outsider_standing"]), 0, outsiderStandingCap)
+}
+
 // Identical in consequence, distinguishable in record.
 var commissionCounters = map[string]string{
 	"completed": "commissions_completed",
@@ -86,6 +120,9 @@ type commissionDefinition struct {
 	RewardsHidden bool
 	Variants      []commissionTerms
 	Base          commissionTerms
+	// OutsiderStanding is what completing this pays somebody in no sect, and
+	// whether they may take it at all (v1.1.0); 0 for members-only work.
+	OutsiderStanding int64
 }
 
 func decodeCommissionTerms(raw string, fallbackDeadline int64) []commissionTerms {
@@ -125,7 +162,8 @@ func decodeCommissionTerms(raw string, fallbackDeadline int64) []commissionTerms
 // startup precisely so they land in the second case rather than the third.
 func loadCommissionDefinition(conn *storage.Conn, questKey string) (*commissionDefinition, bool, error) {
 	res, err := conn.Execute(`SELECT quest_key,title,giver_npc,tier,owner_user_id,status,rewards_json,variants_json,deadline_game_minutes,
-		COALESCE(requires_sect,'') AS requires_sect,COALESCE(reward_visibility,'shown') AS reward_visibility
+		COALESCE(requires_sect,'') AS requires_sect,COALESCE(reward_visibility,'shown') AS reward_visibility,
+		COALESCE(seed_json,'{}') AS seed_json
 		FROM quest_definitions WHERE quest_key=?`, []any{questKey})
 	if err != nil {
 		return nil, false, err
@@ -149,6 +187,7 @@ func loadCommissionDefinition(conn *storage.Conn, questKey string) (*commissionD
 		RequiresSect:  strings.TrimSpace(fmt.Sprint(row["requires_sect"])),
 		RewardsHidden: fmt.Sprint(row["reward_visibility"]) == "hidden",
 	}
+	def.OutsiderStanding = commissionOutsiderStanding(def.QuestKey, def.RequiresSect, fmt.Sprint(row["seed_json"]))
 	if raw, ok := row["owner_user_id"]; ok && raw != nil {
 		owner := i64(raw)
 		def.OwnerUserID = &owner
@@ -274,7 +313,11 @@ func commissionAcceptAction(conn *storage.Conn, userID int64, raw json.RawMessag
 		if sectErr != nil {
 			return authoritativeMutation{}, sectErr
 		}
-		if member == nil || !strings.EqualFold(strings.TrimSpace(fmt.Sprint(member["sect_name"])), def.RequiresSect) {
+		// Somebody in no sect may take the work a sect has opened to outsiders
+		// (v1.1.0). A disciple of another sect may not: the standing it pays is
+		// the way *into* a sect, and a rival's disciple is not looking for one.
+		outsider := member == nil && def.OutsiderStanding > 0
+		if !outsider && (member == nil || !strings.EqualFold(strings.TrimSpace(fmt.Sprint(member["sect_name"])), def.RequiresSect)) {
 			return authoritativeMutation{}, fmt.Errorf("that work is for disciples of the %s", def.RequiresSect)
 		}
 	}
@@ -494,18 +537,36 @@ func resolveCommissionTx(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{
+	out := map[string]any{
 		"quest_key": questKey, "title": def.Title, "giver_npc": def.GiverNPC, "outcome": outcome,
 		"variant_index": variantIndex, "rewards_granted": granted, "standing": standing,
 		"resolved_game_minute": gameMinute, "charged": charge,
-	}, nil
+	}
+	// An outsider's finished work for a sect is standing with that sect
+	// (v1.1.0). A disciple who took it gets nothing extra here: the standing is
+	// the way in, and they are already in.
+	if outcome == "completed" && charge && def.OutsiderStanding > 0 {
+		member, sectErr := sectMembershipRow(conn, userID)
+		if sectErr != nil {
+			return nil, sectErr
+		}
+		if member == nil {
+			score, repErr := adjustReputationTx(conn, userID, def.RequiresSect, def.OutsiderStanding, "an outsider's work for the gate", now)
+			if repErr != nil {
+				return nil, repErr
+			}
+			out["sect_standing"] = map[string]any{"sect": def.RequiresSect, "delta": def.OutsiderStanding, "score": score}
+		}
+	}
+	return out, nil
 }
 
 // A resolve must work even for a definition a GM has since retired - the
 // player's held row is the contract, not the catalog entry.
 func loadCommissionDefinitionForResolve(conn *storage.Conn, questKey string) (*commissionDefinition, error) {
 	res, err := conn.Execute(`SELECT quest_key,title,giver_npc,tier,owner_user_id,rewards_json,variants_json,deadline_game_minutes,
-		COALESCE(reward_visibility,'shown') AS reward_visibility
+		COALESCE(reward_visibility,'shown') AS reward_visibility,
+		COALESCE(requires_sect,'') AS requires_sect,COALESCE(seed_json,'{}') AS seed_json
 		FROM quest_definitions WHERE quest_key=?`, []any{questKey})
 	if err != nil {
 		return nil, err
@@ -522,7 +583,9 @@ func loadCommissionDefinitionForResolve(conn *storage.Conn, questKey string) (*c
 		QuestKey: fmt.Sprint(row["quest_key"]), Title: fmt.Sprint(row["title"]),
 		GiverNPC: giver, Tier: i64(row["tier"]),
 		RewardsHidden: fmt.Sprint(row["reward_visibility"]) == "hidden",
+		RequiresSect:  strings.TrimSpace(fmt.Sprint(row["requires_sect"])),
 	}
+	def.OutsiderStanding = commissionOutsiderStanding(def.QuestKey, def.RequiresSect, fmt.Sprint(row["seed_json"]))
 	deadline := i64(row["deadline_game_minutes"])
 	base := commissionTerms{Label: "standard", DeadlineMinutes: deadline}
 	if text, ok := row["rewards_json"].(string); ok && text != "" {

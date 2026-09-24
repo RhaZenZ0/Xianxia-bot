@@ -62,6 +62,8 @@ func applyLateMigrationAction(conn *storage.Conn, catalog worlddata.Catalog, use
 		return sectRecommendationActionGo(conn, catalog, userID, raw)
 	case "sect.recruitment.trial":
 		return sectTrialActionGo(conn, catalog, userID, raw)
+	case "sect.recruitment.envoys":
+		return sectRecruitmentEnvoysActionGo(conn, catalog, userID, raw)
 	case "sect.contribute", "sect.redeem":
 		return sectEconomyActionGo(conn, catalog, userID, raw, op)
 	case "discipleship.request", "discipleship.resolve", "discipleship.leave":
