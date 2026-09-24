@@ -23,6 +23,7 @@ from ...rules.worldtime import MINUTES_PER_YEAR
 from ..channels import configured_begin_channel
 from ..character_state import current_effect_modifiers
 from ..formatting import human_duration, player_property_emoji, player_property_facility_lines
+from ..hubs import register_confirm_note
 from ..registry import registered_group_command, registered_root_command
 from ..runtime import (
     carried_item_autocomplete,
@@ -977,6 +978,32 @@ async def reincarnate(interaction:discord.Interaction,name:str,path:str,gender:a
     await interaction.response.send_message("\n".join(lines))
 
 
+
+
+async def _reset_confirm_note(interaction: discord.Interaction) -> str:
+    """What `/reset`'s "Are you sure?" adds (v1.3.0): the restarts left.
+
+    Until now the count reached a player only in the reply to a reset they
+    had already made. `character.reset_status` is the engine's one door to
+    it (v1.0.13), and the number is printed as the engine gives it - an
+    absent field is "unknown", never a zero, because a zero here reads as
+    "none left" and a player cannot tell it from "nobody answered".
+    """
+    try:
+        status = dict(await ENGINE.action("character.reset_status", interaction.user.id,
+                                          {"user_id": int(interaction.user.id)}) or {})
+    except Exception:
+        log.exception("character.reset_status unavailable for the confirm step")
+        return "🔁 Restarts remaining: **unknown** — the engine did not answer."
+    remaining = status.get("resets_remaining")
+    allowance = status.get("reset_allowance")
+    if remaining is None or allowance is None:
+        return "🔁 Restarts remaining: **unknown** — the engine did not say."
+    return (f"🔁 Restarts remaining: **{int(remaining)} of {int(allowance)}** for this account, ever. "
+            "This one is spent the moment you confirm.")
+
+
+register_confirm_note("/reset", _reset_confirm_note)
 
 
 @registered_root_command(

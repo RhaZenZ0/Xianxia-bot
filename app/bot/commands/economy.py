@@ -331,14 +331,18 @@ async def auction_browse(interaction:discord.Interaction)->None:
 async def auction_sell(
     interaction:discord.Interaction,item:str,quantity:app_commands.Range[int,1,999999],
     starting_bid:app_commands.Range[int,1,2000000000],duration_minutes:app_commands.Range[int,5,1440]=60,
-    anonymous:bool=False,currency:str="low_spirit_stone"
+    anonymous:bool=False,currency:str=""
 )->None:
     c=await require_character(interaction)
     if not c:return
     found=_house_for_character(c)
     if not found:
         await interaction.response.send_message("You must be inside an auction house to list a lot.",ephemeral=False);return
-    house_id,_=found
+    house_id,house=found
+    # The house's own coin unless the seller names one (v1.2.3): the
+    # default was the Mortal stone in every world, so a lot listed on an
+    # upper-world floor asked bidders for money nobody up there is paid in.
+    currency=str(currency or "").strip() or str(house.get("default_currency") or "low_spirit_stone")
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("auction.sell",interaction.user.id,{"house_id":house_id,"item_id":item,"quantity":int(quantity),"currency_id":currency,"starting_bid":int(starting_bid),"anonymous":anonymous,"ends_at":time.time()+int(duration_minutes)*60},action_id=f"discord:{interaction.id}:auction.sell")

@@ -272,6 +272,20 @@ func consumeInventoryTx(conn *storage.Conn, userID int64, costs map[string]int64
 	}
 	return missing, nil
 }
+
+// craftFailureRefund is the share of a failed craft's inputs that comes back:
+// half of each, rounded down, so one unit of anything is the stake. It is a
+// function so the refund and the reply cannot state the share differently.
+func craftFailureRefund(cost map[string]int64) map[string]int64 {
+	out := map[string]int64{}
+	for item, qty := range cost {
+		if back := qty / 2; back > 0 {
+			out[item] = back
+		}
+	}
+	return out
+}
+
 func addInventoryTx(conn *storage.Conn, userID int64, items map[string]int64) error {
 	for item, qty := range items {
 		if qty <= 0 {
@@ -443,8 +457,20 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	} else {
 		qkey, qlabel, xpbonus, qpoints, mult = craftQuality(margin, success)
 	}
+	// What a miss leaves you (v1.3.0). The inputs were consumed above whether
+	// or not the roll landed, and until now a failure kept all of them: the
+	// tutorial's forge cost three spirit iron and another dig on one miss in
+	// seven. Half of each input comes back, rounded down, so a single unit of
+	// anything is still spent - a craft that could be retried for free would
+	// be a roll with no stake.
+	returned := map[string]int64{}
 	if success {
 		if err := addInventoryTx(conn, userID, output); err != nil {
+			return authoritativeMutation{}, err
+		}
+	} else {
+		returned = craftFailureRefund(recipe.Cost)
+		if err := addInventoryTx(conn, userID, returned); err != nil {
 			return authoritativeMutation{}, err
 		}
 	}
@@ -570,6 +596,7 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 			}
 			return map[string]int64{}
 		}(),
+		"returned":             returned,
 		"profession_progress":  prog,
 		"exam_offered":         examOffered,
 		"profession_bonus":     level,
@@ -628,12 +655,14 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	}
 
 	now := float64(time.Now().UnixNano()) / 1e9
-	remaining, err := cooldownRemaining(conn, userID, "alchemy_forage", now)
+	remaining, err := cooldownRemaining(conn, userID, cooldownForage, now)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
 	if remaining > 0 {
-		return authoritativeMutation{}, fmt.Errorf("forage cooldown active: %d seconds remaining", remaining)
+		// The hunt's shape (v1.3.1), so the bot's cooldown regex words it in
+		// hours and minutes rather than printing raw seconds.
+		return authoritativeMutation{}, fmt.Errorf("cooldown active: %d seconds", remaining)
 	}
 
 	physicalLocation := strings.TrimSpace(cr.Location)
@@ -895,8 +924,8 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	const cooldownSeconds int64 = 20 * 60
-	if err := setCooldown(conn, userID, "alchemy_forage", cooldownSeconds, now); err != nil {
+	cooldownSeconds := cooldownSecondsFor(cooldownForage)
+	if err := setCooldown(conn, userID, cooldownForage, cooldownSeconds, now); err != nil {
 		return authoritativeMutation{}, err
 	}
 

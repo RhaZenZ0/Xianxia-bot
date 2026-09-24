@@ -22,7 +22,7 @@ The footprint was measured the same way stage 2's was, before anything moved:
 was promoted to runtime.py rather than duplicated - it is referenced as a bare
 ``@app_commands.autocomplete(...)`` argument, which evaluates at *module
 import* time, not call time, so a deferred import cannot reach it the way the
-others below do. Five (``SIM``, ``_known_locations``, ``current_npc_location``,
+others below do. Four (``SIM``, ``current_npc_location``,
 ``ensure_sect_abode_record``, ``ensure_sect_abode_thread_for``) stay in
 main.py, where they are used far more than by ``/sect`` alone, and are pulled
 in with a call-time ``from ..main import`` inside the one function that needs
@@ -61,7 +61,7 @@ from ...rules.sect_recruitment import (
     trial_profile,
 )
 from ..registry import registered_group_command
-from ..locations import DEAD, _known_locations, current_npc_location
+from ..locations import DEAD, current_npc_location
 from ..character_state import record_quest_progress, announce_quest_progress
 from ..formatting import player_property_facility_lines, player_property_unbuilt
 from ..services import PLAYER_PROPERTY_FACILITY_LABELS, QUESTS, SIM
@@ -205,28 +205,18 @@ async def _build_family_text(user_id: int, *, show_chinese: bool = False) -> str
 
 
 async def _sync_sect_discoveries(user_id: int, character: dict, *, game_minute: int | None = None) -> list[str]:
-    """Promote already-discovered recruitment locations into public sect knowledge."""
-    if game_minute is None:
-        game_minute = (await current_world_time()).total_minutes
-    known_locations = await _known_locations(user_id, character)
-    reachable: dict[str, str] = {}
-    for sect_name in WORLD.sects:
-        rec = recruitment_definition(WORLD.sects, sect_name)
-        if not rec:
-            continue
-        location = str(rec.get("location") or "")
-        if location and location in known_locations:
-            reachable[sect_name] = location
-    if not reachable:
-        return []
-    # One call for the whole reconcile: this runs on a read path, every time
-    # the sect screen opens, and it used to be a write per sect.
+    """Promote already-discovered recruitment locations into public sect knowledge.
+
+    Which sects that is has been the engine's to say since v1.3.1: it reads the
+    gates the cultivator knows (`knownLocationsTx`) and discovers exactly the
+    sects standing on them, so nothing here names a sect - a list sent from
+    the client could only narrow, and a client could never widen it.
+    """
+    del game_minute  # the engine stamps its own minute (rc.48)
+    del character
     try:
         result = dict(await ENGINE.action("sect.discover", user_id, {
-            "sects": sorted(reachable),
-            "source_keys": reachable,
             "discovery_kind": "recruitment_route",
-            "game_minute": int(game_minute),
         }) or {})
     except GameEngineError:
         log.exception("Sect discovery reconcile failed for user %s", user_id)

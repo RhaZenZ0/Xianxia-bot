@@ -168,32 +168,43 @@ func teachTradeMethodsTx(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	return learned, nil
 }
 
-// catchUpBeginnerPathTx hands over any beginner stage whose predecessor this
-// character has completed and which they were never given - the grandfathering
-// for a stage added after they finished the one before it. A boot migration
-// cannot do this: the definitions are seeded by the bot after the engine
-// starts, and `grantOrdinaryQuestTx` treats a missing one as "no". Done at the
-// lesson's door instead, where it is the lesson stage that matters.
+// catchUpBeginnerPathTx hands over every quest a completed one chains to and
+// the player was never given. Until v1.3.1 it walked `beginner_path` in the
+// content file's order, so a GM who re-pointed a chain in the workbench was
+// obeyed by `questFollowOnTx` and not here; it reads the same `seed_json`
+// `follow_on` now, off every completed quest rather than the path's own, so
+// the two cannot disagree about what comes next. It never errors on a world
+// that has no chains: an absent table is no quests, not a fault.
 func catchUpBeginnerPathTx(conn *storage.Conn, catalog worlddata.Catalog, userID, gameMinute int64) ([]string, error) {
 	handed := []string{}
-	if !tableExistsTx(conn, "character_quests") {
+	if !tableExistsTx(conn, "character_quests") || !tableExistsTx(conn, "quest_definitions") {
 		return handed, nil
 	}
-	for i := 1; i < len(catalog.BeginnerPath); i++ {
-		previous, stage := catalog.BeginnerPath[i-1].QuestKey, catalog.BeginnerPath[i].QuestKey
-		r, err := conn.Execute(`SELECT 1 FROM character_quests WHERE user_id=? AND quest_key=? AND status='completed'`, []any{userID, previous})
+	chained, err := tableHasColumns(conn, "quest_definitions", "seed_json")
+	if err != nil || !chained {
+		return handed, err
+	}
+	r, err := conn.Execute(`SELECT q.quest_key FROM character_quests q
+		JOIN quest_definitions d ON d.quest_key=q.quest_key
+		WHERE q.user_id=? AND q.status='completed' AND COALESCE(d.seed_json,'') LIKE '%follow_on%'
+		ORDER BY q.completed_game_minute, q.quest_key`, []any{userID})
+	if err != nil {
+		return handed, err
+	}
+	for _, row := range r.Rows {
+		next, err := questFollowOnTx(conn, fmt.Sprint(row[0]))
 		if err != nil {
 			return handed, err
 		}
-		if len(r.Rows) == 0 {
+		if strings.TrimSpace(next) == "" {
 			continue
 		}
-		granted, err := grantOrdinaryQuestTx(conn, userID, stage, gameMinute)
+		granted, err := grantOrdinaryQuestTx(conn, userID, next, gameMinute)
 		if err != nil {
 			return handed, err
 		}
 		if granted {
-			handed = append(handed, stage)
+			handed = append(handed, next)
 		}
 	}
 	return handed, nil

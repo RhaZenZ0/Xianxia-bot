@@ -268,6 +268,12 @@ func abodeEstablishActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 		return authoritativeMutation{}, errors.New("character not found")
 	}
 	loc := fmt.Sprint(ch["location"])
+	// A birth household is somebody else's house (v1.3.0): a starter
+	// household is shared by everybody born into it, so a property founded
+	// inside one would stand in a room other players are standing in.
+	if strings.HasPrefix(loc, "birth_family:") {
+		return authoritativeMutation{}, errors.New("a property cannot be founded inside the household you were born into; step out into the town first")
+	}
 	if strings.HasPrefix(loc, "abode:") || strings.HasPrefix(loc, "sect_abode:") || strings.HasPrefix(loc, "personal_world:") || auctionHouseExistsAt(catalog, loc) {
 		return authoritativeMutation{}, errors.New("choose a normal outdoor/city location as the foundation of your property")
 	}

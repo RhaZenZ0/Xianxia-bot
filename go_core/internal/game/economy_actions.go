@@ -488,6 +488,44 @@ func blackMarketTradeAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "economy", EventType: "black_market.trade", EntityType: "black_market", EntityID: fmt.Sprint(post["world_name"]), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 
+// marketUnitPrice is what one unit costs at a market counter, or what the
+// counter pays for one, and it is held inside the band the shops set (v1.2.3).
+// A market's base is the item's sect value times a world factor, which has
+// nothing to do with the shelves: measured off the shipped content, a Wind
+// Gourd cost 9 at a market and a provisioner paid 45 for it, and a Stygian
+// Tomb Token was 420 on a shelf and 840 at the market's counter. Both loops
+// are mints, so a market never sells below the most any keeper pays in that
+// coin and never pays as much as the cheapest shelf asks - the rank ceiling's
+// rule (trade_rank_price.go), stated once more for the counter it forgot.
+func marketUnitPrice(catalog worlddata.Catalog, itemID, currency string, base int64, index float64, buy bool) int64 {
+	unit := max64(1, int64(math.Round(float64(base)*index)))
+	if buy {
+		if floor, ok := highestKeeperBuy(catalog, itemID, currency); ok && unit < floor {
+			unit = floor
+		}
+		return unit
+	}
+	unit = max64(1, int64(math.Round(float64(unit)*0.70)))
+	if shelf, ok := cheapestShelfPrice(catalog, itemID, currency); ok && unit >= shelf {
+		unit = max64(1, shelf-1)
+	}
+	return unit
+}
+
+// highestKeeperBuy is the most any shop pays for an item in one currency.
+func highestKeeperBuy(catalog worlddata.Catalog, itemID, currency string) (int64, bool) {
+	best, found := int64(0), false
+	for _, shop := range catalog.Shops {
+		if shop.Currency != currency {
+			continue
+		}
+		if price, ok := shop.Buys[itemID]; ok && price > 0 && (!found || price > best) {
+			best, found = price, true
+		}
+	}
+	return best, found
+}
+
 func marketTradeAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p marketTradePayload
 	if err := json.Unmarshal(raw, &p); err != nil {
@@ -513,8 +551,8 @@ func marketTradeAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if m == nil {
 		return authoritativeMutation{}, errors.New("that item is not traded in this market")
 	}
-	unit := max64(1, int64(math.Round(float64(i64(m["base_price"]))*parseFloat(m["price_index"]))))
 	currency := fmt.Sprint(m["currency_id"])
+	unit := marketUnitPrice(catalog, p.ItemID, currency, i64(m["base_price"]), parseFloat(m["price_index"]), p.Buy)
 	now := nowSeconds()
 	total := int64(0)
 	bal := int64(0)
@@ -542,7 +580,6 @@ func marketTradeAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		if owned < p.Quantity {
 			return authoritativeMutation{}, errors.New("not enough carried item")
 		}
-		unit = max64(1, int64(math.Round(float64(unit)*0.70)))
 		total = unit * p.Quantity
 		_, err = conn.Execute(`UPDATE inventory SET quantity=quantity-? WHERE user_id=? AND item_id=?`, []any{p.Quantity, userID, p.ItemID})
 		if err != nil {

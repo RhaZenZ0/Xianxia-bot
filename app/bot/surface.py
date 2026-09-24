@@ -20,7 +20,7 @@ from discord import app_commands
 
 from ..database import SCHEMA_VERSION
 from ..rules import feature_unlocks as unlocks
-from ..rules.advanced_runtime import BOSS_TEMPLATES
+from ..rules.advanced_runtime import BOSS_TEMPLATES, boss_lair
 from ..rules.progression_systems import ASCENSION_GATES
 from .admin.core import (
     admin_family_group,
@@ -77,6 +77,7 @@ from .commands.secretrealm import secret_group, secret_status
 from .commands.sect import sect_group
 from .commands import cooldowns as _commands_cooldowns  # noqa: F401  (registers /cooldowns on import)
 from .commands.exploration import _city_board, _city_inn, _city_of
+from ..rules.death_qi import GHOST_APPEASE_GROUND_CEILING, GHOST_HARVEST_GROUND_FLOOR, death_qi_ground_multiplier
 from .commands import locked as _commands_locked  # noqa: F401  (registers /locked on import)
 from .commands import sense as _commands_sense  # noqa: F401  (registers its root commands on import)
 from .commands import support as _commands_support  # noqa: F401  (registers /tribute on import)
@@ -105,7 +106,7 @@ from .hubs import (
 )
 from .locations import here_summary
 from .registry import ACTIONS, EVENT_HANDLERS, registered_root_command
-from .runtime import DB, SETTINGS, WORLD, character_location_display, log, private_location_exit
+from .runtime import DB, SETTINGS, WORLD, character_location_display, current_world_time, log, private_location_exit
 from .services import GUILD, QUESTS, SIM
 from .status_cards import _who_is_here, cultivation_status_fields, menu_facts_line
 
@@ -1073,6 +1074,14 @@ LOCATION_GATES: dict[str, tuple[str, ...]] = {
     "auction_door": ("auction enter",),
     "inn_table": ("trade offer",),
     "city_board": ("city accept",),
+    # The three v1.1.0 left out for their cost (v1.3.1, on the owner's call):
+    # the ghost road's two grounds are the content twin of
+    # `deathQiGroundMultiplier`, and the post and the array are one read each
+    # on a panel refresh - a read that fails hides nothing.
+    "ghost_ground": ("ghost harvest",),
+    "shrine_ground": ("ghost appease",),
+    "black_market_post": ("blackmarket buy", "blackmarket sell"),
+    "array_here": ("array use",),
     "protected_ground": ("battle challenge", "duel challenge"),
     "shrine": ("hunt", "mine"),
     "road_site": ("realmhub go",),
@@ -1170,12 +1179,14 @@ async def _location_hidden_actions(interaction: discord.Interaction, c: dict) ->
         shut["realm_entrance"] = "no secret realm opens here"
     if not _public_sect_gate_here(here):
         shut["sect_gate"] = "the entrance trial is sat at a sect's gate — /world → City → Envoys names them"
-    if not any(str(boss.get("location") or "") == here for boss in BOSS_TEMPLATES.values()):
+    if not any(boss_lair(boss, WORLD.secret_realms)[0] == here for boss in BOSS_TEMPLATES.values()):
         shut["boss_lair"] = "no great beast keeps its lair here"
     shop = WORLD.shops.get(_shop_at(here)) or {}
     if str(shop.get("kind") or "") not in EXAM_HALL_KINDS:
         shut["exam_hall"] = "an examination is sat inside a hall of its trade"
-    if here.startswith(("abode:", "sect_abode:", "personal_world:")) or WORLD.auction_house_at(here) is not None:
+    if here.startswith("birth_family:"):
+        shut["property_ground"] = "a property is founded outside the household you were born into; step out into the town first"
+    elif here.startswith(("abode:", "sect_abode:", "personal_world:")) or WORLD.auction_house_at(here) is not None:
         shut["property_ground"] = "a property is founded on open ground or in a city"
     if here.startswith(("abode:", "personal_world:")):
         shut["manor_ground"] = "a manor is founded somewhere in the world, not inside a property"
@@ -1188,10 +1199,43 @@ async def _location_hidden_actions(interaction: discord.Interaction, c: dict) ->
     if not await _seclusion_site_here(uid, here):
         shut["seclusion_site"] = ("closed-door seclusion wants protected ground, a residence, "
                                   "your sect's manor or your household")
+    ground = death_qi_ground_multiplier(WORLD.data.get("death_qi_system") or {}, WORLD.locations, here)
+    if ground < GHOST_HARVEST_GROUND_FLOOR:
+        shut["ghost_ground"] = "nothing died here recently enough to leave anything worth taking; stand among ruins or on a hunting ground"
+    if ground > GHOST_APPEASE_GROUND_CEILING:
+        shut["shrine_ground"] = "incense is burned where the living keep their dead: a wayside shrine or a temple quarter"
+    if not await _black_market_post_here(here):
+        shut["black_market_post"] = "no black-market trading post is open here"
+    if not await _array_departs_here(here):
+        shut["array_here"] = "no teleportation array stands here — /array list names the ones the world has"
     hidden: dict[str, str] = {}
     for gate, reason in shut.items():
         hidden.update(_action_paths(reason, *LOCATION_GATES[gate]))
     return hidden
+
+
+async def _black_market_post_here(here: str) -> bool:
+    """`blackMarketTradeAction`'s own question: an active post at this place,
+    at the canonical minute. A read that fails answers yes, because a hide must
+    fail towards showing."""
+    try:
+        wt = await current_world_time()
+        return (await DB.get_active_black_market(here, int(wt.total_minutes))) is not None
+    except Exception:
+        log.exception("Could not read the black-market post for the panel hide")
+        return True
+
+
+async def _array_departs_here(here: str) -> bool:
+    """`teleportArrayActionGo`'s: an authored array departing here, or a
+    crossing a cultivator has torn open on this ground (rc.44)."""
+    if any(str(a.get("from") or "") == here for a in WORLD.teleport_arrays.values()):
+        return True
+    try:
+        return bool(await DB.list_world_crossings(here))
+    except Exception:
+        log.exception("Could not read the crossings for the panel hide")
+        return True
 
 
 async def _seclusion_site_here(uid: int, here: str) -> bool:

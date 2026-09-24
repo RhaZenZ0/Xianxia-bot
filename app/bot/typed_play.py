@@ -346,6 +346,14 @@ class _NarrateButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction) -> None:
         view: TypedPlayPicker = self.view  # type: ignore[assignment]
+        # The same two gates a picker click meets in dispatch (v1.2.3): a
+        # button on a message never meets the command tree.
+        closed = await maintenance.refuse(DB, interaction.user)
+        if closed is None:
+            closed = await seclusion.refuse(DB, interaction.user.id)
+        if closed is not None:
+            await interaction.response.send_message(closed)
+            return
         refusal = budget_refusal(interaction.user.id, door="narrate_it")
         if refusal:
             await interaction.response.send_message(refusal, ephemeral=False, delete_after=20)

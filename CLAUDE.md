@@ -4625,6 +4625,142 @@ allowlist. A rule stated in this file and enforced at the sites known when it wa
 reach the site written next, which is why `test_every_engine_key_reaches_the_engine.py` reads the
 keys off the Go source rather than off a list: the next one fails the day it is read.
 
+### Six rules the bot was holding (v1.3.1)
+
+The first group of what was left in `docs/TODO.md`, each a bound that lived in the client (rc.48)
+or a literal beside its own table. Two are worth the paragraph.
+
+**Where a catalogue NPC stands is the engine's answer now** (`npcWhereaboutsTx`). rc.28 wrote
+`current_npc_location` in Python - circuit first, then the simulation row, then the schedule while
+at home, then the registry and a running event's cast - and the engine read only the simulation
+row, so a sponsor's presence could not be a bound. The Go resolver keeps that order exactly, and
+`NPCDefinition` gained `schedule`, `circuit_months` and `circuit_offset` for it; `periodForHour`
+and `circuitStop` are the Python twins' arithmetic, held by `TestPeriodsAndCircuitsAreTheClocks`
+against the same table `app/rules/sense.py` implies. The sponsor test drives the shipped content:
+Elder Xue Hong keeps Moonfen Marsh and walks to Greenriver Town of an evening, so the ask is refused
+at nine in the morning and heard at six.
+
+**A client's list can narrow a discovery and never widen it.** `sect.discover` derives the sects
+from `knownLocationsTx` and `sectGate`, so the trial's "discovered" check cannot be satisfied by
+assertion; the bot's reconcile sends no names at all. The seven tests that drove the old action
+named sects the catalogue does not carry ("Iron Peak Sect", "Jade Fern Sect"), which was exactly
+the shape that could not fail the way production fails - they name real gates now, made known first.
+
+**The catch-up runs on any action**, beside the vitality settle, and reads `seed_json.follow_on`
+off every completed quest rather than the content file's order. The lesson-door test seeded its two
+stages with an empty chain and went red, because a fixture with no chain is a world with no chain.
+
+### Ten decisions in one message (v1.3.0)
+
+The owner answered the open decisions of the last four releases at once, and each is recorded in
+`docs/TODO.md` as fixed. Four of them are worth a paragraph here, because each turned on something a
+reader would not guess.
+
+**A hall teaches what its world can make, and that leaves some ranks empty on purpose.**
+`rankRecipesWhereTheyCanBeMade` splits a rank's recipes on `worldOffers` - a shelf in that world, a
+guaranteed room item of a realm standing in it, the world's tier materials, the tier-flat forage
+makings, and deliberately not the forage rare pool, which is a chance. Measured off the shipped
+content, the Mortal World's third examinations teach nothing in three trades and the Spiritual
+World's Tier 3 Inscription teaches nothing at all. That is the rule choosing a certificate with
+nothing behind it over a method that cannot be made where its holder stands, which is what the
+report in v1.0.15 was about; the reply names what was withheld and that a slip, or a hall in a world
+that can, teaches it. The withheld methods are all sold as slips somewhere the makings are - that is
+what `test_a_method_can_be_made_where_it_is_sold.py` has held since v1.0.15 - so nothing became
+unlearnable.
+
+**The lair that named a realm is a floor of it.** `bossLair` resolves a template whose location is a
+secret realm's name to that realm's entrance, and opens it only to a leader holding the realm's
+inheritance - `inheritances` is written in the last room and survives every later run, where
+`secret_realm_runs` is one row per user overwritten on the next `enter`. The Python twin
+(`boss_lair`) draws Start where the engine will start it; the two boss tables are untouched, so
+v1.1.0's parity gate still holds them equal.
+
+**Half back, rounded down.** A refund of half is a mechanic the owner chose over a full refund and
+over none: a craft that could be retried for free would be a roll with no stake, and `craftFailureRefund`
+drops the odd unit so one of anything is always spent. The reply reads the engine's `returned` map
+rather than restating the share.
+
+**The drill that took the fix with it.** The refund's drill reverted the line with `sed` and
+restored the file with `git checkout` - which restores to HEAD, and the refund was uncommitted, so
+the drill quietly deleted the feature it had just proved. The test caught it on the next run, and
+the whole tree was staged before any further drill. A drill on an uncommitted change restores from
+the index or from a copy, never from HEAD.
+
+### The deferred eight (v1.2.3)
+
+v1.2.1 recorded eight review claims its verifiers never reached rather than fixing them blind. Read
+one at a time, six held and two did not, and the two are the ones worth writing down.
+
+**A compaction is not a restore.** The maintenance barrier drains requests in flight, and a Python
+write is two of them - an execute that opens the implicit `BEGIN` and a commit - so between the two
+a session's connection holds SQLite's write lock with nothing in flight for the barrier to see.
+VACUUM went in, sat out the whole ten-second `busy_timeout`, and failed *"database is locked"*, with
+the commit queued behind the barrier the entire time; the reproduction is the test (10.05 s and a
+409 against the old tree). Restore closes every session and VACUUM must not: a restore replaces the
+world, so a half-written action is discarded either way, while a compaction shrinks a file and
+rolling back somebody's action to do it would be a restore's cost for none of its reason. So
+`SessionManager.InTransaction` counts the sessions holding a transaction and the vacuum branch
+refuses at once with `sessions_busy` - an idle session holds no lock and is no reason to refuse -
+and the Discord handler tells that refusal from a failure and writes no audit row for it.
+
+**One rule at both cultivation doors.** A hand-sat session said *"the manor array and a qi storm are
+qi-path weather; the ground counts for both"* and then read a deployed array inside its ground
+helper, so a body session was priced on it; a retreat withheld the deployed array from the body path
+(a decision `authority2_test.go` names) and applied the manor to it. Each door was the other's
+opposite on one of the two arrays. The rule is one sentence now - a qi-gathering array, the manor's
+or a deployed one, is qi-path weather; the site and the abode's own array are ground - and
+`placeMultiplierForPath` takes the path so the ground helper can keep it. The test holds both
+halves, because a test of one door passes against a tree where the other still disagrees.
+
+**Two claims were read and left, and the reasons are the point.** `meridian.open` has no cooldown
+because its pace is its cost - a quarter of the insight pool, rising each channel - and a wait added
+beside a cost that already bounds it would be a mechanic invented to satisfy a symmetry. The Reopen
+button *does* skip the panel gate, and so does the Menu button, on purpose: rc.56 states that a
+hub's panel opens because it is where the way out is drawn, and each leaf inside it is checked
+again on the press. A claim that reads a designed asymmetry as a hole is the shape rc.49 named from
+the other side - being caught in something is not the same as being handed it.
+
+**The rank ceiling had a shelf it could not see.** `cheapestShelfPrice` walked the shops, and a
+travelling merchant's wares are a shelf that moves: Madam Wen sells a Spirit Focus Talisman at 15
+against a cheapest shop shelf of 17, so a Saint could buy from her and sell to the next counter at
+16, one coin a loop. Measured off the shipped content before it was believed, and the gate walks
+every merchant ware against every keeper who buys it.
+
+**The rest is one rule found in another place.** The undo chain was followed one link deep, so undo,
+redo, undo refused; it is walked to the original now and the chain's length says which way.
+`combat.turn`'s counter-attack TN had no `resonance` while `combat.technique`'s did, so an ordinary
+strike was easier to be hit on than a technique - `counterDefenceTN` is the one statement, held at
+both sites by AST. And `/auction sell` defaulted to the Mortal stone on every floor in the world,
+rc.44's currency class on the Python side; it reads the house's `default_currency`.
+
+**The second tier held almost entirely, and two of it are worth the paragraph.**
+`commission.resolve` took `outcome` off the payload and paid it - so a client sending `completed`
+collected the reward with nothing done. The only honest producer of a completion is
+`quest.progress`, which lands in `resolveCommissionTx` once every objective is reported, and the
+service's own docstring said so (*"Completion happens inside quest.progress, not here"*) while
+the engine beneath it disagreed. It refuses `completed` now, and **five tests had to move**,
+because they completed a commission by asking the action to - a fixture driving the door
+production never uses, which is the `npc_consignments` rule met in a test's choice of door
+rather than its schema. And a **market counter was a mint in both directions**, measured before
+it was believed: it priced off sect value times a world factor with no eye on the shelves, so a
+Wind Gourd cost 9 at a market while a provisioner paid 45 for it, and a Stygian Tomb Token sold
+for 420 on a shelf while the market paid 840. `marketUnitPrice` holds both inside the shops'
+band, the rule `tradeRankSellPrice` already states for a keeper's counter. The upper-world
+send-off (`sendoffArchetypeFor`) was the one place this release read content into a rule rather
+than off it; v1.3.0 authors all thirty-three entries and the reading is gone.
+
+**And the sect trial reads its own tuning, on the owner's call.** `trial_modifier` in
+`app/rules/sect_recruitment.py` printed a sect's `base_tn`, its path bonuses, its root affinities,
+its household traditions and its karma preference in the notes a trial shows - and
+`sectTrialActionGo` rolled `max(10, 15 - rep/25)` for every sect and read none of them. The notes
+were a bound that lived in the client (rc.48), and this one was worse than most, because they
+*looked* like the rule. `sectTrialTuningTx` is the engine's copy now: the sect's own base TN, the
+bonus on both rolls, and the karma refusal that only a sponsor lifts. One test in
+`sect_doors_test.go` had pinned the literal 15/14 with a fixture character who happened to be a
+Sword Cultivator at karma 50 at the Azure Cloud gate, exactly the applicant the tuning favours;
+it sits a path and root the sect has no opinion of now, so it holds the recommendation rule and
+nothing else.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

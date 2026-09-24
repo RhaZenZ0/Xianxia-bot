@@ -117,10 +117,23 @@ func revealSectRouteTx(conn *storage.Conn, catalog worlddata.Catalog, userID int
 // Where a catalogue sponsor is standing is still checked by the bot, because
 // schedules and circuits are resolved there; that is deferred in docs/TODO.md
 // rather than restated here.
-func resolveRecommenderTx(conn *storage.Conn, catalog worlddata.Catalog, npcName string, c mechanicsCharacter, now float64) (string, error) {
+func resolveRecommenderTx(conn *storage.Conn, catalog worlddata.Catalog, npcName string, c mechanicsCharacter, gameMinute int64, now float64) (string, error) {
 	if npc, ok := catalog.NPCs[npcName]; ok {
 		if !npc.CanRecommend || strings.TrimSpace(npc.SectAffiliation) == "" {
 			return "", fmt.Errorf("%s cannot sponsor anybody's entry into a sect", npcName)
+		}
+		// A catalogue sponsor is asked in person (v1.3.1). The bot checked
+		// this and the engine did not, and a bound that lives in the client
+		// is not a bound (rc.48).
+		where, err := npcWhereaboutsTx(conn, catalog, npcName, gameMinute, now)
+		if err != nil {
+			return "", err
+		}
+		if where.Dead {
+			return "", fmt.Errorf("%s is dead and recommends nobody", npcName)
+		}
+		if where.Known && where.Location != c.Location {
+			return "", fmt.Errorf("%s is at %s; you are at %s", npcName, where.Location, c.Location)
 		}
 		return strings.TrimSpace(npc.SectAffiliation), nil
 	}

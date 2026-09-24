@@ -40,9 +40,25 @@ func itemTrade(catalog worlddata.Catalog, itemID string) string {
 }
 
 // cheapestShelfPrice is the lowest price any shop in the catalogue asks for an
-// item in one currency.
+// item in one currency - and any travelling merchant's own wares, which are a
+// shelf that moves (v1.2.3): Madam Wen sells a Spirit Focus Talisman at 15
+// against a cheapest shelf of 17, so a ceiling read off the shops alone let a
+// rank sell it back at 16.
 func cheapestShelfPrice(catalog worlddata.Catalog, itemID, currency string) (int64, bool) {
 	best, found := int64(0), false
+	for _, merchant := range catalog.Merchants {
+		if merchant.Currency != currency {
+			continue
+		}
+		for _, ware := range merchant.Wares {
+			if ware.ItemID != itemID || ware.Price <= 0 {
+				continue
+			}
+			if !found || ware.Price < best {
+				best, found = ware.Price, true
+			}
+		}
+	}
 	for _, shop := range catalog.Shops {
 		if shop.Currency != currency {
 			continue

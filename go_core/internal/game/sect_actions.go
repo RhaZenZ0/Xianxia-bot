@@ -104,7 +104,7 @@ func sectRecommendationActionGo(conn *storage.Conn, catalog worlddata.Catalog, u
 	// trust and `location` was written straight onto the travel list, where a
 	// road-less place is an instant jump. A caller naming a sect is still
 	// heard - an older bot sends one - but only to refuse a mismatch.
-	sponsored, e := resolveRecommenderTx(conn, catalog, p.NPCName, c, nowSeconds())
+	sponsored, e := resolveRecommenderTx(conn, catalog, p.NPCName, c, p.GameMinute, nowSeconds())
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
@@ -292,6 +292,87 @@ func ownedManualKeys(conn *storage.Conn, userID int64) (map[string]bool, error) 
 	return owned, nil
 }
 
+// sectTrialTuning is what a sect's own recruitment block adds to its trial.
+type sectTrialTuning struct {
+	BaseTN          int64
+	PathBonus       int64
+	RootAffinity    int64
+	FamilyBonus     int64
+	KarmaAdjustment int64
+	Bonus           int64
+	Rejection       string
+}
+
+func (t sectTrialTuning) Map() map[string]any {
+	return map[string]any{"base_tn": t.BaseTN, "path_bonus": t.PathBonus, "root_affinity": t.RootAffinity, "family_bonus": t.FamilyBonus, "karma_adjustment": t.KarmaAdjustment, "bonus": t.Bonus}
+}
+
+// sectTrialDefaultTN is the trial's TN for a sect that authors none; every
+// shipped sect authors one, and the Python profile reads the same default.
+const sectTrialDefaultTN = int64(14)
+
+// sectTrialTuningTx reads the sect's recruitment tuning against this
+// character: the base TN, a bonus for the path the sect favours, one point for
+// a root it has an affinity with, the tradition it keeps with a household,
+// and the karma preference - which refuses an applicant on the wrong side of
+// it outright unless a sponsor vouches, and otherwise moves the roll two
+// against or one for. It is the engine's copy of `trial_modifier` in
+// app/rules/sect_recruitment.py, which was the only copy until v1.2.4 and
+// decided nothing (rc.48: a bound that lives in the client is not a bound).
+func sectTrialTuningTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, c mechanicsCharacter, sectName string, hasRecommendation bool) (sectTrialTuning, error) {
+	rec := catalog.Sects[sectName].Recruitment
+	t := sectTrialTuning{BaseTN: rec.BaseTN}
+	if t.BaseTN <= 0 {
+		t.BaseTN = sectTrialDefaultTN
+	}
+	t.BaseTN = maxI64(8, t.BaseTN)
+	t.PathBonus = rec.PathBonuses[strings.TrimSpace(c.Path)]
+	root := strings.ToLower(strings.TrimSpace(c.SpiritualRoot))
+	for _, affinity := range rec.RootAffinities {
+		if a := strings.ToLower(strings.TrimSpace(affinity)); a != "" && strings.Contains(root, a) {
+			t.RootAffinity = 1
+			break
+		}
+	}
+	if len(rec.FamilyArchetypeBonus) > 0 {
+		archetype, err := householdArchetypeTx(conn, userID)
+		if err != nil {
+			return t, err
+		}
+		t.FamilyBonus = rec.FamilyArchetypeBonus[archetype]
+	}
+	res, err := conn.Execute(`SELECT karma_score FROM characters WHERE user_id=?`, []any{userID})
+	if err != nil {
+		return t, err
+	}
+	karma := int64(0)
+	if row := firstRowMap(res); row != nil {
+		karma = i64(row["karma_score"])
+	}
+	switch strings.ToLower(strings.TrimSpace(rec.KarmaPreference)) {
+	case "righteous":
+		switch {
+		case karma <= -200 && !hasRecommendation:
+			t.Rejection = "your karmic record is too notorious for this orthodox sect to admit you without a trusted sponsor"
+		case karma <= -50:
+			t.KarmaAdjustment = -2
+		case karma >= 50:
+			t.KarmaAdjustment = 1
+		}
+	case "demonic":
+		switch {
+		case karma >= 200 && !hasRecommendation:
+			t.Rejection = "your strongly righteous reputation makes this demonic sect unwilling to expose its inner gate without a trusted sponsor"
+		case karma >= 50:
+			t.KarmaAdjustment = -2
+		case karma <= -50:
+			t.KarmaAdjustment = 1
+		}
+	}
+	t.Bonus = t.PathBonus + t.RootAffinity + t.FamilyBonus + t.KarmaAdjustment
+	return t, nil
+}
+
 func sectTrialActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p sectTrialPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
@@ -357,9 +438,22 @@ func sectTrialActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	// conditional pass below - the one thing a sponsor did was the thing no
 	// player was told. It now does both: the bonus rides the rolls, and a near
 	// miss with a sponsor behind you is still a conditional pass.
-	primaryMod := c.Attributes["body"] + c.RealmIndex*2 + c.Phase/3 + recBonus
-	secondaryMod := c.Attributes["insight"] + c.Attributes["spirit"]/2 + c.RealmIndex + recBonus
-	baseTN := maxI64(10, 15-repScore/25)
+	// What the sect authored for its own trial (v1.2.4): its base TN, the
+	// paths it favours, the roots it has an affinity for, the households it
+	// has a tradition with, and which side of the karma ledger it wants. The
+	// bot has printed all of it in the trial notes since the block was written
+	// and the engine read none of it, so every sect's trial was TN 15/14 and
+	// a Sword Cultivator at the Azure Cloud gate got the same odds as anybody.
+	tuning, e := sectTrialTuningTx(conn, catalog, userID, c, p.SectName, rec != nil)
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	if tuning.Rejection != "" {
+		return authoritativeMutation{}, errors.New(tuning.Rejection)
+	}
+	primaryMod := c.Attributes["body"] + c.RealmIndex*2 + c.Phase/3 + recBonus + tuning.Bonus
+	secondaryMod := c.Attributes["insight"] + c.Attributes["spirit"]/2 + c.RealmIndex + recBonus + tuning.Bonus
+	baseTN := maxI64(10, tuning.BaseTN-repScore/25)
 	primary, e := roll2d10Go(primaryMod, baseTN)
 	if e != nil {
 		return authoritativeMutation{}, e
@@ -427,7 +521,7 @@ func sectTrialActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if e = recordSectAttemptGo(conn, userID, p.SectName, "trial", p.Examiner, p.Location, outcome, primary.Total+secondary.Total, primary.TN+secondary.TN, recBonus, p.GameMinute, details, now); e != nil {
 		return authoritativeMutation{}, e
 	}
-	out := map[string]any{"outcome": outcome, "primary": rollMapGo(primary), "secondary": rollMapGo(secondary), "recommendation_bonus": recBonus, "sect_name": p.SectName, "gate": gate}
+	out := map[string]any{"outcome": outcome, "primary": rollMapGo(primary), "secondary": rollMapGo(secondary), "recommendation_bonus": recBonus, "sect_name": p.SectName, "gate": gate, "tuning": tuning.Map()}
 	if granted != nil {
 		out["granted_manual"] = granted
 	}

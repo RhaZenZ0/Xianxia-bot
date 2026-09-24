@@ -155,14 +155,75 @@ func recordProfessionExamTx(conn *storage.Conn, userID int64, rec professionExam
 // examinations or bought a slip at a time. Idempotent, like
 // `teachTradeMethodsTx` - a method already known is left alone, so somebody who
 // bought the slip early keeps their earlier `learned_game_minute`.
-func teachRankRecipesTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, trade string, rank, gameMinute int64, now float64) ([]string, error) {
-	names := make([]string, 0, 4)
-	for name, recipe := range catalog.Recipes {
-		if recipe.Profession == trade && recipe.MinLevel == rank {
-			names = append(names, name)
+// worldOffers is everything the content says can be had inside one world
+// without luck (v1.3.0): a shelf in that world, a guaranteed item in a room of
+// a realm standing in it, the world's own tier materials, and the tier-flat
+// forage makings. The forage rare pool is deliberately not counted - it is a
+// chance, so a method hanging on it is a lottery - which is the same rule
+// `test_a_method_can_be_made_where_it_is_sold.py` states for the slips.
+func worldOffers(catalog worlddata.Catalog, world string) map[string]bool {
+	found := map[string]bool{}
+	for _, shop := range catalog.Shops {
+		if shop.World != world {
+			continue
+		}
+		for _, line := range shop.Sells {
+			found[line.ItemID] = true
 		}
 	}
-	sort.Strings(names)
+	for _, realm := range catalog.SecretRealms {
+		if catalog.Locations[realm.Location].World != world {
+			continue
+		}
+		for _, room := range realm.Rooms {
+			for item := range room.Items {
+				found[item] = true
+			}
+		}
+	}
+	for _, item := range catalog.EventSites.TierMaterials[world] {
+		found[item] = true
+	}
+	for item := range catalog.ForageMaterials {
+		found[item] = true
+	}
+	return found
+}
+
+// rankRecipesWhereTheyCanBeMade splits a trade's recipes at one rank into the
+// ones the hall's world can supply the makings of and the ones it cannot
+// (v1.3.0, on the owner's call). Before this a hall taught its whole rank
+// wherever it stood, so a Mortal-World Journeyman was handed the Dawn Lotus
+// Vitality Pill, whose herb is shelved from the Spiritual World up - a method
+// that could not be made anywhere its holder could stand. What a hall
+// withholds is still taught by its slip, sold only where the method can be
+// made, or by a hall in a world that can.
+func rankRecipesWhereTheyCanBeMade(catalog worlddata.Catalog, trade string, rank int64, world string) (teachable, withheld []string) {
+	offers := worldOffers(catalog, world)
+	for name, recipe := range catalog.Recipes {
+		if recipe.Profession != trade || recipe.MinLevel != rank {
+			continue
+		}
+		makeable := true
+		for item := range recipe.Cost {
+			if !offers[item] {
+				makeable = false
+				break
+			}
+		}
+		if makeable {
+			teachable = append(teachable, name)
+		} else {
+			withheld = append(withheld, name)
+		}
+	}
+	sort.Strings(teachable)
+	sort.Strings(withheld)
+	return teachable, withheld
+}
+
+func teachRankRecipesTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, trade string, rank, gameMinute int64, now float64, world string) ([]string, []string, error) {
+	names, withheld := rankRecipesWhereTheyCanBeMade(catalog, trade, rank, world)
 	taught := make([]string, 0, len(names))
 	for _, name := range names {
 		res, err := conn.Execute(
@@ -170,7 +231,7 @@ func teachRankRecipesTx(conn *storage.Conn, catalog worlddata.Catalog, userID in
 			 VALUES(?,?,?,'exam',?) ON CONFLICT(user_id,recipe) DO NOTHING`,
 			[]any{userID, name, gameMinute, now})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		// Only what the conflict clause did not swallow is new, which is what
 		// lets the reply name what the candidate actually gained rather than
@@ -179,7 +240,7 @@ func teachRankRecipesTx(conn *storage.Conn, catalog worlddata.Catalog, userID in
 			taught = append(taught, name)
 		}
 	}
-	return taught, nil
+	return taught, withheld, nil
 }
 
 type professionExamPayload struct {
@@ -297,7 +358,7 @@ func professionExamAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 			Domain: "profession", EventType: professionExamEvent, EntityType: "character",
 			EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: out}}, nil
 	}
-	taught, err := teachRankRecipesTx(conn, catalog, userID, trade, level, p.GameMinute, now)
+	taught, withheld, err := teachRankRecipesTx(conn, catalog, userID, trade, level, p.GameMinute, now, shop.World)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -306,6 +367,8 @@ func professionExamAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 		return authoritativeMutation{}, err
 	}
 	out["recipes_taught"] = taught
+	out["recipes_withheld"] = withheld
+	out["hall_world"] = shop.World
 	out["standing_gain"] = professionExamStanding
 	return authoritativeMutation{Result: out, Event: eventledger.Event{
 		Domain: "profession", EventType: professionExamEvent, EntityType: "character",

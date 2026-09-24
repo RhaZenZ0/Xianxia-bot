@@ -159,6 +159,22 @@ BOUNTY_HUNTER_TITLES = (
 )
 
 
+def boss_lair(template: dict[str, Any], secret_realms: dict[str, dict[str, Any]]) -> tuple[str, str]:
+    """Where a raid is fought, and the realm whose floor it is (v1.3.0).
+
+    The twin of the engine's `bossLair`: a template whose location names a
+    secret realm is fought at that realm's entrance, once the leader has
+    walked the realm to its end. Returns ``(location, realm_id)``; the
+    realm id is empty for an ordinary lair.
+    """
+    name = str(template.get("location") or "")
+    for realm_id in sorted(secret_realms):
+        realm = secret_realms[realm_id]
+        if str(realm.get("name") or "") == name:
+            return str(realm.get("location") or ""), str(realm_id)
+    return name, ""
+
+
 def boss_encounter_phase(encounter: dict[str, Any]) -> dict[str, Any]:
     """The phase an engine-owned boss encounter is in, for display.
 

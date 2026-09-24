@@ -62,7 +62,7 @@ class EventSiteContentTests(unittest.TestCase):
                     self.assertGreaterEqual(count[0], 1)
                     self.assertGreaterEqual(count[1], count[0])
                     self.assertGreater(int(node.get("tn") or 0), 0)
-                    self.assertIn(node.get("attribute"), {"body", "insight", "heart", "spirit"})
+                    self.assertIn(node.get("attribute"), {"body", "agility", "spirit", "insight", "will", "presence"})
 
     def test_every_node_pays_something(self):
         """A node that hands back nothing is the empty room again, one level down."""

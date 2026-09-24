@@ -69,9 +69,12 @@ class TheReplySaysWhatTheyWereGiven(unittest.TestCase):
 
 class TheGiftFitsTheHousehold(unittest.TestCase):
     def test_a_richer_house_sends_a_better_artifact_and_none_repeat(self):
-        from app.rules.birthfamily import FAMILY_ARCHETYPES
+        from app.rules.birthfamily import FAMILY_ARCHETYPES, UPPER_SAMSARA_FAMILIES
 
         wealth_of = {str(a["id"]): int(a["wealth"]) for a in FAMILY_ARCHETYPES}
+        # The upper-world houses are keyed by archetype (v1.3.0).
+        for houses in UPPER_SAMSARA_FAMILIES.values():
+            wealth_of.update({str(h["archetype"]): int(h["wealth"]) for h in houses})
         sendoff = WORLD["birth_family_sendoff"]
         self.assertEqual(set(sendoff), set(wealth_of), "a household with no send-off")
         items = [str(e["item"]) for e in sendoff.values()]

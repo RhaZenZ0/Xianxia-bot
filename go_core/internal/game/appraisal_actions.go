@@ -83,10 +83,10 @@ func recordAppraisalTx(conn *storage.Conn, userID int64, itemID, kind string, au
 
 // appraisalSubject resolves what is being read: an item out of your own bag,
 // or the lot standing open in front of you.
-func appraisalSubject(conn *storage.Conn, catalog worlddata.Catalog, userID int64, p appraisalPayload) (string, worlddata.Item, error) {
+func appraisalSubject(conn *storage.Conn, catalog worlddata.Catalog, userID int64, location string, p appraisalPayload) (string, worlddata.Item, error) {
 	itemID := strings.TrimSpace(p.ItemID)
 	if p.AuctionID > 0 {
-		res, err := conn.Execute(`SELECT item_id,active FROM auctions WHERE auction_id=?`, []any{p.AuctionID})
+		res, err := conn.Execute(`SELECT item_id,active,house_id FROM auctions WHERE auction_id=?`, []any{p.AuctionID})
 		if err != nil {
 			return "", worlddata.Item{}, err
 		}
@@ -96,6 +96,11 @@ func appraisalSubject(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		}
 		if i64(row["active"]) != 1 {
 			return "", worlddata.Item{}, errors.New("that lot has already been struck")
+		}
+		// "standing where it is being sold" was the comment and not the
+		// check until v1.2.3: any lot in the world could be read from anywhere.
+		if houseID, _, ok := catalogHouseAt(catalog, location); !ok || houseID != fmt.Sprint(row["house_id"]) {
+			return "", worlddata.Item{}, errors.New("that lot is not on this floor")
 		}
 		itemID = fmt.Sprint(row["item_id"])
 	}
@@ -136,7 +141,7 @@ func appraisalAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	itemID, item, err := appraisalSubject(conn, catalog, userID, p)
+	itemID, item, err := appraisalSubject(conn, catalog, userID, c.Location, p)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

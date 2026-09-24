@@ -26,8 +26,17 @@ const (
 )
 
 // placeCultivationMultiplier is the ground's name and its multiplier, or
-// an empty name and one where the ground is nothing in particular.
+// an empty name and one where the ground is nothing in particular, for the
+// qi path: a deployed qi-gathering array counts.
 func placeCultivationMultiplier(conn *storage.Conn, catalog worlddata.Catalog, userID int64, location string, gameMinute int64) (string, float64, error) {
+	return placeMultiplierForPath(conn, catalog, userID, location, gameMinute, false)
+}
+
+// placeMultiplierForPath is the same reading for either path. A deployed
+// qi-gathering array is qi-path weather, the way the manor's is and the way a
+// closed-door retreat has always read it (v1.2.3); the site and the abode's
+// own chamber and array are ground and count for both.
+func placeMultiplierForPath(conn *storage.Conn, catalog worlddata.Catalog, userID int64, location string, gameMinute int64, body bool) (string, float64, error) {
 	name := ""
 	mult := 1.0
 	if conn == nil {
@@ -82,9 +91,13 @@ func placeCultivationMultiplier(conn *storage.Conn, catalog worlddata.Catalog, u
 			}
 		}
 	}
-	arrayName, arrayMult, err := deployedArrayMultiplier(conn, location, gameMinute)
-	if err != nil {
-		return "", 1, err
+	arrayName, arrayMult := "", 1.0
+	if !body {
+		var err error
+		arrayName, arrayMult, err = deployedArrayMultiplier(conn, location, gameMinute)
+		if err != nil {
+			return "", 1, err
+		}
 	}
 	if arrayMult != 1 {
 		mult *= arrayMult

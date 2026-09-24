@@ -1521,16 +1521,12 @@ class AITaskRouter:
             if self._cooling_down(model):
                 self._model_row(model)["skipped_cooling"] += 1
                 continue
-            if not self._route_limiter(model).try_acquire():
-                # A route at ITS OWN provider ceiling is skipped, not failed: the
-                # next model has a separate quota. Spending an upstream attempt to
-                # be told 429 is the waste this replaces.
-                self._model_row(model)["skipped_route_limit"] += 1
-                continue
             google_call = is_aistudio_route(model)
             # The OpenRouter budget is not spent on a call that never reaches
             # OpenRouter. Charging the AI Studio route against it would defeat
-            # the entire reason the route exists.
+            # the entire reason the route exists. It is asked before the
+            # route's own slot (v1.2.3): a raise here ends the walk, and a slot
+            # taken first was spent on a call that was never made.
             if not google_call and not await self.limiter.try_acquire():
                 tier_counts["rate_limited"] += 1
                 snapshot = self.limiter.snapshot()
@@ -1544,6 +1540,12 @@ class AITaskRouter:
                         "narration is procedural until it rolls over"
                     )
                 raise RuntimeError("OpenRouter local request-rate ceiling reached")
+            if not self._route_limiter(model).try_acquire():
+                # A route at ITS OWN provider ceiling is skipped, not failed: the
+                # next model has a separate quota. Spending an upstream attempt to
+                # be told 429 is the waste this replaces.
+                self._model_row(model)["skipped_route_limit"] += 1
+                continue
             attempted.append(model)
             self._model_row(model)["attempts"] += 1
             try:

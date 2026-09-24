@@ -549,6 +549,22 @@ func pickMortalSamsaraTemplate(karma int64) (familyTemplate, error) {
 	return samsaraFamilies[len(samsaraFamilies)-1], nil
 }
 
+// sendoffArchetypeFor is the household tradition a reborn life is sent off
+// with: the `birth_family_sendoff` entry keyed by the template's id or, as
+// every template is, by its archetype. v1.2.3 found the thirty-three
+// upper-world houses had no entry and read the Mortal counterpart off the
+// kind in each id; v1.3.0 authors all thirty-three in the content file, so
+// the reading is gone and an archetype the content does not carry is sent
+// off with nothing rather than with a guess.
+func sendoffArchetypeFor(catalog worlddata.Catalog, family BirthFamily) string {
+	for _, key := range []string{family.ID, family.Archetype} {
+		if _, ok := catalog.BirthFamilySendoff[key]; ok {
+			return key
+		}
+	}
+	return family.Archetype
+}
+
 func pickUpperSamsaraTemplate(world string, karma int64) (upperFamilyTemplate, error) {
 	options := upperSamsaraFamilies[world]
 	if len(options) == 0 {
@@ -1015,10 +1031,11 @@ func reincarnateAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		return authoritativeMutation{}, err
 	}
 	currency := worldBaseCurrency(catalog, world)
-	spiritStones := int64(0)
-	if currency == "low_spirit_stone" {
-		spiritStones = 25
-	}
+	// The sheet mirrors the purse in the money of the world the cultivator
+	// stands in (rc.44), and the purse below is opened in exactly that coin -
+	// so the mirror is 25 in every world, not only where that coin is the
+	// Mortal stone (v1.2.3).
+	spiritStones := int64(25)
 	origin := fmt.Sprintf("%s, %s", family.FamilyName, family.Location)
 	householdLocation := birthFamilyHouseholdLocation(familyID)
 	_, err = conn.Execute(`UPDATE characters SET name=?,origin=?,path=?,spiritual_root=?,gender=?,age_at_creation_years=12,created_game_minute=?,natural_lifespan_years=?,life_extension_years=0,life_status='alive',death_game_minute=NULL,reincarnation_ready_game_minute=NULL,realm_index=0,phase=1,cultivation=0,body_realm_index=0,body_phase=1,body_cultivation=0,sense_power_bonus=0,sense_precision_bonus=0,sense_range_bonus=0,concealment_bonus=0,concealment_active=0,qi=?,qi_max=?,vitality=?,vitality_max=?,spirit_stones=?,insight_xp=0,location=?,attributes_json=?,updated_at=? WHERE user_id=?`, []any{p.Name, origin, path, root, gender, p.GameMinute, natural, qiMax, qiMax, vitMax, vitMax, spiritStones, householdLocation, string(attrsJSON), now, userID})
@@ -1061,7 +1078,7 @@ func reincarnateAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	// A new life is born into a new household, and that household sends its
 	// own child out with its own heirloom (v1.0.0-rc.15). The guard is keyed
 	// on the family, so the previous incarnation's does not block this one.
-	sendoff, err := grantBirthFamilySendoffTx(conn, catalog, userID, familyID, firstNonempty(family.ID, family.Archetype), p.GameMinute, now)
+	sendoff, err := grantBirthFamilySendoffTx(conn, catalog, userID, familyID, sendoffArchetypeFor(catalog, family), p.GameMinute, now)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

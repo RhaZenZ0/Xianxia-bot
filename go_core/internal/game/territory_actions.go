@@ -85,6 +85,16 @@ func territoryClaimActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if t == nil {
 		return authoritativeMutation{}, errors.New("territory not found")
 	}
+	// A claim is made standing on the ground (v1.3.1): the bot only ever
+	// offered the territory whose region is the player's location, and the
+	// engine took any key from anywhere.
+	c, e := loadMechanicsCharacter(conn, userID)
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	if region := strings.TrimSpace(fmt.Sprint(t["region"])); region != c.Location {
+		return authoritativeMutation{}, fmt.Errorf("%s is claimed from %s; you are at %s", fmt.Sprint(t["name"]), region, c.Location)
+	}
 	controller := strings.TrimSpace(fmt.Sprint(t["controller_key"]))
 	now := nowSeconds()
 	out := map[string]any{"territory_key": p.TerritoryKey, "sect_name": sect}

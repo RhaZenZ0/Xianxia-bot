@@ -523,13 +523,22 @@ async def profession_exam(interaction: discord.Interaction, profession: app_comm
                      f"**{int(result.get('balance',0))}**).")
     if result.get("passed"):
         taught = [str(name) for name in list(result.get("recipes_taught") or [])]
+        withheld = [str(name) for name in list(result.get("recipes_withheld") or [])]
         lines.append(f"\n✅ **Passed.** The hall enters you on its roll as a **{result.get('rank_name','')}** "
                      f"of {result.get('profession','')} (+{int(result.get('standing_gain',0))} standing).")
         if taught:
             lines.append("📜 The keeper writes out what a cultivator of that rank is expected to know: "
                          + ", ".join(f"**{name}**" for name in taught) + ".")
-        else:
+        elif not withheld:
             lines.append("📜 You already knew every method of that rank; the certificate is the new part.")
+        if withheld:
+            # A hall teaches only what its own world can make (v1.3.0); the
+            # engine names the rest, and a slip sold where a method can be
+            # made, or a hall standing there, is where it is learned.
+            world = str(result.get("hall_world") or "this world")
+            lines.append(f"📜 Not taught here, because the {world} cannot supply the makings: "
+                         + ", ".join(f"**{name}**" for name in withheld)
+                         + ". A hall of the trade in a world that can, or its method slip, teaches it.")
     else:
         hours = max(1, int(result.get("retry_game_minutes", 1440)) // 60)
         lines.append(f"\n❌ **Not this time.** The hall will look at you again in about **{hours} hours**.")

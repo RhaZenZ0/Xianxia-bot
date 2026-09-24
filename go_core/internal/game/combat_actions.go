@@ -349,6 +349,15 @@ type combatStartPayload struct {
 	GameMinute    int64  `json:"game_minute"`
 }
 
+// counterDefenceTN is what an opponent's counter-attack must beat, stated once
+// for both of the two turns a player can take (v1.2.3). combat.turn and
+// combat.technique each spelled it out, and only the technique's carried the
+// dual-cultivation resonance, so the same cultivator was easier to hit on an
+// ordinary strike than on a technique.
+func counterDefenceTN(realm, stage, defence, lawBonus, companion, resonance int64) int64 {
+	return 10 + realm*2 + stage/3 + defence + lawBonus + companion + resonance
+}
+
 // combatStartAction is the authoritative counterpart to Python's former
 // Database.create_battle: it decides the opponent's starting stats and
 // creates the battle row server-side, instead of trusting a client-computed
@@ -584,7 +593,7 @@ func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		b.Suppressed--
 		out["counter_suppressed"] = true
 	} else {
-		counter, e := roll2d10(4+b.NPCRealm*2+b.NPCStage/3, 10+realm*2+stage/3+defenseBonus+lawBonus+comp)
+		counter, e := roll2d10(4+b.NPCRealm*2+b.NPCStage/3, counterDefenceTN(realm, stage, defenseBonus, lawBonus, comp, resonance))
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
@@ -815,7 +824,7 @@ func combatTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 		b.Suppressed--
 		out["counter_suppressed"] = true
 	} else {
-		counter, e := roll2d10(4+b.NPCRealm*2+b.NPCStage/3, 10+realm*2+stage/3+def+lawBonus+compBonus+resonance)
+		counter, e := roll2d10(4+b.NPCRealm*2+b.NPCStage/3, counterDefenceTN(realm, stage, def, lawBonus, compBonus, resonance))
 		if e != nil {
 			return authoritativeMutation{}, e
 		}

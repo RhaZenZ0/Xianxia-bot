@@ -125,9 +125,9 @@ async def duel_act(interaction: discord.Interaction, style: app_commands.Choice[
     if not match:
         await interaction.response.send_message("You have no active accepted duel.", ephemeral=False)
         return
-    if int(match["turn_user_id"]) != interaction.user.id:
-        await interaction.response.send_message("It is your opponent's turn.", ephemeral=False)
-        return
+    # No turn pre-check here (v1.2.3): the engine runs its breach check before
+    # its turn check precisely so the living player can end a duel whose turn
+    # holder has died (v0.23.1), and a refusal in front of it undid that.
     opponent_id = int(match["player2_user_id"]) if int(match["player1_user_id"]) == interaction.user.id else int(match["player1_user_id"])
     opponent = await DB.get_character(opponent_id)
     if not opponent:

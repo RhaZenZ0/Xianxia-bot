@@ -301,13 +301,15 @@ func TestACatalogueSponsorOnlySpeaksForTheirOwnSect(t *testing.T) {
 }
 
 // sitForcedTrial sits the Azure Cloud trial with both dice of both rolls
-// forced to 5 and attributes of 2, at realm 0 phase 0: primary 10+2 against 15,
-// secondary 10+2+1 against 14 - a fail by 3 and by 1 with nothing behind you.
+// forced to 5 and attributes of 2, at realm 0 phase 0, on a path and root the
+// sect has no opinion of and at karma 0, so its authored tuning (v1.2.4) adds
+// nothing: primary 10+2 against its base TN 14, secondary 10+2+1 against 13 -
+// a fail by 2 and a bare success with nothing behind you.
 func sitForcedTrial(t *testing.T, bonus int64, seq int) map[string]any {
 	t.Helper()
 	path := setupSectTrialDB(t)
 	world := batch4WorldPath(t)
-	batch4Exec(t, path, `UPDATE characters SET realm_index=0,phase=0,attributes_json='{"body":2,"agility":2,"spirit":2,"insight":2,"will":2,"presence":2}' WHERE user_id=42`)
+	batch4Exec(t, path, `UPDATE characters SET realm_index=0,phase=0,path='Beast Binder',spiritual_root='Water Root',karma_score=0,attributes_json='{"body":2,"agility":2,"spirit":2,"insight":2,"will":2,"presence":2}' WHERE user_id=42`)
 	if bonus > 0 {
 		batch4Exec(t, path, `INSERT INTO sect_recommendations(user_id,npc_name,sect_name,bonus,status,created_at,updated_at) VALUES(42,'Inquisitor Shen Rui','Azure Cloud Sect',?,'active',0,0)`, bonus)
 	}
@@ -320,7 +322,7 @@ func TestTheRecommendationRidesBothTrialRolls(t *testing.T) {
 	if got := fmt.Sprint(sitForcedTrial(t, 0, 1)["outcome"]); got != "fail" {
 		t.Fatalf("the unsponsored forced trial was %s, want fail", got)
 	}
-	// +3 on both: 15 against 15 and 16 against 14 - a pass outright.
+	// +3 on both: 15 against 14 and 16 against 13 - a pass outright.
 	result := sitForcedTrial(t, 3, 2)
 	if got := fmt.Sprint(result["outcome"]); got != "pass" {
 		t.Fatalf("a +3 recommendation left the trial at %s; the bonus is not riding the rolls (%v)", got, result)
@@ -328,8 +330,8 @@ func TestTheRecommendationRidesBothTrialRolls(t *testing.T) {
 }
 
 func TestARecommendationStillOpensTheConditionalPass(t *testing.T) {
-	// +1 on both: primary 13 against 15 (-2), secondary 14 against 14 (0) -
-	// one success, combined -2, which only a sponsor turns into admission.
+	// +1 on both: primary 13 against 14 (-1), secondary 14 against 13 (+1) -
+	// one success, combined 0, which only a sponsor turns into admission.
 	if got := fmt.Sprint(sitForcedTrial(t, 1, 3)["outcome"]); got != "conditional_pass" {
 		t.Fatalf("a +1 recommendation near miss was %s, want conditional_pass", got)
 	}
@@ -402,7 +404,7 @@ func TestAnOutsiderMayTakeEntryLevelSectWorkAndEarnsStanding(t *testing.T) {
 	path := setupCommissionDB(t)
 	seedSectCommission(t, path, "commission_gate_roster", `{"outsider_standing": 25}`)
 	commissionMustApply(t, path, "commission.accept", 42, 1, map[string]any{"quest_key": "commission_gate_roster", "game_minute": 1000})
-	out := commissionMustApply(t, path, "commission.resolve", 42, 2, map[string]any{"quest_key": "commission_gate_roster", "outcome": "completed", "game_minute": 1100})
+	out := completeCommission(t, path, "commission_gate_roster", 1100)
 	standing, ok := out["sect_standing"].(map[string]any)
 	if !ok || storage.ParseInt(standing["delta"]) != 25 {
 		t.Fatalf("an outsider's finished sect work paid no standing: %v", out)
@@ -417,7 +419,7 @@ func TestOutsiderStandingIsCappedAndOnlyForTheWayIn(t *testing.T) {
 	path := setupCommissionDB(t)
 	seedSectCommission(t, path, "commission_greedy", `{"outsider_standing": 99}`)
 	commissionMustApply(t, path, "commission.accept", 42, 1, map[string]any{"quest_key": "commission_greedy", "game_minute": 1000})
-	commissionMustApply(t, path, "commission.resolve", 42, 2, map[string]any{"quest_key": "commission_greedy", "outcome": "completed", "game_minute": 1100})
+	completeCommission(t, path, "commission_greedy", 1100)
 	if got := storage.ParseInt(actionScalar(t, path, `SELECT score FROM faction_reputation WHERE user_id=42 AND faction_key='Azure Cloud Sect'`)); got != outsiderStandingCap {
 		t.Fatalf("a seed of 99 paid %d standing; the cap is %d", got, outsiderStandingCap)
 	}
@@ -427,7 +429,7 @@ func TestOutsiderStandingIsCappedAndOnlyForTheWayIn(t *testing.T) {
 	seedSectCommission(t, member, "commission_gate_roster", `{"outsider_standing": 25}`)
 	batch4Exec(t, member, `INSERT INTO sect_membership(user_id,sect_name,joined_at) VALUES(42,'Azure Cloud Sect',0)`)
 	commissionMustApply(t, member, "commission.accept", 42, 1, map[string]any{"quest_key": "commission_gate_roster", "game_minute": 1000})
-	out := commissionMustApply(t, member, "commission.resolve", 42, 2, map[string]any{"quest_key": "commission_gate_roster", "outcome": "completed", "game_minute": 1100})
+	out := completeCommission(t, member, "commission_gate_roster", 1100)
 	if _, ok := out["sect_standing"]; ok {
 		t.Fatal("a disciple was paid the outsider's standing")
 	}

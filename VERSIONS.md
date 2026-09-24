@@ -6,6 +6,87 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.3.1** puts six rules the bot was holding into the engine, and draws three more buttons only where they work.
+
+A catalogue sponsor must be standing where the applicant is, and the engine now knows where a
+catalogue NPC stands - the road a wandering master walks, the simulation's row, the daily schedule
+while they are at home - so the check is a bound rather than a courtesy. Which sects a cultivator has
+discovered is what their known gates justify, not what a client asserts. Work on a city's board is
+taken in that city, and a territory is claimed standing on it. The forage wait is the cooldown
+table's (`FORAGE_COOLDOWN_MINUTES`, twenty minutes as before). And a player who finished the beginner
+path before a stage was added is handed it the next time they do anything, along whatever chain a GM
+has pointed the stages down.
+
+It also hides the ghost road's harvest where nothing died and its rites where nobody is buried,
+the black market where no post is open, and the array where none departs - the three place rules
+v1.1.0 left drawn for their cost, at the cost of one read each on a panel refresh.
+
+**1.3.0** takes ten decisions the owner made in one message: a failed craft gives half of its makings back, a hall teaches only what its world can make, the Nine-Echo Sword Wraith can finally be fought, and the reset asks with the count in hand.
+
+A failed craft returns half of each input, rounded down, so one unit of anything is still the stake;
+the reply names what was salvaged. A trade hall teaches, of the rank passed, only the methods its
+own world can supply the makings of, and says which it withheld and where they are learned instead -
+a Mortal apothecary no longer hands a Journeyman the Dawn Lotus Vitality Pill, whose herb grows a
+world up. The Nine-Echo Sword Wraith's lair, which named a secret realm rather than a place, is a
+secret floor beneath the Sword Grave of Nine Echoes: the raid starts at the realm's entrance once
+the party's leader has walked the realm to its last room. `/reset`'s "Are you sure?" names how many
+restarts the account has left, read from the engine and never restated. The cultivation card shows
+the qi pool and its purity at every realm again, and only the channels wait for the page that opens
+them.
+
+It also authors a send-off for every one of the thirty-three upper-world houses a samsara rebirth
+can land in - an heirloom flying artifact, a handover line and the family trade each, keyed by the
+house's archetype - in place of the reading v1.2.3 made off the kind in each house's id. A property
+cannot be founded inside a birth household, and the panel hides Establish there. The two event nodes
+and five event-menu rows that rolled `heart`, an attribute no character has, roll presence or will,
+and the engine no longer accepts the word. And the Celestial Mandate talisman hall pays 96 for a
+Starfall Talisman, beside the other Celestial halls and under the 102 its makings cost, so the one
+recipe that turned a profit at the first rank does not.
+
+**1.2.3** settles the review's deferred claims, both tiers: fourteen held and are fixed, two were read and left as they are.
+
+A GM's Vacuum no longer stalls behind a half-written action. A Python write is two requests to the
+engine - an execute, which opens the transaction, and a commit - and between them nothing is in
+flight, so the maintenance barrier let VACUUM in while that session still held the write lock;
+VACUUM waited out the whole ten-second busy timeout and then failed, with the commit queued behind
+it. It refuses at once now and says a session is busy, and the commit goes through.
+
+It also makes a qi-gathering array qi-path weather at both doors: a body retreat was priced on the
+sect manor's array while a hand-sat body session was not, and a hand-sat body session was priced on
+a deployed array while a body retreat was not. Both of a player's combat turns defend against the
+counter-attack with one target number, where an ordinary strike had left out the dual-cultivation
+resonance a technique counted. A GM can undo an undo again: undo, redo, undo used to refuse. A
+keeper's rank price stops short of a travelling merchant's wares as well as the shops' shelves,
+which had let a talisman be bought from Madam Wen at 15 and sold back at 16. And `/auction sell`
+lists in the house's own coin unless told otherwise, where it defaulted to the Mortal stone on
+every floor in the world.
+
+And two claims were read and deliberately not changed: `meridian.open` has no cooldown because a
+quarter of the insight pool, rising each channel, is its pace; and an expired panel's Reopen button
+takes the same road the Menu button does - the panel opens, and every leaf inside it is checked
+again on the press.
+
+It also reads the review's second tier. A commission could be completed by asking: the action
+paid whatever outcome the client named, and it refuses "completed" now, since a commission is
+completed by doing it. A market counter sold a Wind Gourd for 9 that a provisioner paid 45 for,
+and paid 840 for a tomb token a shelf sells at 420; a market now sells for no less than any keeper
+pays and pays less than any shelf asks. A lot is appraised only on the floor it stands on. A duel
+whose turn holder has died can be ended by the living player, which a refusal in the bot had been
+standing in front of. Narrate-it meets the maintenance and seclusion gates. A refused character
+creation is told in the engine's words. A sect discovery is stamped with the engine's minute. A
+control request whose body never arrives is answered rather than dropped. And a rebirth above the
+Mortal World is sent off by its house with an heirloom, a trade and a tutor, where before it got
+none of them because no upper-world house carried a send-off entry; its purse mirror is right in
+every world.
+
+And a sect's entrance trial reads what the sect authored, on the owner's call. Every public sect
+carries a base TN, the paths it favours, the roots it has an affinity with, the households it
+keeps a tradition with and which side of the karma ledger it wants, and the bot has printed all of
+it in the trial notes since the block was written - while the engine rolled TN 15 for every sect.
+The Azure Cloud gate is TN 14 and a Sword Cultivator with a Metal root gets +3 there; the
+Celestial Mandate Academy is TN 20; a notorious applicant is refused at an orthodox gate without a
+sponsor, as the notes have always said.
+
 **1.2.2** names the trades' ranks the way the genre does: nine tiers, each a title, each trade its own word.
 
 The owner's call on v1.2.0's grades: the Nine-Tier ladder. Unranked before the first examination,
@@ -781,9 +862,9 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.2.2
+## Release status — v1.3.1
 
-- Current release: v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
+- Current release: v1.3.1 - six rules the bot held are the engine's (a sponsor's presence, the sects a gate justifies, a city's board, a territory's ground, the forage wait, the quest chain catch-up on any action) and three more buttons are drawn only where they work (see the changelog). Built on v1.3.0 - ten of the owner's decisions: a failed craft returns half its makings, a hall teaches only what its world can make, the Nine-Echo Sword Wraith is a secret floor beneath its realm, `/reset` asks with the count, the Qi Body card shows the pool at every realm, thirty-three upper-world send-offs, no property inside a household, `heart` retired, the Starfall hall's buy line lowered (see the changelog). Built on v1.2.3 - the review's eight deferred claims settled: Vacuum refuses at once behind a half-written action, one array rule at both cultivation doors, one counter-attack TN, an undo undone again, a rank price under a merchant's wares, and a lot listed in its house's coin (see the changelog). Built on v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
   Apprentice to Tier 9 Sovereign with each trade's own word in front (Pill, Forge, Talisman, Array,
   Herb, Ore, Beast, Artifact, Treasure). No schema.
 - v1.2.1: a beast can always evolve, a homestead can be upgraded in any world, and a dozen smaller wires from a deep review (see the changelog).

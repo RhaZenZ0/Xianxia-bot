@@ -26,7 +26,7 @@ from ...rules.creation_ui import (
 from ...ops.game_engine import GameEngineError
 from ..channels import _report_game_ui_error, post_server_log
 from ..discovery import LOCATION_DISCOVERY_IMAGES, location_discovery_embed, location_discovery_image_path
-from ..runtime import DB, ENGINE, GENDER_CHOICES, WORLD, _sync_cultivator_role, current_world_time, log, respond
+from ..runtime import DB, ENGINE, GENDER_CHOICES, WORLD, _explain_engine_error, _sync_cultivator_role, current_world_time, log, respond
 from ..threads import ensure_birth_family_household_thread, ensure_expedition_thread
 
 class CharacterModal(discord.ui.Modal):
@@ -77,22 +77,28 @@ class CharacterModal(discord.ui.Modal):
 
         family = self.birth_family
         wt = await current_world_time()
-        creation_envelope = await ENGINE.authoritative_action(
-            "character.create",
-            interaction.user.id,
-            {
-                "discord_name": interaction.user.display_name,
-                "name": str(self.name_input.value).strip(),
-                "concept": str(self.concept_input.value).strip(),
-                "gender": self.selected_gender,
-                "path": normalized_path,
-                "family_choice_id": str(family.get("choice_id") or ""),
-                
-                "age_at_creation_years": 18,
-            },
-            action_id=f"discord:{interaction.id}:character.create",
-            expected_version=self.offer_state_version,
-        )
+        try:
+            creation_envelope = await ENGINE.authoritative_action(
+                "character.create",
+                interaction.user.id,
+                {
+                    "discord_name": interaction.user.display_name,
+                    "name": str(self.name_input.value).strip(),
+                    "concept": str(self.concept_input.value).strip(),
+                    "gender": self.selected_gender,
+                    "path": normalized_path,
+                    "family_choice_id": str(family.get("choice_id") or ""),
+                    "age_at_creation_years": 18,
+                },
+                action_id=f"discord:{interaction.id}:character.create",
+                expected_version=self.offer_state_version,
+            )
+        except GameEngineError as exc:
+            # A refused creation - a name the engine will not take, a stale
+            # offer - is told in the engine's words rather than as a wiring
+            # failure (v1.2.3).
+            await respond(interaction, f"❌ {_explain_engine_error(exc)}", ephemeral=True)
+            return
         creation = dict(creation_envelope.get("result") or {})
         created = bool(creation.get("created"))
         if not created:
