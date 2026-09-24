@@ -4689,6 +4689,18 @@ send-off (`sendoffArchetypeFor`) is the one place this release reads content int
 than off it, and `docs/TODO.md` records it as a decision the owner may replace with authored
 entries.
 
+**And the sect trial reads its own tuning, on the owner's call.** `trial_modifier` in
+`app/rules/sect_recruitment.py` printed a sect's `base_tn`, its path bonuses, its root affinities,
+its household traditions and its karma preference in the notes a trial shows - and
+`sectTrialActionGo` rolled `max(10, 15 - rep/25)` for every sect and read none of them. The notes
+were a bound that lived in the client (rc.48), and this one was worse than most, because they
+*looked* like the rule. `sectTrialTuningTx` is the engine's copy now: the sect's own base TN, the
+bonus on both rolls, and the karma refusal that only a sponsor lifts. One test in
+`sect_doors_test.go` had pinned the literal 15/14 with a fixture character who happened to be a
+Sword Cultivator at karma 50 at the Azure Cloud gate, exactly the applicant the tuning favours;
+it sits a path and root the sect has no opinion of now, so it holds the recommendation rule and
+nothing else.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

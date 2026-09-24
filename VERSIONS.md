@@ -42,6 +42,14 @@ Mortal World is sent off by its house with an heirloom, a trade and a tutor, whe
 none of them because no upper-world house carried a send-off entry; its purse mirror is right in
 every world.
 
+And a sect's entrance trial reads what the sect authored, on the owner's call. Every public sect
+carries a base TN, the paths it favours, the roots it has an affinity with, the households it
+keeps a tradition with and which side of the karma ledger it wants, and the bot has printed all of
+it in the trial notes since the block was written - while the engine rolled TN 15 for every sect.
+The Azure Cloud gate is TN 14 and a Sword Cultivator with a Metal root gets +3 there; the
+Celestial Mandate Academy is TN 20; a notorious applicant is refused at an orthodox gate without a
+sponsor, as the notes have always said.
+
 **1.2.2** names the trades' ranks the way the genre does: nine tiers, each a title, each trade its own word.
 
 The owner's call on v1.2.0's grades: the Nine-Tier ladder. Unranked before the first examination,

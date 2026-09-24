@@ -734,6 +734,14 @@ type SectRecruitment struct {
 	// an envoy, a delegation - or found only through a sponsor. Absent means
 	// public, which is what the Python reader has always assumed.
 	PublicRoute *bool `json:"public_route"`
+	// The trial's tuning (v1.2.4). Authored on every public sect since the
+	// recruitment block was written and printed in the bot's trial notes,
+	// and read by no rule until now: every sect's trial was TN 15/14.
+	BaseTN               int64            `json:"base_tn"`
+	PathBonuses          map[string]int64 `json:"path_bonuses"`
+	RootAffinities       []string         `json:"root_affinities"`
+	FamilyArchetypeBonus map[string]int64 `json:"family_archetype_bonus"`
+	KarmaPreference      string           `json:"karma_preference"`
 }
 
 // Public reports whether a sect's gate is a public recruitment route.

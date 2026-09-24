@@ -121,10 +121,13 @@ deferred half and not the half that says what was done about it.
   `/abode → Leave`, and `abode.leave` reads `cave_abodes` while a residence is a `sect_abodes` row; and
   `abode leave`/`abode focus` were hidden from anybody owning no property, which is every invited guest
   standing inside somebody else's.
-- **deferred (decision)** — *A sect's trial tuning is authored and not read.* `recruitment.base_tn`,
-  `path_bonuses`, `root_affinities` and `family_archetype_bonus` are in the content and in the Python
-  notes a trial prints, and `sectTrialActionGo` reads none of them: the TNs are 15 and 14 for every
-  sect. Wiring them changes every sect's odds, which is a balance call rather than a wiring.
+- **fixed (v1.2.3)** — *A sect's trial tuning is authored and not read.* On the owner's call:
+  `sectTrialTuningTx` reads `base_tn`, `path_bonuses`, `root_affinities`, `family_archetype_bonus`
+  and `karma_preference` off the sect's recruitment block, the bonus rides both rolls and the base
+  TN is the sect's own (14 to 20; the literal was 15 for all); the karma preference refuses a
+  notorious applicant at an orthodox gate without a sponsor, as `trial_modifier` in Python has
+  claimed since it was written. `sect_trial_tuning_test.go` lends the dice and holds each term;
+  `test_the_trial_reads_its_tuning.py` holds that the engine reads every key the notes print.
 - **deferred (engine)** — *A catalogue sponsor's position is checked by the bot.* `resolveRecommenderTx`
   checks that a delegation's elder is standing where the player is, and leaves a catalogue sponsor to
   the bot, because schedules and circuits are resolved in Python. A bound that lives in the client is
