@@ -4625,6 +4625,31 @@ allowlist. A rule stated in this file and enforced at the sites known when it wa
 reach the site written next, which is why `test_every_engine_key_reaches_the_engine.py` reads the
 keys off the Go source rather than off a list: the next one fails the day it is read.
 
+### Six rules the bot was holding (v1.3.1)
+
+The first group of what was left in `docs/TODO.md`, each a bound that lived in the client (rc.48)
+or a literal beside its own table. Two are worth the paragraph.
+
+**Where a catalogue NPC stands is the engine's answer now** (`npcWhereaboutsTx`). rc.28 wrote
+`current_npc_location` in Python - circuit first, then the simulation row, then the schedule while
+at home, then the registry and a running event's cast - and the engine read only the simulation
+row, so a sponsor's presence could not be a bound. The Go resolver keeps that order exactly, and
+`NPCDefinition` gained `schedule`, `circuit_months` and `circuit_offset` for it; `periodForHour`
+and `circuitStop` are the Python twins' arithmetic, held by `TestPeriodsAndCircuitsAreTheClocks`
+against the same table `app/rules/sense.py` implies. The sponsor test drives the shipped content:
+Elder Xue Hong keeps Moonfen Marsh and walks to Greenriver Town of an evening, so the ask is refused
+at nine in the morning and heard at six.
+
+**A client's list can narrow a discovery and never widen it.** `sect.discover` derives the sects
+from `knownLocationsTx` and `sectGate`, so the trial's "discovered" check cannot be satisfied by
+assertion; the bot's reconcile sends no names at all. The seven tests that drove the old action
+named sects the catalogue does not carry ("Iron Peak Sect", "Jade Fern Sect"), which was exactly
+the shape that could not fail the way production fails - they name real gates now, made known first.
+
+**The catch-up runs on any action**, beside the vitality settle, and reads `seed_json.follow_on`
+off every completed quest rather than the content file's order. The lesson-door test seeded its two
+stages with an empty chain and went red, because a fixture with no chain is a world with no chain.
+
 ### Ten decisions in one message (v1.3.0)
 
 The owner answered the open decisions of the last four releases at once, and each is recorded in

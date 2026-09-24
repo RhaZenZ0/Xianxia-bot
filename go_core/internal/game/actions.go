@@ -132,7 +132,7 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 	case "admin.player.set_sect":
 		result, err = adminSetSect(conn, req.ActorID, req.Payload)
 	case "sect.discover":
-		result, err = sectDiscoverAction(conn, req.ActorID, req.Payload)
+		result, err = sectDiscoverAction(conn, catalog, req.ActorID, req.Payload)
 	case "admin.player.set_master":
 		result, err = adminSetMaster(conn, req.ActorID, req.Payload)
 	case "admin.player.set_sect_rank":

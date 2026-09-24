@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 // Recording that a player has learned a sect exists - a small player-side
@@ -31,7 +32,7 @@ import (
 // purpose: the reconciling caller runs on a read path, every open of the sect
 // screen, and an authoritative write there would bump the player's state
 // version for learning nothing.
-func sectDiscoverAction(conn *storage.Conn, userID int64, raw json.RawMessage) (any, error) {
+func sectDiscoverAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (any, error) {
 	p, err := decodeMap(raw)
 	if err != nil {
 		return nil, err
@@ -69,22 +70,6 @@ func sectDiscoverAction(conn *storage.Conn, userID int64, raw json.RawMessage) (
 		return nil, err
 	}
 
-	// De-duplicate before touching the database: a caller that names the same
-	// sect twice should not depend on INSERT OR IGNORE to sort it out.
-	wanted := make([]string, 0, len(rawSects))
-	seen := map[string]bool{}
-	for _, item := range rawSects {
-		name := strings.TrimSpace(fmt.Sprint(item))
-		if name == "" || seen[name] {
-			continue
-		}
-		seen[name] = true
-		wanted = append(wanted, name)
-	}
-	if len(wanted) == 0 {
-		return map[string]any{"discovered": []string{}, "already_known": []string{}}, nil
-	}
-
 	if err := begin(conn); err != nil {
 		return nil, err
 	}
@@ -96,11 +81,49 @@ func sectDiscoverAction(conn *storage.Conn, userID int64, raw json.RawMessage) (
 	if _, err := characterRowTx(conn, userID); err != nil {
 		return nil, err
 	}
+	// Which sects are discovered is the engine's to say (v1.3.1): a sect
+	// whose gate stands on a place the cultivator knows. The caller's list is
+	// still read - an older bot sends one - but only to narrow, never to
+	// widen: a name the gates do not justify is dropped, so a client cannot
+	// satisfy the trial's "discovered" check by asserting it.
+	c, err := loadMechanicsCharacter(conn, userID)
+	if err != nil {
+		return nil, err
+	}
+	known, err := knownLocationsTx(conn, catalog, userID, c)
+	if err != nil {
+		return nil, err
+	}
+	reachable := map[string]string{}
+	for name := range catalog.Sects {
+		if gate := sectGate(catalog, name); gate != "" && known[gate] {
+			reachable[name] = gate
+		}
+	}
+	asked := map[string]bool{}
+	for _, item := range rawSects {
+		if name := strings.TrimSpace(fmt.Sprint(item)); name != "" {
+			asked[name] = true
+		}
+	}
+	wanted := make([]string, 0, len(reachable))
+	for name := range reachable {
+		if len(asked) == 0 || asked[name] {
+			wanted = append(wanted, name)
+		}
+	}
+	sort.Strings(wanted)
+	if len(wanted) == 0 {
+		return map[string]any{"discovered": []string{}, "already_known": []string{}}, nil
+	}
 	now := float64(time.Now().UnixNano()) / 1e9
 	discovered := []string{}
 	alreadyKnown := []string{}
 	for _, name := range wanted {
 		rowSource := source
+		if rowSource == "" {
+			rowSource = reachable[name]
+		}
 		if specific, ok := perSectSource[name]; ok {
 			rowSource = specific
 		}

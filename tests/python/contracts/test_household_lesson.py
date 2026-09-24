@@ -158,7 +158,13 @@ class TheDoorIsWhereItWorks(unittest.TestCase):
         never handed it by the chain; the door catches the path up."""
         source = (GO / "household_lesson.go").read_text(encoding="utf-8")
         self.assertIn("catchUpBeginnerPathTx(conn, catalog, userID, p.GameMinute)", source)
-        self.assertIn("grantOrdinaryQuestTx(conn, userID, stage, gameMinute)", source)
+        # The catch-up follows the chain the stages are seeded with (v1.3.1)
+        # and hands over through the one ordinary grant; the spelling of its
+        # variables is not the rule (v1.0.8).
+        body = source[source.index("func catchUpBeginnerPathTx("):]
+        body = body[:body.index("\nfunc ")]
+        self.assertIn("questFollowOnTx(", body)
+        self.assertIn("grantOrdinaryQuestTx(", body)
 
     def test_the_sendoff_still_teaches_through_the_same_helper(self):
         sendoff = (GO / "birth_family_actions.go").read_text(encoding="utf-8")

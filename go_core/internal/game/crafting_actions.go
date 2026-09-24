@@ -655,12 +655,14 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	}
 
 	now := float64(time.Now().UnixNano()) / 1e9
-	remaining, err := cooldownRemaining(conn, userID, "alchemy_forage", now)
+	remaining, err := cooldownRemaining(conn, userID, cooldownForage, now)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
 	if remaining > 0 {
-		return authoritativeMutation{}, fmt.Errorf("forage cooldown active: %d seconds remaining", remaining)
+		// The hunt's shape (v1.3.1), so the bot's cooldown regex words it in
+		// hours and minutes rather than printing raw seconds.
+		return authoritativeMutation{}, fmt.Errorf("cooldown active: %d seconds", remaining)
 	}
 
 	physicalLocation := strings.TrimSpace(cr.Location)
@@ -922,8 +924,8 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	const cooldownSeconds int64 = 20 * 60
-	if err := setCooldown(conn, userID, "alchemy_forage", cooldownSeconds, now); err != nil {
+	cooldownSeconds := cooldownSecondsFor(cooldownForage)
+	if err := setCooldown(conn, userID, cooldownForage, cooldownSeconds, now); err != nil {
 		return authoritativeMutation{}, err
 	}
 

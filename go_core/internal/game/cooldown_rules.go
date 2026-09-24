@@ -31,6 +31,7 @@ const (
 	cooldownExplore      = "explore"
 	cooldownHunt         = "hunt"
 	cooldownMine         = "mine"
+	cooldownForage       = "alchemy_forage"
 	cooldownSecretRealm  = "secret_realm"
 	cooldownAptitude     = "aptitude"
 	cooldownPerfectQuest = "perfection_quest"
@@ -93,7 +94,10 @@ var actionCooldowns = map[string]cooldownRule{
 	cooldownHunt:      {30, "HUNT_COOLDOWN_MINUTES"},
 	// The seam beside the hunt (v1.1.0): the same wait, because a mine is
 	// the hunt's twin on the Act page and a player reads the two together.
-	cooldownMine:         {30, "MINE_COOLDOWN_MINUTES"},
+	cooldownMine: {30, "MINE_COOLDOWN_MINUTES"},
+	// Forage read its own literal for twelve releases after this table
+	// existed (v1.3.1); the twenty minutes are what it always served.
+	cooldownForage:       {20, "FORAGE_COOLDOWN_MINUTES"},
 	cooldownSecretRealm:  {15, "SECRET_REALM_COOLDOWN_MINUTES"},
 	cooldownPerfectQuest: {60, "PERFECT_QUEST_COOLDOWN_MINUTES"},
 	cooldownPerfectTrial: {360, "PERFECT_TRIAL_COOLDOWN_MINUTES"},

@@ -104,7 +104,7 @@ func sectRecommendationActionGo(conn *storage.Conn, catalog worlddata.Catalog, u
 	// trust and `location` was written straight onto the travel list, where a
 	// road-less place is an instant jump. A caller naming a sect is still
 	// heard - an older bot sends one - but only to refuse a mismatch.
-	sponsored, e := resolveRecommenderTx(conn, catalog, p.NPCName, c, nowSeconds())
+	sponsored, e := resolveRecommenderTx(conn, catalog, p.NPCName, c, p.GameMinute, nowSeconds())
 	if e != nil {
 		return authoritativeMutation{}, e
 	}

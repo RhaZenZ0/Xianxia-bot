@@ -82,16 +82,14 @@ deferred half and not the half that says what was done about it.
 - **fixed (v1.3.0)** — *The tutorial's forge burns materials on a miss.* On the owner's call a failed
   craft returns half of each input, rounded down (`craftFailureRefund`), so one unit of anything is
   the stake; the result carries `returned` and the reply names what was salvaged.
-- **deferred (v1.2.0)** — *The catch-up walks the content file's adjacency.* `catchUpBeginnerPathTx`
-  hands over the stage after any completed stage in `beginner_path` as the file orders it, while the
-  chain a player actually walks is `seed_json.follow_on`; a GM who re-points the chain in the
-  workbench is obeyed by `questFollowOnTx` and not by the catch-up. And it fires only on a quest
-  report that touches an active quest, so a graduate holding no quest at all is never caught up; the
-  menu's tutorial line is empty for them too. A boot-time sweep would be the honest fix and is a
-  decision about what a migration may hand a player.
-- **deferred (v1.2.0)** — *Forage's own wait is still its own literal.* `forageResolveAction` reads its
-  cooldown from `alchemy_forage` with its own wording, not from `actionCooldowns`; the mine reads the
-  table. One more entry and one regex-matching refusal, deferred as the separate fix it is.
+- **fixed (v1.3.1)** — *The catch-up walked the content file's adjacency, and reached nobody holding
+  no quest.* `catchUpBeginnerPathTx` follows `seed_json.follow_on` from every completed quest now, so
+  a GM's re-pointed chain is obeyed, and it runs lazily on every authoritative action beside the
+  vitality settle, so a graduate holding no quest is handed an added stage the next time they do
+  anything at all.
+- **fixed (v1.3.1)** — *Forage's wait was its own literal.* It is `actionCooldowns`' now
+  (`FORAGE_COOLDOWN_MINUTES`, default 20, `.env.example` and compose passthrough), and its refusal
+  is the hunt's shape so the bot words it in hours and minutes.
 - **fixed (v1.3.0)** — *The Qi Body card hides a read.* On the owner's call the pool and the purity
   are shown at every realm; only the channels, the page's own lever, wait with the page and say where
   it opens.
@@ -124,13 +122,14 @@ deferred half and not the half that says what was done about it.
   notorious applicant at an orthodox gate without a sponsor, as `trial_modifier` in Python has
   claimed since it was written. `sect_trial_tuning_test.go` lends the dice and holds each term;
   `test_the_trial_reads_its_tuning.py` holds that the engine reads every key the notes print.
-- **deferred (engine)** — *A catalogue sponsor's position is checked by the bot.* `resolveRecommenderTx`
-  checks that a delegation's elder is standing where the player is, and leaves a catalogue sponsor to
-  the bot, because schedules and circuits are resolved in Python. A bound that lives in the client is
-  not a bound; moving it needs the schedule in Go.
-- **deferred (engine)** — *`sect.discover` takes the sects from the caller.* The reconcile a read path
-  runs sends the list of sects to mark discovered, and the engine writes what it is told. It writes no
-  route, so it cannot put a place on a travel list, but it can satisfy the trial's "discovered" check.
+- **fixed (v1.3.1)** — *A catalogue sponsor's position was checked by the bot.* `npcWhereaboutsTx`
+  is the engine's own answer to where a catalogue NPC stands - the circuit a wandering master walks,
+  the simulation's row, the daily schedule while they are at home, the registry, a running event's
+  cast - in the order `current_npc_location` already used, and `resolveRecommenderTx` refuses a
+  sponsor who is not here or is dead.
+- **fixed (v1.3.1)** — *`sect.discover` took the sects from the caller.* The engine discovers the
+  sects whose gate stands on a place the cultivator knows (`knownLocationsTx` + `sectGate`); a list
+  sent by a client only narrows, never widens, and the bot's reconcile sends none.
 - **fixed (v1.3.0)** — *The "Impress the Visiting Elder" node rolled an attribute nobody has.* It and
   the Possessed Villager node rolled `heart`, and so did five of the event action menu's rows
   (`worldEventActionRules`: aid, support, evacuate, negotiate, withdraw). The elder is impressed on
@@ -141,15 +140,15 @@ deferred half and not the half that says what was done about it.
   realm, and on the owner's call that is what it is: a secret floor beneath the Sword Grave of Nine
   Echoes, fought at the realm's entrance by a party whose leader has walked the realm to its last
   room (`bossLair`; the inheritance is the record). The two boss tables are untouched.
-- **deferred (engine)** — *Two place rules live only in Python.* `/world → City → Accept` checks the
-  city board and `/sect → Territory → Claim` checks for a territory row here, and the engine checks
-  neither; the panel hides both by the same Python rule, so the hide is right and the bound is not.
+- **fixed (v1.3.1)** — *Two place rules lived only in Python.* `commission.accept` refuses work from
+  another city's board (the giver's home through `cityOf`, on both sides) and `territory.claim`
+  refuses a territory whose region is not where the player stands.
 - **fixed (v1.3.0)** — *A property could be founded inside a birth household.* `abode.establish`
   refuses `birth_family:` and the panel hides Establish there, naming why.
-- **deferred (cost)** — *Three place-only refusals are not hidden.* The ghost harvest's ground multiplier
-  would need a Python copy of `deathQiGroundMultiplier`; and the black market's post and an array's
-  departure would need a database read on every panel refresh. Each is hidden only inside a private
-  room, where the answer needs no read.
+- **fixed (v1.3.1)** — *Three place-only refusals were not hidden.* On the owner's call the panel
+  hides `ghost harvest` and `ghost appease` off `app/rules/death_qi.py`, the content twin of
+  `deathQiGroundMultiplier`, and `blackmarket buy`/`sell` and `array use` off one read each on a
+  refresh; a read that fails hides nothing.
 - **fixed (v1.0.16)** — *A condition could not be cured by the medicine made for it.* Reported
   from play as six Heart-Calming Pills on a severity-3 Qi Deviation at 28%, six failures, and *"I
   can't heal injuries"*. The treatment rolled Insight + Spirit against `10 + 2 × severity` through

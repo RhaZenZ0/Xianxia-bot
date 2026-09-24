@@ -221,9 +221,10 @@ func TestAGraduateOfThePathIsHandedTheStageAtTheDoor(t *testing.T) {
 	catalog := districtCatalog(t)
 	last := catalog.BeginnerPath[len(catalog.BeginnerPath)-1].QuestKey
 	before := catalog.BeginnerPath[len(catalog.BeginnerPath)-2].QuestKey
-	for _, key := range []string{before, last} {
-		batch4Exec(t, path, `INSERT INTO quest_definitions(quest_key,title,description,objectives_json,rewards_json,status,created_at,updated_at,seed_json) VALUES(?,?,'d','[{"id":"x","type":"family_lesson","count":1}]','{}','approved',0,0,'{}')`, key, key)
-	}
+	// The chain is `seed_json.follow_on`, as the seeder writes it (v1.3.1:
+	// the catch-up reads the chain rather than the content file's order).
+	batch4Exec(t, path, `INSERT INTO quest_definitions(quest_key,title,description,objectives_json,rewards_json,status,created_at,updated_at,seed_json) VALUES(?,?,'d','[{"id":"x","type":"family_lesson","count":1}]','{}','approved',0,0,?)`, before, before, `{"follow_on":"`+last+`"}`)
+	batch4Exec(t, path, `INSERT INTO quest_definitions(quest_key,title,description,objectives_json,rewards_json,status,created_at,updated_at,seed_json) VALUES(?,?,'d','[{"id":"x","type":"family_lesson","count":1}]','{}','approved',0,0,'{}')`, last, last)
 	// They finished the road home before the lesson existed.
 	batch4Exec(t, path, `INSERT INTO character_quests(user_id,quest_key,status,created_at,updated_at) VALUES(42,?,'completed',0,0)`, before)
 	out, err := lessonAt(t, path, 1000)

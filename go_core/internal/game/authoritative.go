@@ -462,6 +462,13 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 		// rather than propagated, exactly as `ensureRoadTransitReadyTx` is
 		// called for its effect above.
 		_, _ = settleVitalityRecoveryTx(conn, catalog, req.ActorID, actionGameMinute)
+		// A graduate is caught up on any action at all (v1.3.1). The chain
+		// catch-up used to run only at the end of a quest report, so a
+		// player holding no quest - one who finished the path before a stage
+		// was added - was never handed the stage: nothing they did reported.
+		// It is one indexed read and returns no error by construction, for
+		// the reason the settle above gives.
+		_, _ = catchUpBeginnerPathTx(conn, catalog, req.ActorID, actionGameMinute)
 	}
 	var mutation authoritativeMutation
 	if oldAgeDeath != nil {
@@ -485,7 +492,7 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 		case "sect.abode.leave":
 			mutation, err = sectAbodeMoveAction(conn, catalog, req.ActorID, req.Payload, "leave")
 		case "commission.accept":
-			mutation, err = commissionAcceptAction(conn, req.ActorID, req.Payload)
+			mutation, err = commissionAcceptAction(conn, catalog, req.ActorID, req.Payload)
 		case "commission.resolve":
 			mutation, err = commissionResolveAction(conn, catalog, req.ActorID, req.Payload)
 		case "lifecycle.true_death":

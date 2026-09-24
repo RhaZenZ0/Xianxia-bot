@@ -1253,7 +1253,7 @@ class ForageMaterialsAreReadTests(unittest.TestCase):
         self.assertIn("func forageResolveAction", source)
         forage = source[source.index("func forageResolveAction"):]
         forage = forage[:forage.index("\nfunc ")]
-        self.assertTrue("alchemy_forage" in forage, "the cut slice is not the forage action")
+        self.assertTrue("cooldownForage" in forage, "the cut slice is not the forage action")
 
     def test_the_catalogue_carries_the_block(self):
         catalog = (PROJECT_ROOT / "go_core" / "internal" / "worlddata" / "catalog.go").read_text(encoding="utf-8")

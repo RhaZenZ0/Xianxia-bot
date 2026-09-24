@@ -624,6 +624,12 @@ type BirthFamilyLesson struct {
 // clan folds a burnt offering that will carry the living too, a weapon-smith's
 // child leaves on the blade they proved on the anvil, and a fallen clan has
 // only the cracked ancestral sword nobody would buy.
+// CommissionGiver is what the content says about somebody who posts work.
+type CommissionGiver struct {
+	Location string `json:"location"`
+	Title    string `json:"title"`
+}
+
 type BirthFamilySendoff struct {
 	Item string `json:"item"`
 	Line string `json:"line"`
@@ -665,6 +671,14 @@ type NPCDefinition struct {
 	// whereabouts are already decided by content must not also be walked by
 	// the civilization tick, or the two answers fight.
 	Circuit []string `json:"circuit"`
+	// CircuitMonths and CircuitOffset (v1.3.1) pace the circuit: each stop
+	// held for so many world-months, staggered so two masters sharing a road
+	// are not always in the same town. Schedule is where the content puts an
+	// NPC in each period of the day while they are at home. The engine reads
+	// all three now (`npcWhereaboutsTx`), so a sponsor's presence is a bound.
+	CircuitMonths int64             `json:"circuit_months"`
+	CircuitOffset int64             `json:"circuit_offset"`
+	Schedule      map[string]string `json:"schedule"`
 	// SectAffiliation and CanRecommend (v1.1.0) are what let an NPC sponsor a
 	// cultivator's entry into a sect. The engine reads them now rather than
 	// taking a sponsor's sect, and the gate it reveals, from the caller.
@@ -894,7 +908,11 @@ type Catalog struct {
 	SecretRealms        map[string]SecretRealm         `json:"secret_realms"`
 	Inheritances        map[string]Inheritance         `json:"inheritances"`
 	BirthFamilySendoff  map[string]BirthFamilySendoff  `json:"birth_family_sendoff"`
-	BeginnerPath        []BeginnerStage                `json:"beginner_path"`
+	// CommissionGivers (v1.3.1): where each commission's giver stands, so the
+	// engine can hold a city board's rule - the work posted here is the work
+	// of the people who live here - rather than the bot.
+	CommissionGivers map[string]CommissionGiver `json:"commission_givers"`
+	BeginnerPath     []BeginnerStage            `json:"beginner_path"`
 	// WorldEraCycles (v1.0.7): one ordered cycle of eras per world, each
 	// summing to exactly one world year. It lived as a single four-entry Go
 	// literal (`eraCycle`) covering all four worlds at once until now - the

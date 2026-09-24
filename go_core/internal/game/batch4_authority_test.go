@@ -605,7 +605,7 @@ func TestForageResolveEnforcesCooldownInGo(t *testing.T) {
 		Operation:  "forage.resolve",
 		ActorID:    42,
 		Payload:    payload})
-	if err == nil || !strings.Contains(err.Error(), "forage cooldown active") {
+	if err == nil || !strings.Contains(err.Error(), "cooldown active") {
 		t.Fatalf("cooldown err=%v", err)
 	}
 }

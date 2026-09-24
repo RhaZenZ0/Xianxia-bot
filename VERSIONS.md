@@ -6,6 +6,21 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.3.1** puts six rules the bot was holding into the engine, and draws three more buttons only where they work.
+
+A catalogue sponsor must be standing where the applicant is, and the engine now knows where a
+catalogue NPC stands - the road a wandering master walks, the simulation's row, the daily schedule
+while they are at home - so the check is a bound rather than a courtesy. Which sects a cultivator has
+discovered is what their known gates justify, not what a client asserts. Work on a city's board is
+taken in that city, and a territory is claimed standing on it. The forage wait is the cooldown
+table's (`FORAGE_COOLDOWN_MINUTES`, twenty minutes as before). And a player who finished the beginner
+path before a stage was added is handed it the next time they do anything, along whatever chain a GM
+has pointed the stages down.
+
+It also hides the ghost road's harvest where nothing died and its rites where nobody is buried,
+the black market where no post is open, and the array where none departs - the three place rules
+v1.1.0 left drawn for their cost, at the cost of one read each on a panel refresh.
+
 **1.3.0** takes ten decisions the owner made in one message: a failed craft gives half of its makings back, a hall teaches only what its world can make, the Nine-Echo Sword Wraith can finally be fought, and the reset asks with the count in hand.
 
 A failed craft returns half of each input, rounded down, so one unit of anything is still the stake;
@@ -847,9 +862,9 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.3.0
+## Release status — v1.3.1
 
-- Current release: v1.3.0 - ten of the owner's decisions: a failed craft returns half its makings, a hall teaches only what its world can make, the Nine-Echo Sword Wraith is a secret floor beneath its realm, `/reset` asks with the count, the Qi Body card shows the pool at every realm, thirty-three upper-world send-offs, no property inside a household, `heart` retired, the Starfall hall's buy line lowered (see the changelog). Built on v1.2.3 - the review's eight deferred claims settled: Vacuum refuses at once behind a half-written action, one array rule at both cultivation doors, one counter-attack TN, an undo undone again, a rank price under a merchant's wares, and a lot listed in its house's coin (see the changelog). Built on v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
+- Current release: v1.3.1 - six rules the bot held are the engine's (a sponsor's presence, the sects a gate justifies, a city's board, a territory's ground, the forage wait, the quest chain catch-up on any action) and three more buttons are drawn only where they work (see the changelog). Built on v1.3.0 - ten of the owner's decisions: a failed craft returns half its makings, a hall teaches only what its world can make, the Nine-Echo Sword Wraith is a secret floor beneath its realm, `/reset` asks with the count, the Qi Body card shows the pool at every realm, thirty-three upper-world send-offs, no property inside a household, `heart` retired, the Starfall hall's buy line lowered (see the changelog). Built on v1.2.3 - the review's eight deferred claims settled: Vacuum refuses at once behind a half-written action, one array rule at both cultivation doors, one counter-attack TN, an undo undone again, a rank price under a merchant's wares, and a lot listed in its house's coin (see the changelog). Built on v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
   Apprentice to Tier 9 Sovereign with each trade's own word in front (Pill, Forge, Talisman, Array,
   Herb, Ore, Beast, Artifact, Treasure). No schema.
 - v1.2.1: a beast can always evolve, a homestead can be upgraded in any world, and a dozen smaller wires from a deep review (see the changelog).

@@ -242,7 +242,24 @@ func commissionCooldownRemaining(conn *storage.Conn, userID int64, npcName strin
 	return max64(0, i64(row["commission_cooldown_until_game_minute"])-gameMinute), nil
 }
 
-func commissionAcceptAction(conn *storage.Conn, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+// commissionGiverHome is where the content puts a commission's giver: the
+// givers' roster first, else the NPC catalogue. "" is a giver the content
+// does not place, which is no board and so no rule.
+func commissionGiverHome(catalog worlddata.Catalog, giver string) string {
+	giver = strings.TrimSpace(giver)
+	if giver == "" {
+		return ""
+	}
+	if g, ok := catalog.CommissionGivers[giver]; ok && strings.TrimSpace(g.Location) != "" {
+		return strings.TrimSpace(g.Location)
+	}
+	if npc, ok := catalog.NPCs[giver]; ok {
+		return strings.TrimSpace(npc.Location)
+	}
+	return ""
+}
+
+func commissionAcceptAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p commissionAcceptPayload
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
@@ -273,6 +290,18 @@ func commissionAcceptAction(conn *storage.Conn, userID int64, raw json.RawMessag
 		// Not a quest at all. The engine is the authority on what exists, so
 		// it refuses here rather than trusting that whoever called it checked.
 		return authoritativeMutation{}, fmt.Errorf("unknown quest: %s", p.QuestKey)
+	}
+	if def != nil {
+		// A city's board carries the work of the people who live there
+		// (v1.3.1). The bot has drawn the board that way since the boards
+		// were written and the engine took any key from anywhere; the rule
+		// is the engine's now, and it is `cityOf` on both sides so a gate or
+		// a district of the giver's city is that city.
+		if home := commissionGiverHome(catalog, def.GiverNPC); home != "" {
+			if cityOf(catalog, home) != cityOf(catalog, c.Location) {
+				return authoritativeMutation{}, fmt.Errorf("%s posts work on %s's board; you are in %s", def.GiverNPC, cityOf(catalog, home), cityOf(catalog, c.Location))
+			}
+		}
 	}
 	if def == nil {
 		// An ordinary quest: no giver, no deadline, no terms, nothing to

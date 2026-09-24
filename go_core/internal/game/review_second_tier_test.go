@@ -96,6 +96,7 @@ func TestALotIsReadOnItsOwnFloor(t *testing.T) {
 // What time a sect was discovered is the engine's, not the caller's.
 func TestASectDiscoveryIsStampedWithTheCanonicalMinute(t *testing.T) {
 	path := setupIdentityDB(t)
+	knowGate(t, path, "Azure Cloud Sect")
 	batch4SetCanonicalGameMinute(t, path, 4000)
 	if _, err := discoverApply(t, path, 42, map[string]any{
 		"sects": []any{"Azure Cloud Sect"}, "discovery_kind": "exploration", "game_minute": 9999999,
