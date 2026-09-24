@@ -83,8 +83,11 @@ func TestEveryPublicSectOfAWorldCanSendADelegation(t *testing.T) {
 		}
 	}
 	// Deterministic: the same event always names the same sect.
-	if recruitingSectFor(catalog, "event-7", "Greenriver Town") != recruitingSectFor(catalog, "event-7", "Greenriver Town") {
-		t.Fatal("one event named two sects")
+	first := recruitingSectFor(catalog, "event-7", "Greenriver Town")
+	for i := 0; i < 8; i++ {
+		if again := recruitingSectFor(catalog, "event-7", "Greenriver Town"); again != first {
+			t.Fatalf("one event named two sects: %q then %q", first, again)
+		}
 	}
 }
 

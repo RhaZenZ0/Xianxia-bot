@@ -134,12 +134,12 @@ async def carried_item_autocomplete(interaction: discord.Interaction, current: s
         if not needle or needle in name.casefold() or needle in item_id.casefold():
             out.append(app_commands.Choice(name=f"{name} x{qty}"[:100], value=item_id[:100]))
     return out[:25]
+# A sect residence's way out named `/abode → Leave` until v1.1.0, and
+# `abode.leave` reads `cave_abodes` - a residence is a `sect_abodes` row, so it
+# refused with "you are not inside a player-owned property". The residence's
+# own leaf is the way out.
 PRIVATE_LOCATION_EXITS: tuple[tuple[str, str, str], ...] = (
     ("birth_family:", "**/family → Leave**", "your birth household"),
-    # `/abode → Leave` named here until v1.1.0, and `abode.leave` reads
-    # `cave_abodes` - a sect residence is a `sect_abodes` row, so it refused
-    # with "you are not inside a player-owned property". The residence's own
-    # leaf is the way out.
     ("sect_abode:", "**/sect → Holdings → Abode** (Leave)", "your sect residence"),
     ("abode:", "**/abode → Leave**", "your own property"),
     ("personal_world:", "**/innerworld → Leave**", "your personal world"),

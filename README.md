@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v1.0.17
+# Xianxia RP Discord Bot v1.1.0
 
 *A cultivation RPG played entirely through Discord commands: deterministic rules in Go, an AI that
 narrates but never decides, self-hosted on your own hardware.*
@@ -267,7 +267,10 @@ paged when long, with the next steps it names as buttons under it; Refresh clear
 reply with its own buttons or a file lands beside the panel, which stays live underneath. The
 header carries a Here line saying what the place you stand in is and who is about; a chain of
 pickers is one message that changes; a red button asks once before it runs; a panel that goes quiet
-keeps a Reopen button, after a window the operator sets. Battles and events have their own in-place panels.
+keeps a Reopen button, after a window the operator sets. A row the engine would refuse for you
+right now - a Law before its realm, a shop's counter outside a shop, an auction bid off the floor, the
+road from inside your household - is drawn as a locked line saying why and where it works instead
+(v1.1.0 added the ones that depend only on where you stand). Battles and events have their own in-place panels.
 
 The panels that outlive a process come back when it does. A scene thread, an event open for two
 days, an exploration encounter that has paused someone's expedition — Discord keeps those messages
@@ -408,7 +411,12 @@ less with an eight-in-a-hundred chance each session that the qi turns going in. 
 outside the cycle and answer to nobody; a root of several elements is answered by the kindest of them;
 and a better, purer root absorbs more of whatever it touches. The sheet, the session and
 **/cultivation → Arts → Practise** all name the kind a method draws and what your root makes of it.
-A sect is joined through an entrance trial before its examiner; every
+A sect is joined through an entrance trial before its examiner, sat at the sect's gate and open
+from the first realm. No road reaches a gate, so the ways to one are the envoys' hall of a capital,
+which puts every public gate of its world on your travel list, and a sect's recruitment delegation at
+a world event, whose elder can sponsor you (**/sect → Recruitment → Recommendation**, a bonus on both
+trial rolls) and whose trial reveals the gate. Each sect's gate keeper has one piece of entry-level
+work open to somebody in no sect, which earns standing with it and eases its trial. Every
 public sect bestows its own entry manual on passing, chosen inside the trial transaction, and the
 sect residence grows facility by facility with contribution points. A manual is an item, studied
 through the engine, which enforces its realm requirement; the whole 160-manual catalogue is content.
@@ -442,8 +450,8 @@ joined by roads with travel time, danger and encounters, and a place on every ro
   with **/economy → City Shops**; shelves refill on the shop's clock, fuller in a thriving city.
 - **City life**, under **/world → City**: **Look** (gates, districts, who is here, whether the city
   is thriving), **Board** and **Accept** (the city's commissions and, in a capital, the wanted list),
-  **Envoys** (the sect envoys' hall in a capital's temple quarter puts every sect gate in the world
-  on your map), **Rumours** (the city's history, through the same viewpoint gate the narrator uses),
+  **Envoys** (the sect envoys' hall in a capital's temple quarter puts every public sect gate of its
+  world on your travel list), **Rumours** (the city's history, through the same viewpoint gate the narrator uses),
   **Inn** (who is in town, which merchants are at the corner table, and the inn's common-room
   thread). Every trade moves the city's prosperity, and prosperity shows on the shelves and at the gate.
 - **Auction houses.** Every city has one, entered through its warded door; a capital's is grand,
@@ -638,7 +646,7 @@ report is safe to paste into an issue.
 - If narration goes flat after an image rebuild, check **/admin → Server → Ai Status** for a TLS
   banner first. If SQLite reports contention, verify only the engine opens the database.
 
-Keep the whole `data/` directory persistent across rebuilds. The current schema is **60**; every
+Keep the whole `data/` directory persistent across rebuilds. The current schema is **61**; every
 historical migration is kept so an old database upgrades in place.
 
 ## Development
