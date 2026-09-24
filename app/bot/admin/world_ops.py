@@ -539,8 +539,13 @@ async def admin_maintenance(interaction:discord.Interaction,action:app_commands.
             ephemeral=False)
         return
     if action.value=="vacuum":
-        await DB.vacuum();await interaction.followup.send("✅ SQLite VACUUM completed.",ephemeral=False);return
+        await DB.vacuum()
+        # Every state-changing GM action writes its audit row (design rule 6);
+        # these two were the only maintenance branches that did not (v1.2.1).
+        await audit_admin(interaction, "admin.server.vacuum", target="database")
+        await interaction.followup.send("✅ SQLite VACUUM completed.",ephemeral=False);return
     wt=await current_world_time(); counts=await DB.maintenance_cleanup(wt.total_minutes)
+    await audit_admin(interaction, "admin.server.cleanup", target="database", after={str(k): int(v) for k, v in counts.items()})
     await interaction.followup.send(
         "🧹 **Maintenance cleanup complete**\n"+"\n".join(f"• {k}: {v} rows" for k,v in counts.items()),ephemeral=False
     )

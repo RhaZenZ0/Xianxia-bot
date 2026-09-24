@@ -250,6 +250,15 @@ func TestEncryptedBackupIsSealedListedAndRestorable(t *testing.T) {
 		if strings.HasPrefix(entry.Name(), ".restore-") {
 			t.Fatalf("the restore scratch file was left behind: %s", entry.Name())
 		}
+		// The restore's own safety backup is sealed like every other backup
+		// (v1.2.1): it used to be the one plain copy of the live database
+		// left on a sealed deployment.
+		if !backupcrypt.IsEncryptedName(entry.Name()) {
+			t.Fatalf("the restore left a plain file beside the sealed backups: %s", entry.Name())
+		}
+	}
+	if len(entries) != 2 {
+		t.Fatalf("expected the backup and the sealed safety copy, got %d entries", len(entries))
 	}
 
 	// Without the key the same restore is refused before anything is touched.

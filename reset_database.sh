@@ -113,10 +113,14 @@ if [ "$SKIP_DISCORD" -ne 1 ]; then
         if [ -z "$CONTROL_TOKEN" ]; then
             echo "WARNING: No BOT_CONTROL_TOKEN/DASHBOARD_TOKEN found in .env; skipping Discord cleanup." >&2
         else
-            response=$(cd "$PROJECT_DIR" && docker compose exec -T xianxia-bot \
-                wget -q -O - --header="X-Xianxia-Control: $CONTROL_TOKEN" --header='Content-Type: application/json' \
-                --post-data='{"action":"reset_world","payload":{"confirm":"RESET","reason":"reset_database.sh"}}' \
-                "http://127.0.0.1:${HEALTH_PORT:-8082}/control/discord" 2>/dev/null || true)
+            # The bot image (python:3.12-slim) ships neither wget nor curl, so
+            # this used to fail silently every time (v1.2.1); python3 is what
+            # the image is.
+            response=$(cd "$PROJECT_DIR" && docker compose exec -T \
+                -e XIANXIA_CONTROL_TOKEN="$CONTROL_TOKEN" -e XIANXIA_CONTROL_URL="http://127.0.0.1:${HEALTH_PORT:-8082}/control/discord" \
+                xianxia-bot python3 -c 'import json,os,urllib.request
+req=urllib.request.Request(os.environ["XIANXIA_CONTROL_URL"], data=json.dumps({"action":"reset_world","payload":{"confirm":"RESET","reason":"reset_database.sh"}}).encode(), headers={"X-Xianxia-Control": os.environ["XIANXIA_CONTROL_TOKEN"], "Content-Type": "application/json"}, method="POST")
+print(urllib.request.urlopen(req, timeout=120).read().decode())' 2>/dev/null || true)
             deleted=$(printf '%s' "$response" | sed -n 's/.*"threads_deleted"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/p')
             found=$(printf '%s' "$response" | sed -n 's/.*"threads_found"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/p')
             if [ -n "$deleted" ]; then

@@ -71,7 +71,13 @@ func loadLivingCompanionActor(conn *storage.Conn, userID int64) (mechanicsCharac
 // The two professions this file grants. They were string literals at six call
 // sites and read by nothing; naming them is half of making them mean something.
 const (
-	beastTamingProfession      = "Beast Taming"
+	beastTamingProfession = "Beast Taming"
+	// beastLoyaltyCap is the most loyalty feed and train can ever give
+	// (v1.2.1). The evolution requirement is held under it, because a
+	// requirement above the cap is a stage no beast can reach; the SQL twin is
+	// what the two clamping UPDATEs spell, so the three cannot drift.
+	beastLoyaltyCap            = int64(100)
+	beastLoyaltyCapSQL         = "100"
 	artifactRefiningProfession = "Artifact Refining"
 	// What a bonding gains in resonance before the refiner's own skill.
 	artifactBondResonanceStep = int64(8)
@@ -320,7 +326,7 @@ func beastFeedAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 		return authoritativeMutation{}, errors.New("required beast food is not carried")
 	}
 	if _, err = conn.Execute(
-		`UPDATE spirit_beasts SET loyalty=MIN(100,loyalty+?),intelligence=MIN(100,intelligence+MAX(1,?/3)),updated_at=? WHERE user_id=? AND beast_id=?`,
+		`UPDATE spirit_beasts SET loyalty=MIN(`+beastLoyaltyCapSQL+`,loyalty+?),intelligence=MIN(100,intelligence+MAX(1,?/3)),updated_at=? WHERE user_id=? AND beast_id=?`,
 		[]any{gain, gain, now, userID, p.BeastID},
 	); err != nil {
 		return authoritativeMutation{}, err
@@ -385,7 +391,7 @@ func beastTrainAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	}
 	gain := clampI64(6+character.Attributes["spirit"]/3+contextBonus+trainingLevel, 1, 25)
 	if _, err = conn.Execute(
-		`UPDATE spirit_beasts SET loyalty=MIN(100,loyalty+?),intelligence=MIN(100,intelligence+MAX(1,?/3)),updated_at=? WHERE user_id=? AND beast_id=?`,
+		`UPDATE spirit_beasts SET loyalty=MIN(`+beastLoyaltyCapSQL+`,loyalty+?),intelligence=MIN(100,intelligence+MAX(1,?/3)),updated_at=? WHERE user_id=? AND beast_id=?`,
 		[]any{gain, gain, now, userID, p.BeastID},
 	); err != nil {
 		return authoritativeMutation{}, err
@@ -439,7 +445,11 @@ func beastEvolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if row == nil {
 		return authoritativeMutation{}, errors.New("unknown contracted beast")
 	}
-	need := int64(60) + i64(row["evolution_stage"])*10
+	// Loyalty is clamped at beastLoyaltyCap by feed and train, so the
+	// requirement is clamped there too (v1.2.1): 60 + 10 a stage reached 110 at
+	// stage 5 and asked for a number no action could produce, and nothing caps
+	// the stage, so a beast there was told to do the impossible for ever.
+	need := minI64(beastLoyaltyCap, int64(60)+i64(row["evolution_stage"])*10)
 	if i64(row["loyalty"]) < need {
 		return authoritativeMutation{}, fmt.Errorf("loyalty %d is below evolution requirement %d", i64(row["loyalty"]), need)
 	}

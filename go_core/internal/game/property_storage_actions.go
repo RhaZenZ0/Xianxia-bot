@@ -449,9 +449,13 @@ func abodeUpgradeActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 		base = 100
 	}
 	cost := base * (current + 1) * (current + 1)
-	currency := fmt.Sprint(catalog.AbodeSystem["currency"])
-	if currency == "" {
-		currency = "low_spirit_stone"
+	// Charged in the money of the world the cultivator stands in (v1.2.1).
+	// `abode_system.currency` names the Mortal stone, and a homestead may be
+	// founded in any world, so the fixed id refused every upgrade above the
+	// Mortal World - the rc.43 caravan fare, one system over.
+	currency, e := characterBaseCurrencyTx(conn, catalog, userID)
+	if e != nil {
+		return authoritativeMutation{}, e
 	}
 	balance, e := walletDeltaTx(conn, catalog, userID, currency, -cost, nowSeconds())
 	if e != nil {

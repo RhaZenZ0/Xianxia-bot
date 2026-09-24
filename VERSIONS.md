@@ -6,6 +6,26 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.2.1** fixes what a deep review of the tree and one report from play found: a beast can always evolve, a homestead can be upgraded in any world, and a dozen smaller wires.
+
+Reported from play: *"I can't evolve my beast it says loyalty should be 110, but I can't go over
+100"*. The requirement climbed ten a stage past the cap feed and train clamp loyalty at, so stage
+five asked for a number no action could produce, for ever. It is held under the cap now, so every
+stage stays reachable.
+
+A homestead may be founded in any world, and its upgrade charged the Mortal stone in all four - so
+above the Mortal World, where every reward is paid in that world's crystal, no upgrade could ever be
+afforded. It is charged in the money of the world the home stands in. A GM's currency grant now
+mirrors onto the sheet by the target's own world currency rather than by the Mortal stone's name;
+the household's support wait is the engine's rather than the caller's; a hunter killed by a beast or
+a victim killed in a robbery leaves a widow like every other death; a restore's safety backup is
+sealed like every other backup; the narrator asks the registry for the world's own people; the
+Quest Editor recognises the recipes a craft objective names; a stage the tutorial catches a
+graduate up on is told to them; Vacuum and Cleanup write their audit rows; the reset script speaks
+to the bot with a tool its image has; `ENGINE_SHUTDOWN_GRACE_SECONDS` reaches the engine; an
+Admin Console search treats `_` and `%` as text; and a grave claimed twice in the same instant
+hands over one keepsake.
+
 **1.2.0** makes the first hour a short list: cultivate, break through, explore, buy, craft, forge, gather, hunt, mine and quest, and everything else opens as you cultivate.
 
 Player feedback, three reports in a week: *"we need to simplify interface ... Cultivation, Breakthrough,
@@ -751,9 +771,9 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.2.0
+## Release status — v1.2.1
 
-- Current release: v1.2.0 - the first hour is a short list: everything outside cultivate, break
+- Current release: v1.2.1 - a beast can always evolve, a homestead can be upgraded in any world, and a dozen smaller wires from a deep review (see the changelog). Built on v1.2.0 - the first hour is a short list: everything outside cultivate, break
   through, explore, buy, craft, forge, gather, hunt, mine and quest (plus a companion and the body
   path) waits for Foundation Establishment at the earliest; the menu leaves off the hubs with no lever
   open yet and names the tutorial's next step; `/mine` is the ore half of gathering; the beginner path

@@ -6247,10 +6247,13 @@ class Database:
         table = {"location": "content_locations", "npc": "content_npcs", "recipe": "content_recipes", "manual": "content_manuals", "technique": "content_techniques"}.get(kind)
         if table is None:
             return []
-        needle = f"%{query.strip()}%"
+        # `%` and `_` are LIKE's wildcards (v1.2.1): typed as text they made a
+        # GM's `_` match every name in the table. The escape is spelled once.
+        escaped = query.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        needle = f"%{escaped}%"
         async with self._connect() as db:
             cur = await db.execute(
-                f"SELECT name FROM {table} WHERE name LIKE ? COLLATE NOCASE ORDER BY name LIMIT ?",
+                f"SELECT name FROM {table} WHERE name LIKE ? ESCAPE '\\' COLLATE NOCASE ORDER BY name LIMIT ?",
                 (needle, max(1, min(int(limit), 25))),
             )
             return [str(r[0]) for r in await cur.fetchall()]

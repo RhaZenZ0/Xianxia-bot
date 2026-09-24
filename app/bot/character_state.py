@@ -147,6 +147,14 @@ async def announce_quest_progress(interaction: Any, changed: list[dict[str, Any]
     lines = []
     for row in changed or ():
         title = str(row.get("title") or row.get("quest_key"))
+        if row.get("caught_up"):
+            # A tutorial stage handed over by the catch-up (v1.2.0), which
+            # used to be written into the result and read by nothing.
+            lines.append(f"📜 **New quest: {title}**")
+            first = next_objective_label(row.get("objectives"), {})
+            if first:
+                lines.append(f"-# Next: {first}")
+            continue
         if row.get("just_completed"):
             rewards = row.get("rewards_granted") or {}
             parts = []

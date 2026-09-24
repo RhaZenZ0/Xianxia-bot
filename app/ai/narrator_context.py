@@ -157,6 +157,17 @@ class NarratorContextBuilder:
         public = (getattr(self.world, "npcs", {}) or {}).get(name, {}) or {}
         if public:
             return public
+        # The world's own people (rc.27, `npc_registry`): a matured descendant,
+        # a household relative, a GM's NPC. `get_registered_npc` already strips
+        # the GM-facing `origin`, so nothing hidden is added (v1.2.1).
+        registry = getattr(self.db, "get_registered_npc", None)
+        if registry is not None:
+            try:
+                registered = await registry(name)
+            except Exception:
+                registered = None
+            if registered:
+                return dict(registered)
         getter = getattr(self.db, "get_event_npc_definition", None)
         if getter is None:
             return {}

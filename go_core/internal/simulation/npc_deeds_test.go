@@ -70,6 +70,23 @@ func addPerson(t *testing.T, path, name, where, profession string, wealth, ambit
 	}
 }
 
+func deedText(t *testing.T, path, sql string, args ...any) string {
+	t.Helper()
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	res, err := conn.Execute(sql, args)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Rows) == 0 || len(res.Rows[0]) == 0 {
+		return ""
+	}
+	return fmt.Sprint(res.Rows[0][0])
+}
+
 func deedScalar(t *testing.T, path, sql string, args ...any) int64 {
 	t.Helper()
 	conn, err := storage.Open(path)
@@ -420,6 +437,40 @@ func TestAFailedHuntIsPaidForInBlood(t *testing.T) {
 	hurt := deedScalar(t, path, `SELECT COUNT(*) FROM npc_life_state WHERE npc_name='Hunter Gao' AND (injury<>'' OR death_game_minute IS NOT NULL)`)
 	if hurt == 0 {
 		t.Fatal("three hundred hunts at the bottom realm and never a scratch")
+	}
+}
+
+// The dead leave a widow on every path (rc.24). The hunting death and the
+// robbery-murder wrote status='dead' and never released the bonds (v1.2.1),
+// so a spouse stayed married to a corpse.
+func TestAHunterWhoDiesLeavesAWidow(t *testing.T) {
+	defer gamerng.UseRoller(func(int) int { return 0 })()
+	path := deedsDB(t)
+	r := deedsRunner()
+	addPerson(t, path, "Hunter Gao", "Greenriver Town", "trapper", 10, 50, 0)
+	addPerson(t, path, "Widow Gao", "Greenriver Town", "weaver", 10, 0, 0)
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, stmt := range []string{
+		`UPDATE npc_life_state SET relationship_status='married',spouse_name='Widow Gao' WHERE npc_name='Hunter Gao'`,
+		`UPDATE npc_life_state SET relationship_status='married',spouse_name='Hunter Gao' WHERE npc_name='Widow Gao'`,
+	} {
+		if _, err := conn.Execute(stmt, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := conn.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	conn.Close()
+	if _, _, died := runHunts(t, path, r, 300); died != 1 {
+		t.Fatalf("the trapper died %d time(s); the first hunt should have been the last", died)
+	}
+	status := deedText(t, path, `SELECT relationship_status FROM npc_life_state WHERE npc_name='Widow Gao'`)
+	if status != "widowed" {
+		t.Fatalf("Widow Gao is %q, still married to a corpse", status)
 	}
 }
 

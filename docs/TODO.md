@@ -16,6 +16,31 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.2.1)** — *A beast could not evolve past stage four.* Reported from play: *"it says loyalty
+  should be 110, but I can't go over 100"*. `beast.evolve` wanted `60 + 10 × stage` while feed and train
+  clamp loyalty at 100, and nothing caps the stage, so stage five asked for the impossible for ever. The
+  requirement is held under the cap (`beastLoyaltyCap`), stated once beside the two clamps.
+- **fixed (v1.2.1)** — *A homestead outside the Mortal World could never be upgraded.* `abode.upgrade`
+  charged `abode_system.currency` - the Mortal stone - in every world, while every reward above it is
+  paid in that world's crystal (rc.44). Charged through `characterBaseCurrencyTx` now; the rc.43 caravan
+  fare, one system over.
+- **fixed (v1.2.1)** — *Twelve smaller wires from a deep review of the tree.* A GM's currency grant
+  mirrored onto the sheet only for `low_spirit_stone` by name (now the target's world currency); the
+  household's support wait was the caller's (`cooldown_game_minutes`, now the engine's month); two NPC
+  death paths in `npc_deeds.go` never widowed the survivor; a restore's safety backup was the one
+  backup left in the clear on a sealed deployment; the narrator never asked `npc_registry`; the Quest
+  Editor's stand-in world had no `recipes`; `caught_up` stages were written into the quest result and
+  read by nothing; `/admin server maintenance` Vacuum and Cleanup wrote no audit row;
+  `reset_database.sh` drove the bot with `wget` inside an image that has none;
+  `ENGINE_SHUTDOWN_GRACE_SECONDS` was documented and passed by nothing; `search_catalog` treated `_`
+  and `%` as wildcards; and a grave's claim ignored its own guarded UPDATE's row count. Each has a
+  test; `test_every_engine_key_reaches_the_engine.py` is the gate for the compose class.
+- **deferred (review)** — *Unverified findings from the same review.* Recorded in the review report
+  rather than here: VACUUM without closing db-sessions, the manor/deployed-array bonus disagreeing
+  between body-mode training and seclusion, `meridian.open` with no cooldown, the counter-attack TN
+  differing between `combat.turn` and `combat.technique`, a third consecutive `undo_last` refusing,
+  the rank ceiling ignoring merchant wares, `/auction sell` defaulting to Mortal stones in every world,
+  and the Reopen button bypassing the panel gates. None was confirmed; each is a read away.
 - **fixed (v1.2.0)** — *The first hour showed the whole game.* Player feedback: *"we need to simplify
   interface ... Cultivation, Breakthrough, Explore, Shop, Craft, Forge, Gather, Hunt, Mine, Quest until
   Foundation Establishment - these things are enough"* and *"I still forget where to go what to do"*.

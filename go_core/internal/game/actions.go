@@ -69,7 +69,7 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 	case "admin.world.advance_time":
 		result, err = adminAdvanceTime(conn, req.ActorID, req.Payload)
 	case "admin.player.grant_currency":
-		result, err = adminGrantCurrency(conn, req.ActorID, req.Payload)
+		result, err = adminGrantCurrency(conn, catalog, req.ActorID, req.Payload)
 	case "admin.player.karma":
 		result, err = adminKarma(conn, req.ActorID, req.Payload)
 	case "admin.player.fate":
@@ -126,7 +126,7 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 	case "admin.world_event.end":
 		result, err = adminEndWorldEvent(conn, req.ActorID, req.Payload)
 	case "admin.bulk.grant_currency":
-		result, err = adminBulkGrantCurrency(conn, req.ActorID, req.Payload)
+		result, err = adminBulkGrantCurrency(conn, catalog, req.ActorID, req.Payload)
 	case "admin.bulk.reset_cooldowns":
 		result, err = adminBulkResetCooldowns(conn, req.ActorID, req.Payload)
 	case "admin.player.set_sect":
@@ -888,7 +888,7 @@ func adminAdvanceTime(conn *storage.Conn, adminUserID int64, raw json.RawMessage
 	return map[string]any{"game_minute": updated, "delta": minutes}, nil
 }
 
-func adminGrantCurrency(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
+func adminGrantCurrency(conn *storage.Conn, catalog worlddata.Catalog, adminUserID int64, raw json.RawMessage) (any, error) {
 	p, err := decodeMap(raw)
 	if err != nil {
 		return nil, err
@@ -931,7 +931,13 @@ func adminGrantCurrency(conn *storage.Conn, adminUserID int64, raw json.RawMessa
 		return nil, err
 	}
 	after := before + amount
-	if currency == "low_spirit_stone" {
+	// The sheet's mirror follows the base currency of the world the target
+	// stands in (rc.44), not the Mortal stone by name (v1.2.1).
+	mirrorCurrency, err := characterBaseCurrencyTx(conn, catalog, uid)
+	if err != nil {
+		return nil, err
+	}
+	if currency == mirrorCurrency {
 		_, err = conn.Execute(`UPDATE characters SET spirit_stones=MAX(0,spirit_stones+?),updated_at=? WHERE user_id=?`, []any{amount, float64(time.Now().UnixNano()) / 1e9, uid})
 		if err != nil {
 			return nil, err
@@ -1847,7 +1853,7 @@ func adminEndWorldEvent(conn *storage.Conn, adminUserID int64, raw json.RawMessa
 // mean N round trips and N separate audit rows for one GM decision). No bulk
 // primitive existed before this - admin.world.advance_time only looks bulk
 // because it's one shared clock row, not a per-character loop.
-func adminBulkGrantCurrency(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
+func adminBulkGrantCurrency(conn *storage.Conn, catalog worlddata.Catalog, adminUserID int64, raw json.RawMessage) (any, error) {
 	p, err := decodeMap(raw)
 	if err != nil {
 		return nil, err
@@ -1882,7 +1888,11 @@ func adminBulkGrantCurrency(conn *storage.Conn, adminUserID int64, raw json.RawM
 		if _, err = conn.Execute(`INSERT INTO currency_wallets(user_id,currency_id,balance) VALUES(?,?,?) ON CONFLICT(user_id,currency_id) DO UPDATE SET balance=balance+excluded.balance`, []any{uid, currency, amount}); err != nil {
 			return nil, err
 		}
-		if currency == "low_spirit_stone" {
+		mirrorCurrency, err := characterBaseCurrencyTx(conn, catalog, uid)
+		if err != nil {
+			return nil, err
+		}
+		if currency == mirrorCurrency {
 			if _, err = conn.Execute(`UPDATE characters SET spirit_stones=MAX(0,spirit_stones+?),updated_at=? WHERE user_id=?`, []any{amount, now, uid}); err != nil {
 				return nil, err
 			}

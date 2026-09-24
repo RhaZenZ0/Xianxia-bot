@@ -291,6 +291,10 @@ func (r *Runner) npcCrimes(conn *storage.Conn, gm int64) (int64, int64, int64, e
 					[]any{gm, now, victim.name}); err != nil {
 					return committed, witnessed, fatal, err
 				}
+				// The dead leave a widow (rc.24), on this path as on every other.
+				if err := game.ReleaseNPCBondsTx(conn, victim.name, gm, now); err != nil {
+					return committed, witnessed, fatal, err
+				}
 				// A body is always found. Whether it is attached to a name is
 				// the same roll as any other crime.
 				title := fmt.Sprintf("%s is found dead at %s", victim.name, victim.location)
@@ -475,6 +479,10 @@ func (r *Runner) npcBeastHunts(conn *storage.Conn, gm int64) (int64, int64, int6
 			}
 			if _, err := conn.Execute(`UPDATE npc_civilization_state SET status='dead',activity='Deceased',last_game_minute=?,updated_at=? WHERE npc_name=?`,
 				[]any{gm, now, hunter.name}); err != nil {
+				return hunted, took, died, err
+			}
+			// The dead leave a widow (rc.24), on this path as on every other.
+			if err := game.ReleaseNPCBondsTx(conn, hunter.name, gm, now); err != nil {
 				return hunted, took, died, err
 			}
 			r.recordDeed(conn, "npc_killing", fmt.Sprintf("npc_hunt_death:%s:%s:%d", hunter.name, quarry.Name, gm),

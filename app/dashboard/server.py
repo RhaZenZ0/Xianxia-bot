@@ -178,6 +178,9 @@ class _QuestWorld:
         self.locations = dict(data.get("locations") or {})
         self.npcs = dict(data.get("npcs") or {})
         self.items = dict(data.get("items") or {})
+        # A `craft` objective names a recipe (v1.2.1); without this every one
+        # the editor saved or reported was "an unknown recipe".
+        self.recipes = dict(data.get("recipes") or {})
 
 
 def json_safe_numbers(value: Any) -> Any:
@@ -939,7 +942,7 @@ class ReadOnlyDashboardStore:
             return {}
         try:
             return dict(await self._engine.action("secret_realm.rotation", 0, {}) or {})
-        except (GameEngineError, OSError) as exc:
+        except (GameEngineError, httpx.HTTPError, OSError) as exc:
             log.warning("Could not read the secret realm rotation from the engine: %s", exc)
             return {}
 
