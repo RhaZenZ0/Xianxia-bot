@@ -115,7 +115,7 @@ func TestAnUnknownWaitIsAnHourAndNeverNothing(t *testing.T) {
 
 func TestEveryNamedWaitHasAnEntry(t *testing.T) {
 	for _, action := range []string{
-		cooldownCultivate, cooldownExplore, cooldownHunt, cooldownSecretRealm,
+		cooldownCultivate, cooldownExplore, cooldownHunt, cooldownMine, cooldownSecretRealm,
 		cooldownAptitude, cooldownPerfectQuest, cooldownPerfectTrial,
 		cooldownForbidden, cooldownQiRefine, cooldownDaoDual,
 		cooldownGhostHarvest, cooldownGhostAppease,

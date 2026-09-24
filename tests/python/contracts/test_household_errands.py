@@ -120,11 +120,16 @@ class TheDoorsAreWhereTheyWork(unittest.TestCase):
 
     def test_the_beginner_path_comes_home_before_its_last_lesson(self):
         # rc.32 made the road home the last stage; rc.34 puts the head's last
-        # lesson after it (test_household_lesson.py holds that end).
+        # lesson after it (test_household_lesson.py holds that end), and
+        # v1.2.0 puts the trade and the first gate after the lesson. Held as
+        # relationships rather than positions (v1.0.8's rule).
         stages = list(CONTENT["beginner_path"])
-        self.assertEqual(stages[-2]["quest_key"], "beginner_home")
-        self.assertEqual(stages[-3]["follow_on"], "beginner_home")
-        self.assertIn("return_home", [o["type"] for o in stages[-2]["objectives"]])
+        by_key = {s["quest_key"]: s for s in stages}
+        self.assertIn("beginner_home", by_key)
+        self.assertEqual(by_key["beginner_home"]["follow_on"], "beginner_lesson")
+        before = [s for s in stages if s.get("follow_on") == "beginner_home"]
+        self.assertEqual(len(before), 1, "exactly one stage leads home")
+        self.assertIn("return_home", [o["type"] for o in by_key["beginner_home"]["objectives"]])
 
 
 class TheTalismansMakeTheRoundTrip(unittest.TestCase):

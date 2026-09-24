@@ -48,6 +48,7 @@ var cooldownFamilies = []cooldownFamily{
 	{Family: "body_cultivate", Key: "body_cultivate"},
 	{Family: "explore", Key: "explore"},
 	{Family: "hunt", Key: "hunt"},
+	{Family: "mine", Key: "mine"},
 	{Family: "secret_realm", Key: "secret_realm"},
 	{Family: "perfect_quest", Key: "perfect_quest", Gate: gatePerfection},
 	{Family: "perfect_trial", Key: "perfect_trial", Gate: gatePerfection},

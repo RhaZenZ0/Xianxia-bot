@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .progression_systems import profession_rank
+
 SURNAMES = (
     "Chen", "Lin", "Zhao", "Shen", "Wei", "Su", "Bai", "Gu", "Han", "Luo",
     "Xu", "Yan", "Jiang", "Qin", "Mu", "Tang", "Ye", "Feng", "Song", "Xie",
@@ -311,9 +313,9 @@ def family_tutoring_line(sendoff: dict[str, Any]) -> str:
     level = int(tutoring.get("level") or 0)
     xp = int(tutoring.get("xp") or 0)
     if level >= 1:
-        start = f"you leave an **Apprentice** of {trade}"
+        start = f"you leave a **{profession_rank(1)}** {trade} crafter"
     elif xp > 0:
-        start = f"you leave with **{xp} XP** toward Apprentice {trade}"
+        start = f"you leave with **{xp} XP** toward {profession_rank(1)} {trade}"
     else:
         start = f"you leave knowing the basics of {trade}"
     return f"\n🛠️ {tutor.capitalize()}: {start}, and the household's **+{FAMILY_TRADE_BONUS} {trade} tradition** goes with you."

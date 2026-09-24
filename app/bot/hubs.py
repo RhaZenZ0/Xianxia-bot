@@ -126,7 +126,7 @@ _PAGE_EMOJIS = {
     "cultivate": "🧘", "seclusion": "🚪", "body": "🥋", "aptitude": "🧬", "law": "📖",
     "manual": "📚", "conceal": "🌫️", "profession": "🛠️", "learn": "📜", "inventory": "🎒", "storage": "📦",
     "use": "🧪", "equipment": "🛡️", "artifact": "🔮", "provenance": "🔎", "npcinfo": "👤",
-    "talk": "💬", "sense": "👁️", "world": "🌍", "explore": "🧭", "hunt": "🐾",
+    "talk": "💬", "sense": "👁️", "world": "🌍", "explore": "🧭", "hunt": "🐾", "mine": "⛏️",
     "worldevents": "🌩️", "civilization": "🏘️", "scene": "🎭", "era": "🌌", "time": "🕰️",
     "rulers": "👑", "worldrules": "📜", "travel": "🗺️", "realmhub": "🏙️", "array": "🌀",
     "battle": "⚔️", "duel": "🤺", "party": "👥", "formation": "🧭", "boss": "🐲", "hunter": "🎯",
@@ -326,6 +326,33 @@ def register_menu_builder(builder: Any) -> None:
 def register_menu_facts(facts: Any) -> None:
     global _MENU_FACTS
     _MENU_FACTS = facts
+
+
+# The menu's shape for one player (v1.2.0): which hubs it leaves off because
+# the curriculum has opened no lever on them yet, and the tutorial's next step.
+# Registered the way the facts line is, and for the same reason - `WORLD` and
+# the quest service sit above this module - and asked by both doors into the
+# menu, `/menu` and a panel's Back button, so the two cannot draw different
+# menus for one cultivator.
+_MENU_SHAPE: Any = None
+
+
+def register_menu_shape(shape: Any) -> None:
+    global _MENU_SHAPE
+    _MENU_SHAPE = shape
+
+
+async def menu_shape(interaction: discord.Interaction) -> dict[str, Any]:
+    """`{"hidden_hubs": {hub: realm}, "tutorial": str}` for this player, or
+    nothing when the lookup is unavailable or fails: a menu that collapsed
+    hubs because its own lookup broke would read as a game with four hubs."""
+    if not callable(_MENU_SHAPE):
+        return {}
+    try:
+        return dict(await _MENU_SHAPE(interaction) or {})
+    except Exception:
+        log.exception("Menu shape unavailable")
+        return {}
 
 
 # Actions a player cannot use where they stand (v1.0.0-rc.32). The surface
@@ -2085,7 +2112,8 @@ class HubLayoutMenuButton(discord.ui.Button):
         member = interaction.user
         is_admin = isinstance(member, discord.Member) and bool(member.guild_permissions.administrator)
         facts = await menu_facts(interaction)
-        menu = _MENU_BUILDER(owner_id=self.hub_view.owner_id, is_admin=is_admin, owner_name=self.hub_view.owner_name, facts=facts)
+        shape = await menu_shape(interaction)
+        menu = _MENU_BUILDER(owner_id=self.hub_view.owner_id, is_admin=is_admin, owner_name=self.hub_view.owner_name, facts=facts, shape=shape)
         await interaction.response.edit_message(view=menu)
         menu.message = getattr(interaction, "message", None)
         self.hub_view.stop()

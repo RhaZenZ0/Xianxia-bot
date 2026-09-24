@@ -251,7 +251,7 @@ model contexts are unnecessary.
 ## Gameplay tuning
 
 The cooldowns (`CULTIVATE_COOLDOWN_MINUTES`, `EXPLORE_COOLDOWN_MINUTES`,
-`HUNT_COOLDOWN_MINUTES`, `PERFECT_QUEST_COOLDOWN_MINUTES`,
+`HUNT_COOLDOWN_MINUTES`, `MINE_COOLDOWN_MINUTES`, `PERFECT_QUEST_COOLDOWN_MINUTES`,
 `PERFECT_TRIAL_COOLDOWN_MINUTES`, `SECRET_REALM_COOLDOWN_MINUTES`,
 `APTITUDE_COOLDOWN_MINUTES`, `DAO_DUAL_COOLDOWN_MINUTES`) are real
 minutes between uses of the corresponding action. Since v1.0.0-rc.56 they are
@@ -281,7 +281,15 @@ the clock of a **new** world and nothing else. On a world that already has a
 clock the stored rate is the last word, and `/admin world advancetime` with a
 `scale` (or the dashboard's "New time scale") is the only thing that changes it
 — so editing this key on a running world has no effect, and it no longer
-silently undoes a rate a GM set. `REINCARNATION_BASE_SAMSARA_YEARS` and
+silently undoes a rate a GM set. `TRAVEL_TIME_PERCENT` (v1.2.0) is the share of a
+road's length a traveller actually waits, 0 to 100, default **0**: a road is
+walked in the telling, and only the toll, the encounter roll and the discoveries
+along it remain. Set it to 100 for the pace the game shipped with, where a
+journey between neighbouring towns put a cultivator in transit for a real half
+hour and refused every other action until arrival; anything in between scales
+that wait. The road's length is still reported as `travel_minutes` whatever the
+setting, because the toll is priced on it. Read by the **Go engine**, and
+compose passes it in. `REINCARNATION_BASE_SAMSARA_YEARS` and
 `REINCARNATION_MAX_WAIT_SECONDS` shape how long a dead character waits in
 samsara before rebirth.
 

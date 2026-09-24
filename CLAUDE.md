@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 61; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 62; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -4496,6 +4496,106 @@ somebody else's; they are asked by place now, and `abode enter` says where the p
 the Nine-Echo Sword Wraith's lair, in both boss tables, is the name of a secret realm rather than a
 place, so that raid can never be started; the two tables had no parity test and have one now, and the
 lair is a content decision in `docs/TODO.md`.
+
+### The first hour is a short list (v1.2.0)
+
+**Found by playing**, three reports in a week: *"we need to simplify interface ... Cultivation,
+Breakthrough, Explore, Shop, Craft, Forge, Gather, Hunt, Mine, Quest until Foundation Establishment
+- these things are enough"*, *"Interface is overwhelming ... I still forget where to go what to do"*,
+*"instant travels ... I don't have to wait half hour"*, and *"Journeyman sounds medieval"*.
+
+**The curriculum is retuned to the owner's list, not to a theory of pacing.** v1.0.9 built the
+mechanism and v1.0.13 opened three pages back up; this release's roster in
+`scripts/author_feature_unlocks.py` puts every page outside that list at Foundation Establishment
+(realm 2) at the earliest and leaves the deeper floors where they were, with two exceptions the owner
+took: `beast / Companions` stays at 0 because a companion is the one system the first hour has to be
+told about (v1.0.13's own call), and `cultivation / Body` stays at 0 because the body path is a way
+of cultivating and not a system beside it. Body Tempering shows **120 of 250** leaves (142 of 248
+before). The per-leaf overrides say why each stays: the identity reads, the manual the lesson hands
+over, the board and the city's reads (the list says Quest, and the board is where they are), the
+household's doors (Leave as well as Enter - the path starts *inside*, and the first Discord run
+of this release stalled at "Leave is not drawn while inside", with every step after it a cascade),
+`alchemy forage`/`purge`/`condition treat`/`learn`/`profession exam` because the first hour gathers,
+mends, reads a slip and sits an examination, and nothing on `cultivation / Cultivate` at all - a
+closed-door retreat is a way of cultivating, and `insight` is load-bearing besides: every qi-ladder
+crossing from 0 to 1 onward needs a banked insight or a Perfection, and hiding the one lever that
+opens the gate would leave a Body Tempering 9 with no visible way through. **`sect / Recruitment` stays at 0** for v1.1.0's reason: a floor on a leaf
+nothing but a hub press can reach is a bound.
+
+**The meridians and the Laws are the Spiritual World's game**, and they are gated two different
+ways on purpose. `cultivation / Qi Body` is a roster entry at 8, and the cultivation card's Qi Body
+field prints where the page opens rather than `20/108 meridians` below it - v1.0.13's finding turned
+round, a card advertising a number whose lever the curriculum hides (read off the same roster the
+panel reads, no literal realm). The Laws are **not** a roster entry: `law_system.normal_min_realm_index`
+moved from 6 to 8 and `_progression_hidden_actions` already hides the page at that floor, so a second
+statement here would be the rc.39 fault. Two of the suite's Go tests seeded a realm-7 cultivator to
+comprehend a Law and went red on the content change, which is the content floor doing its job.
+
+**The menu leaves off what has nothing to do in it.** `hidden_hubs` in `app/rules/feature_unlocks.py`
+hides a hub only when *every* leaf on *every* page of it is a status read or locked - one open lever
+keeps it on the board - and `collapsed_menu_line` names the hubs left off, the nearest realm, and
+that their slash commands still work. At Body Tempering that is Combat, Abode, Inner World and
+Secret Realms. `is_status_read` moved into the rules module for it, so the generator and the menu
+hold one idea of what a status read is (the authoring script imports it; v1.0.13's drill still
+drives it through the script). It is asked through one registered provider, `menu_shape`, by **both**
+doors into the menu - `/menu` and a panel's Back button - because two builders would draw two menus
+for one cultivator. It fails the way the curriculum fails: an unreadable roster hides nothing, and a
+provider that raises collapses nothing.
+
+**And the menu says what to do next.** The header carries `🧭 Next: **<stage>** — <objective>`, the
+first objective still short on the active beginner-path stage, read off the pinned terms the way the
+journal reads them. Somebody with no character is shown everything.
+
+**The seam (`mining.go`).** Foraging brought back herbs and the tier-flat makings and never ore, so
+spirit iron - three of which every Forging entry method wants - came only from a shop counter or an
+Iron-Horn Boar, and Forging was the one trade a cultivator could learn at the household's table and
+then not practise without money. `exploration.mine` is forage's shape and not forage's code: the
+world's `@ore` through `EventSites.Material`, the same resolver the event sites and the send-off
+use; a rare vein of the *next* world's ore (a Celestial seam has nothing above it and invents
+nothing); `mine_materials`, the tier-flat sibling of `forage_materials` in the same struct; body and
+insight on the roll where forage rolls insight and spirit; the Forging houses' tradition through
+`householdTradeBonusTx`; and a few stones on a rich dig through `applyCanonicalRewardTx`, so they
+land in the money of the world the seam is in (rc.44). The wait is `actionCooldowns`' (`mine`,
+`MINE_COOLDOWN_MINUTES`, compose passthrough - rc.56's rule), the result carries the roll whole
+(v1.0.3's rule), and it refuses indoors and on a shrine the way the hunt does; `LOCATION_GATES`
+hides it in both. Mining is a profession on `PROFESSIONS`, so the content gate counts it.
+
+**The tutorial ends at the first gate, and a graduate is caught up anywhere.** Two stages follow the
+lesson: `beginner_iron` ("Iron from the Seam" - mine spirit iron, come out of a hunt standing, forge
+a Spirit-Iron Sword, sell to a keeper; the targets are stored raw and matched `EqualFold`) and
+`beginner_gate` ("The First Gate" - the first breakthrough, `breakthrough` being a new objective type
+reported by `/breakthrough` on a success, the qi ladder only). The sect road is `beginner_gate`'s
+`follow_on`, so v1.1.0's gate that walks the chain out of the path still holds. Migration 62
+re-points the lesson's `follow_on` on a running world only where it still names the sect road
+(migration 55's rule). And rc.34's catch-up - which handed an added stage over only at the lesson's
+door - runs at the end of every ordinary `questProgress` now, whether or not the report completes
+anything; its first version sat inside the completion branch and the test written for it said so
+(`caught_up=[]` on a report that only advanced an objective). Two caveats are in `docs/TODO.md`: it
+walks the file's adjacency rather than `seed_json`, and a graduate holding no quest at all is never
+reached.
+
+**A road is walked in the telling (`travel_pace.go`).** `TRAVEL_TIME_PERCENT`, default 0, is the
+share of a road's length a traveller actually waits, read the way `clockScaleFromEnv` reads the
+clock's rate and passed through compose's allowlist (rc.39). The road's length is still computed and
+still reported as `travel_minutes` - the toll is priced on it and the harness advances the clock by
+it - and what the setting scales is `wait_minutes`, which is what the transit row and `traveling`
+key off. Encounters resolve before the wait is computed, so a road is dangerous at every pace. The
+two tests about what a wait *does* pin the old pace with `withTheOldPace(t)`; the new ones hold that
+the default writes no transit row and refuses nothing after, that 50 halves the wait, and that an
+unreadable value is the default rather than a refusal.
+
+**The ranks are grades.** `PROFESSION_RANKS = ("Unranked", "Grade 1", … "Grade 5", "Saint")` is the
+one statement; the examinations' `rank_name`, titles and labels quote it ("The Grade 1 Billet"),
+`_rank_lift` and the household lines read `profession_rank`, and the engine's one literal ("has not
+reached Apprentice") became "the first rank". Nothing stored changes: a rank has always been a level.
+
+**What the suite caught, in order.** The surface table refused `/mine` until it was named; the
+curriculum gate's `needed` map named `battle challenge` for `combat_win` and `trade offer` for
+`trade` - every reporter, where the path's labels name the hunt and the shops - so it reads what the
+labels name now; two card tests seeded a realm-3 and a realm-4 cultivator and asserted the qi body's
+numbers, which the card no longer prints there; and the two law fixtures at realm 7 met the new
+content floor. Each is the rule this file already states: a test pinned to a number the owner may
+retune goes red exactly when the owner retunes it.
 
 ## Testing conventions
 

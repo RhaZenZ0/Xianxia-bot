@@ -85,8 +85,8 @@ class TheSendoffSaysWhoTaughtYou(unittest.TestCase):
         master = self._line({**base, "tutoring": {"profession": "Forging", "tutor": "a master retained", "level": 1, "xp": 0}})
         tutor = self._line({**base, "tutoring": {"profession": "Forging", "tutor": "a hired tutor", "level": 0, "xp": 55}})
         basics = self._line({**base, "tutoring": {"profession": "Forging", "tutor": "shown the basics", "level": 0, "xp": 0}})
-        self.assertIn("**Apprentice** of Forging", master)
-        self.assertIn("**55 XP** toward Apprentice Forging", tutor)
+        self.assertIn("**Grade 1** Forging crafter", master)
+        self.assertIn("**55 XP** toward Grade 1 Forging", tutor)
         self.assertIn("knowing the basics of Forging", basics)
         for line in (master, tutor, basics):
             self.assertIn(f"+{FAMILY_TRADE_BONUS} Forging tradition", line)

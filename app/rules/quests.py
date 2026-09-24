@@ -301,6 +301,10 @@ OBJECTIVE_TYPES: dict[str, dict[str, Any]] = {
     "craft": {"target": "recipe", "label": "Craft {target}", "untargeted": "Craft something from a method you know"},
     "trade": {"target": "item", "label": "Buy or sell {target}", "untargeted": "Buy or sell at a shop"},
     "gather": {"target": "item", "label": "Gather {target}", "untargeted": "Forage a material out of the hills"},
+    # Reported by `/breakthrough` on a success (v1.2.0), the qi ladder only: the
+    # first gate is the tutorial's last stage, and one reporter keeps the label
+    # honest - a body breakthrough is a different command with a different name.
+    "breakthrough": {"target": None, "label": "", "untargeted": "Break through to the next stage"},
     # Reported by `/family → Enter` and by a Hearth-Return Talisman
     # (v1.0.0-rc.32). Untargeted by construction: the household is the
     # player's own, and `birth_family:<id>` is not a catalogue location.

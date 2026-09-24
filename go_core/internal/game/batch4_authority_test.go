@@ -373,7 +373,9 @@ func TestBatch4PerfectionOperationsAreAuthoritative(t *testing.T) {
 func TestBatch4LawComprehendPersistsLawDaoCooldownAndReceipt(t *testing.T) {
 	path := setupBatch4AuthorityDB(t)
 	world := batch4WorldPath(t)
-	batch4Exec(t, path, "UPDATE characters SET realm_index=7,phase=3 WHERE user_id=42")
+	// Realm 8: the Laws wait for the Spiritual World since v1.2.0 (the content
+	// floor `law_system.normal_min_realm_index`).
+	batch4Exec(t, path, "UPDATE characters SET realm_index=8,phase=3 WHERE user_id=42")
 
 	result := batch4Result(t, batch4Apply(t, path, world, "law.comprehend", 1, map[string]any{"law": "fire", "game_minute": 200}))
 	if result["law"] != "fire" || storage.ParseInt(result["gain"]) < 1 {

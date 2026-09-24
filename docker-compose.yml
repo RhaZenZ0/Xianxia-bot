@@ -5,7 +5,7 @@ services:
       dockerfile: go_core/Dockerfile
     container_name: xianxia-game-engine
     labels:
-      xianxia.release: "1.1.0"
+      xianxia.release: "1.2.0"
     restart: unless-stopped
     # The engine drains in-flight requests on SIGTERM (default 20s, see
     # ENGINE_SHUTDOWN_GRACE_SECONDS). Docker's default grace is 10s, which
@@ -24,6 +24,10 @@ services:
       # not given is a key it cannot read - which is how Python ended up being
       # the only thing that ever applied WORLD_TIME_SCALE.
       WORLD_TIME_SCALE: "${WORLD_TIME_SCALE:-4}"
+      # The road's pace (v1.2.0): the share of a road's length a traveller
+      # actually waits, 0-100. 0 is instant; 100 is the pace the game shipped
+      # with. Read by the engine, so it has to be passed here too.
+      TRAVEL_TIME_PERCENT: "${TRAVEL_TIME_PERCENT:-0}"
       # The waits a player serves between actions (v1.0.0-rc.56). Fourteen
       # actions used to read their own cooldown off the request payload, so the
       # bound lived in the client and a caller sending 0 served none. The engine
@@ -35,6 +39,7 @@ services:
       DAO_DUAL_COOLDOWN_MINUTES: "${DAO_DUAL_COOLDOWN_MINUTES:-180}"
       EXPLORE_COOLDOWN_MINUTES: "${EXPLORE_COOLDOWN_MINUTES:-20}"
       HUNT_COOLDOWN_MINUTES: "${HUNT_COOLDOWN_MINUTES:-30}"
+      MINE_COOLDOWN_MINUTES: "${MINE_COOLDOWN_MINUTES:-30}"
       SECRET_REALM_COOLDOWN_MINUTES: "${SECRET_REALM_COOLDOWN_MINUTES:-15}"
       PERFECT_QUEST_COOLDOWN_MINUTES: "${PERFECT_QUEST_COOLDOWN_MINUTES:-60}"
       PERFECT_TRIAL_COOLDOWN_MINUTES: "${PERFECT_TRIAL_COOLDOWN_MINUTES:-360}"
@@ -72,7 +77,7 @@ services:
     build: .
     container_name: xianxia-roleplay-bot
     labels:
-      xianxia.release: "1.1.0"
+      xianxia.release: "1.2.0"
     restart: unless-stopped
     env_file:
       - .env

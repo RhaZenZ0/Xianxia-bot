@@ -89,6 +89,8 @@ func TestStage5AllAuthoritativeQueriesRejectCallerGameMinute(t *testing.T) {
 }
 
 func TestStage5RoadTravelUsesCanonicalClockDurationAndDanger(t *testing.T) {
+	// About what a wait does, so it needs one (v1.2.0): the shipped default is 0.
+	withTheOldPace(t)
 	path := setupBatch5AuthorityDB(t)
 	world := batch4WorldPath(t)
 	catalog, err := worlddata.Load(world)

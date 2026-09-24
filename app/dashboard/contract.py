@@ -21,7 +21,7 @@ DASHBOARD_API_VERSION = 2
 # `reveals_sect`, stamped at spawn for a recruitment delegation. No dashboard
 # reader selects either table's columns by name, and a GM has no lever over a
 # running event's cast; the Discord event panel is what reads them.
-DASHBOARD_REVIEWED_SCHEMA_VERSION = 61
+DASHBOARD_REVIEWED_SCHEMA_VERSION = 62
 
 DASHBOARD_GET_API_PATHS = frozenset({
     "/api/overview", "/api/capabilities", "/api/timeline", "/api/npcs", "/api/npc",

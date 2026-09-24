@@ -171,7 +171,7 @@ class TheRoadOnTheSurface(unittest.TestCase):
     def test_the_sheet_names_death_qi_and_its_residue(self):
         surface, _, cards = _modules()
         status = {
-            "realm_index": 3, "stage": 5, "cultivation": 400, "cost": 3000, "insight_xp": 2,
+            "realm_index": 8, "stage": 5, "cultivation": 400, "cost": 3000, "insight_xp": 2,
             "odds": {"tn": 16, "modifier": 9, "probability": 60, "movers": []},
             "stance": "circulate", "stance_label": "Circulate", "stance_mult": 1.0, "cooldown_remaining": 0,
             "qi": 3000, "qi_max": 9000, "qi_regen": 41.2, "purity": 44, "purity_ceiling": 49,

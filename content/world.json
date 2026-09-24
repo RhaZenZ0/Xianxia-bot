@@ -31315,7 +31315,7 @@
       }
     },
     "comprehend_cooldown_minutes": 120,
-    "normal_min_realm_index": 6,
+    "normal_min_realm_index": 8,
     "supreme_min_realm_index": 11
   },
   "special_effects": {
@@ -66637,7 +66637,8 @@
       "Inscription": "@ore",
       "Artifact Refining": "@ore",
       "Beast Taming": "@core",
-      "Appraisal": "@core"
+      "Appraisal": "@core",
+      "Mining": "@ore"
     },
     "by_path": {
       "Sword Cultivator": "@ore",
@@ -68185,9 +68186,9 @@
     "Forging": [
       {
         "rank": 1,
-        "rank_name": "Apprentice",
+        "rank_name": "Grade 1",
         "quest_key": "exam_forging_apprentice",
-        "title": "The Apprentice's Billet",
+        "title": "The Grade 1 Billet",
         "description": "A smith who has not been watched at the anvil is a smith nobody will vouch for. Take a billet to a weaponsmith's hall and work it under the keeper's eye.",
         "opening": "The keeper clears a space at the second anvil, sets a billet down on it, and goes back to their own work without another word. The watching has already started.",
         "hall_kind": "weaponsmith",
@@ -68199,7 +68200,7 @@
             "id": "sit",
             "type": "profession_exam",
             "count": 1,
-            "label": "Sit the Apprentice examination in Forging - **/craft → Profession → Exam**"
+            "label": "Sit the Grade 1 examination in Forging - **/craft → Profession → Exam**"
           }
         ],
         "rewards": {
@@ -68208,9 +68209,9 @@
       },
       {
         "rank": 2,
-        "rank_name": "Journeyman",
+        "rank_name": "Grade 2",
         "quest_key": "exam_forging_journeyman",
-        "title": "The Journeyman's Edge",
+        "title": "The Grade 2 Edge",
         "description": "Anyone can make a blade that looks like one. Stand at a weaponsmith's hall and put an edge on steel while the keeper decides whether it is work or decoration.",
         "opening": "The billet is better metal this time, and the keeper does not leave. They stand where they can see your hands and nothing else.",
         "hall_kind": "weaponsmith",
@@ -68222,7 +68223,7 @@
             "id": "sit",
             "type": "profession_exam",
             "count": 1,
-            "label": "Sit the Journeyman examination in Forging - **/craft → Profession → Exam**"
+            "label": "Sit the Grade 2 examination in Forging - **/craft → Profession → Exam**"
           }
         ],
         "rewards": {
@@ -68231,9 +68232,9 @@
       },
       {
         "rank": 3,
-        "rank_name": "Expert",
+        "rank_name": "Grade 3",
         "quest_key": "exam_forging_expert",
-        "title": "The Expert's Folding",
+        "title": "The Grade 3 Folding",
         "description": "A hall does not certify its own competition lightly. Fold and temper at a weaponsmith's counter until the keeper admits the work is beyond them or is not.",
         "opening": "There is no billet waiting. The keeper asks what you intend to make, listens, and then says: show me.",
         "hall_kind": "weaponsmith",
@@ -68245,7 +68246,7 @@
             "id": "sit",
             "type": "profession_exam",
             "count": 1,
-            "label": "Sit the Expert examination in Forging - **/craft → Profession → Exam**"
+            "label": "Sit the Grade 3 examination in Forging - **/craft → Profession → Exam**"
           }
         ],
         "rewards": {
@@ -68256,9 +68257,9 @@
     "Alchemy": [
       {
         "rank": 1,
-        "rank_name": "Apprentice",
+        "rank_name": "Grade 1",
         "quest_key": "exam_alchemy_apprentice",
-        "title": "The Apprentice's Decoction",
+        "title": "The Grade 1 Decoction",
         "description": "A pill hall will not take your word for what you can brew. Stand at an apothecary's counter and raise one decoction while the keeper watches the flame.",
         "opening": "The keeper sets out a cracked furnace, the one they give everybody, and a measure of herbs that will forgive exactly one mistake.",
         "hall_kind": "apothecary",
@@ -68270,7 +68271,7 @@
             "id": "sit",
             "type": "profession_exam",
             "count": 1,
-            "label": "Sit the Apprentice examination in Alchemy - **/craft → Profession → Exam**"
+            "label": "Sit the Grade 1 examination in Alchemy - **/craft → Profession → Exam**"
           }
         ],
         "rewards": {
@@ -68279,9 +68280,9 @@
       },
       {
         "rank": 2,
-        "rank_name": "Journeyman",
+        "rank_name": "Grade 2",
         "quest_key": "exam_alchemy_journeyman",
-        "title": "The Journeyman's Furnace",
+        "title": "The Grade 2 Furnace",
         "description": "Heat is the whole art and nobody can be told it. Work an apothecary's own furnace under its keeper until the pill comes out whole.",
         "opening": "They open the good furnace for you. That is either respect or a trap, and you will not know which until the flame takes.",
         "hall_kind": "apothecary",
@@ -68293,7 +68294,7 @@
             "id": "sit",
             "type": "profession_exam",
             "count": 1,
-            "label": "Sit the Journeyman examination in Alchemy - **/craft → Profession → Exam**"
+            "label": "Sit the Grade 2 examination in Alchemy - **/craft → Profession → Exam**"
           }
         ],
         "rewards": {
@@ -68302,9 +68303,9 @@
       },
       {
         "rank": 3,
-        "rank_name": "Expert",
+        "rank_name": "Grade 3",
         "quest_key": "exam_alchemy_expert",
-        "title": "The Expert's Toxicity",
+        "title": "The Grade 3 Toxicity",
         "description": "An expert is somebody whose pills do not poison the person who swallows them. Sit the third examination at an apothecary's counter.",
         "opening": "The keeper asks you first what happens to somebody who takes two of what you are about to make. Then they hand you the herbs.",
         "hall_kind": "apothecary",
@@ -68316,7 +68317,7 @@
             "id": "sit",
             "type": "profession_exam",
             "count": 1,
-            "label": "Sit the Expert examination in Alchemy - **/craft → Profession → Exam**"
+            "label": "Sit the Grade 3 examination in Alchemy - **/craft → Profession → Exam**"
           }
         ],
         "rewards": {
@@ -68327,9 +68328,9 @@
     "Inscription": [
       {
         "rank": 1,
-        "rank_name": "Apprentice",
+        "rank_name": "Grade 1",
         "quest_key": "exam_inscription_apprentice",
-        "title": "The Apprentice's Stroke",
+        "title": "The Grade 1 Stroke",
         "description": "Ink does not forgive a shaking hand. Draw one talisman through, start to finish, at a talisman hall while its keeper reads the strokes.",
         "opening": "The paper is cheap and the ink is not. The keeper counts out exactly enough of both.",
         "hall_kind": "talisman",
@@ -68341,7 +68342,7 @@
             "id": "sit",
             "type": "profession_exam",
             "count": 1,
-            "label": "Sit the Apprentice examination in Inscription - **/craft → Profession → Exam**"
+            "label": "Sit the Grade 1 examination in Inscription - **/craft → Profession → Exam**"
           }
         ],
         "rewards": {
@@ -68350,9 +68351,9 @@
       },
       {
         "rank": 2,
-        "rank_name": "Journeyman",
+        "rank_name": "Grade 2",
         "quest_key": "exam_inscription_journeyman",
-        "title": "The Journeyman's Sequence",
+        "title": "The Grade 2 Sequence",
         "description": "One stroke is a stroke; a sequence is a talisman. Sit the second examination at a talisman hall counter.",
         "opening": "The keeper names a sequence you have not drawn before and watches to see whether you ask them to repeat it.",
         "hall_kind": "talisman",
@@ -68364,7 +68365,7 @@
             "id": "sit",
             "type": "profession_exam",
             "count": 1,
-            "label": "Sit the Journeyman examination in Inscription - **/craft → Profession → Exam**"
+            "label": "Sit the Grade 2 examination in Inscription - **/craft → Profession → Exam**"
           }
         ],
         "rewards": {
@@ -68373,9 +68374,9 @@
       },
       {
         "rank": 3,
-        "rank_name": "Expert",
+        "rank_name": "Grade 3",
         "quest_key": "exam_inscription_expert",
-        "title": "The Expert's Seal",
+        "title": "The Grade 3 Seal",
         "description": "A seal binds or it does not, and a hall's reputation rides on the difference. Sit the third examination at a talisman hall.",
         "opening": "They clear the whole counter. Whatever you draw here, they will be selling under their own name afterwards.",
         "hall_kind": "talisman",
@@ -68387,7 +68388,7 @@
             "id": "sit",
             "type": "profession_exam",
             "count": 1,
-            "label": "Sit the Expert examination in Inscription - **/craft → Profession → Exam**"
+            "label": "Sit the Grade 3 examination in Inscription - **/craft → Profession → Exam**"
           }
         ],
         "rewards": {
@@ -68398,9 +68399,9 @@
     "Formation": [
       {
         "rank": 1,
-        "rank_name": "Apprentice",
+        "rank_name": "Grade 1",
         "quest_key": "exam_formation_apprentice",
-        "title": "The Apprentice's Flags",
+        "title": "The Grade 1 Flags",
         "description": "A formation misplaced by a handspan is a formation that does nothing. Set your flags at an array workshop while the keeper paces the lines.",
         "opening": "The workshop floor is marked with a hundred old chalk lines. The keeper wipes one section clean and points at it.",
         "hall_kind": "array",
@@ -68412,7 +68413,7 @@
             "id": "sit",
             "type": "profession_exam",
             "count": 1,
-            "label": "Sit the Apprentice examination in Formation - **/craft → Profession → Exam**"
+            "label": "Sit the Grade 1 examination in Formation - **/craft → Profession → Exam**"
           }
         ],
         "rewards": {
@@ -68421,9 +68422,9 @@
       },
       {
         "rank": 2,
-        "rank_name": "Journeyman",
+        "rank_name": "Grade 2",
         "quest_key": "exam_formation_journeyman",
-        "title": "The Journeyman's Node",
+        "title": "The Grade 2 Node",
         "description": "Anyone can lay flags. A journeyman knows which one carries the load. Sit the second examination at an array workshop.",
         "opening": "The keeper lays out a disk with one node deliberately wrong and asks you to raise it anyway.",
         "hall_kind": "array",
@@ -68435,7 +68436,7 @@
             "id": "sit",
             "type": "profession_exam",
             "count": 1,
-            "label": "Sit the Journeyman examination in Formation - **/craft → Profession → Exam**"
+            "label": "Sit the Grade 2 examination in Formation - **/craft → Profession → Exam**"
           }
         ],
         "rewards": {
@@ -68444,9 +68445,9 @@
       },
       {
         "rank": 3,
-        "rank_name": "Expert",
+        "rank_name": "Grade 3",
         "quest_key": "exam_formation_expert",
-        "title": "The Expert's Array",
+        "title": "The Grade 3 Array",
         "description": "An expert raises something that holds with the keeper leaning on it. Sit the third examination at an array workshop.",
         "opening": "There is no instruction at all. The keeper sits down on a crate at the edge of the floor and waits.",
         "hall_kind": "array",
@@ -68458,7 +68459,7 @@
             "id": "sit",
             "type": "profession_exam",
             "count": 1,
-            "label": "Sit the Expert examination in Formation - **/craft → Profession → Exam**"
+            "label": "Sit the Grade 3 examination in Formation - **/craft → Profession → Exam**"
           }
         ],
         "rewards": {
@@ -68610,6 +68611,64 @@
       "rewards": {
         "insight_xp": 40,
         "spirit_stones": 30
+      },
+      "follow_on": "beginner_iron"
+    },
+    {
+      "quest_key": "beginner_iron",
+      "title": "Iron from the Seam",
+      "description": "A smith's trade begins in the ground. Break ore out of a seam, come through one fight standing, forge one blade from a method you know, and sell it to a keeper who knows what it is worth.",
+      "opening": "The head of the house has said what they had to say. What is left is the trade itself: a seam in the hills, a fire, and a counter at the end of it.",
+      "objectives": [
+        {
+          "id": "dig",
+          "type": "gather",
+          "target": "spirit_iron",
+          "count": 1,
+          "label": "Break spirit iron out of a seam - **/world → Act → Mine**"
+        },
+        {
+          "id": "stand",
+          "type": "combat_win",
+          "count": 1,
+          "label": "Come out of one fight standing - **/world → Act → Hunt**"
+        },
+        {
+          "id": "forge",
+          "type": "craft",
+          "target": "Spirit-Iron Sword",
+          "count": 1,
+          "label": "Forge a Spirit-Iron Sword - **/craft → General Crafting → Craft**"
+        },
+        {
+          "id": "sell",
+          "type": "trade",
+          "count": 1,
+          "label": "Sell something to a keeper - **/economy → City Shops → Sell**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 40,
+        "spirit_stones": 40
+      },
+      "follow_on": "beginner_gate"
+    },
+    {
+      "quest_key": "beginner_gate",
+      "title": "The First Gate",
+      "description": "Everything so far has been the ground floor. Fill the stage you stand on and break through to the next - the first of many gates, and the one that opens the rest of the world.",
+      "opening": "The qi you have gathered has nowhere left to go. There is a wall, and the only way past it is through.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "count": 1,
+          "label": "Break through to the next stage - **/cultivation → Cultivate → Breakthrough**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 60,
+        "spirit_stones": 50
       },
       "follow_on": "road_to_a_sect"
     }
@@ -69234,16 +69293,23 @@
       "abode upgrade": 3,
       "abode visit": 3,
       "afterlife": 5,
+      "aptitude awaken": 2,
+      "aptitude evolve": 2,
+      "aptitude harmonize": 2,
+      "aptitude temper": 2,
       "array list": 2,
       "array use": 2,
       "artifact awaken": 2,
       "artifact bond": 2,
       "auction appraise": 2,
       "auction bid": 2,
-      "auction browse": 1,
+      "auction browse": 2,
       "auction enter": 2,
       "auction leave": 2,
       "auction sell": 2,
+      "battle act": 2,
+      "battle challenge": 2,
+      "battle finish": 2,
       "blackmarket buy": 3,
       "blackmarket rumors": 3,
       "blackmarket sell": 3,
@@ -69255,17 +69321,23 @@
       "boss claim": 3,
       "boss list": 2,
       "boss start": 3,
-      "bounty": 1,
       "caravan dispatch": 3,
       "caravan events": 3,
+      "city envoys": 2,
+      "conceal": 2,
       "crime atone": 3,
+      "dantian refine": 8,
       "daoheart": 2,
-      "duel act": 1,
-      "duel challenge": 1,
-      "duel respond": 1,
+      "duel act": 2,
+      "duel challenge": 2,
+      "duel respond": 2,
+      "effects": 2,
       "family ancestry": 5,
+      "family child": 2,
       "family claim": 5,
+      "family clan": 2,
       "family conflict": 5,
+      "family descendants": 2,
       "family history": 5,
       "family house child": 4,
       "family house found": 4,
@@ -69280,6 +69352,8 @@
       "formation assign": 2,
       "formation create": 2,
       "formation stance": 2,
+      "ghost appease": 2,
+      "ghost harvest": 2,
       "grudges": 3,
       "hunter act": 3,
       "inheritances": 5,
@@ -69287,8 +69361,16 @@
       "innerworld enter": 5,
       "innerworld leave": 5,
       "innerworld setrule": 5,
-      "karma": 1,
+      "karma": 2,
+      "manual practise": 2,
+      "manual study": 2,
+      "manual technique": 2,
+      "market buy": 2,
+      "market prices": 2,
+      "market sell": 2,
       "merchant buy": 2,
+      "meridian heal": 8,
+      "meridian open": 8,
       "party create": 2,
       "party join": 2,
       "party leave": 2,
@@ -69298,13 +69380,12 @@
       "perfect quest": 5,
       "perfect start": 5,
       "perfect trial": 5,
-      "provenance": 1,
-      "realmhub go": 1,
+      "realmhub go": 2,
       "reincarnate": 5,
-      "reputation": 1,
-      "secretrealm enter": 1,
-      "secretrealm explore": 1,
-      "secretrealm leave": 1,
+      "reputation": 2,
+      "secretrealm enter": 2,
+      "secretrealm explore": 2,
+      "secretrealm leave": 2,
       "sect abode": 2,
       "sect address": 2,
       "sect contribute": 2,
@@ -69322,41 +69403,67 @@
       "sect shadow": 2,
       "sect treasury": 2,
       "soul": 5,
-      "spatialkey": 1,
+      "spatialkey": 2,
+      "specialeffects": 2,
+      "storage deposit": 2,
+      "storage withdraw": 2,
       "territory claim": 4,
+      "trade accept": 2,
+      "trade decline": 2,
+      "trade offer": 2,
       "war act": 4
     },
     "pages": {
       "abode / Access": 3,
       "abode / Property": 3,
       "ascend / Perfection": 5,
+      "character / Afflictions": 2,
       "character / Consequences": 3,
       "character / Dao Partnership": 4,
       "character / Fate": 4,
       "character / Samsara": 5,
+      "combat / Active Battle": 2,
       "combat / Boss Raids": 3,
       "combat / Bounty Hunter": 3,
-      "combat / Duels": 1,
+      "combat / Duels": 2,
       "combat / Formations": 2,
       "combat / Party": 2,
+      "craft / Alchemy": 2,
+      "craft / Profession": 2,
+      "cultivation / Arts": 2,
+      "cultivation / Ghost": 2,
+      "cultivation / Path": 2,
+      "cultivation / Qi Body": 8,
       "economy / Auction House": 2,
       "economy / Black Market": 3,
       "economy / Caravans": 3,
+      "economy / Local Market": 2,
       "economy / Merchants": 2,
+      "economy / Trade": 2,
+      "family / Family": 2,
       "family / House": 4,
       "family / Legacy": 5,
       "innerworld / Personal World": 5,
       "items / Artifacts": 2,
-      "items / Provenance": 1,
-      "realm / Secret Realms": 1,
-      "realm / Spatial Keys": 1,
+      "items / Provenance": 2,
+      "items / Storage": 2,
+      "realm / Secret Realms": 2,
+      "realm / Spatial Keys": 2,
       "sect / Discipleship": 2,
       "sect / Holdings": 2,
       "sect / Sect": 2,
       "sect / Territory": 4,
       "sect / War": 4,
-      "travel / Realm Capitals": 1,
-      "travel / Teleportation Arrays": 2
+      "travel / Realm Capitals": 2,
+      "travel / Teleportation Arrays": 2,
+      "world / City": 2
+    }
+  },
+  "mine_materials": {
+    "array_disk_blank": {
+      "chance": 10,
+      "min_resources": 40,
+      "max": 1
     }
   }
 }

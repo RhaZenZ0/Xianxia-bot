@@ -16,6 +16,36 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.2.0)** — *The first hour showed the whole game.* Player feedback: *"we need to simplify
+  interface ... Cultivation, Breakthrough, Explore, Shop, Craft, Forge, Gather, Hunt, Mine, Quest until
+  Foundation Establishment - these things are enough"* and *"I still forget where to go what to do"*.
+  The curriculum is retuned to that list (120 of 250 leaves at Body Tempering, down from 142), the
+  menu leaves off the hubs with no lever open yet and names the tutorial's next step, and `/mine` is
+  built. See CLAUDE.md, "The first hour is a short list".
+- **fixed (v1.2.0)** — *A road put a cultivator in transit for a real half hour.* `TRAVEL_TIME_PERCENT`,
+  default 0; the old pace is 100. The toll, the encounter and the road-side discoveries are untouched.
+- **fixed (v1.2.0)** — *"Journeyman sounds medieval."* The rank ladder is Unranked, Grade 1-5 and Saint,
+  stated once (`PROFESSION_RANKS`) and held equal to the examinations' `rank_name`s.
+- **deferred (v1.2.0)** — *The tutorial's forge burns materials on a miss.* `craft.resolve` consumes
+  the inputs whether or not the roll lands (`crafting_actions.go`), and "Iron from the Seam" asks for a
+  Spirit-Iron Sword at TN 14, which a fresh crafter clears about six times in seven. A miss costs
+  three spirit iron and another dig. Whether a failed craft should return part of its inputs is a
+  mechanic, not a wiring, and is not decided here.
+- **deferred (v1.2.0)** — *The catch-up walks the content file's adjacency.* `catchUpBeginnerPathTx`
+  hands over the stage after any completed stage in `beginner_path` as the file orders it, while the
+  chain a player actually walks is `seed_json.follow_on`; a GM who re-points the chain in the
+  workbench is obeyed by `questFollowOnTx` and not by the catch-up. And it fires only on a quest
+  report that touches an active quest, so a graduate holding no quest at all is never caught up; the
+  menu's tutorial line is empty for them too. A boot-time sweep would be the honest fix and is a
+  decision about what a migration may hand a player.
+- **deferred (v1.2.0)** — *Forage's own wait is still its own literal.* `forageResolveAction` reads its
+  cooldown from `alchemy_forage` with its own wording, not from `actionCooldowns`; the mine reads the
+  table. One more entry and one regex-matching refusal, deferred as the separate fix it is.
+- **deferred (v1.2.0)** — *The Qi Body card hides a read.* Below Spirit Body Transformation the
+  cultivation card prints where the qi body opens rather than the pool, the purity and the channels -
+  v1.0.13's own finding turned round, a card advertising a number whose lever the curriculum hides.
+  The pool and the purity still price every technique a Body Tempering cultivator uses; whether that
+  half should stay visible is a decision.
 - **fixed (v1.1.0)** — *There was no road into a sect.* Reported in Discord: at a Major Sect
   Recruitment event a player was told by the Visiting Elder that they were impatient and would not be
   taken, and the next player asked *"What menu?"*. The event named no sect and its elder belonged to

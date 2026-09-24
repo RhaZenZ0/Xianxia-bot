@@ -594,6 +594,26 @@ func questProgress(conn *storage.Conn, catalog worlddata.Catalog, userID int64, 
 			}
 		}
 	}
+	// Grandfathering the tutorial (v1.2.0). A stage added to the beginner
+	// path after a player finished the one before it is handed over at the
+	// lesson's door (rc.34) - and only there, so a graduate who never asks
+	// for a second lesson is never caught up. Any quest report of theirs that
+	// touches an ordinary quest is a door now, whether or not it completes
+	// one. Two caveats, stated: it walks the content file's adjacency rather
+	// than `seed_json.follow_on`, so a GM who re-pointed the chain is obeyed
+	// by `questFollowOnTx` above and not here; and it fires only on a report
+	// that touched an active quest, which is the one thing a cultivator with
+	// nothing to do cannot produce - the `/menu` line names their next
+	// objective for that reason.
+	if !isCommission {
+		caughtUp, catchErr := catchUpBeginnerPathTx(conn, catalog, userID, gameMinute)
+		if catchErr != nil {
+			return nil, catchErr
+		}
+		if len(caughtUp) > 0 {
+			transition["caught_up"] = caughtUp
+		}
+	}
 	if err := conn.Commit(); err != nil {
 		return nil, err
 	}

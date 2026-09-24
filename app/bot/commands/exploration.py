@@ -633,6 +633,76 @@ async def hunt(interaction: discord.Interaction) -> None:
         )
 
 
+@registered_root_command(name="mine", description="Break ore out of a seam for forging materials", guild=GUILD)
+@serialized_user_action
+async def mine(interaction: discord.Interaction) -> None:
+    """The seam's twin of the hills' forage (v1.2.0).
+
+    Foraging brought back herbs and the tier-flat makings and never ore, so
+    spirit iron - three of which every Forging entry method wants - came only
+    from a shop counter or an Iron-Horn Boar. The owner's brief for the first
+    hour names Mine beside Gather, Hunt and Forge; the engine rolls it
+    (`exploration.mine`) and this prints the result and reports each distinct
+    material as `gather`, the way the forage does, so a quest can ask for iron.
+    """
+    c = await require_character(interaction)
+    if not c:
+        return
+    await interaction.response.defer(ephemeral=False)
+    wt = await current_world_time()
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "exploration.mine", interaction.user.id,
+            {},
+            action_id=f"discord:{interaction.id}:exploration.mine",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"The seam could not be worked: {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    resolved = dict(envelope.get("result") or {})
+    roll = SimpleNamespace(**dict(resolved.get("roll") or {}))
+    success = bool(resolved.get("success"))
+    mine_progress = dict(resolved.get("profession_progress") or {})
+    level = int(mine_progress.get("level", 0))
+    seam = str(resolved.get("location") or c.get("location", ""))
+    family_bonus = int(resolved.get("family_bonus", 0))
+    family_trade = str(resolved.get("family_trade") or "Forging")
+    bonus_bits = f" • Household {family_trade.lower()} lore **+{family_bonus}**" if family_bonus else ""
+    rank_line = (
+        f"\n⛏️ Mining: **{profession_rank(level)}** Lv.{level} "
+        f"• XP {int(mine_progress.get('xp', 0))}/{profession_xp_needed(level)}"
+    )
+    if not success:
+        await reply_long(
+            interaction,
+            f"⛏️ **Mine — {seam}**\n{roll_line(roll)}\n"
+            f"Regional spirit resources: **{int(resolved.get('spirit_resources', 0))}/100**.{bonus_bits} "
+            "The seam gives up nothing this time." + rank_line,
+        )
+        return
+    awarded = {str(k): int(v) for k, v in dict(resolved.get("loot") or {}).items()}
+    rare = str(resolved.get("rare_found") or "")
+    rare_line = f"\n✨ Rare vein: **{WORLD.item_name(rare)}**." if rare else ""
+    makings = {str(k): int(v) for k, v in dict(resolved.get("materials_found") or {}).items()}
+    makings_line = f"\n📜 Craft makings: **{WORLD.item_names(makings)}**." if makings else ""
+    stones = int(resolved.get("stones", 0) or 0)
+    stones_line = f"\n💰 A rich seam: **+{stones} spirit stones**." if stones else ""
+    # One `gather` report per distinct material that came out of the ground,
+    # recorded before the reply and told after (rc.28, v1.0.5).
+    progressed: list[dict] = []
+    for material in sorted({**awarded, **makings}):
+        progressed += await record_quest_progress(
+            interaction.user.id, "gather", amount=1, target=str(material),
+            game_minute=wt.total_minutes)
+    await reply_long(
+        interaction,
+        f"⛏️ **Mine — {seam}**\n{roll_line(roll)}\n"
+        f"Regional spirit resources: **{int(resolved.get('spirit_resources', 0))}/100**.{bonus_bits}\n"
+        f"Mined: **{WORLD.item_names(awarded)}**.{rare_line}{makings_line}{stones_line}" + rank_line,
+    )
+    await announce_quest_progress(interaction, progressed)
+
+
 async def recipe_autocomplete(
     interaction: discord.Interaction, current: str
 ) -> list[app_commands.Choice[str]]:
@@ -1695,12 +1765,17 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
     if bool(result.get("road_connection")):
         danger=int(result.get("road_danger") or 0)
         chance=int(result.get("road_encounter_chance_percent") or 0)
-        arrival_display=_discord_arrival_display(result)
         road=_travel_mode_line(result)+(
-            f"\n⏱️ Arrival **{arrival_display}** • Danger **{danger}/45** • "
-            f"Encounter risk **{chance}%**."
-            "\n🚶 You remain in transit and cannot take authoritative actions until arrival."
+            f"\n⏱️ Danger **{danger}/45** • Encounter risk **{chance}%**."
         )
+        # The wait is the engine's (`TRAVEL_TIME_PERCENT`, v1.2.0), and by
+        # default there is none: a road is walked in the telling. Only a
+        # journey that actually put the traveller in transit says so.
+        if bool(result.get("traveling")):
+            road+=(
+                f"\n🚶 Arrival **{_discord_arrival_display(result)}** — "
+                "you remain in transit and cannot take authoritative actions until then."
+            )
         encounter=result.get("road_encounter")
         if isinstance(encounter,dict):
             road+=f"\n⚠️ {str(encounter.get('detail') or 'A road encounter delays the journey')}"
