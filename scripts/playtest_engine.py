@@ -1730,8 +1730,11 @@ async def run(url: str, token: str, db_path: str) -> Report:
             key = str(wave.get("condition_key"))
             treated = await step(report, f"condition.treat the {key} the {wave.get('name')} left", act("condition.treat", PLAYER, {"condition": key}))
             if treated is not None:
-                report.add("PASS", f"the treatment of {key}, reported",
-                           f"success={treated.get('success')} severity {treated.get('severity_before')}->{treated.get('severity_after')} resolved={treated.get('resolved')}")
+                # Certain since v1.0.16: the roll decides how much a treatment
+                # mends, never whether, so a pill always lowers the severity.
+                before, after = present(treated.get("severity_before")), present(treated.get("severity_after"))
+                report.add("PASS" if 0 <= after < before else "FAIL", f"the treatment of {key} mends it, whatever the roll",
+                           f"success={treated.get('success')} severity {before}->{after} resolved={treated.get('resolved')}")
         if not failed:
             report.add("PASS", "no wave failed, so nothing was left to treat", "the dice passed all three")
     # The seam a survived tribulation leaves (v1.0.0-rc.44). The attempt above

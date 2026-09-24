@@ -376,11 +376,13 @@ async def condition_treat(interaction: discord.Interaction, condition: str) -> N
         return
     result = dict(envelope.get("result") or {})
     roll = SimpleNamespace(**dict(result.get("roll") or {}))
-    if bool(result.get("success")):
-        outcome = ("The condition is **resolved** and its mechanical penalties are removed."
-                   if bool(result.get("resolved")) else f"Severity falls to **{int(result.get('severity_after',0))}/5**.")
+    # A treatment always mends since v1.0.16: the roll decides how much, never
+    # whether, so the line reads the severity the engine wrote, not `success`.
+    if bool(result.get("resolved")):
+        outcome = "The condition is **resolved** and its mechanical penalties are removed."
     else:
-        outcome = "The treatment fails. The medicine is consumed, but the condition does not worsen."
+        outcome = (f"Severity falls from {int(result.get('severity_before', 0))} "
+                   f"to **{int(result.get('severity_after', 0))}/5**.")
     await interaction.followup.send(
         f"🩺 **Treat {result.get('name', condition)}**\n{roll_line(roll)}\n{outcome}", ephemeral=False,
     )

@@ -16,6 +16,29 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.0.16)** — *A condition could not be cured by the medicine made for it.* Reported
+  from play as six Heart-Calming Pills on a severity-3 Qi Deviation at 28%, six failures, and *"I
+  can't heal injuries"*. The treatment rolled Insight + Spirit against `10 + 2 × severity` through
+  `canonicalAttribute`, which counted the condition's own effect row - and Qi Deviation, Meridian
+  Damage and Dantian Damage take their severity off Spirit (Soul Wound off both), so the cure grew
+  harder exactly as the ailment grew worse; a failure mended nothing and still spent the pill. Every
+  treatment mends now (one level on a failure, two on a success, three on a strong success), the TN is
+  `10 + severity`, and the condition being treated is left out of its own roll. See CLAUDE.md, "A
+  treatment always mends".
+- **fixed (v1.0.17)** — *A keeper paid a Saint what it paid a beggar.* Reported from play as the Qi
+  Nourishing Pill selling for 11 and buying back for 4. The third itself is the authored rule and is
+  kept: across all 831 things a shop both sells and buys the buy-back is a median of 33% and never
+  above 40%, and nothing can be bought in one shop and sold in another for a profit. What the check
+  found was on the crafting side - three Mortal recipes (the Qi Nourishing Pill, the Spirit-Iron Sword,
+  the Spirit-Iron Lamellar) sold back for less than their own ingredients. On the owner's call a rank
+  in the item's trade now adds 2 of the shop's coin per rank above Novice to what the keeper pays,
+  never reaching the cheapest shelf price in that coin, and shelf prices are untouched. See CLAUDE.md,
+  "A keeper pays a craftsman by rank".
+- **deferred (content)** — *The Starfall Talisman is a profit for anybody who can make it.* Found by
+  the same measurement, and older than v1.0.17: its inputs cost 102 on the Celestial World's shelves
+  and the Celestial Mandate talisman hall pays 120 for one at Novice, so any cultivator who knows the
+  method turns a profit on every craft, bounded only by shelf stock and the roll. Whether that is a
+  reward or a slip is a content decision; lowering that hall's `buys` line below 102 closes it.
 - **fixed (v1.0.15)** — *The Heart Calming Pill could not be made in the only world that sold it.*
   Reported from play, straight after the Apprentice examination in Jadewood: *"missing materials:
   Twin Extremes Ice-Fire Fruit x1"*. The method's slip is shelved only in the Mortal World and the

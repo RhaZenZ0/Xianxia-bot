@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-RELEASE_VERSION = "1.0.15"
+RELEASE_VERSION = "1.0.17"
 __version__ = RELEASE_VERSION
 
 

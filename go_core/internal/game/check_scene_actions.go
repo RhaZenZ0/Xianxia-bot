@@ -48,7 +48,20 @@ func applyStatModifiers(base float64, stat string, modifiers []effectModifier) f
 	return (base + add) * mult
 }
 
-func canonicalAttribute(conn *storage.Conn, catalog worlddata.Catalog, userID, gameMinute int64, attr string) (int64, error) {
+// effectSource names one `active_effects` row by the pair every writer keys it
+// on, so a reader can leave that one row out.
+type effectSource struct{ Type, ID string }
+
+// canonicalAttribute is an attribute as every check reads it: the sheet, then
+// effects, the ground's array, root, bloodline and physique.
+//
+// `skip` leaves named effect rows out (v1.0.16). One caller needs it: a
+// condition's cure must not be rolled against the condition itself. Qi
+// Deviation takes its severity off Spirit, and the treatment rolls Spirit - so
+// before this, the worse the deviation the less able anybody was to mend it,
+// and at severity 5 a fresh cultivator's odds were 0-3%. Every other penalty
+// still counts: a Soul Wound still hurts the treatment of a deviation.
+func canonicalAttribute(conn *storage.Conn, catalog worlddata.Catalog, userID, gameMinute int64, attr string, skip ...effectSource) (int64, error) {
 	attr = strings.ToLower(strings.TrimSpace(attr))
 	allowed := map[string]bool{"body": true, "agility": true, "spirit": true, "insight": true, "will": true, "presence": true, "heart": true}
 	if !allowed[attr] {
@@ -71,11 +84,17 @@ func canonicalAttribute(conn *storage.Conn, catalog worlddata.Catalog, userID, g
 	mods := []effectModifier{}
 
 	// Persisted effects (conditions, medicine, temporary buffs/debuffs).
-	er, err := conn.Execute(`SELECT effect_json,stacks FROM active_effects WHERE user_id=? AND starts_game_minute<=? AND (ends_game_minute IS NULL OR ends_game_minute>?)`, []any{userID, gameMinute, gameMinute})
+	er, err := conn.Execute(`SELECT effect_json,stacks,source_type,source_id FROM active_effects WHERE user_id=? AND starts_game_minute<=? AND (ends_game_minute IS NULL OR ends_game_minute>?)`, []any{userID, gameMinute, gameMinute})
 	if err != nil {
 		return 0, err
 	}
+rows:
 	for _, row := range er.Rows {
+		for _, s := range skip {
+			if fmt.Sprint(row[2]) == s.Type && fmt.Sprint(row[3]) == s.ID {
+				continue rows
+			}
+		}
 		var payload effectPayload
 		if json.Unmarshal([]byte(fmt.Sprint(row[0])), &payload) == nil {
 			stacks := maxI64(1, storage.ParseInt(row[1]))
