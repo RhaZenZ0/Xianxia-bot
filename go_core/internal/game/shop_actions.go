@@ -187,7 +187,10 @@ func shopStockRows(conn *storage.Conn, catalog worlddata.Catalog, key string) ([
 	return rows, nil
 }
 
-func shopBuysRows(catalog worlddata.Catalog, shop worlddata.Shop) []map[string]any {
+// shopBuysRows is the keeper's board as *this* cultivator would be paid off
+// it: a rank in an item's trade raises its line (v1.0.17), and a board that
+// showed the price anybody gets would disagree with the sale it advertises.
+func shopBuysRows(conn *storage.Conn, catalog worlddata.Catalog, userID int64, shop worlddata.Shop) ([]map[string]any, error) {
 	ids := make([]string, 0, len(shop.Buys))
 	for id := range shop.Buys {
 		ids = append(ids, id)
@@ -199,9 +202,13 @@ func shopBuysRows(catalog worlddata.Catalog, shop worlddata.Shop) []map[string]a
 		if name == "" {
 			name = id
 		}
-		rows = append(rows, map[string]any{"item_id": id, "name": name, "price": max64(1, shop.Buys[id])})
+		quote, err := tradeSellQuoteTx(conn, catalog, userID, shop, id)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, map[string]any{"item_id": id, "name": name, "price": quote.Unit, "base_price": quote.Base, "trade": quote.Trade, "trade_rank": quote.Rank})
 	}
-	return rows
+	return rows, nil
 }
 
 // shopHereQuery lists the shops of the city the player stands in (or whose
@@ -272,6 +279,10 @@ func shopBrowseQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	if err != nil {
 		return nil, err
 	}
+	buys, err := shopBuysRows(conn, catalog, userID, shop)
+	if err != nil {
+		return nil, err
+	}
 	return map[string]any{
 		"shop":        key,
 		"name":        shop.Name,
@@ -282,7 +293,7 @@ func shopBrowseQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 		"currency_id": shop.Currency,
 		"description": shop.Description,
 		"stock":       stock,
-		"buys":        shopBuysRows(catalog, shop),
+		"buys":        buys,
 	}, nil
 }
 
@@ -387,11 +398,15 @@ func shopSellAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	price, wanted := shop.Buys[p.ItemID]
-	if !wanted {
+	if _, wanted := shop.Buys[p.ItemID]; !wanted {
 		return authoritativeMutation{}, fmt.Errorf("%s does not buy %s", shop.Name, itemDisplayName(catalog, p.ItemID))
 	}
-	unit := max64(1, price)
+	// A rank in the trade that makes it fetches more (v1.0.17).
+	quote, err := tradeSellQuoteTx(conn, catalog, userID, shop, p.ItemID)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	unit := quote.Unit
 	// What the keeper is willing to pay depends on what they are being
 	// handed. A copy fetches a copy's price, which is what makes an
 	// appraisal worth paying for before you buy off a broker.
@@ -445,6 +460,10 @@ func shopSellAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 		"currency_id":  shop.Currency,
 		"balance":      balance,
 		"on_the_shelf": restocked,
+		// What anybody would have been paid, and the rank that paid more.
+		"base_price": quote.Base,
+		"trade":      quote.Trade,
+		"trade_rank": quote.Rank,
 	}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "economy", EventType: "shop.sell", EntityType: "shop", EntityID: key, GameMinute: p.GameMinute, Payload: out}}, nil
 }

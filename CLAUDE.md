@@ -4346,7 +4346,37 @@ Pill sells for 11 and buys back for 4. Across all 831 things a shop both sells a
 is a median third and never above 40%, and no item can be bought in one shop and sold in another
 for a profit - so it is the authored rule, and on the owner's call it stays. What the check did find
 is recorded in `docs/TODO.md`: made from shop-bought materials, crafting always costs more than
-buying the result, and three Mortal recipes sell back for less than their own ingredients.
+buying the result, and three Mortal recipes sell back for less than their own ingredients. The
+owner's answer to that came the same day, as v1.0.17, below.
+
+### A keeper pays a craftsman by rank (`trade_rank_price.go`, v1.0.17)
+
+The owner's call on v1.0.16's second question: the third a keeper pays stays, and a rank in the trade
+that **makes** an item adds `tradeRankSellStep` (2) of the shop's own coin per rank above Novice to
+it. The trade is read off the recipe that outputs the item (`itemTrade`), so raw materials - which no
+recipe makes - keep the third, and each of the thirty-three crafted outputs belongs to exactly one
+trade. Only the sell side moves; shelf prices are untouched, so buying stays the money sink it is.
+
+**The ceiling is the whole safety of it.** A sell price that reaches a buy price is a mint: buy off one
+shelf, sell to the next counter, repeat. `tradeRankSellPrice` stops one coin short of the cheapest
+shelf price for that item anywhere in the same currency - *anywhere*, not this shop, because the loop
+runs between two shops - and `TestNoRankTurnsAShopIntoAMint` walks the whole shipped catalogue at
+Saint to hold it. Its drill prints *"celestial_mandate_forge pays a Saint 22 for spirit_iron_sword,
+and it sells for 21 on a shelf"*.
+
+**What the gate deliberately does not refuse is a craft that pays**, and its first version did. It
+also forbade a Saint selling a recipe's output for more than the inputs cost on the shelves, and
+failed on the Hearth-Return Talisman: paper and ink for 8, sold for 17. That is not a mint - it costs
+a craft action, the roll, trade XP and the shelf's own finite stock - and making crafting pay is the
+reason the rank exists. A gate encoding a claim rather than a rule will happily make you change the
+rule (v1.0.3's lesson), so that half was cut. Measured instead: four talismans turn a stone or two
+from Journeyman up out of shop-bought materials, and one recipe - the Starfall Talisman - already
+turned a profit at Novice before this release, which is in `docs/TODO.md` as a content decision.
+
+**The board and the sale are one price.** `shopBuysRows` now quotes per player through the same
+`tradeSellQuoteTx` the sale uses, because a board showing what *anybody* gets would disagree with the
+sale it advertises - rc.46's rule. Both carry `base_price`, `trade` and `trade_rank`, and the bot only
+says which rank lifted the price (`_rank_lift`); it decides nothing.
 
 ## Testing conventions
 
