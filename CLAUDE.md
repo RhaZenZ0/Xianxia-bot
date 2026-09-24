@@ -4761,6 +4761,36 @@ Sword Cultivator at karma 50 at the Azure Cloud gate, exactly the applicant the 
 it sits a path and root the sect has no opinion of now, so it holds the recommendation rule and
 nothing else.
 
+### The daily five are one step (v1.3.2)
+
+**Found by playing**, with the `/cooldowns` reading pasted: *"For each command i have to go to 3
+steps. Time consuming ... Hunt, Gather, Mine, Explore, Cultivate. With slash command or interface
+button. Instead of a b then c."* Four of the five were root commands already - `explore`, `hunt`,
+`mine` and `cultivate` are `registered_root_command`s - and **none was in `TREE_COMMANDS`**, so a
+hub page was the only door: rc.43's `/learn` shape, where a command exists and reaches nobody, for
+the five most-used commands in the game. Forage was a group leaf (`alchemy forage`) with no root.
+
+`DAILY_ACTIONS` in `surface.py` is the five, spliced into `TREE_COMMANDS`, and `_DAILY_LEAVES` says
+which hub leaf each one is. `/forage` is a root whose body is one call to the registry's binding of
+`alchemy forage`, so the two doors are one handler and `test_the_daily_five_are_one_step.py` reads
+the body by AST to hold it. The menu's **Daily** row (`MenuDailyButton`) opens the hub in place and
+then calls `_start_hub_action`, in that order, so the result lands where a hub's own quick button
+draws it and the press meets `_invoke_action`'s maintenance and seclusion check like every other.
+Somebody with no character is not shown the row: `/begin` is all they can do.
+
+Three neighbouring gates were pinned to the old shape and each moved to a rule. `test_command_cleanup`
+forbade the string `**/explore**` in the bot package - right while no such slash command existed,
+and it holds the root to `_DAILY_LEAVES` now. Two menu tests counted sixteen buttons; they count
+`16 + len(DAILY_ACTIONS)`. And `test_seclusion_lockout`'s list of the tree commands that act grew by
+the five, which is the decision written down: each is a hub leaf the panel gate already refuses on
+the press, and `interaction_check` refuses the slash command by the same rule.
+
+`_hint_action` learned that a printed `**/hunt**` names no hub: it resolves the leaf whose path is
+`/hunt`, or the one group leaf carrying that bare name (`/forage` → `alchemy forage`), so a reply
+keeps the next-step button the hub path used to earn. The Discord playtest presses the Daily row's
+Cultivate and holds that the panel opened and ran something, then drives each of the five as a
+slash command.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

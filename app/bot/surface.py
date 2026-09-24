@@ -85,11 +85,13 @@ from .commands.territory import caravan_group, party_group, party_status, territ
 from . import maintenance, seclusion
 from .hubs import (
     LAYOUT_COMPONENTS_AVAILABLE,
+    HubAction,
     HubDefinition,
     HubPage,
     HubStatusField,
     _hub_icon,
     _leaf_actions,
+    _start_hub_action,
     menu_shape,
     open_hub_in_place,
     panel_timeout,
@@ -650,6 +652,34 @@ _MENU_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
 # first. Lost at restart, which costs one tap.
 _LAST_HUB: dict[int, str] = {}
 
+# The daily five (v1.3.2): `root -> (hub, leaf path)`. Player feedback: *"For
+# each command i have to go to 3 steps ... Hunt, Gather, Mine, Explore,
+# Cultivate. With slash command or interface button. Instead of a b then c."*
+# Each root is registered into the command tree (`TREE_COMMANDS`) and drawn
+# as one row on the menu; a press opens the hub in place and runs the leaf,
+# so the result lands in the same panel a hub press would use, behind the
+# same gate (`_invoke_action` checks maintenance and seclusion on the press).
+# The order is the order a day goes: sit, go out, what you find out there.
+_DAILY_LEAVES: tuple[tuple[str, str, str], ...] = (
+    ("cultivate", "cultivation", "/cultivate"),
+    ("explore", "world", "/explore"),
+    ("hunt", "world", "/hunt"),
+    ("forage", "craft", "/alchemy forage"),
+    ("mine", "world", "/mine"),
+)
+DAILY_ACTIONS: tuple[str, ...] = tuple(root for root, _, _ in _DAILY_LEAVES)
+
+
+def _daily_leaf(hub: str, path: str) -> HubAction | None:
+    definition = _HUB_BY_NAME.get(hub)
+    if definition is None:
+        return None
+    for page in definition.pages:
+        for action in _leaf_actions(page):
+            if action.path == path:
+                return action
+    return None
+
 
 def _hub_label(name: str) -> str:
     if name in _HUB_LABELS:
@@ -753,6 +783,39 @@ class MenuHubButton(discord.ui.Button):
         await _open_hub_from_menu(interaction, self.hub_name)
 
 
+class MenuDailyButton(discord.ui.Button):
+    """One of the daily five (v1.3.2): opens its hub in place and presses the
+    leaf, so the press is one tap and the result is drawn where a hub's own
+    quick button would draw it."""
+
+    def __init__(self, root: str, hub: str, path: str) -> None:
+        self.root, self.hub, self.path = str(root), str(hub), str(path)
+        action = _daily_leaf(self.hub, self.path)
+        label = action.label if action is not None else self.root.title()
+        super().__init__(label=label[:20], style=discord.ButtonStyle.success, emoji=_hub_icon_for_leaf(self.root))
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        action = _daily_leaf(self.hub, self.path)
+        definition = _HUB_BY_NAME.get(self.hub)
+        if action is None or definition is None:
+            await interaction.response.send_message(f"Use **/{self.root}**.", ephemeral=False)
+            return
+        _LAST_HUB[int(interaction.user.id)] = self.hub
+        view = await open_hub_in_place(interaction, definition, _status_provider_for(definition))
+        if view is None:
+            # The layout is not available here: the panel went out as a new
+            # message and the leaf is one press away on it.
+            return
+        page = next((p for p in definition.pages if action in _leaf_actions(p)), None)
+        if page is not None:
+            view.page_key = page.key
+        await _start_hub_action(interaction, view, action)
+
+
+def _hub_icon_for_leaf(root: str) -> str:
+    return {"cultivate": "🧘", "explore": "🧭", "hunt": "🗡️", "forage": "🌿", "mine": "⛏️"}.get(root, "▶️")
+
+
 class MenuBeginButton(discord.ui.Button):
     """Begin, when there is no character to open a hub for."""
 
@@ -799,6 +862,12 @@ class MenuView(_MenuBase):
         container.add_item(discord.ui.TextDisplay(header[:1900]))
         no_character = self.facts.startswith("🌱")
         last = _LAST_HUB.get(self.owner_id)
+        if not no_character:
+            container.add_item(discord.ui.TextDisplay("**Daily**\n-# one tap each; also **/cultivate**, **/explore**, **/hunt**, **/forage**, **/mine**"))
+            daily = discord.ui.ActionRow()
+            for root, hub, path in _DAILY_LEAVES:
+                daily.add_item(MenuDailyButton(root, hub, path))
+            container.add_item(daily)
         for title, blurb, names in _MENU_GROUPS:
             shown = [name for name in names if name not in self.hidden_hubs]
             if not shown:
@@ -1390,6 +1459,10 @@ async def on_app_command_error(
 # KeyError on every bot startup.
 TREE_COMMANDS: tuple[str, ...] = (
     "begin", "me", "quests", "action", "check", "admin", "menu", "tribute", "cooldowns", "locked",
+    # The daily five (v1.3.2): each is also a hub leaf, and a slash command
+    # of its own is one step where the hub is three. `DAILY_ACTIONS` names
+    # the leaf each one is, and the menu draws them as a row.
+    *DAILY_ACTIONS,
 )
 
 

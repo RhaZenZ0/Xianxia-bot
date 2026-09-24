@@ -76,10 +76,11 @@ class TheMenuIsFourRowsOfFour(unittest.TestCase):
         surface._LAST_HUB.pop(7, None)
         plain = hubs._MENU_BUILDER(owner_id=7, is_admin=False, owner_name="T", facts="📍 **Greenriver Town**")
         labels = [b.label for b in _buttons(plain)]
-        self.assertEqual(len(labels), 16)
+        # Sixteen hubs and the daily five (v1.3.2).
+        self.assertEqual(len(labels), 16 + len(surface.DAILY_ACTIONS))
         self.assertNotIn("Begin", labels)
         admin = hubs._MENU_BUILDER(owner_id=7, is_admin=True, owner_name="T", facts="")
-        self.assertEqual(len(_buttons(admin)), 17)
+        self.assertEqual(len(_buttons(admin)), 17 + len(surface.DAILY_ACTIONS))
         fresh = hubs._MENU_BUILDER(owner_id=7, is_admin=False, owner_name="T", facts="🌱 No cultivator yet.")
         self.assertIn("Begin", [b.label for b in _buttons(fresh)])
         surface._LAST_HUB[7] = "world"

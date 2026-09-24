@@ -455,7 +455,21 @@ def _hint_action(hub_name: str, steps: Sequence[str]) -> "HubAction | None":
     hub world, its page labelled City, its action labelled Look; a bare
     `/travel` is the first action of the hub's first page."""
     definition = next((d for d in REGISTERED_HUBS if d.name == hub_name), None)
-    if definition is None or not definition.pages:
+    if definition is None:
+        # A root command that is also a hub leaf (`**/hunt**`, v1.3.2): the
+        # button a reply earns is the leaf, wherever a hub holds it.
+        if steps:
+            return None
+        name = str(hub_name).strip().casefold()
+        leaves = [action for d in REGISTERED_HUBS for page in d.pages for action in _leaf_actions(page)]
+        direct = next((action for action in leaves if action.path.casefold() == f"/{name}"), None)
+        if direct is not None:
+            return direct
+        # `/forage` is the root of the leaf `alchemy forage`: a group leaf
+        # answers to its bare name only when exactly one carries it.
+        named = [action for action in leaves if str(getattr(action.command, "name", "")).casefold() == name]
+        return named[0] if len(named) == 1 else None
+    if not definition.pages:
         return None
     labels = [str(step).strip().casefold() for step in steps if str(step).strip()]
     page = definition.pages[0]

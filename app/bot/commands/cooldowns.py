@@ -41,11 +41,11 @@ from ..services import GUILD
 # `tests/python/unit/test_cooldowns_command.py` holds this table to the engine
 # roster in go_core/internal/game/cooldown_status.go, in both directions.
 FAMILY_LABELS: dict[str, tuple[str, str, str]] = {
-    "cultivate": ("🧘", "Cultivate", "**/cultivation → Cultivate → Cultivate**"),
+    "cultivate": ("🧘", "Cultivate", "**/cultivate**"),
     "body_cultivate": ("🥋", "Temper the body", "**/cultivation → Body → Cultivate**"),
-    "explore": ("🧭", "Explore", "**/world → Act → Explore**"),
-    "hunt": ("🗡️", "Hunt", "**/world → Act → Hunt**"),
-    "mine": ("⛏️", "Mine", "**/world → Act → Mine**"),
+    "explore": ("🧭", "Explore", "**/explore**"),
+    "hunt": ("🗡️", "Hunt", "**/hunt**"),
+    "mine": ("⛏️", "Mine", "**/mine**"),
     "secret_realm": ("🌀", "Enter a secret realm", "**/realm → Secret Realms → Explore**"),
     "perfect_quest": ("✨", "Perfection quest", "**/ascend → Perfection → Quest**"),
     "perfect_trial": ("⚔️", "Perfection trial", "**/ascend → Perfection → Trial**"),
@@ -53,7 +53,7 @@ FAMILY_LABELS: dict[str, tuple[str, str, str]] = {
     "body_perfect_trial": ("⚔️", "Body perfection trial", "**/ascend → Perfection → Trial**"),
     "support_vote": ("🎁", "The patron's tribute", "**/tribute**"),
     "alchemy_purge": ("🧪", "Purge pill toxicity", "**/craft → Alchemy → Purge**"),
-    "alchemy_forage": ("🌿", "Forage for herbs and craft makings", "**/craft → Alchemy → Forage**"),
+    "alchemy_forage": ("🌿", "Forage for herbs and craft makings", "**/forage**"),
     "beast_tame": ("🐾", "Tame a beast", "**/beast → Companions → Tame**"),
     "meridian_heal": ("🩹", "Heal a meridian", "**/cultivation → Qi Body → Heal**"),
     "qi_refine": ("💠", "Refine your qi", "**/cultivation → Qi Body → Refine**"),

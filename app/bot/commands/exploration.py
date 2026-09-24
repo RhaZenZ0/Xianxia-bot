@@ -33,7 +33,7 @@ from ..discovery import (
 from ..formatting import human_duration, roll_line
 from ..hubs import register_hub_option_hint, HubDynamicOption, register_hub_option_provider
 from ..locations import _known_locations, access_realm_index, destination_groups, location_autocomplete, npcs_present
-from ..registry import VIEW_RESTORERS, registered_group_command, registered_root_command
+from ..registry import ACTIONS, VIEW_RESTORERS, registered_group_command, registered_root_command
 from ..runtime import (
     DB,
     _sync_realm_presence_roles,
@@ -1180,6 +1180,17 @@ async def alchemy_forage(interaction: discord.Interaction) -> None:
         f"• XP {int(forage_progress.get('xp',0))}/{profession_xp_needed(level)}"
     )
     await announce_quest_progress(interaction, progressed)
+
+
+@registered_root_command(name="forage", description="Gather herbs and craft makings where you stand", guild=GUILD)
+async def forage(interaction: discord.Interaction) -> None:
+    """`/forage`, one step (v1.3.2). Player feedback: *"For each command i
+    have to go to 3 steps."* The five things a cultivator does every day -
+    cultivate, explore, hunt, forage, mine - are each a slash command of their
+    own now; four were roots already and this is the fifth. It is the same
+    handler `/craft → Alchemy → Forage` presses, reached through the registry
+    so the two doors cannot drift: nothing is decided here."""
+    await ACTIONS.handler_for(alchemy_forage)(interaction)
 
 
 @registered_group_command(alchemy_group, name="purge", description="Slowly purge medicinal residue by spending Qi in controlled circulation")

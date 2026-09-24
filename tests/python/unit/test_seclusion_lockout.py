@@ -155,9 +155,11 @@ class TheAllowlistIsTheRealSurface(unittest.TestCase):
         self.assertTrue(registered, "the tree tuple is empty; the gate is broken, not the tree")
         self.assertTrue(seclusion.OPEN_COMMANDS <= registered,
                         f"{sorted(seclusion.OPEN_COMMANDS - registered)} is open but not a command")
-        # The three that act are deliberately shut, and this says so.
+        # The ones that act are deliberately shut, and this says so: the
+        # three that always were, and the daily five (v1.3.2), each a hub
+        # leaf the panel gate already refuses on the press.
         self.assertEqual(sorted(registered - seclusion.OPEN_COMMANDS - {"admin"}),
-                         ["action", "begin", "tribute"])
+                         sorted(["action", "begin", "tribute", *surface.DAILY_ACTIONS]))
 
     def test_the_way_out_is_a_leaf_every_hub_walk_can_reach(self):
         hubs, _ = self._surface()

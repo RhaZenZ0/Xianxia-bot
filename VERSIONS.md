@@ -6,6 +6,18 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.3.2** makes the five things a cultivator does every day one step each: `/cultivate`, `/explore`, `/hunt`, `/forage` and `/mine` are slash commands, and the menu carries them as a row of five buttons.
+
+Player feedback, with the `/cooldowns` reading pasted: *"For each command i have to go to 3 steps.
+Time consuming ... Hunt, Gather, Mine, Explore, Cultivate. With slash command or interface button.
+Instead of a b then c."* Four of the five were root commands already and none was in the command
+tree, so a hub page was the only door; forage was a group leaf with no root at all. Each is in the
+tree now (`/forage` runs the same handler as Craft → Alchemy → Forage, through the registry, so the
+two doors cannot drift). The menu's **Daily** row is one tap each: a press opens the hub in place
+and runs the leaf, so the result lands in the same panel a hub press would use, behind the same
+maintenance and seclusion gate. `/cooldowns` names the command instead of the three-step path, and
+a reply that prints `**/hunt**` still earns its next-step button. Nothing in the engine changed.
+
 **1.3.1** puts six rules the bot was holding into the engine, and draws three more buttons only where they work.
 
 A catalogue sponsor must be standing where the applicant is, and the engine now knows where a
@@ -862,9 +874,9 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.3.1
+## Release status — v1.3.2
 
-- Current release: v1.3.1 - six rules the bot held are the engine's (a sponsor's presence, the sects a gate justifies, a city's board, a territory's ground, the forage wait, the quest chain catch-up on any action) and three more buttons are drawn only where they work (see the changelog). Built on v1.3.0 - ten of the owner's decisions: a failed craft returns half its makings, a hall teaches only what its world can make, the Nine-Echo Sword Wraith is a secret floor beneath its realm, `/reset` asks with the count, the Qi Body card shows the pool at every realm, thirty-three upper-world send-offs, no property inside a household, `heart` retired, the Starfall hall's buy line lowered (see the changelog). Built on v1.2.3 - the review's eight deferred claims settled: Vacuum refuses at once behind a half-written action, one array rule at both cultivation doors, one counter-attack TN, an undo undone again, a rank price under a merchant's wares, and a lot listed in its house's coin (see the changelog). Built on v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
+- Current release: v1.3.2 - the daily five are one step each: `/cultivate`, `/explore`, `/hunt`, `/forage` and `/mine` are slash commands and a row of five buttons on the menu (see the changelog). Built on v1.3.1 - six rules the bot held are the engine's (a sponsor's presence, the sects a gate justifies, a city's board, a territory's ground, the forage wait, the quest chain catch-up on any action) and three more buttons are drawn only where they work (see the changelog). Built on v1.3.0 - ten of the owner's decisions: a failed craft returns half its makings, a hall teaches only what its world can make, the Nine-Echo Sword Wraith is a secret floor beneath its realm, `/reset` asks with the count, the Qi Body card shows the pool at every realm, thirty-three upper-world send-offs, no property inside a household, `heart` retired, the Starfall hall's buy line lowered (see the changelog). Built on v1.2.3 - the review's eight deferred claims settled: Vacuum refuses at once behind a half-written action, one array rule at both cultivation doors, one counter-attack TN, an undo undone again, a rank price under a merchant's wares, and a lot listed in its house's coin (see the changelog). Built on v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
   Apprentice to Tier 9 Sovereign with each trade's own word in front (Pill, Forge, Talisman, Array,
   Herb, Ore, Beast, Artifact, Treasure). No schema.
 - v1.2.1: a beast can always evolve, a homestead can be upgraded in any world, and a dozen smaller wires from a deep review (see the changelog).

@@ -961,6 +961,32 @@ async def run(url: str, token: str, db_path: str) -> Report:
         if opened:
             report.add("PASS", f"{len(opened)} hubs opened", ", ".join(opened))
 
+        # ---- 4a. the daily five are one step (v1.3.2) ---------------------------
+        async def daily_row():
+            from app.bot.surface import DAILY_ACTIONS
+            menu = await player.slash(channels["begin-here"], "menu")
+            panel = Panel(player, channels["begin-here"], menu.response)
+            for label in ("Cultivate", "Explore", "Hunt", "Forage", "Mine"):
+                expect(section_button(panel.message().components, label) is not None,
+                       f"the menu draws no {label!r} in its Daily row; it offers {panel.labels()}")
+            await panel.press("Cultivate")
+            text = panel.text()
+            for failure in WIRING_FAILURE_TEXTS:
+                expect(failure not in text, f"the Daily Cultivate press raised: {text[:600]}")
+            expect("Cultivation" in text, f"the Daily press did not open the cultivation hub in place: {text[:600]}")
+            expect("cultivat" in text.lower() and ("essence" in text.lower() or "again in" in text.lower() or "cooldown" in text.lower()),
+                   f"the Daily press drew the hub and ran nothing: {text[:600]}")
+            for root in DAILY_ACTIONS:
+                result = await player.slash(channels["begin-here"], root)
+                reply = result_text(result)
+                expect(reply.strip(), f"/{root} answered nothing")
+                for failure in WIRING_FAILURE_TEXTS:
+                    expect(failure not in reply, f"/{root} raised: {reply[:400]}")
+            return list(DAILY_ACTIONS)
+        daily = await step(report, "the menu's Daily row runs a leaf in one tap and each of the five is a slash command", daily_row())
+        if daily:
+            report.add("PASS", "daily five", ", ".join("/" + r for r in daily))
+
         # ---- 5. home, and the doors it hides ------------------------------------
         async def inside():
             panel = await open_hub(player, channels["begin-here"], "family")
