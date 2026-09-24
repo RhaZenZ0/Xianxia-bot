@@ -4584,10 +4584,17 @@ two tests about what a wait *does* pin the old pace with `withTheOldPace(t)`; th
 the default writes no transit row and refuses nothing after, that 50 halves the wait, and that an
 unreadable value is the default rather than a refusal.
 
-**The ranks are grades.** `PROFESSION_RANKS = ("Unranked", "Grade 1", … "Grade 5", "Saint")` is the
-one statement; the examinations' `rank_name`, titles and labels quote it ("The Grade 1 Billet"),
-`_rank_lift` and the household lines read `profession_rank`, and the engine's one literal ("has not
+**The ranks are tiers (v1.2.2 revised v1.2.0's grades on the owner's call).** `PROFESSION_TIERS` is
+the nine titles, Apprentice to Sovereign, and `PROFESSION_TIER_WORDS` the word each trade puts in
+front (Pill, Forge, Talisman, Array, Herb, Ore, Beast, Artifact, Treasure); `profession_rank(level,
+trade)` is the one statement, answering "Unranked" at 0, "Tier N <word> <title>" from 1, the top
+tier past 9, and the bare tier for a trade it does not know - never a wrong word. The examinations'
+`rank_name`, titles and labels quote it ("The Tier 1 Forge Apprentice's Billet"), `_rank_lift`, the
+household lines and every profession surface pass the trade, and the engine's one literal ("has not
 reached Apprentice") became "the first rank". Nothing stored changes: a rank has always been a level.
+The Eight-Grade alternative (Common … Divine) was set aside because Common and Saint are already a
+root grade and a realm - the v1.0.11 vocabulary collision - and the four General Titles would leave
+levels 4 to 6 unnamed.
 
 **What the suite caught, in order.** The surface table refused `/mine` until it was named; the
 curriculum gate's `needed` map named `battle challenge` for `combat_win` and `trade offer` for

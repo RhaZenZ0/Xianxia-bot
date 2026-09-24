@@ -52,11 +52,24 @@ PROFESSIONS = (
     "Beast Taming", "Artifact Refining", "Appraisal",
 )
 
-# The rank ladder, stated once (v1.2.0). "Journeyman sounds medieval" - player
-# feedback, and the owner's call is a numbered grade with a title at the top:
-# Unranked before the first examination, Grade 1 to 5, and Saint. The content
+# The rank ladder, stated once. "Journeyman sounds medieval" (v1.2.0), and the
+# owner's call in v1.2.2 is the genre's Nine-Tier ladder: Unranked before the
+# first examination, then Tier 1 to Tier 9, each tier a title, each trade its
+# own word in front of it - Pill Apprentice, Forge Sovereign. A rank is a level
+# and nothing stored changes; the tiers are how a level is read. The content
 # file's `profession_exams[].rank_name` quotes these and a gate holds them equal.
-PROFESSION_RANKS = ("Unranked", "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Saint")
+PROFESSION_TIERS = (
+    "Apprentice", "Adept", "Artisan", "Expert", "Master",
+    "Grandmaster", "Sage", "Emperor", "Sovereign",
+)
+# The word a trade puts in front of its tier. A trade this does not name gets
+# the bare tier, never a wrong word.
+PROFESSION_TIER_WORDS = {
+    "Alchemy": "Pill", "Forging": "Forge", "Inscription": "Talisman", "Formation": "Array",
+    "Foraging": "Herb", "Mining": "Ore", "Beast Taming": "Beast",
+    "Artifact Refining": "Artifact", "Appraisal": "Treasure",
+}
+PROFESSION_RANKS = ("Unranked", *(f"Tier {n} {title}" for n, title in enumerate(PROFESSION_TIERS, start=1)))
 
 
 
@@ -66,8 +79,18 @@ def profession_xp_needed(level: int) -> int:
     return 60 + level * 40
 
 
-def profession_rank(level: int) -> str:
-    return PROFESSION_RANKS[min(len(PROFESSION_RANKS) - 1, max(0, int(level)))]
+def profession_rank(level: int, trade: str = "") -> str:
+    """What a level in a trade is called: "Unranked", or "Tier N <word> <title>".
+
+    The trade's word is optional so a caller that knows only the level still
+    reads the ladder; the examinations and every trade-aware surface pass it.
+    """
+    tier = min(len(PROFESSION_TIERS), max(0, int(level)))
+    if tier == 0:
+        return PROFESSION_RANKS[0]
+    word = PROFESSION_TIER_WORDS.get(str(trade or "").strip(), "")
+    title = PROFESSION_TIERS[tier - 1]
+    return f"Tier {tier} {word} {title}" if word else f"Tier {tier} {title}"
 
 
 ASCENSION_GATES: dict[int, dict[str, Any]] = {

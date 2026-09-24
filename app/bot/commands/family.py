@@ -342,7 +342,7 @@ async def birth_family_tutor(interaction:discord.Interaction)->None:
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     level=int(result.get("level",0)); xp=int(result.get("xp",0)); trade=str(result.get("profession",""))
-    taught=(f"you now stand a **{profession_rank(1)}** {trade} crafter" if level>=1 else f"**{xp} XP** toward {profession_rank(1)} {trade}")
+    taught=(f"you now stand a **{profession_rank(1, trade)}**" if level>=1 else f"**{xp} XP** toward {profession_rank(1, trade)}")
     await interaction.followup.send(
         f"🛠️ **{result.get('family_name','The household')}** teaches again — {result.get('tutor','')}: {taught}."
         f"\nThe house holds wealth **{int(result.get('wealth',0))}/100**; a richer house teaches better.",

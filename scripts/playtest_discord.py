@@ -857,7 +857,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
             # what stops its hall ever offering it, because
             # `grantOrdinaryQuestTx` reads an already-held quest as "no".
             offered = text.split("**Available**", 1)[1] if "**Available**" in text else ""
-            for handed in ("Grade 3", "Grade 2", "Grade 1", "Out of the Gate",
+            for handed in ("Tier 3", "Tier 2", "Tier 1", "Out of the Gate",
                            "Iron for the Hearth", "A Road Toward a Sect"):
                 expect(handed not in offered,
                        f"the journal offers {handed!r}, which a roster exists to hand over: {offered[:200]}")

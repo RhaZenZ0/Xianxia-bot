@@ -60,7 +60,7 @@ async def artifact_bond(interaction: discord.Interaction, item: str) -> None:
     await interaction.followup.send(
         f"🗡️ Bond with **{WORLD.item_name(item)}** deepens to **{artifact['bond_level']}**. "
         f"Resonance **{artifact['resonance']}%**.\n"
-        f"🔨 Artifact Refining: **{profession_rank(int(artifact_progress.get('level', 0)))}** "
+        f"🔨 Artifact Refining: **{profession_rank(int(artifact_progress.get('level', 0)), 'Artifact Refining')}** "
         f"Lv.{int(artifact_progress.get('level', 0))}.",
         ephemeral=False,
     )
@@ -111,7 +111,7 @@ async def artifact_awaken(interaction: discord.Interaction, item: str, spirit_na
     await interaction.followup.send(
         f"✨ **{WORLD.item_name(item)} awakens.** Its spirit answers to **{artifact['spirit_name']}** "
         f"at **{artifact['resonance']}% resonance**. Awakened artifacts contribute to battle checks.\n"
-        f"🔮 Artifact Refining: **{profession_rank(int(artifact_progress.get('level', 0)))}** "
+        f"🔮 Artifact Refining: **{profession_rank(int(artifact_progress.get('level', 0)), 'Artifact Refining')}** "
         f"Lv.{int(artifact_progress.get('level', 0))}.",
         ephemeral=False,
     )
