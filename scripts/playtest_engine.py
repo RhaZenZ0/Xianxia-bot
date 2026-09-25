@@ -264,6 +264,26 @@ async def run(url: str, token: str, db_path: str) -> Report:
     if errand is not None:
         report.add("PASS" if str(errand.get("quest_key", "")).startswith("errand_forging_") else "FAIL", "a Forging house asks a Forging errand", f"{errand.get('quest_key')}")
     await step(report, "a second errand while one is carried is refused", act("family.errand", PLAYER, {}), expect_error="finish the errand")
+    # The GM's quest levers (v1.4.1): a missed report replayed, then the errand
+    # finished outright - through the path a player's own report takes.
+    if errand is not None:
+        errand_key = str(errand.get("quest_key", ""))
+        held = next((dict(r) for r in await db.list_character_quests(PLAYER) if r["quest_key"] == errand_key), {})
+        # An ordinary grant pins no terms, so the objectives are the definition's.
+        objectives = json.loads(held.get("terms_json") or "{}").get("objectives") if held.get("terms_json") else None
+        if not objectives:
+            objectives = dict(await db.get_quest_definition(errand_key) or {}).get("objectives") or []
+        first = dict(next(iter(objectives or []), {}))
+        await audited("admin.player.quest_progress", {"user_id": PLAYER, "quest_key": errand_key, "objective_type": first.get("type", ""),
+                                                      "target": first.get("target") or "", "amount": 1, "reason": "playtest"},
+                      name="a GM replays one missed objective report")
+        finished = await audited("admin.player.quest_complete", {"user_id": PLAYER, "quest_key": errand_key, "reason": "playtest"},
+                                 name="a GM completes the errand")
+        if finished is not None:
+            report.add("PASS" if finished.get("status") == "completed" and finished.get("household_standing") else "FAIL",
+                       "a GM-completed errand is paid like a finished one, standing included", f"{finished}")
+        await step(report, "a completed quest cannot be completed again",
+                   gm("admin.player.quest_complete", {"user_id": PLAYER, "quest_key": errand_key, "reason": "playtest"}), expect_error="not active")
     await step(report, "grant a Waymark Talisman", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": "waymark_talisman", "quantity": 1, "reason": "playtest"}))
     marked = await step(report, "a Waymark Talisman takes you back to the mark", act("item.use", PLAYER, {"item_id": "waymark_talisman"}))
     if marked is not None:

@@ -545,6 +545,13 @@ The Admin Console's NPC card (rc.38) carries **Lose** and **Bring back** beside 
 `admin.npc.set_missing`, the disappearance a GM can stage, audited and undoable like relocate. See
 "What only the world makes" above for why it writes the tick's own row.
 
+The Player Editor's **Quests** card (v1.4.1) is the only lever on a player's `character_quests`. An
+objective is counted only while its quest is `active`, so a report made too early (the household
+lesson passed before "The Last Lesson" was handed over) is lost for good. `admin.player.quest_progress`
+replays one report and `admin.player.quest_complete` fills every objective; both go through
+`questProgressTx`, the body `quest.progress` itself runs, so reward, commission, standing, follow-on
+and the beginner catch-up are one statement. Neither is in `reversibleAdminActions`: the reward is paid.
+
 
 ## What each release found
 
