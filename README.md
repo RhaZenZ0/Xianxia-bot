@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v1.4.0
+# Xianxia RP Discord Bot v1.5.0
 
 *A cultivation RPG played entirely through Discord commands: deterministic rules in Go, an AI that
 narrates but never decides, self-hosted on your own hardware.*
@@ -504,6 +504,12 @@ worst of it lengthens a chase rather than ending it, and the lever is the obviou
 trail is read off what is still in your bags or on your back. Sell the relic and it cools. A
 cultivator who has taken nothing is pursued exactly as before.
 
+A cultivator at Foundation Establishment can keep a **market stall** in a city's street
+(**/economy → Market Stalls**, v1.5.0): goods laid on it leave the bag and sell while you are away,
+to other cultivators at your price and - bounded - to the town, which never takes the last unit,
+never pays more than one coin under the cheapest shop shelf, and pays out of its own wealth. The
+city takes a tenth of each sale; a homestead's merchant hall adds listing room and shrinks the cut.
+
 Sects stock their own storehouses too. `sect_treasury` is what contribution points buy from, and it
 used to fill only when a player donated — so a sect nobody had joined had bare shelves forever. Its
 own disciples hand things in now, at a rate their numbers set and capped so a storehouse stays one,
@@ -651,7 +657,7 @@ report is safe to paste into an issue.
 - If narration goes flat after an image rebuild, check **/admin → Server → Ai Status** for a TLS
   banner first. If SQLite reports contention, verify only the engine opens the database.
 
-Keep the whole `data/` directory persistent across rebuilds. The current schema is **64**; every
+Keep the whole `data/` directory persistent across rebuilds. The current schema is **65**; every
 historical migration is kept so an old database upgrades in place.
 
 ## Development

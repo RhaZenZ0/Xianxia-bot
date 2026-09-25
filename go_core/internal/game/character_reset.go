@@ -266,6 +266,7 @@ var characterResetReleased = map[string][2]string{
 	"quest_definitions.owner_user_id":      {"a quest they wrote", "quests they wrote"},
 	"sect_manors.founded_by_user_id":       {"the sect manor they founded", "sect manors they founded"},
 	"player_families.founder_user_id":      {"the family they founded", "families they founded"},
+	"stall_sales.buyer_user_id":            {"a purchase at another cultivator's stall", "purchases at other cultivators' stalls"},
 }
 
 // characterResetUnknown is who a kept row says did it once the cultivator who

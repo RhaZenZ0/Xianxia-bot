@@ -64,6 +64,7 @@ from .commands.economy import (
     market_group,
     merchant_group,
     shop_group,
+    stall_group,
     storage_group,
     trade_group,
 )
@@ -160,6 +161,7 @@ _GROUP_ACTION_ROOTS = {
     "market": market_group,
     "merchant": merchant_group,
     "shop": shop_group,
+    "stall": stall_group,
     "trade": trade_group,
     "blackmarket": blackmarket_group,
     "realmhub": realmhub_group,
@@ -178,7 +180,7 @@ _MIGRATED_ROOTS = {
     "innerworld", "inventory", "karma", "law", "learn", "lifespan", "manual", "market", "merchant", "shop", "trade", "blackmarket",
     "meridian", "npcinfo", "party", "perfect", "profession", "provenance", "reincarnate",
     "reputation", "reset", "rulers", "scene", "seclusion", "secretrealm", "sect", "sense",
-    "sheet", "soul", "spatialkey", "specialeffects", "stance", "insight", "storage", "talk", "territory",
+    "sheet", "soul", "spatialkey", "specialeffects", "stall", "stance", "insight", "storage", "talk", "territory",
     "time", "travel", "realmhub", "tribulation", "use", "wallet", "war", "world",
     "worldevents", "worldrules",
 }
@@ -358,6 +360,7 @@ _HUB_DEFINITIONS = (
         pages=(
             _hub_page("wallet", "Wallet", "View cultivation currencies."),
             _hub_page("shop", "City Shops", "The smithy, apothecary and talisman hall of each city: find them by exploring, enter them by travelling, buy and sell inside."),
+            _hub_page("stall", "Market Stalls", "Your own stall in a city's street: standing listings that sell to cultivators and townsfolk while you are away, grown by your homestead's merchant hall."),
             _hub_page("market", "Local Market", "Buy and sell in the dynamic local economy."),
             _hub_page("blackmarket", "Black Market", "Locate rotating underworld posts and trade forbidden goods."),
             _hub_page("auction", "Auction House", "Browse, list and bid in protected auctions."),
@@ -1033,6 +1036,9 @@ async def _household_hidden_actions(interaction: discord.Interaction, c: dict) -
 # engine reads: realm and stage, the membership row, the abode row, the
 # personal world, the beasts, the house, the soul record.
 LAW_MIN_REALM_INDEX = int((WORLD.data.get("law_system") or {}).get("normal_min_realm_index") or 6)
+# The realm a stall asks for (v1.5.0), read off the same roster the engine
+# reads (`stall_system`), with the engine's own default for a file without one.
+STALL_MIN_REALM_INDEX = int((WORLD.data.get("stall_system") or {}).get("min_realm_index") or 2)
 PROGRESSION_GATES: dict[str, tuple[str, ...]] = {
     # gate -> the leaves hidden while the gate is shut
     "law": ("law comprehend", "law technique"),
@@ -1058,6 +1064,10 @@ PROGRESSION_GATES: dict[str, tuple[str, ...]] = {
     "beast": ("beast feed", "beast train", "beast evolve", "beast active"),
     "house_member": ("family house invite", "family house leave", "family house child"),
     "house_outsider": ("family house found",),
+    # A stall (v1.5.0): tending one needs one, opening one needs none and the
+    # realm the roster asks for. The board and the status are reads and stay.
+    "stall_keeper": ("stall list", "stall withdraw", "stall close"),
+    "stall_open": ("stall open",),
     "samsara": ("family ancestry", "family legacy", "family investigate", "family quest", "family claim", "family conflict"),
 }
 
@@ -1107,6 +1117,13 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
     legacy = await DB.get_soul_legacy(uid)
     if int((legacy or {}).get("incarnation_count") or 1) <= 1 and not (legacy or {}).get("past_lives"):
         shut["samsara"] = "a first life has no past to trace"
+    stall = await _player_stall(uid)
+    if stall is None:
+        if realm < STALL_MIN_REALM_INDEX:
+            shut["stall_open"] = f"a stall asks for {WORLD.realm_name(STALL_MIN_REALM_INDEX)}; you stand at {WORLD.realm_name(realm)}"
+        shut["stall_keeper"] = "you keep no stall yet — Open one in a city's street"
+    else:
+        shut["stall_open"] = f"you already keep {stall.get('name')} in {stall.get('city')}"
     hidden: dict[str, str] = {}
     for gate, reason in shut.items():
         hidden.update(_action_paths(reason, *PROGRESSION_GATES[gate]))
@@ -1145,6 +1162,9 @@ LOCATION_GATES: dict[str, tuple[str, ...]] = {
     "auction_floor": ("auction leave", "auction bid", "auction sell", "auction browse"),
     "auction_door": ("auction enter",),
     "inn_table": ("trade offer",),
+    # A stall is kept in a city's street (v1.5.0): tended and bought from
+    # in that city, and nowhere private. `stallCityAt` is the engine's question.
+    "city_street": ("stall open", "stall list", "stall withdraw", "stall buy", "stall close"),
     "city_board": ("city accept",),
     # The three v1.1.0 left out for their cost (v1.3.1, on the owner's call):
     # the ghost road's two grounds are the content twin of
@@ -1241,6 +1261,8 @@ async def _location_hidden_actions(interaction: discord.Interaction, c: dict) ->
                              else "trades are struck at an inn's long table — find a city's inn")
     if not _city_board(city):
         shut["city_board"] = "nobody who posts work lives here — try a city's board"
+    if private or not any(str(shop.get("city") or "") == city for shop in WORLD.shops.values()):
+        shut["city_street"] = "a stall is kept in a city's street — travel to a city"
     if WORLD.location_safe_zone(here):
         shut["protected_ground"] = "local formations suppress violence here"
     if str(place.get("road_site") or "") == "shrine":
@@ -1284,6 +1306,17 @@ async def _location_hidden_actions(interaction: discord.Interaction, c: dict) ->
     for gate, reason in shut.items():
         hidden.update(_action_paths(reason, *LOCATION_GATES[gate]))
     return hidden
+
+
+async def _player_stall(uid: int) -> dict | None:
+    """The player's own stall, or None. A read that fails answers None, which
+    hides the tending doors and leaves Open drawn - the engine refuses either
+    way if it must, and a hide must fail towards showing the door in."""
+    try:
+        return await DB.get_player_stall(uid)
+    except Exception:
+        log.exception("Could not read the stall for the panel hide")
+        return None
 
 
 async def _black_market_post_here(here: str) -> bool:

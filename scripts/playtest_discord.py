@@ -1233,6 +1233,40 @@ async def run(url: str, token: str, db_path: str) -> Report:
         if note:
             report.add("PASS", "the road, for the record", note)
 
+        # ---- 7b. a stall in the street (v1.5.0) ----------------------------------
+        # Scripted rather than left to the sweep, because the sweep fills the
+        # list modal with a canned item and gets the designed refusal: this is
+        # the loop that matters - open, lay goods on it, see it on the board,
+        # take them back, take it down - driven at the curriculum's ceiling,
+        # which section 6 has already raised the player to.
+        async def stall():
+            was_at = str((await DB.get_character(int(player.id)) or {}).get("location") or "")
+            await ENGINE.action("admin.player.teleport", int(gm.id), {"user_id": int(player.id), "location": "Greenriver Town", "reason": "playtest: a city's street for the stall"})
+            await ENGINE.action("admin.player.adjust_item", int(gm.id), {"user_id": int(player.id), "item_id": "recovery_pill", "quantity": 3, "reason": "playtest: goods for the stall"})
+            await settle_patiently(env)
+            economy = await open_hub(player, channels["begin-here"], "economy", env=env)
+            await economy.goto("Market Stalls", env=env)
+            board = result_text(await economy.press("Board"))
+            expect("stall" in board.casefold(), f"the Board leaf did not read the city's stalls: {board[:300]}")
+            opened = result_text(await player.slash(channels["begin-here"], "stall open", name="Sim's Table"))
+            expect("is set up in" in opened, f"/stall open did not set the stall up: {opened[:300]}")
+            listed = result_text(await player.slash(channels["begin-here"], "stall list", item="recovery_pill", quantity=3, price=6))
+            expect("Listing **#" in listed, f"/stall list did not lay the goods out: {listed[:300]}")
+            board = result_text(await player.slash(channels["begin-here"], "stall board"))
+            expect("Sim's Table" in board and "Recovery Pill" in board, f"the board does not show the stall: {board[:300]}")
+            status = result_text(await player.slash(channels["begin-here"], "stall status"))
+            expect("On the stall" in status, f"/stall status does not list the goods: {status[:300]}")
+            listing = listed.split("Listing **#", 1)[1].split("**", 1)[0]
+            withdrawn = result_text(await player.slash(channels["begin-here"], "stall withdraw", listing=int(listing)))
+            expect("back into your bag" in withdrawn, f"/stall withdraw did not return the goods: {withdrawn[:300]}")
+            closed = result_text(await player.slash(channels["begin-here"], "stall close"))
+            expect("is taken down" in closed, f"/stall close did not take the stall down: {closed[:300]}")
+            if was_at:
+                await ENGINE.action("admin.player.teleport", int(gm.id), {"user_id": int(player.id), "location": was_at, "reason": "playtest: back where the run had them"})
+                await settle_patiently(env)
+            return "opened, listed, on the board, withdrawn, closed"
+        await step(report, "/economy → Market Stalls: a stall is opened, stocked, seen on the board, emptied and taken down", stall())
+
         # ---- 8. every leaf of every hub ------------------------------------------
         # Everything above is scripted: a loop whose outcome matters, asserted
         # on. This is generic: every leaf the hubs register, pressed once by a
