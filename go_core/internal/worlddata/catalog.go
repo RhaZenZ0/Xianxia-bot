@@ -961,6 +961,25 @@ type Catalog struct {
 	// beside it, and they share ForageMaterial's shape so the tree has one
 	// idea of what a find chance looks like.
 	MineMaterials map[string]ForageMaterial `json:"mine_materials"`
+	// StallSystem (v1.5.0): a cultivator's own market stall in a city's
+	// street - the realm it asks for, how many listings it holds and how the
+	// homestead's merchant hall grows that, the city's cut, and how many
+	// purchases the town makes at one city's stalls on a tick.
+	StallSystem StallSystem `json:"stall_system"`
+}
+
+// StallSystem is that roster. Every field is read by one rule in the game
+// package (`stallRulesFor`), which also holds the defaults for a content
+// file that carries none.
+type StallSystem struct {
+	Description           string `json:"description"`
+	MinRealmIndex         int64  `json:"min_realm_index"`
+	BaseSlots             int64  `json:"base_slots"`
+	SlotsPerMerchantLevel int64  `json:"slots_per_merchant_level"`
+	FeePercent            int64  `json:"fee_percent"`
+	FeeDiscountPerLevel   int64  `json:"fee_discount_per_level"`
+	MinFeePercent         int64  `json:"min_fee_percent"`
+	NPCBuysPerCityPerDay  int64  `json:"npc_buys_per_city_per_day"`
 }
 
 // ForageMaterial is one entry of that roster. Chance is the base percentage

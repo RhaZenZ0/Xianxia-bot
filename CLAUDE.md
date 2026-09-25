@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 64; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 65; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -4919,6 +4919,77 @@ records every operation and answers canned JSON; `XIANXIA_UPDATE_SH` names a fak
 of the three outcomes. What is held is the conversation - the operations in order, the statuses and
 details, the world closed and reopened in all three - because the wiring between two programs on a
 NAS is what no unit test of either would see.
+
+### A stall in the city (`stall_actions.go`, schema 65, v1.5.0)
+
+Asked as a question - *"What are your thoughts on a player owning a shop?"* - and the answer began
+with what the tree already had. The homestead's `merchant` facility ("Merchant Pavilion", the
+merchant hall) is authored in `abode_system.facilities`, built and raised to level 9 through
+`abode.upgrade` for `100·(L+1)²` stones, stored in `cave_abodes.merchant_level`, printed to the
+narrator - and was read by **no rule**. The peach, the root grade and `/learn` again: a thing
+players were paying for and nothing served. `stallSlotsAndFee` is its one reader now.
+
+**Why a stall in the street, and not the two other shapes.** A storefront inside the homestead
+sells to nobody: the property is private, guests are invited, and founding needs sect rank 40.
+Buying a catalogue shop fights the architecture: shops are `content_*` tables rewritten from the
+file, the keeper is a string, stock refills from content, and every counter's price band is
+anchored on those shelves. A stall is what was missing between `trade.offer`, which needs both
+players at one inn at one time, and the auction floor, which needs bids and a timer - on a small
+server across time zones, neither is "leave it and go".
+
+Six rules, stated once (the file's header carries them too):
+
+- **A stall is not a shelf.** `cheapestShelfPrice` and `highestKeeperBuy` take a catalogue and no
+  connection; `TestAStallIsNotAShelf` reads their signatures to hold it, and holds `stall_listings`
+  to the two stall files. Nothing a player asks enters the band the rank ceiling, the market counter
+  and a merchant's valuation are held inside.
+- **The town buys - bounded four ways, on the owner's call.** Never the last unit (two or more
+  left, one bought, the listing re-read after every buy); never above one coin under the cheapest
+  content shelf in that coin, so an item no shop sells is never bought and buy-off-a-shelf-sell-to-
+  the-town cannot loop; out of the NPC's own `npc_civilization_state.wealth`, guarded on the UPDATE;
+  and `npc_buys_per_city_per_day` per city per day, three days caught up at most. It is a step at
+  the end of `dynamic_economy` (`npc_stalls.go`), daily and on unless a GM turns the system off,
+  and it never returns an error over a listing - one system's error ends the tick.
+- **Merchants never touch a stall.** `MerchantsBid` reads `auctions`; `TestAMerchantNeverBidsOnAStall`
+  holds `merchant_actions.go` to naming no stall.
+- **One payout.** `stallSaleTx` (exported `game.StallSaleTx`) is the only function that turns a
+  listing decrement into seller stones, the city's cut, a ledger row and the prosperity nudge every
+  other sale moves; a cultivator's buy and the town's buy both call it. The simulation test holds
+  that `npc_stalls.go` carries no wallet write and no ledger insert of its own.
+- **Priced in the money of the world the stall stands in** (rc.44), fixed at `stall.open`; a seller
+  who has travelled up a world is still credited the stall's coin. Every wallet move goes through
+  `walletDeltaTx`, so `TestThePurseHasOneDoor` needed no new allowance.
+- **Escrow.** `stall.list` takes the goods out of the bag the way `auction.sell` does; withdraw and
+  close put them back. A refused list spends nothing.
+
+**Where and who.** `stallCityAt` is the engine's question: not a private prefix, `cityOf` (a gate
+is its city, v1.0.9), and a place with shops in it - the rule `shopHereQuery` already states with
+`is_city`. Tending a stall (list, withdraw, close) and buying from one are done standing in its
+city. The realm floor is `stall_system.min_realm_index` (2) and the whole roster is content:
+slots (`base_slots + slots_per_merchant_level × level`), the cut (`fee_percent` less
+`fee_discount_per_level` a level, never under `min_fee_percent`, rounded down so a one-coin sale is
+the seller's whole), and the town's budget. One stall per character; close returns everything and
+open again renames it. `stall.board` and `stall.status` never refuse: somewhere with no stalls is
+an empty board, and no stall is `stall: null`.
+
+**Erasure and reset.** `player_stalls.user_id`, `stall_listings.user_id` and `stall_sales.user_id`
+are `user_id`, already a subject column with the delete disposition, and the tables cascade off
+`characters` - so an erased seller takes the stall and its goods with them exactly as an auction
+seller takes their lots. `stall_sales.buyer_user_id` is a **new column name**, classified in
+`erasureAnonymise` (the seller's ledger; only who bought is personal) and released by
+`characterResetReleased`, because a reset that refused over a purchase at somebody else's stall
+would be v1.0.14's fault in a new hat. The Go test drives the cascade under `foreign_keys=ON`.
+
+**The surface.** `/economy → Market Stalls` is one page of seven leaves. Board and Buy open at
+realm 0 - buying is the owner's "Shop" - and the rest at Foundation Establishment;
+`LOCATION_GATES["city_street"]` hides every tending door outside a city and inside a private room,
+and `PROGRESSION_GATES` hides tending without a stall and opening with one (or below the floor).
+`STALL_MIN_REALM_INDEX` is read off the same roster the engine reads. `stall buy` reports the
+`trade` objective before its reply, the rule `test_a_quest_is_recorded_before_it_is_told` holds.
+Three empty-picker hints say what to do when the bag, the stall or the city's board is empty.
+
+**What the town's step deliberately leaves alone.** It debits no player, reads no player's price
+into any band, and skips rather than errors: a bad row costs one purchase, never the tick.
 
 ## Testing conventions
 

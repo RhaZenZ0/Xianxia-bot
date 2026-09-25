@@ -1,4 +1,4 @@
-"""The economy: wallet, use, /storage, /auction, /merchant, /shop, /market, /blackmarket and /civilization.
+"""The economy: wallet, use, /storage, /auction, /merchant, /shop, /stall, /market, /blackmarket and /civilization.
 
 Split phase 9b (v0.19.45, docs/history/MAIN_SPLIT_PLAN.md). Cut verbatim from
 main.py in definition order; reads only modules below main.py.
@@ -19,6 +19,7 @@ from ...rules.trade_receipt import format_trade_receipt
 from ..auction_feed import announce_lot, refresh_lot
 from ..formatting import human_duration
 from ..pickers import auction_currency_autocomplete, usable_item_autocomplete
+from ..hubs import register_hub_option_hint
 from ..registry import registered_group_command, registered_root_command
 from ..runtime import _explain_engine_error, DB, ENGINE, WORLD, carried_item_autocomplete, character_location_display, current_world_time, log, reply_long, require_character, respond, serialized_user_action
 from ..channels import _get_thread
@@ -697,6 +698,259 @@ async def shop_sell_item_autocomplete(interaction:discord.Interaction,current:st
         if needle and needle not in name.lower() and needle not in item_id.lower():continue
         choices.append(app_commands.Choice(name=f"{name} (you carry {have}) — {int(line.get('price') or 0)} {currency} each"[:100],value=item_id))
     return choices[:25]
+
+
+# ---------------------------------------------------------------------------
+# /stall - a cultivator's own market stall in a city's street (v1.5.0)
+# ---------------------------------------------------------------------------
+# Standing listings that sell while the owner is away, to other cultivators
+# and - bounded by the engine - to the world's own people. Everything here is
+# presentation: the engine decides who may open one, where, how many listings
+# it holds, what the city takes, and what the town will pay; this only asks
+# and prints. The merchant hall of the homestead is what grows a stall.
+
+stall_group=app_commands.Group(name="stall",description="Your own market stall in a city's street - standing listings that sell while you are away")
+
+
+async def _stall_status(user_id:int)->dict[str,Any]:
+    return dict(await ENGINE.action("stall.status",user_id,{}) or {})
+
+
+async def _stall_board(user_id:int)->dict[str,Any]:
+    return dict(await ENGINE.action("stall.board",user_id,{}) or {})
+
+
+def _stall_coin(row:dict[str,Any],fallback:str="low_spirit_stone")->str:
+    return WORLD.currency_name(str(row.get("currency_id") or fallback))
+
+
+def _stall_listing_line(row:dict[str,Any],coin:str)->str:
+    ceiling=int(row.get("npc_ceiling") or 0)
+    town=f" · townsfolk pay up to {ceiling}" if ceiling and int(row.get("unit_price") or 0)<=ceiling else ""
+    return (f"• #{int(row.get('listing_id') or 0)} **{WORLD.item_name(str(row.get('item_id') or ''))}** ×{int(row.get('quantity') or 0)}"
+            f" — {int(row.get('unit_price') or 0)} {coin} each{town}")
+
+
+@registered_group_command(stall_group, name="board",description="The stalls of the city you stand in, and what is laid on them")
+async def stall_board(interaction:discord.Interaction)->None:
+    c=await require_character(interaction)
+    if not c:return
+    try:
+        board=await _stall_board(interaction.user.id)
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
+    if not board.get("available"):
+        await interaction.response.send_message("The stalls are not open in this world yet.",ephemeral=False);return
+    if not board.get("is_city"):
+        await interaction.response.send_message("Stalls are kept in a city's street. Travel to a city and look again.",ephemeral=False);return
+    city=str(board.get("city") or "")
+    coin=_stall_coin(board)
+    stalls=list(board.get("stalls") or [])
+    if not stalls:
+        await interaction.response.send_message(
+            f"Nobody keeps a stall in **{city}** yet. Open one with **/economy → Market Stalls → Open** and lay your goods on it.",ephemeral=False);return
+    lines=[f"🧺 **Market stalls in {city}**"]
+    for stall in stalls:
+        mine=" (yours)" if stall.get("mine") else ""
+        lines.append(f"\n**{stall.get('name')}**{mine} — kept by {stall.get('owner_name') or 'a cultivator'}")
+        listings=list(stall.get("listings") or [])
+        if not listings:
+            lines.append("• nothing laid out right now")
+        for row in listings:
+            lines.append(_stall_listing_line(row,coin))
+    lines.append("\nBuy with **/economy → Market Stalls → Buy**; the number is the listing.")
+    await reply_long(interaction,"\n".join(lines))
+
+
+@registered_group_command(stall_group, name="status",description="Your own stall: what is on it, what it holds, and what has sold")
+async def stall_status(interaction:discord.Interaction)->None:
+    c=await require_character(interaction)
+    if not c:return
+    try:
+        status=await _stall_status(interaction.user.id)
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
+    if not status.get("available"):
+        await interaction.response.send_message("The stalls are not open in this world yet.",ephemeral=False);return
+    stall=status.get("stall")
+    lines=[]
+    if not stall:
+        floor=int(status.get("min_realm_index") or 2)
+        if int(status.get("realm_index") or 0)<floor:
+            lines.append(f"You keep no stall. A stall asks for **{WORLD.realm_name(floor)}**; you stand at {WORLD.realm_name(int(status.get('realm_index') or 0))}.")
+        else:
+            lines.append("You keep no stall. Stand in a city's street and open one with **/economy → Market Stalls → Open**.")
+    else:
+        stall=dict(stall)
+        coin=_stall_coin(stall)
+        lines.append(f"🧺 **{stall.get('name')}** in **{stall.get('city')}** — priced in {coin}.")
+        lines.append(f"Holds **{int(status.get('slots_used') or 0)}/{int(status.get('slots_total') or 0)}** listings; the city takes **{int(status.get('fee_percent') or 0)}%** of each sale"
+                     + (f" (merchant hall level {int(status.get('merchant_level') or 0)})." if int(status.get('merchant_level') or 0) else ". Raise the merchant hall of a homestead for more room and a smaller cut."))
+        listings=list(status.get("listings") or [])
+        lines.append("\n**On the stall**" if listings else "\nNothing is laid out. Lay goods on it with **/economy → Market Stalls → List**.")
+        for row in listings:
+            lines.append(_stall_listing_line(row,coin))
+    sales=list(status.get("recent_sales") or [])
+    if sales:
+        lines.append("\n**Recent sales**")
+        for sale in sales:
+            who=f"to {sale.get('buyer_npc_name')}" if sale.get("buyer_is_npc") else "to a cultivator"
+            fee=int(sale.get("fee") or 0)
+            cut=f", the city took {fee}" if fee else ""
+            lines.append(f"• {WORLD.item_name(str(sale.get('item_id') or ''))} ×{int(sale.get('quantity') or 0)} {who} — {int(sale.get('unit_price') or 0)} {WORLD.currency_name(str(sale.get('currency_id') or 'low_spirit_stone'))} each{cut}")
+    await reply_long(interaction,"\n".join(lines))
+
+
+@registered_group_command(stall_group, name="open",description="Set up your stall in the street of the city you stand in")
+@serialized_user_action
+async def stall_open(interaction:discord.Interaction,name:str)->None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction): return
+    try:
+        envelope=await ENGINE.authoritative_action("stall.open",interaction.user.id,{"name":str(name)},action_id=f"discord:{interaction.id}:stall.open")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    await interaction.followup.send(
+        f"🧺 **{result.get('name')}** is set up in **{result.get('city')}**, priced in {_stall_coin(result)}. "
+        f"It holds **{int(result.get('slots') or 0)}** listings and the city takes **{int(result.get('fee_percent') or 0)}%** of each sale. "
+        f"Lay goods on it with **/economy → Market Stalls → List**; they sell while you are away.",
+        ephemeral=False,
+    )
+
+
+@registered_group_command(stall_group, name="list",description="Lay carried goods on your stall at a price of your choosing")
+@app_commands.autocomplete(item=carried_item_autocomplete)
+@serialized_user_action
+async def stall_list(interaction:discord.Interaction,item:str,quantity:app_commands.Range[int,1,99]=1,price:app_commands.Range[int,1,1000000]=1)->None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction): return
+    try:
+        envelope=await ENGINE.authoritative_action("stall.list",interaction.user.id,{"item_id":item,"quantity":int(quantity),"unit_price":int(price)},action_id=f"discord:{interaction.id}:stall.list")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    coin=_stall_coin(result)
+    ceiling=int(result.get("npc_ceiling") or 0)
+    if not ceiling:
+        town="No shop shelves it, so only cultivators will buy it."
+    elif result.get("npc_may_buy"):
+        town=f"Townsfolk pay up to {ceiling} {coin} for one and never take the last."
+    else:
+        town=f"Townsfolk pay at most {ceiling} {coin} for one, so at this price only cultivators will buy."
+    await interaction.followup.send(
+        f"🧺 Listing **#{int(result.get('listing_id') or 0)}**: **{WORLD.item_name(str(result.get('item_id') or item))} ×{int(result.get('quantity') or quantity)}** "
+        f"at **{int(result.get('unit_price') or price)} {coin}** each. {town}",
+        ephemeral=False,
+    )
+
+
+async def _my_listing_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[int]]:
+    try:
+        status=await _stall_status(interaction.user.id)
+    except Exception:
+        return []
+    needle=current.lower().strip()
+    coin=_stall_coin(dict(status.get("stall") or {}))
+    choices=[]
+    for row in list(status.get("listings") or []):
+        name=WORLD.item_name(str(row.get("item_id") or ""))
+        if needle and needle not in name.lower():continue
+        choices.append(app_commands.Choice(name=f"#{int(row.get('listing_id') or 0)} {name} ×{int(row.get('quantity') or 0)} — {int(row.get('unit_price') or 0)} {coin}"[:100],value=int(row.get("listing_id") or 0)))
+    return choices[:25]
+
+
+@registered_group_command(stall_group, name="withdraw",description="Take a listing off your stall and back into your bag")
+@serialized_user_action
+async def stall_withdraw(interaction:discord.Interaction,listing:int)->None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction): return
+    try:
+        envelope=await ENGINE.authoritative_action("stall.withdraw",interaction.user.id,{"listing_id":int(listing)},action_id=f"discord:{interaction.id}:stall.withdraw")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    await interaction.followup.send(
+        f"🧺 **{WORLD.item_name(str(result.get('item_id') or ''))} ×{int(result.get('quantity') or 0)}** comes off the stall and back into your bag.",
+        ephemeral=False,
+    )
+
+
+@stall_withdraw.autocomplete("listing")
+async def stall_withdraw_listing_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[int]]:
+    return await _my_listing_autocomplete(interaction,current)
+
+
+async def _board_listing_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[int]]:
+    try:
+        board=await _stall_board(interaction.user.id)
+    except Exception:
+        return []
+    needle=current.lower().strip()
+    coin=_stall_coin(board)
+    choices=[]
+    for stall in list(board.get("stalls") or []):
+        if stall.get("mine"):continue
+        for row in list(stall.get("listings") or []):
+            name=WORLD.item_name(str(row.get("item_id") or ""))
+            if needle and needle not in name.lower() and needle not in str(stall.get("name") or "").lower():continue
+            choices.append(app_commands.Choice(name=f"#{int(row.get('listing_id') or 0)} {name} ×{int(row.get('quantity') or 0)} — {int(row.get('unit_price') or 0)} {coin} · {stall.get('name')}"[:100],value=int(row.get("listing_id") or 0)))
+    return choices[:25]
+
+
+@registered_group_command(stall_group, name="buy",description="Buy from a stall in the city you stand in")
+@serialized_user_action
+async def stall_buy(interaction:discord.Interaction,listing:int,quantity:app_commands.Range[int,1,99]=1)->None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction): return
+    try:
+        envelope=await ENGINE.authoritative_action("stall.buy",interaction.user.id,{"listing_id":int(listing),"quantity":int(quantity)},action_id=f"discord:{interaction.id}:stall.buy")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    await _report_trade(interaction,str(result.get("item_id") or ""))
+    await interaction.followup.send(
+        f"🧺 **{result.get('stall_name') or 'The stall'}** sells you **{WORLD.item_name(str(result.get('item_id') or ''))} ×{int(result.get('quantity') or quantity)}** "
+        f"for **{int(result.get('total') or 0)} {_stall_coin(result)}** ({int(result.get('unit_price') or 0)} each). Balance: **{int(result.get('balance') or 0)}**.",
+        ephemeral=False,
+    )
+
+
+@stall_buy.autocomplete("listing")
+async def stall_buy_listing_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[int]]:
+    return await _board_listing_autocomplete(interaction,current)
+
+
+@registered_group_command(stall_group, name="close",description="Take your stall down; everything on it comes back into your bag")
+@serialized_user_action
+async def stall_close(interaction:discord.Interaction)->None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction): return
+    try:
+        envelope=await ENGINE.authoritative_action("stall.close",interaction.user.id,{},action_id=f"discord:{interaction.id}:stall.close")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    returned=dict(result.get("returned") or {})
+    back=", ".join(f"{WORLD.item_name(k)} ×{int(v)}" for k,v in sorted(returned.items())) or "nothing was left on it"
+    await interaction.followup.send(f"🧺 **{result.get('name')}** in {result.get('city')} is taken down; back into your bag: {back}.",ephemeral=False)
+
+
+register_hub_option_hint(
+    stall_list,
+    "item",
+    "Your bag is empty - there is nothing to lay on the stall. Gather with **/forage** or **/mine**, hunt with **/hunt**, or craft with **/craft → General Crafting → Craft**.",
+)
+register_hub_option_hint(
+    stall_withdraw,
+    "listing",
+    "Nothing is on your stall. Lay goods on it with **/economy → Market Stalls → List**, or check **/economy → Market Stalls → Status**.",
+)
+register_hub_option_hint(
+    stall_buy,
+    "listing",
+    "No other cultivator has anything on a stall in this city. See the board with **/economy → Market Stalls → Board**, or set up your own with **Open**.",
+)
 
 
 trade_group=app_commands.Group(name="trade",description="Trade directly with another cultivator at the inn - offer, accept, decline")

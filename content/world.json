@@ -69977,6 +69977,10 @@
       "soul": 5,
       "spatialkey": 2,
       "specialeffects": 2,
+      "stall close": 2,
+      "stall list": 2,
+      "stall open": 2,
+      "stall withdraw": 2,
       "storage deposit": 2,
       "storage withdraw": 2,
       "territory claim": 4,
@@ -70010,6 +70014,7 @@
       "economy / Black Market": 3,
       "economy / Caravans": 3,
       "economy / Local Market": 2,
+      "economy / Market Stalls": 2,
       "economy / Merchants": 2,
       "economy / Trade": 2,
       "family / Family": 2,
@@ -70037,5 +70042,15 @@
       "min_resources": 40,
       "max": 1
     }
+  },
+  "stall_system": {
+    "description": "A cultivator's own market stall in a city's street (v1.5.0). Standing listings that sell while the owner is away, to other cultivators and - bounded - to the world's own people. min_realm_index is the cultivation a stall asks for; base_slots and slots_per_merchant_level are how many listings it holds, grown by the homestead's merchant hall; fee_percent is the city's cut of each sale, less fee_discount_per_level per merchant-hall level and never under min_fee_percent; npc_buys_per_city_per_day bounds how many purchases the town makes on one tick.",
+    "min_realm_index": 2,
+    "base_slots": 2,
+    "slots_per_merchant_level": 1,
+    "fee_percent": 10,
+    "fee_discount_per_level": 1,
+    "min_fee_percent": 2,
+    "npc_buys_per_city_per_day": 3
   }
 }

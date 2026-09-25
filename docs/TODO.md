@@ -16,6 +16,17 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.5.0)** — *A player can own a shop.* Asked as a question - *"What are your thoughts on
+  a player owning a shop?"* - and answered with a stall in a city's street rather than a storefront in
+  the private homestead (nobody could walk in) or a catalogue shop bought outright (shops are content
+  tables, the keeper is a string, and every counter's price band is anchored on their shelves). The
+  homestead's `merchant` facility had been buildable, raisable and printed to the narrator since it
+  was written and read by no rule; `stallSlotsAndFee` is that rule. On the owner's call anyone at
+  Foundation Establishment may open one and the town buys too, bounded: never the last unit, never
+  above one coin under the cheapest shelf, out of its own wealth, three a city a day. See CLAUDE.md,
+  "A stall in the city". Two omissions with reasons: no rename (close returns everything and open
+  again names it) and no `admin.stall.close` lever until a GM asks for one - a GM's erasure and reset
+  already take a stall with the character.
 - **fixed (v1.2.1)** — *A beast could not evolve past stage four.* Reported from play: *"it says loyalty
   should be 110, but I can't go over 100"*. `beast.evolve` wanted `60 + 10 × stage` while feed and train
   clamp loyalty at 100, and nothing caps the stage, so stage five asked for the impossible for ever. The
