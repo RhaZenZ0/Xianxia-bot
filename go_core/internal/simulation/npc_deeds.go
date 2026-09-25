@@ -240,7 +240,7 @@ func (r *Runner) npcCrimes(conn *storage.Conn, gm int64) (int64, int64, int64, e
 				return committed, witnessed, fatal, err
 			}
 			itemID := contraband[pick]
-			item := r.World.Items[itemID]
+			item := worldItem(r.World, itemID)
 			moved, err := r.smuggleToNightMarket(conn, criminal.world, itemID, item, gm)
 			if err != nil {
 				return committed, witnessed, fatal, err
@@ -441,7 +441,7 @@ func (r *Runner) npcBeastHunts(conn *storage.Conn, gm int64) (int64, int64, int6
 			// out, and goes where an NPC's finds already go: the nearest floor.
 			listed := false
 			for _, itemID := range sortedKeys(quarry.Loot) {
-				item, ok := r.World.Items[itemID]
+				item, _, ok := game.ItemDef(r.World, itemID)
 				if !ok {
 					continue
 				}

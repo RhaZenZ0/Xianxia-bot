@@ -37,6 +37,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"xianxia/core/internal/eventledger"
@@ -55,6 +56,8 @@ type stallRules struct {
 	FeeDiscountPerLevel   int64
 	MinFeePercent         int64
 	NPCBuysPerCityPerDay  int64
+	DistancePercentPerHop int64
+	CrossWorldHops        int64
 }
 
 func stallRulesFor(catalog worlddata.Catalog) stallRules {
@@ -67,6 +70,8 @@ func stallRulesFor(catalog worlddata.Catalog) stallRules {
 		FeeDiscountPerLevel:   s.FeeDiscountPerLevel,
 		MinFeePercent:         s.MinFeePercent,
 		NPCBuysPerCityPerDay:  s.NPCBuysPerCityPerDay,
+		DistancePercentPerHop: s.DistancePercentPerHop,
+		CrossWorldHops:        s.CrossWorldHops,
 	}
 	if r.MinRealmIndex <= 0 {
 		r.MinRealmIndex = 2
@@ -88,6 +93,12 @@ func stallRulesFor(catalog worlddata.Catalog) stallRules {
 	}
 	if r.NPCBuysPerCityPerDay <= 0 {
 		r.NPCBuysPerCityPerDay = 3
+	}
+	if r.DistancePercentPerHop < 0 {
+		r.DistancePercentPerHop = 0
+	}
+	if r.CrossWorldHops <= 0 {
+		r.CrossWorldHops = 20
 	}
 	return r
 }
@@ -417,16 +428,17 @@ func stallBuyAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 	if sellerID == userID {
 		return authoritativeMutation{}, errors.New("you cannot buy from your own stall")
 	}
+	// A stall is in reach from anywhere (v1.6.0); what distance costs is a
+	// surcharge per road between the buyer and it, not a refusal.
 	city := fmt.Sprint(listing["city"])
-	if here, ok := stallCityAt(catalog, c.Location); !ok || here != city {
-		return authoritativeMutation{}, fmt.Errorf("that stall stands in %s; travel there to buy from it", city)
-	}
+	hops := stallDistanceHops(catalog, stallBuyerWhereTx(conn, c.Location), city)
 	if have := i64(listing["quantity"]); have < p.Quantity {
 		return authoritativeMutation{}, fmt.Errorf("only %d left on that stall", have)
 	}
 	currency := fmt.Sprint(listing["currency_id"])
 	unit := i64(listing["unit_price"])
-	total := unit * p.Quantity
+	surcharge := stallSurchargePerUnit(catalog, unit, hops) * p.Quantity
+	total := unit*p.Quantity + surcharge
 	now := nowSeconds()
 	balance, err := walletDeltaTx(conn, catalog, userID, currency, -total, now)
 	if err != nil {
@@ -437,7 +449,7 @@ func stallBuyAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 		return authoritativeMutation{}, err
 	}
 	buyer := userID
-	paid, fee, err := stallSaleTx(conn, catalog, listing, p.Quantity, &buyer, "", p.GameMinute, now)
+	paid, fee, err := stallSaleTx(conn, catalog, listing, p.Quantity, surcharge, &buyer, "", p.GameMinute, now)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -453,7 +465,7 @@ func stallBuyAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 		"listing_id": p.ListingID, "seller_user_id": sellerID, "stall_name": stallName, "city": city,
 		"item_id": itemID, "item_name": itemDisplayName(catalog, itemID), "quantity": p.Quantity,
 		"unit_price": unit, "total": total, "currency_id": currency, "balance": balance,
-		"seller_paid": paid, "fee": fee,
+		"seller_paid": paid, "fee": fee, "hops": hops, "surcharge": surcharge,
 	}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "economy", EventType: "stall.buy", EntityType: "stall", EntityID: fmt.Sprint(sellerID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
@@ -503,7 +515,12 @@ func stallCloseAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 // moves the city's prosperity the point every other sale moves. The cut rounds
 // down, so a one-coin sale is the seller's whole. It never debits anybody: the
 // buyer's side - a cultivator's purse or an NPC's wealth - is the caller's.
-func stallSaleTx(conn *storage.Conn, catalog worlddata.Catalog, listing map[string]any, quantity int64, buyerUserID *int64, buyerNPC string, gm int64, now float64) (paid, fee int64, err error) {
+//
+// `surcharge` is what distance added on top of the asking price (v1.6.0),
+// already debited from the buyer. It is split three ways: a third to the
+// seller, a third to the city's cut (which, like the cut itself, goes into no
+// purse), and the rest - the courier's - leaves the economy.
+func stallSaleTx(conn *storage.Conn, catalog worlddata.Catalog, listing map[string]any, quantity, surcharge int64, buyerUserID *int64, buyerNPC string, gm int64, now float64) (paid, fee int64, err error) {
 	listingID := i64(listing["listing_id"])
 	sellerID := i64(listing["user_id"])
 	have := i64(listing["quantity"])
@@ -520,6 +537,10 @@ func stallSaleTx(conn *storage.Conn, catalog worlddata.Catalog, listing map[stri
 	_, feePercent := stallSlotsAndFee(catalog, level)
 	fee = total * feePercent / 100
 	paid = total - fee
+	if surcharge > 0 {
+		paid += surcharge / 3
+		fee += surcharge / 3
+	}
 	if have == quantity {
 		if _, err = conn.Execute(`DELETE FROM stall_listings WHERE listing_id=?`, []any{listingID}); err != nil {
 			return 0, 0, err
@@ -548,39 +569,152 @@ func stallSaleTx(conn *storage.Conn, catalog worlddata.Catalog, listing map[stri
 
 // StallSaleTx is stallSaleTx for the simulation package, which must not keep
 // a copy of the payout (the WalletDeltaTx precedent, rc.43).
+// The town's buyers stand in the stall's own city, so they pay no distance.
 func StallSaleTx(conn *storage.Conn, catalog worlddata.Catalog, listing map[string]any, quantity int64, buyerUserID *int64, buyerNPC string, gm int64, now float64) (paid, fee int64, err error) {
-	return stallSaleTx(conn, catalog, listing, quantity, buyerUserID, buyerNPC, gm, now)
+	return stallSaleTx(conn, catalog, listing, quantity, 0, buyerUserID, buyerNPC, gm, now)
 }
 
-// stallBoardQuery is every stall in the city the caller stands in, with its
-// listings. It never refuses: somewhere with no stalls is an empty board.
+// stallDistanceHops is how many roads lie between where a buyer stands and a
+// stall's city: a shortest walk over the roads travel uses, within one world.
+// A road-side site (a waystation) sits on the leg between its two cities, so
+// it is a stop on the way between them. Another world counts as the roster's
+// cross_world_hops; somewhere in the same world that no road reaches - a marsh,
+// a sect's mountain gate, a household - counts as half of that: far, but not
+// another world.
+func stallDistanceHops(catalog worlddata.Catalog, location, stallCity string) int64 {
+	far := stallRulesFor(catalog).CrossWorldHops
+	from := cityOf(catalog, location)
+	start, ok := catalog.Locations[from]
+	goal, ok2 := catalog.Locations[stallCity]
+	if !ok2 {
+		return far
+	}
+	if !ok || start.Private {
+		return far
+	}
+	if start.World != goal.World {
+		return far
+	}
+	if from == stallCity {
+		return 0
+	}
+	onLeg := map[string][]string{}
+	for _, name := range sortedLocationNames(catalog) {
+		loc := catalog.Locations[name]
+		if loc.RoadSite == "" || loc.World != goal.World {
+			continue
+		}
+		for _, end := range loc.RoadLeg {
+			onLeg[end] = append(onLeg[end], name)
+		}
+	}
+	neighbours := func(here string) []string {
+		out := canonicalRoadNeighbors(catalog, here, int64(1<<30))
+		out = append(out, onLeg[here]...)
+		if loc := catalog.Locations[here]; loc.RoadSite != "" {
+			out = append(out, loc.RoadLeg...)
+		}
+		return out
+	}
+	seen := map[string]bool{from: true}
+	frontier := []string{from}
+	// Walked to exhaustion rather than stopped at `far`: a city a long way off
+	// by road is capped at the cross-world distance, never answered as the
+	// off-road half of it, which would make the far end of a world cheaper
+	// than its middle.
+	for hops := int64(1); len(frontier) > 0; hops++ {
+		next := []string{}
+		for _, here := range frontier {
+			for _, n := range neighbours(here) {
+				if cityOf(catalog, n) == stallCity {
+					return minI64(hops, far)
+				}
+				if !seen[n] {
+					seen[n] = true
+					next = append(next, n)
+				}
+			}
+		}
+		frontier = next
+	}
+	return far / 2
+}
+
+// stallBuyerWhereTx is where a buyer is measured from: where they stand, except
+// that somebody at home in their birth household is in that household's town.
+// A read that fails leaves the place as it is (and so, off the roads, far).
+func stallBuyerWhereTx(conn *storage.Conn, location string) string {
+	id, ok := strings.CutPrefix(location, "birth_family:")
+	if !ok {
+		return location
+	}
+	res, err := conn.Execute(`SELECT location FROM birth_families WHERE family_id=?`, []any{id})
+	if err != nil || len(res.Rows) == 0 {
+		return location
+	}
+	return fmt.Sprint(res.Rows[0][0])
+}
+
+func sortedLocationNames(catalog worlddata.Catalog) []string {
+	names := make([]string, 0, len(catalog.Locations))
+	for name := range catalog.Locations {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// stallSurchargePerUnit is what distance adds to one unit: the roster's share
+// per road, rounded down, so a stall in the buyer's own city costs its price.
+func stallSurchargePerUnit(catalog worlddata.Catalog, unit, hops int64) int64 {
+	if hops <= 0 || unit <= 0 {
+		return 0
+	}
+	return unit * hops * stallRulesFor(catalog).DistancePercentPerHop / 100
+}
+
+// stallBoardQuery is every stall there is (v1.6.0: a stall is in reach from
+// anywhere), nearest first, each listing carrying what it costs from where the
+// caller stands - its price plus the distance surcharge. It never refuses:
+// a world with no stalls is an empty board.
 func stallBoardQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (map[string]any, error) {
 	c, err := loadMechanicsCharacter(conn, userID)
 	if err != nil {
 		return nil, err
 	}
 	city, isCity := stallCityAt(catalog, c.Location)
-	out := map[string]any{"city": city, "is_city": isCity, "available": stallTablesExist(conn), "stalls": []map[string]any{}}
-	if !isCity || !stallTablesExist(conn) {
+	out := map[string]any{"city": city, "is_city": isCity, "available": stallTablesExist(conn), "stalls": []map[string]any{},
+		"distance_percent_per_hop": stallRulesFor(catalog).DistancePercentPerHop}
+	if !stallTablesExist(conn) {
 		return out, nil
 	}
-	out["currency_id"] = worldBaseCurrency(catalog, catalog.Locations[city].World)
-	res, err := conn.Execute(`SELECT s.user_id,s.name,COALESCE(c.name,'') AS owner_name FROM player_stalls s LEFT JOIN characters c ON c.user_id=s.user_id WHERE s.city=? ORDER BY s.name,s.user_id`, []any{city})
+	if isCity {
+		out["currency_id"] = worldBaseCurrency(catalog, catalog.Locations[city].World)
+	}
+	res, err := conn.Execute(`SELECT s.user_id,s.name,s.city,COALESCE(c.name,'') AS owner_name FROM player_stalls s LEFT JOIN characters c ON c.user_id=s.user_id ORDER BY s.name,s.user_id`, nil)
 	if err != nil {
 		return nil, err
 	}
+	where := stallBuyerWhereTx(conn, c.Location)
 	stalls := []map[string]any{}
 	for _, row := range rowsToMaps(res) {
 		owner := i64(row["user_id"])
+		stallCity := fmt.Sprint(row["city"])
+		hops := stallDistanceHops(catalog, where, stallCity)
 		listings, err := stallListingRows(conn, catalog, owner)
 		if err != nil {
 			return nil, err
 		}
+		for _, l := range listings {
+			unit := i64(l["unit_price"])
+			l["price_here"] = unit + stallSurchargePerUnit(catalog, unit, hops)
+		}
 		stalls = append(stalls, map[string]any{
 			"owner_user_id": owner, "owner_name": fmt.Sprint(row["owner_name"]), "name": fmt.Sprint(row["name"]),
-			"mine": owner == userID, "listings": listings,
+			"city": stallCity, "hops": hops, "mine": owner == userID, "listings": listings,
 		})
 	}
+	sort.SliceStable(stalls, func(i, j int) bool { return i64(stalls[i]["hops"]) < i64(stalls[j]["hops"]) })
 	out["stalls"] = stalls
 	return out, nil
 }

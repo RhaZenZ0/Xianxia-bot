@@ -95,7 +95,7 @@ func SpawnWorldEventNodes(conn *storage.Conn, catalog worlddata.Catalog, eventKe
 		if itemID == "" {
 			qty = 0
 		}
-		if _, ok := catalog.Items[itemID]; itemID != "" && !ok {
+		if _, _, ok := itemDef(catalog, itemID); itemID != "" && !ok {
 			// A tier material the item catalogue does not carry would grant a
 			// phantom item; drop the payout rather than the node.
 			itemID, qty = "", 0

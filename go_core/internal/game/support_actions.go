@@ -202,7 +202,7 @@ func supportVoteGift(conn *storage.Conn, catalog worlddata.Catalog, c mechanicsC
 	// The same guard SpawnWorldEventNodes uses: a tier material this world
 	// does not name, or one the item catalogue does not carry, would be a
 	// phantom in the bag. Drop the item and keep the stones.
-	if _, ok := catalog.Items[itemID]; itemID != "" && ok {
+	if _, _, ok := itemDef(catalog, itemID); itemID != "" && ok {
 		gift.ItemID = itemID
 		// "@herb" and "@ore" name a richer item every world (spirit_herb 2 ->
 		// heavenpetal_herb 20), so one of them is already tier-appropriate.

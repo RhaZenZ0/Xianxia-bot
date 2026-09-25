@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from .advanced_catalog import augment_advanced_catalog
+from .item_grades import base_item_id, grade_rung, graded_name, split_item_grade
 
 # The content's word for an effect cast at somebody else. The engine states it
 # once as `lawControlCategory`; this is the same string read from the same
@@ -232,10 +233,47 @@ class World:
         return str(effect.get("category", "")) == CONTROL_EFFECT_CATEGORY
 
     def item_name(self, item_id: str) -> str:
-        return str(self.items.get(item_id, {}).get("name", item_id.replace("_", " ").title()))
+        """An item's name at its grade (v1.6.0): "Qi Pill (High)"; Low is bare."""
+        base = base_item_id(item_id)
+        name = str(self.items.get(base, {}).get("name", base.replace("_", " ").title()))
+        return graded_name(name, self.item_grades, item_id)
+
+    def item_definition(self, item_id: str) -> dict[str, Any]:
+        """An item's definition at its grade (v1.6.0): the base entry, named at
+        its grade and priced at it. A graded id is not a key of ``items``, so a
+        bare ``items.get`` answers nothing for it; this is the door a reader of
+        a carried id goes through. What a grade does to a use is the engine's
+        and is not restated here. An id the catalogue does not carry is ``{}``.
+        """
+        base, grade = split_item_grade(item_id)
+        entry = self.items.get(base)
+        if not entry:
+            return {}
+        out = dict(entry)
+        if grade:
+            # The engine's itemDef knows a graded id only when its base is a
+            # recipe's output and its grade a rung above the first, so a picker
+            # never offers "spirit_herb@high" as though it were something.
+            index, rung = grade_rung(self.item_grades, grade)
+            crafted = any(base in (recipe.get("output") or {}) for recipe in self.recipes.values())
+            if index == 0 or not rung or not crafted:
+                return {}
+            mult = int(rung.get("price_mult") or 1)
+            for key in ("base_price", "sect_value"):
+                if key in out:
+                    out[key] = int(out[key] or 0) * mult
+            out["name"] = self.item_name(item_id)
+        return out
 
     def item_sect_value(self, item_id: str) -> int:
-        return max(1, int(self.items.get(item_id, {}).get("sect_value", 1)))
+        base, grade = split_item_grade(item_id)
+        _, rung = grade_rung(self.item_grades, grade)
+        return max(1, int(self.items.get(base, {}).get("sect_value", 1)) * int(rung.get("price_mult") or 1))
+
+    @property
+    def item_grades(self) -> dict:
+        """The grade ladder (`item_grade_system`), for the item_grades helpers."""
+        return dict(self.data.get("item_grade_system") or {})
 
     def currency_name(self, currency_id: str) -> str:
         return str(self.currencies.get(currency_id, {}).get("name", currency_id.replace("_", " ").title()))
@@ -398,7 +436,7 @@ class World:
             return "none"
         parts = []
         for item_id, qty in items.items():
-            name = self.items.get(item_id, {}).get("name", item_id)
+            name = self.item_definition(item_id).get("name", item_id)
             parts.append(f"{name} x{qty}")
         return ", ".join(parts)
 

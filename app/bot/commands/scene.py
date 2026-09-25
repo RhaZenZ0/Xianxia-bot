@@ -86,7 +86,7 @@ async def _claim_grave_if_here(user_id: int, c: dict, npc: str, wt) -> str:
     home = str(result.get("home_location") or "")
     item = str(result.get("keepsake_item") or "")
     stones = int(result.get("keepsake_stones") or 0)
-    took = [WORLD.items.get(item, {}).get("name", item) for item in ([item] if item else [])]
+    took = [WORLD.item_name(item) for item in ([item] if item else [])]
     if stones:
         took.append(f"{stones} spirit stones")
     carried = ", ".join(took) if took else "nothing but the fact of it"

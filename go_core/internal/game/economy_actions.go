@@ -164,7 +164,7 @@ func auctionLeaveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 			"where": auctionDoorstep(house.Name)}
 		if int64(roll) < chance {
 			itemID := fmt.Sprint(risk["item_id"])
-			item := catalog.Items[itemID]
+			item, _, _ := itemDef(catalog, itemID)
 			baseRealm, baseStage := i64(c["realm_index"]), i64(c["phase"])
 			driftChoices := []int64{-1, 0, 0, 1}
 			if strings.EqualFold(item.AuctionInterest, "legendary") {
@@ -622,12 +622,12 @@ func equipmentPowerGo(conn *storage.Conn, userID int64) (map[string]int64, error
 		if i64(row["equipped"]) == 0 || i64(row["durability"]) <= 0 {
 			continue
 		}
-		d, ok := defs[fmt.Sprint(row["item_id"])]
+		d, ok := defs[itemBaseID(fmt.Sprint(row["item_id"]))]
 		if !ok {
 			continue
 		}
 		condition := math.Max(.25, math.Min(1, float64(i64(row["durability"]))/float64(max64(1, i64(row["max_durability"])))))
-		quality := math.Max(.5, 1+(float64(i64(row["quality"])-100)/200))
+		quality := equipmentQualityMult(i64(row["quality"]))
 		vals := map[string]int64{"attack": d.Attack, "defense": d.Defense, "spirit": d.Spirit, "agility": d.Agility}
 		for _, k := range []string{"attack", "defense", "spirit", "agility"} {
 			out[k] += int64(math.Round(float64(vals[k]) * condition * quality))

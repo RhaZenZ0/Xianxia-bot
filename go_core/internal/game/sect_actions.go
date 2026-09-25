@@ -543,7 +543,7 @@ func sectEconomyActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID i
 		return authoritativeMutation{}, errors.New("you are not a member of a sect")
 	}
 	sect := fmt.Sprint(mem["sect_name"])
-	item, ok := catalog.Items[p.ItemID]
+	item, _, ok := itemDef(catalog, p.ItemID)
 	if !ok {
 		return authoritativeMutation{}, errors.New("unknown item")
 	}

@@ -152,7 +152,7 @@ func explorationMineAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	// sites, the send-off and the forage already use; a ref the catalogue does
 	// not carry falls back to Mortal iron rather than to a row for nothing.
 	commonOre := catalog.EventSites.Material(worldName, "@ore")
-	if _, ok := catalog.Items[commonOre]; !ok || commonOre == "" {
+	if _, _, ok := itemDef(catalog, commonOre); !ok || commonOre == "" {
 		commonOre = "spirit_iron"
 	}
 	commonQty := maxI64(1, 1+resources/35+maxI64(0, cr.RealmIndex)/8)
@@ -163,7 +163,7 @@ func explorationMineAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	rareFound := ""
 	if worldTier+1 < int64(len(worlds)) {
 		rareOre := catalog.EventSites.Material(worlds[worldTier+1], "@ore")
-		if _, ok := catalog.Items[rareOre]; ok && rareOre != "" && rareOre != commonOre {
+		if _, _, ok := itemDef(catalog, rareOre); ok && rareOre != "" && rareOre != commonOre {
 			chance := minI64(40, mineRareOreChance+maxI64(0, resources-50)/4+maxI64(0, cr.RealmIndex)/3)
 			rareRoll, rollErr := gamerng.Intn(100)
 			if rollErr != nil {
@@ -194,7 +194,7 @@ func explorationMineAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	sort.Strings(materialIDs)
 	for _, id := range materialIDs {
 		spec := catalog.MineMaterials[id]
-		if _, ok := catalog.Items[id]; !ok {
+		if _, _, ok := itemDef(catalog, id); !ok {
 			continue
 		}
 		if spec.Chance <= 0 || spec.Max <= 0 || resources < spec.MinResources {

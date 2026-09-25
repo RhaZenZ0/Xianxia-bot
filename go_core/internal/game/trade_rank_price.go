@@ -25,6 +25,7 @@ const tradeRankSellStep = int64(2)
 // no recipe makes. Recipe ids are walked sorted so the answer cannot depend
 // on a map range; the shipped content has no item two trades both make.
 func itemTrade(catalog worlddata.Catalog, itemID string) string {
+	itemID = itemBaseID(itemID)
 	ids := make([]string, 0, len(catalog.Recipes))
 	for id := range catalog.Recipes {
 		ids = append(ids, id)

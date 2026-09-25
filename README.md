@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v1.5.0
+# Xianxia RP Discord Bot v1.6.0
 
 *A cultivation RPG played entirely through Discord commands: deterministic rules in Go, an AI that
 narrates but never decides, self-hosted on your own hardware.*
@@ -509,6 +509,14 @@ A cultivator at Foundation Establishment can keep a **market stall** in a city's
 to other cultivators at your price and - bounded - to the town, which never takes the last unit,
 never pays more than one coin under the cheapest shop shelf, and pays out of its own wealth. The
 city takes a tenth of each sale; a homestead's merchant hall adds listing room and shrinks the cut.
+Since v1.6.0 a stall is in reach from anywhere: the board lists every stall in the world, nearest
+first, and goods from a stall farther off cost 5% more a road (another world counts as twenty),
+split between the seller, the city and the courier.
+
+Every crafted item carries a **grade** (v1.6.0) - Low, Mid, High, Superior or Transcendent - set by
+how well the craft went and capped by your rank in the trade. A higher grade works harder (up to
+three times) and is worth more (double each step). Shops deal in Low, capitals in Mid as well; the
+finer grades are sold between players, at a stall or on the auction floor.
 
 Sects stock their own storehouses too. `sect_treasury` is what contribution points buy from, and it
 used to fill only when a player donated — so a sect nobody had joined had bare shelves forever. Its

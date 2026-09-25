@@ -57877,6 +57877,12 @@
           "made_here": true
         },
         {
+          "item_id": "spirit_iron_sword@mid",
+          "quantity": 1,
+          "price": 26,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_iron",
           "quantity": 9,
           "price": 6,
@@ -57886,6 +57892,12 @@
           "item_id": "spirit_iron_armor",
           "quantity": 1,
           "price": 17,
+          "made_here": true
+        },
+        {
+          "item_id": "spirit_iron_armor@mid",
+          "quantity": 1,
+          "price": 34,
           "made_here": true
         },
         {
@@ -57901,9 +57913,21 @@
           "made_here": true
         },
         {
+          "item_id": "spirit_crystal_sword@mid",
+          "quantity": 1,
+          "price": 98,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_crystal_mail",
           "quantity": 1,
           "price": 59,
+          "made_here": true
+        },
+        {
+          "item_id": "spirit_crystal_mail@mid",
+          "quantity": 1,
+          "price": 118,
           "made_here": true
         },
         {
@@ -57933,7 +57957,11 @@
         "spirit_crystal_ore": 3,
         "spirit_crystal_sword": 18,
         "azure_flying_sword": 91,
-        "spirit_crystal_mail": 22
+        "spirit_crystal_mail": 22,
+        "spirit_iron_sword@mid": 10,
+        "spirit_iron_armor@mid": 12,
+        "spirit_crystal_sword@mid": 36,
+        "spirit_crystal_mail@mid": 44
       }
     },
     "azure_crown_apothecary": {
@@ -57955,9 +57983,21 @@
           "made_here": true
         },
         {
+          "item_id": "recovery_pill@mid",
+          "quantity": 3,
+          "price": 26,
+          "made_here": true
+        },
+        {
           "item_id": "qi_pill",
           "quantity": 5,
           "price": 13,
+          "made_here": true
+        },
+        {
+          "item_id": "qi_pill@mid",
+          "quantity": 2,
+          "price": 26,
           "made_here": true
         },
         {
@@ -57973,9 +58013,21 @@
           "made_here": true
         },
         {
+          "item_id": "heart_calming_pill@mid",
+          "quantity": 2,
+          "price": 26,
+          "made_here": true
+        },
+        {
           "item_id": "qi_replenishment_pill",
           "quantity": 4,
           "price": 13,
+          "made_here": true
+        },
+        {
+          "item_id": "qi_replenishment_pill@mid",
+          "quantity": 2,
+          "price": 26,
           "made_here": true
         },
         {
@@ -57991,9 +58043,21 @@
           "made_here": true
         },
         {
+          "item_id": "moonveil_recovery_pill@mid",
+          "quantity": 2,
+          "price": 78,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_condensation_pill",
           "quantity": 2,
           "price": 46,
+          "made_here": true
+        },
+        {
+          "item_id": "spirit_condensation_pill@mid",
+          "quantity": 1,
+          "price": 92,
           "made_here": true
         },
         {
@@ -58037,7 +58101,13 @@
         "heart_calming_pill": 5,
         "qi_replenishment_pill": 5,
         "moonveil_recovery_pill": 15,
-        "spirit_condensation_pill": 17
+        "spirit_condensation_pill": 17,
+        "recovery_pill@mid": 10,
+        "qi_pill@mid": 10,
+        "heart_calming_pill@mid": 10,
+        "qi_replenishment_pill@mid": 10,
+        "moonveil_recovery_pill@mid": 30,
+        "spirit_condensation_pill@mid": 34
       }
     },
     "azure_crown_talisman_hall": {
@@ -58071,9 +58141,21 @@
           "made_here": true
         },
         {
+          "item_id": "swift_wind_talisman@mid",
+          "quantity": 2,
+          "price": 26,
+          "made_here": true
+        },
+        {
           "item_id": "stone_skin_talisman",
           "quantity": 4,
           "price": 15,
+          "made_here": true
+        },
+        {
+          "item_id": "stone_skin_talisman@mid",
+          "quantity": 2,
+          "price": 30,
           "made_here": true
         },
         {
@@ -58083,9 +58165,21 @@
           "made_here": true
         },
         {
+          "item_id": "spirit_focus_talisman@mid",
+          "quantity": 1,
+          "price": 34,
+          "made_here": true
+        },
+        {
           "item_id": "crystal_ward_talisman",
           "quantity": 2,
           "price": 39,
+          "made_here": true
+        },
+        {
+          "item_id": "crystal_ward_talisman@mid",
+          "quantity": 1,
+          "price": 78,
           "made_here": true
         },
         {
@@ -58119,9 +58213,21 @@
           "made_here": true
         },
         {
+          "item_id": "hearth_return_talisman@mid",
+          "quantity": 1,
+          "price": 60,
+          "made_here": true
+        },
+        {
           "item_id": "waymark_talisman",
           "quantity": 2,
           "price": 30,
+          "made_here": true
+        },
+        {
+          "item_id": "waymark_talisman@mid",
+          "quantity": 1,
+          "price": 60,
           "made_here": true
         },
         {
@@ -58146,7 +58252,13 @@
         "paper_crane_charm": 25,
         "spirit_focus_talisman": 6,
         "hearth_return_talisman": 5,
-        "waymark_talisman": 5
+        "waymark_talisman": 5,
+        "swift_wind_talisman@mid": 10,
+        "stone_skin_talisman@mid": 10,
+        "crystal_ward_talisman@mid": 30,
+        "spirit_focus_talisman@mid": 12,
+        "hearth_return_talisman@mid": 10,
+        "waymark_talisman@mid": 10
       }
     },
     "azure_crown_provisions": {
@@ -58174,6 +58286,12 @@
           "made_here": false
         },
         {
+          "item_id": "recovery_pill@mid",
+          "quantity": 2,
+          "price": 30,
+          "made_here": false
+        },
+        {
           "item_id": "talisman_paper",
           "quantity": 7,
           "price": 4,
@@ -58198,6 +58316,12 @@
           "made_here": false
         },
         {
+          "item_id": "moonveil_recovery_pill@mid",
+          "quantity": 1,
+          "price": 90,
+          "made_here": false
+        },
+        {
           "item_id": "wind_gourd",
           "quantity": 1,
           "price": 130,
@@ -58211,7 +58335,8 @@
         "talisman_paper": 1,
         "moonveil_herb": 3,
         "wind_gourd": 45,
-        "moonveil_recovery_pill": 15
+        "moonveil_recovery_pill": 15,
+        "moonveil_recovery_pill@mid": 30
       }
     },
     "broken_halo_array_workshop": {
@@ -58357,6 +58482,12 @@
           "made_here": true
         },
         {
+          "item_id": "spirit_iron_sword@mid",
+          "quantity": 1,
+          "price": 52,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_iron",
           "quantity": 12,
           "price": 12,
@@ -58366,6 +58497,12 @@
           "item_id": "spirit_iron_armor",
           "quantity": 1,
           "price": 33,
+          "made_here": true
+        },
+        {
+          "item_id": "spirit_iron_armor@mid",
+          "quantity": 1,
+          "price": 66,
           "made_here": true
         },
         {
@@ -58387,9 +58524,21 @@
           "made_here": true
         },
         {
+          "item_id": "spirit_crystal_sword@mid",
+          "quantity": 1,
+          "price": 196,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_crystal_mail",
           "quantity": 1,
           "price": 117,
+          "made_here": true
+        },
+        {
+          "item_id": "spirit_crystal_mail@mid",
+          "quantity": 1,
+          "price": 234,
           "made_here": true
         },
         {
@@ -58405,9 +58554,21 @@
           "made_here": true
         },
         {
+          "item_id": "immortal_gold_sabre@mid",
+          "quantity": 1,
+          "price": 390,
+          "made_here": true
+        },
+        {
           "item_id": "immortal_gold_plate",
           "quantity": 1,
           "price": 234,
+          "made_here": true
+        },
+        {
+          "item_id": "immortal_gold_plate@mid",
+          "quantity": 1,
+          "price": 468,
           "made_here": true
         },
         {
@@ -58423,9 +58584,21 @@
           "made_here": true
         },
         {
+          "item_id": "starsteel_glaive@mid",
+          "quantity": 1,
+          "price": 780,
+          "made_here": true
+        },
+        {
           "item_id": "starsteel_aegis",
           "quantity": 1,
           "price": 468,
+          "made_here": true
+        },
+        {
+          "item_id": "starsteel_aegis@mid",
+          "quantity": 1,
+          "price": 936,
           "made_here": true
         },
         {
@@ -58461,7 +58634,15 @@
         "azure_flying_sword": 189,
         "spirit_crystal_mail": 22,
         "immortal_gold_plate": 56,
-        "starsteel_aegis": 140
+        "starsteel_aegis": 140,
+        "spirit_iron_sword@mid": 20,
+        "spirit_iron_armor@mid": 24,
+        "spirit_crystal_sword@mid": 74,
+        "immortal_gold_sabre@mid": 150,
+        "starsteel_glaive@mid": 300,
+        "spirit_crystal_mail@mid": 44,
+        "immortal_gold_plate@mid": 112,
+        "starsteel_aegis@mid": 280
       }
     },
     "celestial_mandate_apothecary": {
@@ -58483,9 +58664,21 @@
           "made_here": true
         },
         {
+          "item_id": "recovery_pill@mid",
+          "quantity": 5,
+          "price": 52,
+          "made_here": true
+        },
+        {
           "item_id": "qi_pill",
           "quantity": 8,
           "price": 26,
+          "made_here": true
+        },
+        {
+          "item_id": "qi_pill@mid",
+          "quantity": 4,
+          "price": 52,
           "made_here": true
         },
         {
@@ -58501,9 +58694,21 @@
           "made_here": true
         },
         {
+          "item_id": "heart_calming_pill@mid",
+          "quantity": 3,
+          "price": 52,
+          "made_here": true
+        },
+        {
           "item_id": "qi_replenishment_pill",
           "quantity": 7,
           "price": 26,
+          "made_here": true
+        },
+        {
+          "item_id": "qi_replenishment_pill@mid",
+          "quantity": 3,
+          "price": 52,
           "made_here": true
         },
         {
@@ -58519,6 +58724,12 @@
           "made_here": true
         },
         {
+          "item_id": "longevity_pill@mid",
+          "quantity": 1,
+          "price": 780,
+          "made_here": true
+        },
+        {
           "item_id": "moonveil_herb",
           "quantity": 10,
           "price": 19,
@@ -58531,9 +58742,21 @@
           "made_here": true
         },
         {
+          "item_id": "moonveil_recovery_pill@mid",
+          "quantity": 3,
+          "price": 156,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_condensation_pill",
           "quantity": 2,
           "price": 91,
+          "made_here": true
+        },
+        {
+          "item_id": "spirit_condensation_pill@mid",
+          "quantity": 1,
+          "price": 182,
           "made_here": true
         },
         {
@@ -58549,9 +58772,21 @@
           "made_here": true
         },
         {
+          "item_id": "dawnlotus_vitality_pill@mid",
+          "quantity": 1,
+          "price": 312,
+          "made_here": true
+        },
+        {
           "item_id": "immortal_marrow_pill",
           "quantity": 2,
           "price": 182,
+          "made_here": true
+        },
+        {
+          "item_id": "immortal_marrow_pill@mid",
+          "quantity": 1,
+          "price": 364,
           "made_here": true
         },
         {
@@ -58567,9 +58802,21 @@
           "made_here": true
         },
         {
+          "item_id": "heavenpetal_elixir@mid",
+          "quantity": 1,
+          "price": 624,
+          "made_here": true
+        },
+        {
           "item_id": "starlight_dao_pill",
           "quantity": 1,
           "price": 364,
+          "made_here": true
+        },
+        {
+          "item_id": "starlight_dao_pill@mid",
+          "quantity": 1,
+          "price": 728,
           "made_here": true
         },
         {
@@ -58602,7 +58849,18 @@
         "dawnlotus_vitality_pill": 37,
         "immortal_marrow_pill": 44,
         "heavenpetal_elixir": 93,
-        "starlight_dao_pill": 109
+        "starlight_dao_pill": 109,
+        "recovery_pill@mid": 20,
+        "qi_pill@mid": 20,
+        "heart_calming_pill@mid": 10,
+        "qi_replenishment_pill@mid": 10,
+        "longevity_pill@mid": 234,
+        "moonveil_recovery_pill@mid": 30,
+        "spirit_condensation_pill@mid": 34,
+        "dawnlotus_vitality_pill@mid": 74,
+        "immortal_marrow_pill@mid": 88,
+        "heavenpetal_elixir@mid": 186,
+        "starlight_dao_pill@mid": 218
       }
     },
     "celestial_mandate_talisman_hall": {
@@ -58636,9 +58894,21 @@
           "made_here": true
         },
         {
+          "item_id": "swift_wind_talisman@mid",
+          "quantity": 3,
+          "price": 52,
+          "made_here": true
+        },
+        {
           "item_id": "stone_skin_talisman",
           "quantity": 7,
           "price": 30,
+          "made_here": true
+        },
+        {
+          "item_id": "stone_skin_talisman@mid",
+          "quantity": 3,
+          "price": 60,
           "made_here": true
         },
         {
@@ -58648,9 +58918,21 @@
           "made_here": true
         },
         {
+          "item_id": "spirit_focus_talisman@mid",
+          "quantity": 1,
+          "price": 66,
+          "made_here": true
+        },
+        {
           "item_id": "crystal_ward_talisman",
           "quantity": 2,
           "price": 78,
+          "made_here": true
+        },
+        {
+          "item_id": "crystal_ward_talisman@mid",
+          "quantity": 1,
+          "price": 156,
           "made_here": true
         },
         {
@@ -58660,9 +58942,21 @@
           "made_here": true
         },
         {
+          "item_id": "golden_edge_talisman@mid",
+          "quantity": 1,
+          "price": 312,
+          "made_here": true
+        },
+        {
           "item_id": "starfall_talisman",
           "quantity": 2,
           "price": 312,
+          "made_here": true
+        },
+        {
+          "item_id": "starfall_talisman@mid",
+          "quantity": 1,
+          "price": 624,
           "made_here": true
         },
         {
@@ -58694,7 +58988,13 @@
         "starfall_talisman": 96,
         "paper_crane_charm": 52,
         "void_stride_talisman": 770,
-        "spirit_focus_talisman": 6
+        "spirit_focus_talisman": 6,
+        "swift_wind_talisman@mid": 20,
+        "stone_skin_talisman@mid": 22,
+        "crystal_ward_talisman@mid": 60,
+        "golden_edge_talisman@mid": 120,
+        "starfall_talisman@mid": 192,
+        "spirit_focus_talisman@mid": 12
       }
     },
     "celestial_mandate_provisions": {
@@ -58719,6 +59019,12 @@
           "item_id": "recovery_pill",
           "quantity": 7,
           "price": 30,
+          "made_here": false
+        },
+        {
+          "item_id": "recovery_pill@mid",
+          "quantity": 3,
+          "price": 60,
           "made_here": false
         },
         {
@@ -58752,6 +59058,12 @@
           "made_here": false
         },
         {
+          "item_id": "moonveil_recovery_pill@mid",
+          "quantity": 1,
+          "price": 180,
+          "made_here": false
+        },
+        {
           "item_id": "dawnlotus_herb",
           "quantity": 7,
           "price": 38,
@@ -58764,6 +59076,12 @@
           "made_here": false
         },
         {
+          "item_id": "dawnlotus_vitality_pill@mid",
+          "quantity": 1,
+          "price": 360,
+          "made_here": false
+        },
+        {
           "item_id": "heavenpetal_herb",
           "quantity": 7,
           "price": 75,
@@ -58773,6 +59091,12 @@
           "item_id": "heavenpetal_elixir",
           "quantity": 1,
           "price": 360,
+          "made_here": false
+        },
+        {
+          "item_id": "heavenpetal_elixir@mid",
+          "quantity": 1,
+          "price": 720,
           "made_here": false
         },
         {
@@ -58793,7 +59117,10 @@
         "wind_gourd": 94,
         "moonveil_recovery_pill": 15,
         "dawnlotus_vitality_pill": 37,
-        "heavenpetal_elixir": 93
+        "heavenpetal_elixir": 93,
+        "moonveil_recovery_pill@mid": 30,
+        "dawnlotus_vitality_pill@mid": 74,
+        "heavenpetal_elixir@mid": 186
       }
     },
     "celestial_river_beast_hall": {
@@ -63101,6 +63428,12 @@
           "made_here": true
         },
         {
+          "item_id": "spirit_iron_sword@mid",
+          "quantity": 1,
+          "price": 40,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_iron",
           "quantity": 11,
           "price": 9,
@@ -63110,6 +63443,12 @@
           "item_id": "spirit_iron_armor",
           "quantity": 1,
           "price": 25,
+          "made_here": true
+        },
+        {
+          "item_id": "spirit_iron_armor@mid",
+          "quantity": 1,
+          "price": 50,
           "made_here": true
         },
         {
@@ -63131,9 +63470,21 @@
           "made_here": true
         },
         {
+          "item_id": "spirit_crystal_sword@mid",
+          "quantity": 1,
+          "price": 148,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_crystal_mail",
           "quantity": 1,
           "price": 88,
+          "made_here": true
+        },
+        {
+          "item_id": "spirit_crystal_mail@mid",
+          "quantity": 1,
+          "price": 176,
           "made_here": true
         },
         {
@@ -63149,9 +63500,21 @@
           "made_here": true
         },
         {
+          "item_id": "immortal_gold_sabre@mid",
+          "quantity": 1,
+          "price": 294,
+          "made_here": true
+        },
+        {
           "item_id": "immortal_gold_plate",
           "quantity": 1,
           "price": 176,
+          "made_here": true
+        },
+        {
+          "item_id": "immortal_gold_plate@mid",
+          "quantity": 1,
+          "price": 352,
           "made_here": true
         },
         {
@@ -63167,9 +63530,21 @@
           "made_here": true
         },
         {
+          "item_id": "starsteel_glaive@mid",
+          "quantity": 1,
+          "price": 586,
+          "made_here": true
+        },
+        {
           "item_id": "starsteel_aegis",
           "quantity": 1,
           "price": 351,
+          "made_here": true
+        },
+        {
+          "item_id": "starsteel_aegis@mid",
+          "quantity": 1,
+          "price": 702,
           "made_here": true
         },
         {
@@ -63205,7 +63580,15 @@
         "azure_flying_sword": 154,
         "spirit_crystal_mail": 22,
         "immortal_gold_plate": 56,
-        "starsteel_aegis": 140
+        "starsteel_aegis": 140,
+        "spirit_iron_sword@mid": 14,
+        "spirit_iron_armor@mid": 18,
+        "spirit_crystal_sword@mid": 56,
+        "immortal_gold_sabre@mid": 112,
+        "starsteel_glaive@mid": 224,
+        "spirit_crystal_mail@mid": 44,
+        "immortal_gold_plate@mid": 112,
+        "starsteel_aegis@mid": 280
       }
     },
     "nine_heavens_apothecary": {
@@ -63227,9 +63610,21 @@
           "made_here": true
         },
         {
+          "item_id": "recovery_pill@mid",
+          "quantity": 4,
+          "price": 40,
+          "made_here": true
+        },
+        {
           "item_id": "qi_pill",
           "quantity": 7,
           "price": 20,
+          "made_here": true
+        },
+        {
+          "item_id": "qi_pill@mid",
+          "quantity": 3,
+          "price": 40,
           "made_here": true
         },
         {
@@ -63245,9 +63640,21 @@
           "made_here": true
         },
         {
+          "item_id": "heart_calming_pill@mid",
+          "quantity": 3,
+          "price": 40,
+          "made_here": true
+        },
+        {
           "item_id": "qi_replenishment_pill",
           "quantity": 6,
           "price": 20,
+          "made_here": true
+        },
+        {
+          "item_id": "qi_replenishment_pill@mid",
+          "quantity": 3,
+          "price": 40,
           "made_here": true
         },
         {
@@ -63263,6 +63670,12 @@
           "made_here": true
         },
         {
+          "item_id": "longevity_pill@mid",
+          "quantity": 1,
+          "price": 586,
+          "made_here": true
+        },
+        {
           "item_id": "moonveil_herb",
           "quantity": 9,
           "price": 15,
@@ -63275,9 +63688,21 @@
           "made_here": true
         },
         {
+          "item_id": "moonveil_recovery_pill@mid",
+          "quantity": 3,
+          "price": 118,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_condensation_pill",
           "quantity": 2,
           "price": 69,
+          "made_here": true
+        },
+        {
+          "item_id": "spirit_condensation_pill@mid",
+          "quantity": 1,
+          "price": 138,
           "made_here": true
         },
         {
@@ -63293,9 +63718,21 @@
           "made_here": true
         },
         {
+          "item_id": "dawnlotus_vitality_pill@mid",
+          "quantity": 1,
+          "price": 234,
+          "made_here": true
+        },
+        {
           "item_id": "immortal_marrow_pill",
           "quantity": 2,
           "price": 137,
+          "made_here": true
+        },
+        {
+          "item_id": "immortal_marrow_pill@mid",
+          "quantity": 1,
+          "price": 274,
           "made_here": true
         },
         {
@@ -63311,9 +63748,21 @@
           "made_here": true
         },
         {
+          "item_id": "heavenpetal_elixir@mid",
+          "quantity": 1,
+          "price": 468,
+          "made_here": true
+        },
+        {
           "item_id": "starlight_dao_pill",
           "quantity": 1,
           "price": 273,
+          "made_here": true
+        },
+        {
+          "item_id": "starlight_dao_pill@mid",
+          "quantity": 1,
+          "price": 546,
           "made_here": true
         },
         {
@@ -63346,7 +63795,18 @@
         "dawnlotus_vitality_pill": 37,
         "immortal_marrow_pill": 44,
         "heavenpetal_elixir": 93,
-        "starlight_dao_pill": 109
+        "starlight_dao_pill": 109,
+        "recovery_pill@mid": 14,
+        "qi_pill@mid": 14,
+        "heart_calming_pill@mid": 10,
+        "qi_replenishment_pill@mid": 10,
+        "longevity_pill@mid": 234,
+        "moonveil_recovery_pill@mid": 30,
+        "spirit_condensation_pill@mid": 34,
+        "dawnlotus_vitality_pill@mid": 74,
+        "immortal_marrow_pill@mid": 88,
+        "heavenpetal_elixir@mid": 186,
+        "starlight_dao_pill@mid": 218
       }
     },
     "nine_heavens_talisman_hall": {
@@ -63380,9 +63840,21 @@
           "made_here": true
         },
         {
+          "item_id": "swift_wind_talisman@mid",
+          "quantity": 3,
+          "price": 40,
+          "made_here": true
+        },
+        {
           "item_id": "stone_skin_talisman",
           "quantity": 6,
           "price": 22,
+          "made_here": true
+        },
+        {
+          "item_id": "stone_skin_talisman@mid",
+          "quantity": 3,
+          "price": 44,
           "made_here": true
         },
         {
@@ -63392,9 +63864,21 @@
           "made_here": true
         },
         {
+          "item_id": "spirit_focus_talisman@mid",
+          "quantity": 1,
+          "price": 50,
+          "made_here": true
+        },
+        {
           "item_id": "crystal_ward_talisman",
           "quantity": 2,
           "price": 59,
+          "made_here": true
+        },
+        {
+          "item_id": "crystal_ward_talisman@mid",
+          "quantity": 1,
+          "price": 118,
           "made_here": true
         },
         {
@@ -63404,9 +63888,21 @@
           "made_here": true
         },
         {
+          "item_id": "golden_edge_talisman@mid",
+          "quantity": 1,
+          "price": 234,
+          "made_here": true
+        },
+        {
           "item_id": "starfall_talisman",
           "quantity": 2,
           "price": 234,
+          "made_here": true
+        },
+        {
+          "item_id": "starfall_talisman@mid",
+          "quantity": 1,
+          "price": 468,
           "made_here": true
         },
         {
@@ -63438,7 +63934,13 @@
         "starfall_talisman": 90,
         "paper_crane_charm": 42,
         "void_stride_talisman": 630,
-        "spirit_focus_talisman": 6
+        "spirit_focus_talisman": 6,
+        "swift_wind_talisman@mid": 14,
+        "stone_skin_talisman@mid": 16,
+        "crystal_ward_talisman@mid": 44,
+        "golden_edge_talisman@mid": 90,
+        "starfall_talisman@mid": 180,
+        "spirit_focus_talisman@mid": 12
       }
     },
     "nine_heavens_provisions": {
@@ -63463,6 +63965,12 @@
           "item_id": "recovery_pill",
           "quantity": 6,
           "price": 23,
+          "made_here": false
+        },
+        {
+          "item_id": "recovery_pill@mid",
+          "quantity": 3,
+          "price": 46,
           "made_here": false
         },
         {
@@ -63496,6 +64004,12 @@
           "made_here": false
         },
         {
+          "item_id": "moonveil_recovery_pill@mid",
+          "quantity": 1,
+          "price": 136,
+          "made_here": false
+        },
+        {
           "item_id": "dawnlotus_herb",
           "quantity": 6,
           "price": 29,
@@ -63508,6 +64022,12 @@
           "made_here": false
         },
         {
+          "item_id": "dawnlotus_vitality_pill@mid",
+          "quantity": 1,
+          "price": 270,
+          "made_here": false
+        },
+        {
           "item_id": "heavenpetal_herb",
           "quantity": 6,
           "price": 57,
@@ -63517,6 +64037,12 @@
           "item_id": "heavenpetal_elixir",
           "quantity": 1,
           "price": 270,
+          "made_here": false
+        },
+        {
+          "item_id": "heavenpetal_elixir@mid",
+          "quantity": 1,
+          "price": 540,
           "made_here": false
         },
         {
@@ -63537,7 +64063,10 @@
         "wind_gourd": 77,
         "moonveil_recovery_pill": 15,
         "dawnlotus_vitality_pill": 37,
-        "heavenpetal_elixir": 93
+        "heavenpetal_elixir": 93,
+        "moonveil_recovery_pill@mid": 30,
+        "dawnlotus_vitality_pill@mid": 74,
+        "heavenpetal_elixir@mid": 186
       }
     },
     "ninefold_noble_provisions": {
@@ -65005,6 +65534,12 @@
           "made_here": true
         },
         {
+          "item_id": "spirit_iron_sword@mid",
+          "quantity": 1,
+          "price": 32,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_iron",
           "quantity": 10,
           "price": 7,
@@ -65014,6 +65549,12 @@
           "item_id": "spirit_iron_armor",
           "quantity": 1,
           "price": 20,
+          "made_here": true
+        },
+        {
+          "item_id": "spirit_iron_armor@mid",
+          "quantity": 1,
+          "price": 40,
           "made_here": true
         },
         {
@@ -65035,9 +65576,21 @@
           "made_here": true
         },
         {
+          "item_id": "spirit_crystal_sword@mid",
+          "quantity": 1,
+          "price": 118,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_crystal_mail",
           "quantity": 1,
           "price": 71,
+          "made_here": true
+        },
+        {
+          "item_id": "spirit_crystal_mail@mid",
+          "quantity": 1,
+          "price": 142,
           "made_here": true
         },
         {
@@ -65053,9 +65606,21 @@
           "made_here": true
         },
         {
+          "item_id": "immortal_gold_sabre@mid",
+          "quantity": 1,
+          "price": 234,
+          "made_here": true
+        },
+        {
           "item_id": "immortal_gold_plate",
           "quantity": 1,
           "price": 141,
+          "made_here": true
+        },
+        {
+          "item_id": "immortal_gold_plate@mid",
+          "quantity": 1,
+          "price": 282,
           "made_here": true
         },
         {
@@ -65088,7 +65653,13 @@
         "immortal_gold_sabre": 45,
         "azure_flying_sword": 122,
         "spirit_crystal_mail": 22,
-        "immortal_gold_plate": 56
+        "immortal_gold_plate": 56,
+        "spirit_iron_sword@mid": 12,
+        "spirit_iron_armor@mid": 14,
+        "spirit_crystal_sword@mid": 44,
+        "immortal_gold_sabre@mid": 90,
+        "spirit_crystal_mail@mid": 44,
+        "immortal_gold_plate@mid": 112
       }
     },
     "spirit_jade_apothecary": {
@@ -65110,9 +65681,21 @@
           "made_here": true
         },
         {
+          "item_id": "recovery_pill@mid",
+          "quantity": 4,
+          "price": 32,
+          "made_here": true
+        },
+        {
           "item_id": "qi_pill",
           "quantity": 6,
           "price": 16,
+          "made_here": true
+        },
+        {
+          "item_id": "qi_pill@mid",
+          "quantity": 3,
+          "price": 32,
           "made_here": true
         },
         {
@@ -65128,9 +65711,21 @@
           "made_here": true
         },
         {
+          "item_id": "heart_calming_pill@mid",
+          "quantity": 2,
+          "price": 32,
+          "made_here": true
+        },
+        {
           "item_id": "qi_replenishment_pill",
           "quantity": 5,
           "price": 16,
+          "made_here": true
+        },
+        {
+          "item_id": "qi_replenishment_pill@mid",
+          "quantity": 2,
+          "price": 32,
           "made_here": true
         },
         {
@@ -65152,9 +65747,21 @@
           "made_here": true
         },
         {
+          "item_id": "moonveil_recovery_pill@mid",
+          "quantity": 2,
+          "price": 94,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_condensation_pill",
           "quantity": 2,
           "price": 55,
+          "made_here": true
+        },
+        {
+          "item_id": "spirit_condensation_pill@mid",
+          "quantity": 1,
+          "price": 110,
           "made_here": true
         },
         {
@@ -65170,9 +65777,21 @@
           "made_here": true
         },
         {
+          "item_id": "dawnlotus_vitality_pill@mid",
+          "quantity": 1,
+          "price": 188,
+          "made_here": true
+        },
+        {
           "item_id": "immortal_marrow_pill",
           "quantity": 2,
           "price": 110,
+          "made_here": true
+        },
+        {
+          "item_id": "immortal_marrow_pill@mid",
+          "quantity": 1,
+          "price": 220,
           "made_here": true
         },
         {
@@ -65201,7 +65820,15 @@
         "moonveil_recovery_pill": 15,
         "spirit_condensation_pill": 17,
         "dawnlotus_vitality_pill": 37,
-        "immortal_marrow_pill": 44
+        "immortal_marrow_pill": 44,
+        "recovery_pill@mid": 12,
+        "qi_pill@mid": 12,
+        "heart_calming_pill@mid": 10,
+        "qi_replenishment_pill@mid": 10,
+        "moonveil_recovery_pill@mid": 30,
+        "spirit_condensation_pill@mid": 34,
+        "dawnlotus_vitality_pill@mid": 74,
+        "immortal_marrow_pill@mid": 88
       }
     },
     "spirit_jade_talisman_hall": {
@@ -65235,9 +65862,21 @@
           "made_here": true
         },
         {
+          "item_id": "swift_wind_talisman@mid",
+          "quantity": 2,
+          "price": 32,
+          "made_here": true
+        },
+        {
           "item_id": "stone_skin_talisman",
           "quantity": 5,
           "price": 18,
+          "made_here": true
+        },
+        {
+          "item_id": "stone_skin_talisman@mid",
+          "quantity": 2,
+          "price": 36,
           "made_here": true
         },
         {
@@ -65247,15 +65886,33 @@
           "made_here": true
         },
         {
+          "item_id": "spirit_focus_talisman@mid",
+          "quantity": 1,
+          "price": 40,
+          "made_here": true
+        },
+        {
           "item_id": "crystal_ward_talisman",
           "quantity": 2,
           "price": 47,
           "made_here": true
         },
         {
+          "item_id": "crystal_ward_talisman@mid",
+          "quantity": 1,
+          "price": 94,
+          "made_here": true
+        },
+        {
           "item_id": "golden_edge_talisman",
           "quantity": 2,
           "price": 94,
+          "made_here": true
+        },
+        {
+          "item_id": "golden_edge_talisman@mid",
+          "quantity": 1,
+          "price": 188,
           "made_here": true
         },
         {
@@ -65279,7 +65936,12 @@
         "crystal_ward_talisman": 18,
         "golden_edge_talisman": 36,
         "paper_crane_charm": 33,
-        "spirit_focus_talisman": 6
+        "spirit_focus_talisman": 6,
+        "swift_wind_talisman@mid": 12,
+        "stone_skin_talisman@mid": 12,
+        "crystal_ward_talisman@mid": 36,
+        "golden_edge_talisman@mid": 72,
+        "spirit_focus_talisman@mid": 12
       }
     },
     "spirit_jade_provisions": {
@@ -65304,6 +65966,12 @@
           "item_id": "recovery_pill",
           "quantity": 5,
           "price": 18,
+          "made_here": false
+        },
+        {
+          "item_id": "recovery_pill@mid",
+          "quantity": 2,
+          "price": 36,
           "made_here": false
         },
         {
@@ -65337,6 +66005,12 @@
           "made_here": false
         },
         {
+          "item_id": "moonveil_recovery_pill@mid",
+          "quantity": 1,
+          "price": 108,
+          "made_here": false
+        },
+        {
           "item_id": "dawnlotus_herb",
           "quantity": 5,
           "price": 23,
@@ -65346,6 +66020,12 @@
           "item_id": "dawnlotus_vitality_pill",
           "quantity": 2,
           "price": 108,
+          "made_here": false
+        },
+        {
+          "item_id": "dawnlotus_vitality_pill@mid",
+          "quantity": 1,
+          "price": 216,
           "made_here": false
         },
         {
@@ -65364,7 +66044,9 @@
         "dawnlotus_herb": 7,
         "wind_gourd": 61,
         "moonveil_recovery_pill": 15,
-        "dawnlotus_vitality_pill": 37
+        "dawnlotus_vitality_pill": 37,
+        "moonveil_recovery_pill@mid": 30,
+        "dawnlotus_vitality_pill@mid": 74
       }
     },
     "starroad_provisions": {
@@ -70044,13 +70726,71 @@
     }
   },
   "stall_system": {
-    "description": "A cultivator's own market stall in a city's street (v1.5.0). Standing listings that sell while the owner is away, to other cultivators and - bounded - to the world's own people. min_realm_index is the cultivation a stall asks for; base_slots and slots_per_merchant_level are how many listings it holds, grown by the homestead's merchant hall; fee_percent is the city's cut of each sale, less fee_discount_per_level per merchant-hall level and never under min_fee_percent; npc_buys_per_city_per_day bounds how many purchases the town makes on one tick.",
+    "description": "A cultivator's own market stall in a city's street (v1.5.0). Standing listings that sell while the owner is away, to other cultivators and - bounded - to the world's own people. min_realm_index is the cultivation a stall asks for; base_slots and slots_per_merchant_level are how many listings it holds, grown by the homestead's merchant hall; fee_percent is the city's cut of each sale, less fee_discount_per_level per merchant-hall level and never under min_fee_percent; npc_buys_per_city_per_day bounds how many purchases the town makes on one tick. Since v1.6.0 a stall is in reach from anywhere: distance_percent_per_hop is how much dearer it is per road between the buyer and the stall, and a buyer in another world or a private place counts as cross_world_hops roads, somewhere in the same world that no road reaches as half of that. That surcharge is split three ways: a third to the seller, a third to the city's cut, the rest the courier's.",
     "min_realm_index": 2,
     "base_slots": 2,
     "slots_per_merchant_level": 1,
     "fee_percent": 10,
     "fee_discount_per_level": 1,
     "min_fee_percent": 2,
-    "npc_buys_per_city_per_day": 3
+    "npc_buys_per_city_per_day": 3,
+    "distance_percent_per_hop": 5,
+    "cross_world_hops": 20
+  },
+  "item_grade_system": {
+    "grades": [
+      {
+        "key": "low",
+        "label": "Low",
+        "effect_mult": 1.0,
+        "price_mult": 1,
+        "min_rank": 0,
+        "qualities": [
+          "crude",
+          "ordinary"
+        ]
+      },
+      {
+        "key": "mid",
+        "label": "Mid",
+        "effect_mult": 1.25,
+        "price_mult": 2,
+        "min_rank": 1,
+        "qualities": [
+          "refined",
+          "fine"
+        ]
+      },
+      {
+        "key": "high",
+        "label": "High",
+        "effect_mult": 1.5,
+        "price_mult": 4,
+        "min_rank": 3,
+        "qualities": [
+          "superior"
+        ]
+      },
+      {
+        "key": "superior",
+        "label": "Superior",
+        "effect_mult": 2.0,
+        "price_mult": 8,
+        "min_rank": 5,
+        "qualities": [
+          "flawless",
+          "masterwork"
+        ]
+      },
+      {
+        "key": "transcendent",
+        "label": "Transcendent",
+        "effect_mult": 3.0,
+        "price_mult": 16,
+        "min_rank": 7,
+        "qualities": [],
+        "min_margin": 12
+      }
+    ]
   }
 }

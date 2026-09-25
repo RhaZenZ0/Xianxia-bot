@@ -260,7 +260,7 @@ func bestFlightArtifact(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	}
 	best, name := int64(0), ""
 	for _, row := range res.Rows {
-		item, ok := catalog.Items[fmt.Sprint(row[0])]
+		item, _, ok := itemDef(catalog, fmt.Sprint(row[0]))
 		if !ok || item.Flight <= best {
 			continue
 		}

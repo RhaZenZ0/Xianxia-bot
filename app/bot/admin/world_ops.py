@@ -351,7 +351,7 @@ async def admin_grant(
             return
         payload.update({"currency_id": target, "amount": int(amount)})
     else:
-        if target not in WORLD.items:
+        if not WORLD.item_definition(target):
             await interaction.response.send_message("Unknown item.", ephemeral=False)
             return
         # v0.19.32: one-of-a-kind reward equipment (the Bugslayer Sword) is

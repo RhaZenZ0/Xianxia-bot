@@ -4991,6 +4991,55 @@ Three empty-picker hints say what to do when the bag, the stall or the city's bo
 **What the town's step deliberately leaves alone.** It debits no player, reads no player's price
 into any band, and skips rather than errors: a bad row costs one purchase, never the tick.
 
+### A grade is a suffix, and one door reads it (`item_grade.go`, v1.6.0)
+
+Asked for: items graded Low / Mid / High / Superior / Transcendent, NPC shops dealing only in the
+lowest, player stalls in any. The owner's calls: crafted items only (the recipe outputs), grade by
+the craft's margin capped by trade rank, stronger *and* pricier, towns sell Low and capitals Mid,
+the price doubling a step (x1/2/4/8/16), keepers buying Low and Mid only.
+
+**The quality ladder graded nothing.** `alchemyQualityGo` and `craftQuality` have named a craft's
+quality since before the trades had ranks, and spent it on one thing: a larger Alchemy batch.
+Nothing read quality when an item was used, and `equipment_instances.quality` was read by two
+formulas - `1+(q-100)/200` solo, `q/100` in group combat - that agreed only at 100, the one value
+anything had ever written. `equipmentQualityMult` is the one formula now, and a grade binds at
+its inverse (`gradeEquipmentQuality`), so a High sword really is x1.5.
+
+**A suffix, not a column, and the reason is the tables.** An item id is free text in the bag,
+storage, a stall, the auction floor, a trade offer and a sect's treasury, with no foreign key to
+content, so `<base>@<grade>` rides through all of them with no schema change - and the bare id is
+Low, so every existing row is already correct. A column would have been a migration on six tables
+and a new key on each. The separator is a code constant on both sides, not content: changing it
+would orphan every graded row.
+
+**The cost of a suffix is that `catalog.Items[id]` answers "unknown" for every graded item**, and
+production Go had ~38 of those. `itemDef` is the one door - base, rung, and whether the id names
+anything (only a recipe output has a grade; the first rung is written bare, so `qi_pill@low` is
+refused rather than becoming a second name for Low) - and `TestTheCatalogueIsReadByOneDoor` holds
+production Go to it by AST, the `TestThePurseHasOneDoor` shape. The bot has the same problem with
+`WORLD.items` and the same answer: `World.item_definition`, held by
+`test_item_grades.py`. **What a grade is worth is priced inside `itemDef`**, so every reader of
+`BasePrice`/`SectValue` - sect contribution, appraisal, a merchant's valuation, a keeper's counter -
+gets the grade's worth without knowing grades exist. **What it does is scaled where it is used**:
+restores, lifespan, a modifier (an additive value multiplied, a multiplier's distance from 1), and
+duration. Toxicity is deliberately not, because a stronger pill is not a cleaner one.
+
+**The mint rule holds per grade for free**: `cheapestShelfPrice` and `highestKeeperBuy` key on the
+full graded id, so a Mid counter is held under the Mid shelf. A keeper refuses `keeperGradeCeiling`
+(High) and above before asking whether the shop wants the item. And a stall's town buyers already
+buy only what some shelf sells (v1.5.0), so High and finer sell to players only - exactly the split
+asked for, with no new rule.
+
+**A stall is in reach from anywhere, priced by the road** (asked in the same session: "the player
+shop are always in reach the only thing the price increases per distance"). `stallDistanceHops` is
+a shortest walk over `canonicalRoadNeighbors` plus each road site's `road_leg`, walked to exhaustion
+and capped at `cross_world_hops` - stopped early, a far city would have answered as the off-road
+half and been cheaper than the middle of its world. Another world or a private place is
+`cross_world_hops` (20); the same world but no road (a marsh, a sect gate) is half; a household is
+measured from its town. The surcharge is split a third to the seller, a third to the city's cut
+(which like the fee goes into no purse) and the rest a courier sink; `StallSaleTx`, the town's
+door, passes zero because the town stands in the stall's city.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

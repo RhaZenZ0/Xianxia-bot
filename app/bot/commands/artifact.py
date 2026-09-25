@@ -76,7 +76,7 @@ async def artifact_bond_autocomplete(interaction: discord.Interaction, current: 
     needle = current.casefold().strip()
     choices: list[app_commands.Choice[str]] = []
     for item_id, quantity in sorted(dict(inventory or {}).items()):
-        if int(quantity or 0) <= 0 or item_id not in WORLD.items:
+        if int(quantity or 0) <= 0 or not WORLD.item_definition(item_id):
             continue
         label = WORLD.item_name(item_id)
         if needle and needle not in label.casefold() and needle not in item_id.casefold():

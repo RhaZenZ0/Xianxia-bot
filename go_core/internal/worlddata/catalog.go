@@ -966,6 +966,29 @@ type Catalog struct {
 	// homestead's merchant hall grows that, the city's cut, and how many
 	// purchases the town makes at one city's stalls on a tick.
 	StallSystem StallSystem `json:"stall_system"`
+	// ItemGrades (v1.6.0): the five grades a crafted item can carry, what each
+	// multiplies and the trade rank that can make it. Which items are graded is
+	// not listed here: it is every recipe's output, read off Recipes.
+	ItemGrades ItemGradeSystem `json:"item_grade_system"`
+}
+
+// ItemGradeSystem is the grade ladder a crafted item climbs (v1.6.0). A graded
+// item is stored as "<base>@<key>"; the bare id is the first grade.
+type ItemGradeSystem struct {
+	Grades []ItemGrade `json:"grades"`
+}
+
+// ItemGrade is one rung. A craft reaches it when its quality is one of
+// Qualities or its margin is at least MinMargin (when set), and only a crafter
+// at MinRank or above in the recipe's trade may make it.
+type ItemGrade struct {
+	Key        string   `json:"key"`
+	Label      string   `json:"label"`
+	EffectMult float64  `json:"effect_mult"`
+	PriceMult  int64    `json:"price_mult"`
+	MinRank    int64    `json:"min_rank"`
+	Qualities  []string `json:"qualities"`
+	MinMargin  *int64   `json:"min_margin"`
 }
 
 // StallSystem is that roster. Every field is read by one rule in the game
@@ -980,6 +1003,12 @@ type StallSystem struct {
 	FeeDiscountPerLevel   int64  `json:"fee_discount_per_level"`
 	MinFeePercent         int64  `json:"min_fee_percent"`
 	NPCBuysPerCityPerDay  int64  `json:"npc_buys_per_city_per_day"`
+	// DistancePercentPerHop and CrossWorldHops (v1.6.0): a stall is in reach
+	// from anywhere, and a buyer pays this share more for each road between
+	// them and it; another world, or a place on no road, counts as
+	// CrossWorldHops roads.
+	DistancePercentPerHop int64 `json:"distance_percent_per_hop"`
+	CrossWorldHops        int64 `json:"cross_world_hops"`
 }
 
 // ForageMaterial is one entry of that roster. Chance is the base percentage

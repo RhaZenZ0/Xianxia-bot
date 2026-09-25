@@ -1164,7 +1164,7 @@ LOCATION_GATES: dict[str, tuple[str, ...]] = {
     "inn_table": ("trade offer",),
     # A stall is kept in a city's street (v1.5.0): tended and bought from
     # in that city, and nowhere private. `stallCityAt` is the engine's question.
-    "city_street": ("stall open", "stall list", "stall withdraw", "stall buy", "stall close"),
+    "city_street": ("stall open", "stall list", "stall withdraw", "stall close"),
     "city_board": ("city accept",),
     # The three v1.1.0 left out for their cost (v1.3.1, on the owner's call):
     # the ghost road's two grounds are the content twin of

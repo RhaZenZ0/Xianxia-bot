@@ -529,7 +529,7 @@ async def inventory(interaction: discord.Interaction) -> None:
             # The fallback only covers an id missing from the catalogue; an
             # entry present but short a field must not take the listing down
             # with it, so every read has its own default.
-            item = WORLD.items.get(item_id) or {}
+            item = WORLD.item_definition(item_id)
             name = str(item.get("name") or item_id)
             lines.append(f"**{name}** x{qty} — {item.get('description') or ''}")
         text = "\n".join(lines)

@@ -439,23 +439,22 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 			describeMaterials(catalog, missing))
 	}
 
-	output := map[string]int64{}
-	for k, v := range recipe.Output {
-		output[k] = v
-	}
-	qkey, qlabel, xpbonus, qpoints, mult := "", "", int64(0), int64(0), int64(1)
+	qkey, qlabel, xpbonus, qpoints := "", "", int64(0), int64(0)
 	if strings.EqualFold(profession, "Alchemy") {
-		qkey, qlabel, mult, xpbonus = alchemyQualityGo(margin, success)
-		if success && mult > 1 {
-			for k, v := range output {
-				output[k] = v * mult
-			}
-		}
+		qkey, qlabel, _, xpbonus = alchemyQualityGo(margin, success)
 		if margin > 0 {
 			qpoints = margin
 		}
 	} else {
-		qkey, qlabel, xpbonus, qpoints, mult = craftQuality(margin, success)
+		qkey, qlabel, xpbonus, qpoints, _ = craftQuality(margin, success)
+	}
+	// The grade (v1.6.0). Quality used to multiply an alchemy batch and do
+	// nothing for the other three trades; it is spent on the grade of what is
+	// made now, capped by the crafter's rank in this trade.
+	gradeIndex, gradeReached := craftGradeIndex(catalog, qkey, margin, level)
+	output := map[string]int64{}
+	for k, v := range recipe.Output {
+		output[gradedID(catalog, k, gradeIndex)] = v
 	}
 	// What a miss leaves you (v1.3.0). The inputs were consumed above whether
 	// or not the roll landed, and until now a failure kept all of them: the
@@ -600,7 +599,9 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		"profession_progress":  prog,
 		"exam_offered":         examOffered,
 		"profession_bonus":     level,
-		"output_multiplier":    mult,
+		"grade":                craftGradeLabel(catalog, gradeIndex),
+		"grade_reached":        craftGradeLabel(catalog, gradeReached),
+		"grade_reached_rank":   craftGradeRank(catalog, gradeReached),
 		"location":             location,
 		"game_minute":          gameMinute,
 		"effect_bonus":         effectBonus,
@@ -783,7 +784,7 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	// a ref the item catalogue does not carry falls back to the Mortal herb
 	// rather than producing a row for an item that does not exist.
 	commonHerb := catalog.EventSites.Material(worldName, "@herb")
-	if _, ok := catalog.Items[commonHerb]; !ok || commonHerb == "" {
+	if _, _, ok := itemDef(catalog, commonHerb); !ok || commonHerb == "" {
 		commonHerb = "spirit_herb"
 	}
 	lootPlan := map[string]int64{commonHerb: minI64(5, commonQty)}
@@ -796,16 +797,16 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 		Base int64
 	}
 	rarePool := []rareCandidate{}
-	if _, ok := catalog.Items["fire_spirit_root_herb"]; ok {
+	if _, _, ok := itemDef(catalog, "fire_spirit_root_herb"); ok {
 		rarePool = append(rarePool, rareCandidate{"fire_spirit_root_herb", 35})
 	}
-	if _, ok := catalog.Items["ice_spirit_blazing_grass"]; ok && worldTier >= 1 {
+	if _, _, ok := itemDef(catalog, "ice_spirit_blazing_grass"); ok && worldTier >= 1 {
 		rarePool = append(rarePool, rareCandidate{"ice_spirit_blazing_grass", 24})
 	}
-	if _, ok := catalog.Items["twin_extremes_fruit"]; ok && worldTier >= 1 {
+	if _, _, ok := itemDef(catalog, "twin_extremes_fruit"); ok && worldTier >= 1 {
 		rarePool = append(rarePool, rareCandidate{"twin_extremes_fruit", 15})
 	}
-	if _, ok := catalog.Items["jade_life_herb"]; ok && worldTier >= 2 {
+	if _, _, ok := itemDef(catalog, "jade_life_herb"); ok && worldTier >= 2 {
 		rarePool = append(rarePool, rareCandidate{"jade_life_herb", 6})
 	}
 	rareFound := ""
@@ -857,7 +858,7 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 		// The same guard the tiered herb uses: content naming an item the
 		// catalogue does not carry must not write an inventory row for a
 		// thing that does not exist.
-		if _, ok := catalog.Items[id]; !ok {
+		if _, _, ok := itemDef(catalog, id); !ok {
 			continue
 		}
 		if spec.Chance <= 0 || spec.Max <= 0 || resources < spec.MinResources {
@@ -1003,7 +1004,7 @@ func recipeLearnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		return authoritativeMutation{}, err
 	}
 	itemID := strings.TrimSpace(p.ItemID)
-	item, ok := catalog.Items[itemID]
+	item, _, ok := itemDef(catalog, itemID)
 	if !ok {
 		return authoritativeMutation{}, fmt.Errorf("unknown item: %s", itemID)
 	}

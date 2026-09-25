@@ -6,6 +6,45 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.6.0** gives every crafted item a grade - Low, Mid, High, Superior or Transcendent - made by how well the craft went and capped by the crafter's rank, and makes every player's stall reachable from anywhere in the world, dearer by the road.
+
+The quality ladder a craft rolls has always had names (ordinary, refined, fine, superior,
+flawless, masterwork) and spent them on one thing: a larger Alchemy batch. Nothing read quality
+when an item was used. `item_grade_system` in `content/world.json` is the ladder now, each grade
+with what it does (x1, x1.25, x1.5, x2, x3), what it is worth (x1, x2, x4, x8, x16) and the trade
+rank that may make it (any, Tier 1, Tier 3, Tier 5, Tier 7). A craft reaches the highest grade its
+quality or margin meets, then steps down to the best its maker's rank allows, and the reply says
+which rank would have made the better one. The Alchemy batch multiplier is gone, because quality
+is spent on grade now; a failed craft still returns half its makings.
+
+A graded item is its id with a suffix - `qi_pill@high` - and the bare id is Low, so every item
+anybody already holds is Low and nothing is migrated. The suffix rides through the bag, storage,
+a stall, the auction floor and a trade offer without a schema change. `itemDef` is the one door
+from an id to its definition in the engine and `TestTheCatalogueIsReadByOneDoor` holds production
+Go to it; `World.item_definition` is the bot's, held the same way. Only a recipe's output has a
+grade: a material, a manual or a key does not, and `spirit_herb@high` is nothing.
+
+What a grade does is scaled where the item is used: restores, lifespan, a pill's modifiers and how
+long it lasts. Toxicity is not, because a stronger pill is not a cleaner one. A bound weapon or
+armour carries its grade as its quality, and the two quality formulas the game had - one in solo
+combat and one in group combat, agreeing only at the one value anything had ever written - are one.
+What a grade is worth is priced once, in `itemDef`, so a sect's contribution, an appraisal, a
+merchant's valuation and a keeper's counter all see it without knowing grades exist.
+
+Keepers deal in Low and Mid only. Every town sells Low; the sixteen capital shops also sell Mid,
+at twice the price, and buy it back at twice the Low price (`scripts/author_mid_shelves.py`
+wrote the 192 lines). A keeper refuses anything finer and says where it sells: at a player's stall
+or on the auction floor. The mint rule holds per grade, because a counter's ceiling is keyed on the
+full graded id.
+
+A player's stall is in reach from anywhere now, on the owner's call. The board lists every stall
+in the world, nearest first, each with its roads and what it costs from where you stand; the price
+rises `distance_percent_per_hop` (5%) per road. Another world, or a private place, counts as
+`cross_world_hops` (20) roads; somewhere in the same world that no road reaches counts as half of
+that; a household is measured from its town. The surcharge is split three ways - a third to the
+seller, a third to the city's cut, the rest the courier's - and the town's own buyers stand in the
+stall's city and pay none. Tending a stall is still done in its city.
+
 **1.5.0** gives a cultivator at Foundation Establishment a market stall in a city's street: goods laid on it sell while the owner is away, to other cultivators at the asking price and - bounded - to the town, and the homestead's merchant hall, built and raised for twenty releases and read by nothing, is what grows it.
 
 Trade between two players needed both at one inn at one time, and the auction floor needs bids
@@ -1002,9 +1041,9 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.5.0
+## Release status — v1.6.0
 
-- Current release: v1.5.0 - a cultivator at Foundation Establishment keeps a market stall in a city's street (schema 65): standing listings that sell while they are away, to cultivators and - never the last unit, never above the shelf, out of its own wealth - to the town; the homestead's merchant hall grows it (see the changelog). Built on v1.4.1 - a GM can finish or advance a player's quest from the Player Editor's new Quests card, through the same path a player's own report takes (see the changelog). Built on v1.4.0 - a GM updates the server from the dashboard: an audited request, a watcher on the NAS running `update.sh --upgrade`, and the outcome on the card (see the changelog). Built on v1.3.5 - command use is counted (schema 64) and the ten most used commands are on `/admin server observability`; nothing is reordered for it (see the changelog). Built on v1.3.4 - the punch list cleared: the Stygian Ghost Scripture is the Ghost Cultivator's high manual and its inheritance reads `preferred_paths`, a path's skill is on the sheet, two dead era keys deleted (see the changelog). Built on v1.3.3 - the eight open rule decisions settled: a Law control technique weakens its opponent (schema 63), a clan treaty that runs out ends and leaves a rivalry, the auction-door ambush is on the house's doorstep, five entries closed with reasons (see the changelog). Schema 63. Built on v1.3.2 - the daily five are one step each: `/cultivate`, `/explore`, `/hunt`, `/forage` and `/mine` are slash commands and a row of five buttons on the menu (see the changelog). Built on v1.3.1 - six rules the bot held are the engine's (a sponsor's presence, the sects a gate justifies, a city's board, a territory's ground, the forage wait, the quest chain catch-up on any action) and three more buttons are drawn only where they work (see the changelog). Built on v1.3.0 - ten of the owner's decisions: a failed craft returns half its makings, a hall teaches only what its world can make, the Nine-Echo Sword Wraith is a secret floor beneath its realm, `/reset` asks with the count, the Qi Body card shows the pool at every realm, thirty-three upper-world send-offs, no property inside a household, `heart` retired, the Starfall hall's buy line lowered (see the changelog). Built on v1.2.3 - the review's eight deferred claims settled: Vacuum refuses at once behind a half-written action, one array rule at both cultivation doors, one counter-attack TN, an undo undone again, a rank price under a merchant's wares, and a lot listed in its house's coin (see the changelog). Built on v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
+- Current release: v1.6.0 - every crafted item carries a grade, Low to Transcendent, made by the craft's quality and capped by rank; keepers deal in Low and Mid (capitals sell Mid) and a player's stall in any grade, reachable from anywhere at 5% a road (see the changelog). Built on v1.5.0 - a cultivator at Foundation Establishment keeps a market stall in a city's street (schema 65): standing listings that sell while they are away, to cultivators and - never the last unit, never above the shelf, out of its own wealth - to the town; the homestead's merchant hall grows it (see the changelog). Built on v1.4.1 - a GM can finish or advance a player's quest from the Player Editor's new Quests card, through the same path a player's own report takes (see the changelog). Built on v1.4.0 - a GM updates the server from the dashboard: an audited request, a watcher on the NAS running `update.sh --upgrade`, and the outcome on the card (see the changelog). Built on v1.3.5 - command use is counted (schema 64) and the ten most used commands are on `/admin server observability`; nothing is reordered for it (see the changelog). Built on v1.3.4 - the punch list cleared: the Stygian Ghost Scripture is the Ghost Cultivator's high manual and its inheritance reads `preferred_paths`, a path's skill is on the sheet, two dead era keys deleted (see the changelog). Built on v1.3.3 - the eight open rule decisions settled: a Law control technique weakens its opponent (schema 63), a clan treaty that runs out ends and leaves a rivalry, the auction-door ambush is on the house's doorstep, five entries closed with reasons (see the changelog). Schema 63. Built on v1.3.2 - the daily five are one step each: `/cultivate`, `/explore`, `/hunt`, `/forage` and `/mine` are slash commands and a row of five buttons on the menu (see the changelog). Built on v1.3.1 - six rules the bot held are the engine's (a sponsor's presence, the sects a gate justifies, a city's board, a territory's ground, the forage wait, the quest chain catch-up on any action) and three more buttons are drawn only where they work (see the changelog). Built on v1.3.0 - ten of the owner's decisions: a failed craft returns half its makings, a hall teaches only what its world can make, the Nine-Echo Sword Wraith is a secret floor beneath its realm, `/reset` asks with the count, the Qi Body card shows the pool at every realm, thirty-three upper-world send-offs, no property inside a household, `heart` retired, the Starfall hall's buy line lowered (see the changelog). Built on v1.2.3 - the review's eight deferred claims settled: Vacuum refuses at once behind a half-written action, one array rule at both cultivation doors, one counter-attack TN, an undo undone again, a rank price under a merchant's wares, and a lot listed in its house's coin (see the changelog). Built on v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
   Apprentice to Tier 9 Sovereign with each trade's own word in front (Pill, Forge, Talisman, Array,
   Herb, Ore, Beast, Artifact, Treasure). No schema.
 - v1.2.1: a beast can always evolve, a homestead can be upgraded in any world, and a dozen smaller wires from a deep review (see the changelog).

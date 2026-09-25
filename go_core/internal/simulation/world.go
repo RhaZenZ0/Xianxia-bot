@@ -787,10 +787,10 @@ func (r *Runner) blackMarkets(conn *storage.Conn, steps, gm int64) (string, erro
 			}
 			id := candidates[idx]
 			used[id] = true
-			item := r.Catalog.Items[id]
-			base := item.BasePrice
+			item := worldItem(r.World, id)
+			base := game.ItemBasePrice(r.World, id)
 			if base <= 0 {
-				base = max64(8, item.SectValue*8)
+				base = max64(8, game.ItemSectValue(r.World, id)*8)
 			}
 			qty := int64(1 + hash64(id, world, fmt.Sprint(gm))%4)
 			scarcity := 1.0 + float64(max64(0, 8-qty))*0.05

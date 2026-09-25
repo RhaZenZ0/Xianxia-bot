@@ -145,7 +145,7 @@ func (r *Runner) npcConsignments(conn *storage.Conn, steps, gm int64) (string, e
 			return "", err
 		}
 		itemID := pool[pick]
-		item := r.World.Items[itemID]
+		item := worldItem(r.World, itemID)
 
 		legal := strings.ToLower(strings.TrimSpace(item.LegalStatus))
 		if legal == "forbidden" || legal == "contraband" || legal == "restricted" {

@@ -105,7 +105,7 @@ async def _remember_freeform_npc_scene(
 
 def _item_label(item_id: str) -> str:
     """Name the item rather than printing its key at the player."""
-    item = dict(WORLD.items.get(str(item_id)) or {})
+    item = WORLD.item_definition(str(item_id))
     return str(item.get("name") or str(item_id).replace("_", " ").title())
 
 

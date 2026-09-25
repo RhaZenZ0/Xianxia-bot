@@ -181,7 +181,7 @@ func combatEquipment(conn *storage.Conn, userID int64) (attack, defense, spirit,
 		return
 	}
 	for _, x := range r.Rows {
-		d, ok := equipDefs[fmt.Sprint(x[0])]
+		d, ok := equipDefs[itemBaseID(fmt.Sprint(x[0]))]
 		if !ok {
 			continue
 		}
@@ -192,10 +192,7 @@ func combatEquipment(conn *storage.Conn, userID int64) (attack, defense, spirit,
 		if condition > 1 {
 			condition = 1
 		}
-		quality := 1 + (float64(i64(x[3]))-100)/200
-		if quality < 0.5 {
-			quality = 0.5
-		}
+		quality := equipmentQualityMult(i64(x[3]))
 		attack += int64(math.Round(float64(d[0]) * condition * quality))
 		defense += int64(math.Round(float64(d[1]) * condition * quality))
 		spirit += int64(math.Round(float64(d[2]) * condition * quality))
@@ -1012,7 +1009,7 @@ func combatRecoveryItemAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	item, ok := catalog.Items[p.ItemID]
+	item, _, ok := itemDef(catalog, p.ItemID)
 	if !ok || (item.Use.Instant.QiRestore <= 0 && item.Use.Instant.VitalityRestore <= 0) {
 		return authoritativeMutation{}, errors.New("item has no instant battle recovery effect")
 	}
@@ -1033,13 +1030,14 @@ func combatRecoveryItemAction(conn *storage.Conn, catalog worlddata.Catalog, use
 		return authoritativeMutation{}, e
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
-	qiRestore := maxI64(0, item.Use.Instant.QiRestore)
+	grade := itemEffectMult(catalog, p.ItemID)
+	qiRestore := gradedAmount(item.Use.Instant.QiRestore, grade)
 	if qiRestore > 0 {
 		if state, err := settleQi(conn, catalog, userID, p.GameMinute, now); err == nil {
 			qiRestore = state.Restore(qiRestore)
 		}
 	}
-	_, e = conn.Execute(`UPDATE characters SET qi=MIN(qi_max,qi+?),vitality=MIN(vitality_max,vitality+?),updated_at=? WHERE user_id=?`, []any{qiRestore, item.Use.Instant.VitalityRestore, now, userID})
+	_, e = conn.Execute(`UPDATE characters SET qi=MIN(qi_max,qi+?),vitality=MIN(vitality_max,vitality+?),updated_at=? WHERE user_id=?`, []any{qiRestore, gradedAmount(item.Use.Instant.VitalityRestore, grade), now, userID})
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
@@ -1049,7 +1047,7 @@ func combatRecoveryItemAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	}
 	x := st.Rows[0]
 	newVitality, newVitalityMax := i64(x[2]), i64(x[3])
-	if item.Use.Instant.VitalityRestore > 0 {
+	if gradedAmount(item.Use.Instant.VitalityRestore, grade) > 0 {
 		// Keep battles.player_hp in lockstep with characters.vitality the same
 		// way every other combat mutation does (combat.turn/combat.technique
 		// decrement both together on damage) - a mid-battle heal that only
@@ -1059,7 +1057,7 @@ func combatRecoveryItemAction(conn *storage.Conn, catalog worlddata.Catalog, use
 			return authoritativeMutation{}, e
 		}
 	}
-	out := map[string]any{"battle_id": p.BattleID, "item_id": p.ItemID, "item_name": item.Name, "qi": i64(x[0]), "qi_max": i64(x[1]), "vitality": newVitality, "vitality_max": newVitalityMax, "qi_restore": item.Use.Instant.QiRestore, "vitality_restore": item.Use.Instant.VitalityRestore}
+	out := map[string]any{"battle_id": p.BattleID, "item_id": p.ItemID, "item_name": item.Name, "qi": i64(x[0]), "qi_max": i64(x[1]), "vitality": newVitality, "vitality_max": newVitalityMax, "qi_restore": item.Use.Instant.QiRestore, "vitality_restore": gradedAmount(item.Use.Instant.VitalityRestore, grade)}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "combat", EventType: "recovery_item", EntityType: "battle", EntityID: fmt.Sprint(p.BattleID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 
