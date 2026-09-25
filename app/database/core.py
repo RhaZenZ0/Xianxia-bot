@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 63
+SCHEMA_VERSION = 64
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -182,6 +182,7 @@ OPERATIONAL_REQUIRED_TABLES = frozenset(
         "schema_migrations",
         "schema_version",
         "seclusion_sessions",
+        "command_usage",
         "secret_realm_runs",
         "sect_abodes",
         "sect_factions",
@@ -2677,7 +2678,41 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             "ALTER TABLE battles ADD COLUMN opponent_modifiers_json TEXT NOT NULL DEFAULT '{}'",
         ),
     ),
+    (
+        64,
+        "command_use_is_counted",
+        (
+            # v1.3.5: how often each command is used, per UTC day, server-wide.
+            # `path` is the leaf path the hubs build (`/alchemy forage`,
+            # `/travel`), so a slash command, a hub press and a typed line
+            # count as one thing. No user id on purpose: the count is about
+            # the command, not the player, so the erasure sweep never has to
+            # know the table exists. Read by the GM's observability card and
+            # by nothing that decides what a panel draws - the owner's call
+            # was to count and not to reorder.
+            """CREATE TABLE IF NOT EXISTS command_usage (
+                path TEXT NOT NULL,
+                day TEXT NOT NULL,
+                presses INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (path, day)
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_command_usage_day ON command_usage(day)",
+        ),
+    ),
 )
+
+
+COMMAND_USAGE_DAYS = 30
+
+
+def _usage_day(now: float | None = None) -> str:
+    """The UTC calendar day a press is counted under (v1.3.5)."""
+    return time.strftime("%Y-%m-%d", time.gmtime(time.time() if now is None else now))
+
+
+def _usage_cutoff_day(days: int, now: float | None = None) -> str:
+    """The first day still inside a `days`-day window."""
+    return _usage_day((time.time() if now is None else now) - max(0, int(days)) * 86400)
 
 
 class _ObservedCursor:
@@ -6825,10 +6860,39 @@ class Database:
                 ("sect_politics_events","DELETE FROM sect_politics_events WHERE event_id NOT IN (SELECT event_id FROM sect_politics_events ORDER BY event_id DESC LIMIT 2000)",()),
                 ("world_action_events","DELETE FROM world_action_events WHERE action_id NOT IN (SELECT action_id FROM world_action_events ORDER BY action_id DESC LIMIT 5000)",()),
                 ("wild_beast_encounters","DELETE FROM wild_beast_encounters WHERE status!='available' AND updated_at<?",(now-30*86400,)),
+                ("command_usage","DELETE FROM command_usage WHERE day<?",(_usage_cutoff_day(COMMAND_USAGE_DAYS),)),
             ):
                 cur=await db.execute(sql,args); counts[label]=max(0,int(cur.rowcount or 0))
             await db.execute("PRAGMA optimize"); await db.commit()
         return counts
+
+    # ------------------------------------------------------------------
+    # Command use (v1.3.5): counted, pruned, shown to the GM, reordering nothing
+    # ------------------------------------------------------------------
+    async def record_command_use(self, path: str) -> None:
+        """One more press of `path` today (UTC). Presentation bookkeeping: the
+        engine has no rule that reads it."""
+        key = str(path or "").strip()
+        if not key:
+            return
+        async with self._connect() as db:
+            await db.execute(
+                "INSERT INTO command_usage(path, day, presses) VALUES(?,?,1) "
+                "ON CONFLICT(path, day) DO UPDATE SET presses=presses+1",
+                (key, _usage_day()),
+            )
+            await db.commit()
+
+    async def command_usage_counts(self, days: int = COMMAND_USAGE_DAYS) -> dict[str, int]:
+        """Presses per command path over the last `days` days, most used first."""
+        async with self._connect() as db:
+            cur = await db.execute(
+                "SELECT path, SUM(presses) AS n FROM command_usage WHERE day>=? "
+                "GROUP BY path ORDER BY n DESC, path",
+                (_usage_cutoff_day(days),),
+            )
+            rows = await cur.fetchall()
+        return {str(r[0]): int(r[1] or 0) for r in rows}
 
     async def vacuum(self) -> None:
         """Compact the authoritative database.

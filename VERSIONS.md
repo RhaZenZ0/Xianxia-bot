@@ -6,6 +6,27 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.3.5** counts how often each command is used and shows the GM the most used ones - and changes no order for it: the daily five stay first on the menu and every page keeps its authored order, on the owner's call.
+
+The owner asked to collect the most used commands. `command_usage` (schema 64) holds one row per
+command path per UTC day, server-wide and with no user id, so the erasure sweep never has to know it
+exists. The path is the leaf path the hubs build (`/alchemy forage`, `/travel`), so a slash command, a
+hub press and a typed line count as one thing, and three doors record it after their own refusal has
+passed - the command tree's `interaction_check` (a command only; an autocomplete request shares that
+check and is a keystroke), `hubs._invoke_action` and `typed_play.dispatch`. Recording never raises
+and never waits (`app/bot/usage.py`): a counter that could cost a player their reply, or a round
+trip on every press of `/explore`, would be a worse bug than the one it measures. The cleanup prunes
+past thirty days.
+
+And `/admin server observability` gains **Most used commands (30 days)**: the top ten paths with
+their presses, "none recorded yet" on a fresh world, and "unknown" rather than a zero when the
+count cannot be read. It is the one reader of the counts; `test_command_use_is_counted.py` holds
+that nothing which draws a panel reads them, because the numbers were asked for to be seen and not
+to reorder anything.
+
+- **Schema 64** adds `command_usage(path, day, presses)`, a presentation counter of command presses
+  per UTC day, pruned by the maintenance cleanup at thirty days.
+
 **1.3.4** clears the last of the punch list: the Stygian Ghost Scripture is the Ghost Cultivator's high art and its inheritance knows whose it is, a path's skill is on the sheet, and two era keys that nothing could scale are gone.
 
 `inheritances.stygian_keeper_legacy` preferred the Soul Cultivator and granted a scripture that was a
@@ -918,9 +939,9 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.3.4
+## Release status — v1.3.5
 
-- Current release: v1.3.4 - the punch list cleared: the Stygian Ghost Scripture is the Ghost Cultivator's high manual and its inheritance reads `preferred_paths`, a path's skill is on the sheet, two dead era keys deleted (see the changelog). Built on v1.3.3 - the eight open rule decisions settled: a Law control technique weakens its opponent (schema 63), a clan treaty that runs out ends and leaves a rivalry, the auction-door ambush is on the house's doorstep, five entries closed with reasons (see the changelog). Schema 63. Built on v1.3.2 - the daily five are one step each: `/cultivate`, `/explore`, `/hunt`, `/forage` and `/mine` are slash commands and a row of five buttons on the menu (see the changelog). Built on v1.3.1 - six rules the bot held are the engine's (a sponsor's presence, the sects a gate justifies, a city's board, a territory's ground, the forage wait, the quest chain catch-up on any action) and three more buttons are drawn only where they work (see the changelog). Built on v1.3.0 - ten of the owner's decisions: a failed craft returns half its makings, a hall teaches only what its world can make, the Nine-Echo Sword Wraith is a secret floor beneath its realm, `/reset` asks with the count, the Qi Body card shows the pool at every realm, thirty-three upper-world send-offs, no property inside a household, `heart` retired, the Starfall hall's buy line lowered (see the changelog). Built on v1.2.3 - the review's eight deferred claims settled: Vacuum refuses at once behind a half-written action, one array rule at both cultivation doors, one counter-attack TN, an undo undone again, a rank price under a merchant's wares, and a lot listed in its house's coin (see the changelog). Built on v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
+- Current release: v1.3.5 - command use is counted (schema 64) and the ten most used commands are on `/admin server observability`; nothing is reordered for it (see the changelog). Built on v1.3.4 - the punch list cleared: the Stygian Ghost Scripture is the Ghost Cultivator's high manual and its inheritance reads `preferred_paths`, a path's skill is on the sheet, two dead era keys deleted (see the changelog). Built on v1.3.3 - the eight open rule decisions settled: a Law control technique weakens its opponent (schema 63), a clan treaty that runs out ends and leaves a rivalry, the auction-door ambush is on the house's doorstep, five entries closed with reasons (see the changelog). Schema 63. Built on v1.3.2 - the daily five are one step each: `/cultivate`, `/explore`, `/hunt`, `/forage` and `/mine` are slash commands and a row of five buttons on the menu (see the changelog). Built on v1.3.1 - six rules the bot held are the engine's (a sponsor's presence, the sects a gate justifies, a city's board, a territory's ground, the forage wait, the quest chain catch-up on any action) and three more buttons are drawn only where they work (see the changelog). Built on v1.3.0 - ten of the owner's decisions: a failed craft returns half its makings, a hall teaches only what its world can make, the Nine-Echo Sword Wraith is a secret floor beneath its realm, `/reset` asks with the count, the Qi Body card shows the pool at every realm, thirty-three upper-world send-offs, no property inside a household, `heart` retired, the Starfall hall's buy line lowered (see the changelog). Built on v1.2.3 - the review's eight deferred claims settled: Vacuum refuses at once behind a half-written action, one array rule at both cultivation doors, one counter-attack TN, an undo undone again, a rank price under a merchant's wares, and a lot listed in its house's coin (see the changelog). Built on v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
   Apprentice to Tier 9 Sovereign with each trade's own word in front (Pill, Forge, Talisman, Array,
   Herb, Ore, Beast, Artifact, Treasure). No schema.
 - v1.2.1: a beast can always evolve, a homestead can be upgraded in any world, and a dozen smaller wires from a deep review (see the changelog).

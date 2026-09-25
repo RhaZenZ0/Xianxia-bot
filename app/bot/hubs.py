@@ -355,6 +355,27 @@ async def menu_shape(interaction: discord.Interaction) -> dict[str, Any]:
         return {}
 
 
+# How often a leaf is pressed (v1.3.5). The surface registers one callable
+# taking the leaf path; it is called after the press has passed the panel
+# gate and never awaited, and a recorder that raises costs nothing but a log
+# line - the count decides nothing about what a panel draws.
+_USAGE_RECORDER: Any = None
+
+
+def register_usage_recorder(recorder: Any) -> None:
+    global _USAGE_RECORDER
+    _USAGE_RECORDER = recorder
+
+
+def _record_leaf_use(path: str) -> None:
+    if not callable(_USAGE_RECORDER):
+        return
+    try:
+        _USAGE_RECORDER(path)
+    except Exception:
+        log.exception("Command-use recorder failed for %s", path)
+
+
 # Actions a player cannot use where they stand (v1.0.0-rc.32). The surface
 # registers one async provider returning the paths ("/family enter") to leave
 # off the panel for this player right now; it is asked whenever the panel
@@ -1324,6 +1345,7 @@ async def _invoke_action(
         else:
             await interaction.followup.send(refusal, ephemeral=False)
         return
+    _record_leaf_use(action.path)
     proxy = HubInteractionProxy(
         interaction, hub_view, command_override=action.command, supplied_options=supplied
     )

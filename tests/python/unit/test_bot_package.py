@@ -359,7 +359,7 @@ def _module_level_relative_imports(path):
 # noted (command modules read each other: law -> battle, exploration -> sect;
 # inspect_sim reads world_ops). The graph is also required to be acyclic.
 TIERS = (
-    ("registry.py", "scene_layout.py", "typed_play_router.py", "maintenance.py", "seclusion.py"),
+    ("registry.py", "scene_layout.py", "typed_play_router.py", "maintenance.py", "seclusion.py", "usage.py"),
     ("runtime.py", "hubs.py"),
     ("services.py", "typed_play.py"),
     ("formatting.py", "locations.py", "pickers.py"),

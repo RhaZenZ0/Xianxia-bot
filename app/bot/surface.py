@@ -82,7 +82,7 @@ from .commands import locked as _commands_locked  # noqa: F401  (registers /lock
 from .commands import sense as _commands_sense  # noqa: F401  (registers its root commands on import)
 from .commands import support as _commands_support  # noqa: F401  (registers /tribute on import)
 from .commands.territory import caravan_group, party_group, party_status, territory_group, war_group, war_status
-from . import maintenance, seclusion
+from . import maintenance, seclusion, usage
 from .hubs import (
     LAYOUT_COMPONENTS_AVAILABLE,
     HubAction,
@@ -97,6 +97,7 @@ from .hubs import (
     panel_timeout,
     register_panel_idle,
     register_hubs,
+    register_usage_recorder,
     register_menu_builder,
     register_menu_facts,
     register_menu_shape,
@@ -983,6 +984,8 @@ register_menu_builder(lambda owner_id, is_admin, owner_name, facts="", shape=Non
 ))
 register_menu_facts(_menu_facts)
 register_menu_shape(_menu_shape)
+# Presses counted, reordering nothing (v1.3.5).
+register_usage_recorder(lambda path: usage.note(DB, path))
 
 
 # The household's doors (v1.0.0-rc.32). Enter opens only from the family's

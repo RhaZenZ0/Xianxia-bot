@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 63; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 64; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -4843,6 +4843,28 @@ way round. The Go test drives the shipped Stygian Lantern Tomb through the real 
 paths, which is rc.58's rule: a fixture that rewrote this link is how the link stayed wrong for
 twelve releases. Two count gates (197 manuals, 681 techniques, 53 demonic) moved with the content,
 which is the v1.0.8 rule doing its job on an authored addition.
+
+### Counted, not consulted (`command_usage`, schema 64, v1.3.5)
+
+The owner asked to collect the most used commands and put those systems first in the menus, and
+then decided the opposite half: **count, and reorder nothing** - the daily five stay first, in an
+order the owner sets by hand in `_DAILY_LEAVES`. So the table is a counter and only a counter: one
+row per command path per UTC day, server-wide, no user id (the erasure sweep matches columns by
+name, so it never has to know the table exists), pruned at thirty days by `maintenance_cleanup`.
+
+**One identifier, three doors.** The path is the leaf path the hubs build, so a slash command, a
+hub press and a typed line are one thing. The command tree's `interaction_check` records it only
+for `InteractionType.application_command` - an autocomplete request shares that check and is a
+keystroke, not a use, and a hub press never reaches the tree, so it is counted where it lands in
+`_invoke_action` after `_panel_refusal`; `typed_play.dispatch` counts its root and talk branches.
+Each records after its own refusal has passed, so a press the world refused is not a use.
+
+**It never raises and never waits.** `app/bot/usage.py` sits in the bottom tier beside
+`maintenance.py` and takes the handle by value for `test_typed_play_surface`'s reason; the write is
+fired and not awaited, because an audit of how often `/explore` is pressed is not worth a round trip
+on every press of it. The one reader is the GM's observability card, and an unreadable count says
+"unknown" rather than printing a zero - the `engine —` footer lesson (v1.0.8). The gate holds both
+halves: every door counts, and nothing that draws a panel reads the counts.
 
 ## Testing conventions
 

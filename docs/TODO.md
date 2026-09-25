@@ -722,6 +722,12 @@ deferred half and not the half that says what was done about it.
   that gate red — a check that pins how a rule is *written* failing exactly when the rule is fixed,
   which is v1.0.8's lesson, met for the fourth time in four releases — v1.0.9, v1.0.10 and v1.0.12
   each retired a hand-copy of the command tree's tuple for the same reason.
+- **fixed (v1.3.5)** — *Which commands are used most.* Asked for as a way to put the most used
+  systems first in the menus; the owner then decided the numbers reorder nothing (the daily five stay
+  first, in the order they choose by hand) and reversed the earlier "no" to a usage log now that the
+  numbers themselves are wanted. `command_usage` (schema 64) counts presses per command path per UTC
+  day, server-wide, thirty days deep; three doors record it and `/admin server observability` shows
+  the top ten. `test_command_use_is_counted.py` holds that nothing drawing a panel reads the counts.
 - **deferred (known limit)** — *The leaf sweep counts a leaf pressed into a designed refusal as covered.*
   Left open as a known limit on the owner's call (v1.3.4).
   This is rc.58's finding on the Discord side, and it is the reason `/battle challenge` was green for

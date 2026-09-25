@@ -28,6 +28,7 @@ from discord.ext import commands
 
 from ...ai import chat_monitor
 from ...database import SCHEMA_VERSION
+from ...database.core import COMMAND_USAGE_DAYS
 from ...rules.realm_hubs import REALM_HUBS, realm_hub, realm_hub_visibility, realm_presence_role_name
 from ...version import RELEASE_VERSION
 from ..channels import (
@@ -1396,7 +1397,31 @@ async def admin_observability(interaction: discord.Interaction) -> None:
     if alerts:
         lines.append("\n**Recent Alerts**")
         for a in alerts: lines.append(f"• `{a['alert_key']}` • {a['severity']} • delivered={bool(a['delivered'])} — {a['message']}")
+    lines.extend(await most_used_command_lines())
     await reply_long(interaction,"\n".join(lines),ephemeral=False)
+
+
+MOST_USED_SHOWN = 10
+
+
+async def most_used_command_lines() -> list[str]:
+    """The card's "Most used commands" block (v1.3.5): the top paths over the
+    last `COMMAND_USAGE_DAYS`, read through `DB.command_usage_counts` and
+    reordering nothing. An unreadable count says so rather than printing an
+    empty board a GM would read as "nobody plays"."""
+    header = f"\n**Most used commands ({COMMAND_USAGE_DAYS} days)**"
+    try:
+        counts = await DB.command_usage_counts()
+    except Exception as exc:
+        return [header, f"• unknown — {type(exc).__name__}: {exc}"]
+    if not counts:
+        return [header, "• none recorded yet"]
+    lines = [header]
+    for path, presses in list(counts.items())[:MOST_USED_SHOWN]:
+        lines.append(f"• `{path}` — **{presses}**")
+    if len(counts) > MOST_USED_SHOWN:
+        lines.append(f"• …and {len(counts) - MOST_USED_SHOWN} more")
+    return lines
 
 
 # ---------------------------------------------------------------------------

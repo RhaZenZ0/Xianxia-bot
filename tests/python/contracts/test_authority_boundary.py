@@ -602,6 +602,9 @@ BOOKKEEPING_METHODS = {
     # the same class of write as seed_world_territories beside it.
     "sync_commission_pool",
     "flush_slow_query_log", "maintenance_cleanup", "log_admin_action",
+    # v1.3.5: how often a command is used, a presentation counter the engine
+    # has no rule for and the owner chose to count and not act on.
+    "record_command_use",
     # cosmetic / GM review of drafts (no gameplay table)
     "set_address_style", "set_quest_definition_status",
 }
@@ -744,8 +747,9 @@ PRESENTATION_WRITES: dict[str, set[str]] = {
     "record_startup_event": {"startup_events"},
     "record_operational_alert": {"operational_alerts"},
     "flush_slow_query_log": {"slow_query_log"},
-    "maintenance_cleanup": {"active_effects", "civilization_events", "cooldowns", "economy_events", "event_threads",
-                            "sect_politics_events", "wild_beast_encounters", "world_action_events"},
+    "maintenance_cleanup": {"active_effects", "civilization_events", "command_usage", "cooldowns", "economy_events",
+                            "event_threads", "sect_politics_events", "wild_beast_encounters", "world_action_events"},
+    "record_command_use": {"command_usage"},
 }
 
 # Uppercase keywords only, as the layer writes them; `DO UPDATE SET` inside an
