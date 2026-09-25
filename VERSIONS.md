@@ -6,6 +6,28 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.4.0** lets a GM update the server from the dashboard: the Admin Console's Server update card asks for the newest release, a watcher on the NAS installs it with every backup and rollback `update.sh` already has, and the card shows how it went.
+
+Nothing inside the stack can update it - the images carry the code and no container holds the
+Docker socket or the host checkout - so the button writes an audited request into the engine
+(`admin.server.request_update`, a `world_state` row with its own nonce), and **`update_watch.sh`**,
+a new script beside `update.sh` on the NAS, does the work: it reads the request the way `update.sh`
+already reaches `/v1/db/backups` (`docker compose exec` into the engine container, the token read
+from the container's own environment - no port opened, no privilege added), closes the world with
+the Maintenance lever, runs `./update.sh --upgrade`, reopens the world whatever happened, and
+reports `acked`, `fetching` and `done` or `failed` under the request's nonce
+(`admin.server.update_status`, audited as actor 0 so the audit table shows the watcher wrote it).
+A closed request takes no more reports, so a watcher that restarted cannot re-report a settled one;
+a heartbeat every five minutes is how the card knows the watcher is alive, and the button is
+offered only while it is. A release that adds a `.env` key is refused by `update.sh`'s own preflight
+before anything stops, and the card says *"needs ./migrate_env.sh"* - the watcher never touches the
+file the tokens live in.
+
+And the card reads what is newest from the bot's own release check (`release`, a new read on the
+control channel), so `release_channel.py` stays the one comparison and GitHub is asked once per
+`UPDATE_CHECK_HOURS`; an unreachable bot shows "unknown", never "up to date". `startup.sh` says when
+the watcher is not running. One new key, `UPDATE_WATCH_INTERVAL_SECONDS`. No schema change.
+
 **1.3.5** counts how often each command is used and shows the GM the most used ones - and changes no order for it: the daily five stay first on the menu and every page keeps its authored order, on the owner's call.
 
 The owner asked to collect the most used commands. `command_usage` (schema 64) holds one row per
@@ -939,9 +961,9 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.3.5
+## Release status — v1.4.0
 
-- Current release: v1.3.5 - command use is counted (schema 64) and the ten most used commands are on `/admin server observability`; nothing is reordered for it (see the changelog). Built on v1.3.4 - the punch list cleared: the Stygian Ghost Scripture is the Ghost Cultivator's high manual and its inheritance reads `preferred_paths`, a path's skill is on the sheet, two dead era keys deleted (see the changelog). Built on v1.3.3 - the eight open rule decisions settled: a Law control technique weakens its opponent (schema 63), a clan treaty that runs out ends and leaves a rivalry, the auction-door ambush is on the house's doorstep, five entries closed with reasons (see the changelog). Schema 63. Built on v1.3.2 - the daily five are one step each: `/cultivate`, `/explore`, `/hunt`, `/forage` and `/mine` are slash commands and a row of five buttons on the menu (see the changelog). Built on v1.3.1 - six rules the bot held are the engine's (a sponsor's presence, the sects a gate justifies, a city's board, a territory's ground, the forage wait, the quest chain catch-up on any action) and three more buttons are drawn only where they work (see the changelog). Built on v1.3.0 - ten of the owner's decisions: a failed craft returns half its makings, a hall teaches only what its world can make, the Nine-Echo Sword Wraith is a secret floor beneath its realm, `/reset` asks with the count, the Qi Body card shows the pool at every realm, thirty-three upper-world send-offs, no property inside a household, `heart` retired, the Starfall hall's buy line lowered (see the changelog). Built on v1.2.3 - the review's eight deferred claims settled: Vacuum refuses at once behind a half-written action, one array rule at both cultivation doors, one counter-attack TN, an undo undone again, a rank price under a merchant's wares, and a lot listed in its house's coin (see the changelog). Built on v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
+- Current release: v1.4.0 - a GM updates the server from the dashboard: an audited request, a watcher on the NAS running `update.sh --upgrade`, and the outcome on the card (see the changelog). Built on v1.3.5 - command use is counted (schema 64) and the ten most used commands are on `/admin server observability`; nothing is reordered for it (see the changelog). Built on v1.3.4 - the punch list cleared: the Stygian Ghost Scripture is the Ghost Cultivator's high manual and its inheritance reads `preferred_paths`, a path's skill is on the sheet, two dead era keys deleted (see the changelog). Built on v1.3.3 - the eight open rule decisions settled: a Law control technique weakens its opponent (schema 63), a clan treaty that runs out ends and leaves a rivalry, the auction-door ambush is on the house's doorstep, five entries closed with reasons (see the changelog). Schema 63. Built on v1.3.2 - the daily five are one step each: `/cultivate`, `/explore`, `/hunt`, `/forage` and `/mine` are slash commands and a row of five buttons on the menu (see the changelog). Built on v1.3.1 - six rules the bot held are the engine's (a sponsor's presence, the sects a gate justifies, a city's board, a territory's ground, the forage wait, the quest chain catch-up on any action) and three more buttons are drawn only where they work (see the changelog). Built on v1.3.0 - ten of the owner's decisions: a failed craft returns half its makings, a hall teaches only what its world can make, the Nine-Echo Sword Wraith is a secret floor beneath its realm, `/reset` asks with the count, the Qi Body card shows the pool at every realm, thirty-three upper-world send-offs, no property inside a household, `heart` retired, the Starfall hall's buy line lowered (see the changelog). Built on v1.2.3 - the review's eight deferred claims settled: Vacuum refuses at once behind a half-written action, one array rule at both cultivation doors, one counter-attack TN, an undo undone again, a rank price under a merchant's wares, and a lot listed in its house's coin (see the changelog). Built on v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
   Apprentice to Tier 9 Sovereign with each trade's own word in front (Pill, Forge, Talisman, Array,
   Herb, Ore, Beast, Artifact, Treasure). No schema.
 - v1.2.1: a beast can always evolve, a homestead can be upgraded in any world, and a dozen smaller wires from a deep review (see the changelog).

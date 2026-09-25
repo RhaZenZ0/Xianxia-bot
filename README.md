@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v1.3.5
+# Xianxia RP Discord Bot v1.4.0
 
 *A cultivation RPG played entirely through Discord commands: deterministic rules in Go, an AI that
 narrates but never decides, self-hosted on your own hardware.*
@@ -622,6 +622,11 @@ release; it never installs anything. On the NAS:
 ```
 
 `RELEASE_MANIFEST.sha256` inside the tree proves an unpacked release is intact; `update.sh` checks it.
+
+**From the dashboard (v1.4.0):** the Admin Console's *Server update* card asks for the newest release
+and shows how it went. It needs `update_watch.sh` running on the NAS (`nohup sh ./update_watch.sh &`,
+or `--oneshot` from a scheduled task), which runs the same `./update.sh --upgrade` with the same
+backups and rollback - see `docs/CONFIGURATION.md`, "Updating from the dashboard".
 
 An upgrade never touches your `.env` — that is where the tokens are. So when a release adds a key,
 `update.sh` stops before it changes anything and says the `.env` is incomplete. Rebuild it on the

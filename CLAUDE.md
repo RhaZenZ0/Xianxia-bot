@@ -4866,6 +4866,53 @@ on every press of it. The one reader is the GM's observability card, and an unre
 "unknown" rather than printing a zero - the `engine —` footer lesson (v1.0.8). The gate holds both
 halves: every door counts, and nothing that draws a panel reads the counts.
 
+### Updating from the dashboard (`update_watch.sh`, v1.4.0)
+
+Asked for, and answered with the design that adds no privilege. Nothing inside the stack can update
+it: the images carry the code and no container holds the Docker socket or the host checkout. So the
+Admin Console's Server update card writes an **audited request** into the engine
+(`admin.server.request_update`, `world_state['update_request']` with an engine-made nonce), and a
+host script beside `update.sh`, **`update_watch.sh`**, does the rest.
+
+**One host-to-engine channel, the one that already existed.** `update.sh` has reached
+`/v1/db/backups` since v0.20.9 by `docker compose exec` into the engine container with the token read
+from the container's own environment; the watcher reaches `/v1/game/action` the same way, for its
+read (`admin.server.update_request`, no audit), its reports (`admin.server.update_status`, audited
+as actor 0) and the Maintenance lever it closes and reopens the world with. `docker-compose.yml` did
+not change, and `test_update_watcher.py` holds that no socket is mounted and no engine port is
+published. The alternative - a sidecar holding the Docker socket, called by the dashboard - was set
+aside because the socket is root on the NAS.
+
+**The nonce is the single-consumption guard.** A report must name the open request's nonce, and a
+request in a terminal state takes no more reports - so a watcher that crashed and restarted, or a
+second one somebody started, cannot re-report against a request already settled; the watcher also
+keeps the nonces it handled in a state file so one tick cannot run a request twice. The terminal
+report writes `update_result`, a separate row, so the last outcome outlives the next request.
+
+**The watcher is deliberately not `update.sh --watch`.** That script re-execs from a detached copy
+so a release can replace it; a persistent loop living in the file being replaced is the shape that
+dance exists to avoid. `update_watch.sh` only ever runs whatever `update.sh` is on disk and reads
+its exit code and log: 0 is `done` with the new `VERSION`; non-zero before the log ever said
+"Stopping" is the `.env` preflight refusing, reported as *"needs ./migrate_env.sh"* with nothing
+changed; non-zero after it is `update.sh`'s own rollback having run. The world is reopened whatever
+happened, retried while the engine comes back - a failed update that leaves the world shut is worse
+than one that reopens it. The watcher never touches `.env`: the file holds the tokens, and the
+owner's "no new privileges" is a boundary for the host loop too.
+
+**The card says what it knows.** `update_card_state` is pure and its two ways to mislead are held
+by `test_the_server_update_card.py`: an unreachable bot is "unknown", never "up to date" (the
+`engine —` footer lesson, v1.0.8), and a watcher nobody has heard from for fifteen minutes is "not
+running", with the button withheld. What is newest comes from the bot's own `check_for_release`
+through a new `release` read on the control channel, so `release_channel.py` stays the one
+comparison. `startup.sh` prints a hint when the watcher's lock is absent and never spawns it: it must
+outlive the stack being down.
+
+**The shell test stands in for what cannot run here.** `XIANXIA_ENGINE_CALL` names a stub that
+records every operation and answers canned JSON; `XIANXIA_UPDATE_SH` names a fake updater for each
+of the three outcomes. What is held is the conversation - the operations in order, the statuses and
+details, the world closed and reopened in all three - because the wiring between two programs on a
+NAS is what no unit test of either would see.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

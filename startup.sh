@@ -118,4 +118,10 @@ echo "Bot logs:       docker compose logs -f --tail=150 xianxia-bot"
 echo "Database init:  docker compose logs xianxia-db-init"
 if [ "$DASHBOARD_ON" = "1" ]; then
   echo "Dashboard logs: docker compose --profile dashboard logs -f --tail=150 xianxia-dashboard"
+  # v1.4.0: the dashboard's Server update card needs the watcher on this host.
+  # Advisory only - the watcher is started by hand or by a scheduled task, and
+  # it must outlive this stack being down, so startup.sh never spawns it.
+  if [ ! -d "../.xianxia-watcher.lock" ]; then
+    echo "Dashboard updates: not running - start with: nohup sh ./update_watch.sh >/dev/null 2>&1 &"
+  fi
 fi

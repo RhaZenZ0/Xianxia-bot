@@ -728,6 +728,13 @@ deferred half and not the half that says what was done about it.
   numbers themselves are wanted. `command_usage` (schema 64) counts presses per command path per UTC
   day, server-wide, thirty days deep; three doors record it and `/admin server observability` shows
   the top ten. `test_command_use_is_counted.py` holds that nothing drawing a panel reads the counts.
+- **fixed (v1.4.0)** — *Updating from the GM dashboard.* Asked for; the owner chose a host-side
+  watcher over a privileged sidecar. The dashboard's Server update card writes an audited request
+  (`admin.server.request_update`); `update_watch.sh` on the NAS reads it through the engine the way
+  `update.sh` reaches `/v1/db/backups`, closes the world, runs `./update.sh --upgrade`, reopens the
+  world and reports under the request's nonce. Left out on purpose: unattended `.env` migration (the
+  watcher never touches the tokens), switching channel from the card, a rollback picker, and locking
+  the lockdown against a GM reopening the world mid-install.
 - **deferred (known limit)** — *The leaf sweep counts a leaf pressed into a designed refusal as covered.*
   Left open as a known limit on the owner's call (v1.3.4).
   This is rc.58's finding on the Discord side, and it is the reason `/battle challenge` was green for

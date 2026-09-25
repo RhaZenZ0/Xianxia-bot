@@ -2289,6 +2289,33 @@ async def run(url: str, token: str, db_path: str) -> Report:
     await audited("admin.server.maintenance_mode",
                   {"enabled": False, "reason": "playtest"}, name="open the world again")
     await step(report, "the player may act again", act_free("cultivation.train", PLAYER, {}))
+
+    # -- an update asked for from the dashboard (v1.4.0) ---------------------
+    # The GM's request, the watcher's reports under the request's own nonce,
+    # the closing result, and the read both sides use. The watcher itself is
+    # a host script this harness cannot run; what it says to the engine is
+    # driven here exactly as it would say it.
+    requested = await audited("admin.server.request_update",
+                              {"channel": "stable", "reason": "playtest"}, name="the GM asks for an update")
+    nonce = str((requested or {}).get("nonce") or "")
+    await either("a second request is refused while one is open",
+                 gm("admin.server.request_update", {"channel": "stable", "reason": "playtest"}), "already")
+    await either("a report naming another update is refused",
+                 gm("admin.server.update_status", {"nonce": "not-this-one", "status": "acked"}), "different update")
+    for status in ("acked", "fetching", "installing"):
+        await audited("admin.server.update_status", {"nonce": nonce, "status": status, "detail": "playtest"},
+                      name=f"the watcher reports {status}")
+    await audited("admin.server.update_status",
+                  {"nonce": nonce, "status": "done", "detail": "playtest", "installed_version": "0.0.0-playtest"},
+                  name="the watcher reports done")
+    read = await step(report, "admin.server.update_request", query("admin.server.update_request", GM, {}))
+    result = dict((read or {}).get("result") or {})
+    report.add("PASS" if result.get("status") == "done" and result.get("installed_version") == "0.0.0-playtest" else "FAIL",
+               "the result carries the watcher's closing report", str(result))
+    await either("a report against a closed request is refused",
+                 gm("admin.server.update_status", {"nonce": nonce, "status": "failed"}), "no update is in progress")
+    await step(report, "a heartbeat with no request open",
+               gm("admin.server.update_status", {"status": "heartbeat"}))
     await audited("admin.simulation.interval", {"system": "npc_life", "days": 7, "reason": "playtest"})
     await audited("admin.commission.review", {"quest_key": str(world["commissions"][0]["quest_key"]), "status": "approved", "reason": "playtest"})
     await either("admin.commission.retire", gm("admin.commission.retire", {"user_id": BUYER, "reason": "playtest"}), "holds no commission")

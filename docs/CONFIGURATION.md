@@ -494,6 +494,34 @@ not listed in `RELEASE_MANIFEST.sha256` — the manifest proves the tree CI
 verified, and the tag is stamped after that check — which is safe because
 `sha256sum -c` verifies the files the manifest lists and ignores any other.
 
+### Updating from the dashboard (v1.4.0)
+
+The Admin Console's **Server update** card asks the NAS to install the newest release. Nothing
+inside the containers can do that - the images carry the code and none of them holds the Docker
+socket - so the button only writes an audited request into the engine (`admin.server.request_update`),
+and **`update_watch.sh`**, a script beside `update.sh` on the NAS, does the work: it reads the
+request the way `update.sh` already reaches the engine (`docker compose exec` into the engine
+container, the token read from the container's own environment - no port is opened for it),
+closes the world with the Maintenance lever, runs `./update.sh --upgrade` with all its backups and
+its rollback, reopens the world whatever happened, and reports the outcome under the request's own
+nonce. The card shows the request's progress, the last outcome, and whether the watcher has been
+heard from; the button is offered only while it has.
+
+Start it once, on the NAS, either way:
+
+```bash
+nohup sh ./update_watch.sh >/dev/null 2>&1 &     # a loop, polling every UPDATE_WATCH_INTERVAL_SECONDS
+sh ./update_watch.sh --oneshot                    # one poll; put this in a Container Station / cron scheduled task
+```
+
+`UPDATE_WATCH_INTERVAL_SECONDS` (default 30, floor 5) is the loop's poll; a scheduled task decides
+its own. The watcher logs to `update_watch.log` in the project directory and keeps a lock in the
+parent directory, so a second copy exits at once; `update.sh`'s own lock still serialises it against
+a manual `./update.sh`. It never touches `.env`: a release that adds a key is refused by
+`update.sh`'s preflight before anything is stopped, and the card reports *"needs ./migrate_env.sh"* -
+that step stays yours, because the file holds the tokens. A GM who opens the world by hand while an
+update is running is not stopped; the watcher reopens it at the end either way.
+
 ## Daily route check (v0.27.0)
 
 Every `ROUTE_AUDIT_HOURS` the bot pings each configured narration route with
