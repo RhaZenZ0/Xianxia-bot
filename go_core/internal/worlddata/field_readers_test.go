@@ -53,6 +53,7 @@ var fieldsReadByPresentation = map[string]string{
 	"PhysiqueDefinition.Drawback":  "app/bot/commands/aptitude.py prints it on /aptitude physique",
 	"EventSiteTemplate.Objective":  "app/rules/game.py reads it off the template",
 	"AuctionHouse.ChannelName":     "app/bot/channels.py names an auction channel from it",
+	"Path.Skill":                   "app/bot/commands/character.py prints it under the path on /sheet (v1.3.4)",
 }
 
 // unreadContentFields is a field no rule and no surface reads, with the reason
@@ -61,11 +62,7 @@ var fieldsReadByPresentation = map[string]string{
 // precedent: tightening a rule nothing held reveals the backlog that the
 // absence of the rule created. Each entry is a decision waiting in
 // `docs/TODO.md`, not a shrug.
-var unreadContentFields = map[string]string{
-	"Path.Skill": "seven paths name a skill (Sword, Spiritual Arts, ...) and each string occurs " +
-		"exactly once in the whole content file - its own declaration. What a path's skill is " +
-		"(a line on a card, a bonus, or a field to delete) is content design; punch list, v1.0.1",
-}
+var unreadContentFields = map[string]string{}
 
 // parsedContentFields is every `worlddata` struct field carrying a json tag,
 // keyed `Struct.Field`.

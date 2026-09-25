@@ -27,7 +27,7 @@ from typing import Any, Awaitable, Callable
 
 import discord
 
-from . import maintenance, seclusion
+from . import maintenance, seclusion, usage
 from .registry import ACTIONS, EVENT_HANDLERS
 from .runtime import DB, SETTINGS, TYPED_PLAY_BUDGET, log
 from .typed_play_router import Candidate, CommandParameter, CommandSpec, Route, VerbTable
@@ -247,6 +247,7 @@ async def dispatch(interaction: Any, candidate: Candidate) -> None:
                 await interaction.response.send_message("They are not here any more.")
                 return
             arguments[parameter] = member
+        usage.note(DB, "/" + str(command.qualified_name))
         await handler(interaction, **arguments)
         return
     if candidate.kind == "talk":
@@ -254,6 +255,7 @@ async def dispatch(interaction: Any, candidate: Candidate) -> None:
         handler = ACTIONS.handler_for(command)
         if isinstance(interaction, MessageInteraction):
             interaction.command = command
+        usage.note(DB, "/" + str(command.qualified_name))
         await handler(interaction, str(candidate.payload["npc"]), str(candidate.payload["message"]))
         return
     if candidate.kind == "scene":

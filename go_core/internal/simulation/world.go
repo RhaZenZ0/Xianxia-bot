@@ -694,6 +694,11 @@ func (r *Runner) clans(conn *storage.Conn, steps, gm int64) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// And the ones that have run out end (v1.3.3), after the drift so a
+	// treaty a killing took to zero is closed on the tick that finds it.
+	if _, err = endExhaustedClanRelations(conn, gm, now); err != nil {
+		return "", err
+	}
 	count := int64(0)
 	if res, e := conn.Execute(`SELECT COUNT(DISTINCT family_id) AS n FROM martial_clan_branches WHERE status='active'`, nil); e == nil {
 		if row := firstMap(res); row != nil {

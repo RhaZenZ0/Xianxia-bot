@@ -735,6 +735,15 @@ class NarratorContextBuilder:
                 f"Active battle: {_clip(battle.get('npc_name') or battle.get('target_name') or 'opponent', 100)} | "
                 f"status {_clip(battle.get('status', 'active'), 50)}. Do not resolve additional combat outside fixed rolls."
             )
+            if str(battle.get("source") or "").startswith("auction:"):
+                # The one fight the safe-zone rule lets through on a protected
+                # street (v1.3.3): it stands on the house's own doorstep, where
+                # its protection has already ended, and the line above saying
+                # violence cannot begin here must not be the last word.
+                lines.append(
+                    "This battle is an ambush on the auction house's doorstep, where the house's protection ends; "
+                    "it is not a fight begun inside the protected interior."
+                )
 
         bounties = state.get("bounties") or []
         if bounties:

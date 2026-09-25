@@ -19,7 +19,7 @@ from typing import Any
 import discord
 from discord import app_commands
 
-from ...rules.battle import matchup_label, suppression_label, vitality_band, vitality_bar
+from ...rules.battle import matchup_label, opponent_debuff_label, suppression_label, vitality_band, vitality_bar
 from ...ops.game_engine import GameEngineError
 from ...rules.worldtime import MINUTES_PER_YEAR
 from ..channels import _report_game_ui_error
@@ -104,6 +104,9 @@ def _battle_embed(c:dict,b:dict,techniques:list[tuple[str,str,str]],items:list[t
     )
     e.add_field(name="Location",value=str(b.get('location') or 'Unknown'),inline=True)
     e.add_field(name="Suppression",value=suppression_label(int(b.get('npc_suppressed_turns',0))),inline=False)
+    debuff=opponent_debuff_label(b.get('opponent_modifiers_json'))
+    if debuff:
+        e.add_field(name="On the opponent",value=debuff,inline=False)
     if defeated:
         e.add_field(name="Final Decision",value="🤝 Spare — end the battle without killing\n☠️ Kill — true NPC death with persistent world consequences",inline=False)
     else:
@@ -260,6 +263,11 @@ async def _execute_battle_law_technique(interaction: discord.Interaction, battle
     roll = SimpleNamespace(**dict(result.get("roll") or {}))
     lines = [f"🌌 **{result.get('technique_name', technique)}**", roll_line(roll)]
     if bool(getattr(roll, "success", False)):
+        # What the effect did to the opponent (v1.3.3), read off the engine's
+        # own sum rather than the content: the battle row carries it now.
+        debuff = opponent_debuff_label(result.get("opponent_modifiers"))
+        if debuff:
+            lines.append(f"🕸️ On **{battle['npc_name']}** for this battle: {debuff}.")
         if technique == "spatial_lockdown":
             lines.append(f"Space freezes around **{battle['npc_name']}**. Their counteractions are suppressed for **{int(result.get('suppressed_turns', 1))} turn(s)**.")
         elif technique == "spatial_strangulation":

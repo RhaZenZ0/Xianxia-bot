@@ -23391,12 +23391,16 @@
     },
     "stygian_ghost_scripture": {
       "name": "Stygian Ghost Scripture",
-      "description": "A dangerous soul inheritance for sensing, restraining and negotiating with the dead.",
+      "description": "The Ghost Cultivator's high art: a dangerous scripture for sensing, restraining and negotiating with the dead. Sealed in the Stygian Lantern Tomb.",
       "sect_value": 450,
       "auction_interest": "legendary",
       "door_event_chance": 70,
       "hunter_realm_bonus": 2,
-      "base_price": 3650
+      "base_price": 3650,
+      "type": "manual",
+      "manual_id": "stygian_ghost_scripture",
+      "legal_status": "forbidden",
+      "market_excluded": true
     },
     "spatial_pouch": {
       "name": "Common Spatial Pouch",
@@ -27457,9 +27461,9 @@
     },
     "stygian_keeper_legacy": {
       "name": "Stygian Keeper Legacy",
-      "description": "A forbidden soul inheritance dealing with ghosts, corpse echoes and the boundary between life and death.",
+      "description": "A forbidden ghost inheritance dealing with ghosts, corpse echoes and the boundary between life and death; the Stygian Ghost Scripture is the Ghost Cultivator's high art.",
       "preferred_paths": [
-        "Soul Cultivator"
+        "Ghost Cultivator"
       ],
       "bonuses": {
         "qi_max": 2,
@@ -27755,6 +27759,7 @@
           "attribute": "will",
           "tn": 15,
           "preferred_paths": [
+            "Ghost Cultivator",
             "Soul Cultivator"
           ],
           "cultivation": 14,
@@ -27768,6 +27773,7 @@
           "attribute": "presence",
           "tn": 16,
           "preferred_paths": [
+            "Ghost Cultivator",
             "Soul Cultivator"
           ],
           "cultivation": 17,
@@ -27783,6 +27789,7 @@
           "attribute": "spirit",
           "tn": 18,
           "preferred_paths": [
+            "Ghost Cultivator",
             "Soul Cultivator"
           ],
           "cultivation": 20,
@@ -27796,6 +27803,7 @@
           "attribute": "will",
           "tn": 20,
           "preferred_paths": [
+            "Ghost Cultivator",
             "Soul Cultivator"
           ],
           "cultivation": 24,
@@ -35717,6 +35725,21 @@
           "gate_without_asking_canon_qin_draw",
           "gate_without_asking_canon_standing_post",
           "gate_without_asking_canon_not_asking"
+        ]
+      },
+      "stygian_ghost_scripture": {
+        "name": "Stygian Ghost Scripture",
+        "item_id": "stygian_ghost_scripture",
+        "alignment": "Demonic",
+        "path": "Ghost Cultivator",
+        "grade": "Heaven",
+        "element": "Yin",
+        "min_realm_index": 4,
+        "description": "The Ghost Cultivator's high art, kept by the Stygian Keeper: it teaches the dead to answer, the living to be burned, and the boundary to be crossed and recrossed. Every page costs karma.",
+        "techniques": [
+          "stygian_corpse_lantern_call",
+          "stygian_boundary_ferry",
+          "stygian_keepers_seal"
         ]
       }
     },
@@ -48014,13 +48037,67 @@
           "control"
         ],
         "description": "A guard that faces outward and is never, ever turned round."
+      },
+      "stygian_corpse_lantern_call": {
+        "name": "Corpse-Lantern Call",
+        "manual": "stygian_ghost_scripture",
+        "min_mastery": 0,
+        "qi_cost": 4,
+        "vitality_cost": 1,
+        "damage": 7,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 2,
+        "exposure": 4,
+        "tags": [
+          "ghost",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "Nine blue lantern-flames rise from the ground and burn the living where they stand."
+      },
+      "stygian_boundary_ferry": {
+        "name": "Boundary Ferry",
+        "manual": "stygian_ghost_scripture",
+        "min_mastery": 30,
+        "qi_cost": 6,
+        "vitality_cost": 0,
+        "damage": 0,
+        "heal": 9,
+        "suppress_turns": 0,
+        "karma_cost": 1,
+        "exposure": 3,
+        "tags": [
+          "ghost",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "The cultivator steps a pace across the river of the dead and back, and the wounds stay on the far bank."
+      },
+      "stygian_keepers_seal": {
+        "name": "Stygian Keeper's Seal",
+        "manual": "stygian_ghost_scripture",
+        "min_mastery": 60,
+        "qi_cost": 9,
+        "vitality_cost": 2,
+        "damage": 11,
+        "heal": 0,
+        "suppress_turns": 1,
+        "karma_cost": 3,
+        "exposure": 6,
+        "tags": [
+          "ghost",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A lesser seal of the underworld closes over the opponent, and for a breath they are counted among the dead."
       }
     },
     "catalog_contract": {
-      "manuals": 196,
-      "techniques": 678,
-      "demonic_manuals": 52,
-      "demonic_techniques": 196
+      "manuals": 197,
+      "techniques": 681,
+      "demonic_manuals": 53,
+      "demonic_techniques": 199
     }
   },
   "commission_givers": {

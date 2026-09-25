@@ -47,14 +47,11 @@ var eraModifierReaders = []string{"EraModifier", "currentEraModifierGo", "eraTer
 // deferred with a reason in docs/TODO.md, never a shrug; authoring a key into
 // content that is named here fails `TestNoEraAuthorsAModifierNothingReads`
 // below, so the allowlist cannot be used to smuggle one in.
-var unreadEraModifiers = map[string]string{
-	"secret_realm_frequency": "would weight the secret-realm branch of eligibleUnexpectedEvents, whose " +
-		"weights rc.53 deliberately balanced per realm; changing them from an era is a mechanic, " +
-		"not a wiring, and would undo that balance silently. Not authored by any era in v1.0.7.",
-	"market_volatility": "would move shop and auction prices, which no rule varies today at all - " +
-		"a price is content times a fixed markup. That is a mechanic of its own. Not authored " +
-		"by any era in v1.0.7.",
-}
+// Empty since v1.3.4: `secret_realm_frequency` and `market_volatility` were
+// deleted from the vocabulary on the owner's call rather than wired - nothing
+// in the game varies a price, and the realm weights are balanced per realm by
+// rc.53 - so an entry here is a new decision, never a backlog.
+var unreadEraModifiers = map[string]string{}
 
 func repoRoot(t *testing.T) string {
 	t.Helper()

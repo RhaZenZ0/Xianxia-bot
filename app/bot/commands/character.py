@@ -144,7 +144,10 @@ async def sheet(interaction: discord.Interaction) -> None:
     if mutation_name:
         root_text += f"\nMutation: **{mutation_name}**"
     embed.add_field(name="Spiritual Root", value=root_text, inline=True)
-    embed.add_field(name="Path", value=c["path"], inline=True)
+    # The path's skill (v1.3.4): `paths.<name>.skill` was parsed and read by
+    # nothing for the life of the file; it is the line under the path now.
+    skill = str((WORLD.paths.get(c["path"]) or {}).get("skill") or "").strip()
+    embed.add_field(name="Path", value=f"{c['path']}\n-# {skill}" if skill else c["path"], inline=True)
     location_display=await character_location_display(c)
     embed.add_field(name="Location", value=location_display, inline=True)
     wallet_lines=[f"{WORLD.currency_name(cid)}: **{int(balance):,}**" for cid,balance in wallet.items() if int(balance)>0]

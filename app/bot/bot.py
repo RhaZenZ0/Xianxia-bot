@@ -35,7 +35,7 @@ from .admin.narration_control import (
 )
 from .channels import post_server_log
 from .character_state import _remember_freeform_npc_scene
-from . import maintenance, seclusion
+from . import maintenance, seclusion, usage
 from .runtime import DB, ENGINE, SETTINGS, TYPED_PLAY_BUDGET, WORLD, _sync_realm_presence_roles, character_location_display, chunk_text, current_world_time, log, respond
 from ..ai.quest_forge import store_draft
 from ..rules.quests import (QUEST_DEFINITIONS, ascension_quest_seed_rows, beginner_path_seed_rows,
@@ -129,6 +129,12 @@ class GatedCommandTree(app_commands.CommandTree):
             # closed door.
             refusal = await seclusion.refuse(DB, interaction.user.id, command=name)
         if refusal is None:
+            # Counted only once the refusals have passed, and only for the
+            # command itself: an autocomplete request shares this check and
+            # is a keystroke, not a use (v1.3.5). A hub press never reaches
+            # the tree, so it is counted where it lands instead.
+            if interaction.type is discord.InteractionType.application_command and name:
+                usage.note(DB, "/" + name)
             return True
         await respond(interaction, refusal, ephemeral=False)
         return False

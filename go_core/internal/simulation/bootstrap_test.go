@@ -3,7 +3,6 @@ package simulation
 import (
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 
 	"xianxia/core/internal/storage"
@@ -142,8 +141,11 @@ CREATE TABLE world_history_events(
 		t.Fatal("the hidden sect must be flagged hidden")
 	}
 	manualItems := 0
+	// By type, not by id: v1.3.4's Stygian Ghost Scripture is the first
+	// manual item whose id does not end in "_manual", and a suffix is a
+	// name rather than a reader (CLAUDE.md).
 	for id, item := range runner.Catalog.Items {
-		if strings.HasSuffix(id, "_manual") && item.Type == "manual" {
+		if item.Type == "manual" {
 			manualItems++
 			if !item.MarketExcluded {
 				t.Fatalf("manual item %s is not market_excluded", id)

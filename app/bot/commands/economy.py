@@ -275,7 +275,9 @@ async def auction_leave(interaction:discord.Interaction)->None:
     lines=[f"🚪 You step out of **{result.get('name','the auction hall')}** into **{result.get('outside','outside')}**.","The Pavilion's protection ends at the door."]
     incident=dict(result.get('incident') or {})
     if incident.get('triggered'):
-        if incident.get('battle_id'): lines.append(f"⚔️ A stronger pursuer ambushed you. Battle **#{incident['battle_id']}** has begun.")
+        if incident.get('battle_id'):
+            where=str(incident.get('where') or 'outside')
+            lines.append(f"⚔️ A stronger pursuer ambushed you {where}. Battle **#{incident['battle_id']}** has begun.")
         else: lines.append("🌑 Someone took an interest in your auction purchase after you left the Pavilion.")
     await interaction.followup.send("\n".join(lines),ephemeral=False)
 

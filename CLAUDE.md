@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 62; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 64; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -4760,6 +4760,111 @@ bonus on both rolls, and the karma refusal that only a sponsor lifts. One test i
 Sword Cultivator at karma 50 at the Azure Cloud gate, exactly the applicant the tuning favours;
 it sits a path and root the sect has no opinion of now, so it holds the recommendation rule and
 nothing else.
+
+### The daily five are one step (v1.3.2)
+
+**Found by playing**, with the `/cooldowns` reading pasted: *"For each command i have to go to 3
+steps. Time consuming ... Hunt, Gather, Mine, Explore, Cultivate. With slash command or interface
+button. Instead of a b then c."* Four of the five were root commands already - `explore`, `hunt`,
+`mine` and `cultivate` are `registered_root_command`s - and **none was in `TREE_COMMANDS`**, so a
+hub page was the only door: rc.43's `/learn` shape, where a command exists and reaches nobody, for
+the five most-used commands in the game. Forage was a group leaf (`alchemy forage`) with no root.
+
+`DAILY_ACTIONS` in `surface.py` is the five, spliced into `TREE_COMMANDS`, and `_DAILY_LEAVES` says
+which hub leaf each one is. `/forage` is a root whose body is one call to the registry's binding of
+`alchemy forage`, so the two doors are one handler and `test_the_daily_five_are_one_step.py` reads
+the body by AST to hold it. The menu's **Daily** row (`MenuDailyButton`) opens the hub in place and
+then calls `_start_hub_action`, in that order, so the result lands where a hub's own quick button
+draws it and the press meets `_invoke_action`'s maintenance and seclusion check like every other.
+Somebody with no character is not shown the row: `/begin` is all they can do.
+
+Three neighbouring gates were pinned to the old shape and each moved to a rule. `test_command_cleanup`
+forbade the string `**/explore**` in the bot package - right while no such slash command existed,
+and it holds the root to `_DAILY_LEAVES` now. Two menu tests counted sixteen buttons; they count
+`16 + len(DAILY_ACTIONS)`. And `test_seclusion_lockout`'s list of the tree commands that act grew by
+the five, which is the decision written down: each is a hub leaf the panel gate already refuses on
+the press, and `interaction_check` refuses the slash command by the same rule.
+
+`_hint_action` learned that a printed `**/hunt**` names no hub: it resolves the leaf whose path is
+`/hunt`, or the one group leaf carrying that bare name (`/forage` → `alchemy forage`), so a reply
+keeps the next-step button the hub path used to earn. The Discord playtest presses the Daily row's
+Cultivate and holds that the panel opened and ran something, then drives each of the five as a
+slash command.
+
+### Eight decisions, three changes (v1.3.3)
+
+The eight `deferred (design)` entries in `docs/TODO.md` were researched one at a time - what the code
+does, the options, a recommendation - and the owner took three changes and closed five. Two things
+about the three are worth keeping.
+
+**The opponent is a row now, for one thing only.** A battle opponent has always been a name on
+`battles`, which is why `combat.technique` could resolve `spatial_lockdown` and write its authored
+modifiers nowhere (rc.58 named it and deferred it). Schema 63's `opponent_modifiers_json` is not an
+`active_effects` for NPCs - it is the sum of what Law control effects have done to *this* opponent,
+for the length of *this* battle, read by exactly two rules: the counter-attack loses `agility`+`body`
+(`counterAttackDebuff`, never positive), and the flee roll gains the opponent's lost `escape_bonus`,
+because on a target that stat is how far they can follow. `applyOpponentEffect` reads the effect's
+`modifiers` where a value is consumed, so `modifier_vocabulary_test.go` still counts the stats
+fetched. Every read and write guards on the column (`battleHasOpponentMods`), for v1.1.0's reason: in
+the compose stack the engine is healthy before db-init migrates, and a battle fought in that window
+is fought without the debuff rather than failing the turn. The test walks attack turns until the
+technique's own suppression runs out, because the technique suppresses the very counter that would
+show the debuff - a test that asserted on the first turn would pass against a tree that applied
+nothing.
+
+**Drift never crosses zero; a killing does.** `endExhaustedClanRelations` runs after the drift in
+`clans()`. The drift moves every score away from zero (+1 for a treaty, -1 for a rivalry or feud),
+so what brings a treaty to zero is `combat_aftermath.go` taking every relation of a house down when
+its head is killed - and until now nothing looked, so the alliance sat at 0 for ever, read by
+`family.support` as worthless. A treaty at or below zero ends and a rivalry opens from both sides at
+`clanRelationOpeningScore["rivalry"]` (the one map, so a rivalry born of a broken alliance is worth
+what one signed cold is), with a `clan_relation_ended` history row keyed on the minute so a long
+world can end the same pair twice; a rivalry at or above zero ends and nothing follows; a blood feud
+never ends here. The invented bootstrap partners carry no id and are written from the one side that
+exists.
+
+The ambush wording is one function, `auctionDoorstep`, read by the leave result and told to the
+narrator off the battle's `source` prefix, because the context line above it says violence cannot
+begin in a safe zone and the ambush stands in one for 47 of 48 houses.
+
+### The last of the punch list (v1.3.4)
+
+Five entries, one worth the paragraph. **The inheritance that preferred a path it could not
+serve.** `stygian_keeper_legacy` was written when the Ghost Cultivator had no manuals (the seventh
+path, v1.0.3), so it preferred the Soul Cultivator and granted a scripture that was a 3,650-stone
+item with no `type`. It is the Ghost Cultivator's now, and the scripture is authored as the path's
+high manual - Heaven grade, realm 4, Demonic, three techniques with karma costs, `market_excluded`
+like every other manual item (`test_every_manual_has_an_item_and_none_is_market_stock` holds that,
+and refused the first draft). `grantInheritanceTx` reads `PreferredPaths` for the first time: on a
+preferred path the manual's first-study row is written the way the household lesson writes it, so
+the scripture is usable at once; off-path the sealed copy goes into the bags. `manualForItem` finds
+the manual by its `item_id` over sorted keys, because manuals name their item and never the other
+way round. The Go test drives the shipped Stygian Lantern Tomb through the real catalogue for both
+paths, which is rc.58's rule: a fixture that rewrote this link is how the link stayed wrong for
+twelve releases. Two count gates (197 manuals, 681 techniques, 53 demonic) moved with the content,
+which is the v1.0.8 rule doing its job on an authored addition.
+
+### Counted, not consulted (`command_usage`, schema 64, v1.3.5)
+
+The owner asked to collect the most used commands and put those systems first in the menus, and
+then decided the opposite half: **count, and reorder nothing** - the daily five stay first, in an
+order the owner sets by hand in `_DAILY_LEAVES`. So the table is a counter and only a counter: one
+row per command path per UTC day, server-wide, no user id (the erasure sweep matches columns by
+name, so it never has to know the table exists), pruned at thirty days by `maintenance_cleanup`.
+
+**One identifier, three doors.** The path is the leaf path the hubs build, so a slash command, a
+hub press and a typed line are one thing. The command tree's `interaction_check` records it only
+for `InteractionType.application_command` - an autocomplete request shares that check and is a
+keystroke, not a use, and a hub press never reaches the tree, so it is counted where it lands in
+`_invoke_action` after `_panel_refusal`; `typed_play.dispatch` counts its root and talk branches.
+Each records after its own refusal has passed, so a press the world refused is not a use.
+
+**It never raises and never waits.** `app/bot/usage.py` sits in the bottom tier beside
+`maintenance.py` and takes the handle by value for `test_typed_play_surface`'s reason; the write is
+fired and not awaited, because an audit of how often `/explore` is pressed is not worth a round trip
+on every press of it. The one reader is the GM's observability card, and an unreadable count says
+"unknown" rather than printing a zero - the `engine —` footer lesson (v1.0.8). The gate holds both
+halves: every door counts, and nothing that draws a panel reads the counts.
 
 ## Testing conventions
 

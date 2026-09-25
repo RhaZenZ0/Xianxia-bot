@@ -303,7 +303,9 @@ deferred half and not the half that says what was done about it.
   already async and pass `npcs_present`'s answer, the same resolver rc.28 wrote and v1.0.8 pointed
   the picker at. This was the third reader of one question; rc.28 fixed the cards and v1.0.8 the
   picker.
-- **deferred (design)** — *The curriculum is realm-banded, and some systems are not about realm.*
+- **fixed (v1.3.3, closed)** — *The curriculum is realm-banded, and some systems are not about realm.*
+  On the owner's call, left as is: each of the three is refused by its real gate in the engine, and a
+  second axis in the roster needs a precedence rule before it is worth having.
   The Ghost Cultivator's `ghost` page is path-specific, the hidden sect's door is a karma gate, and
   a profession's rank is its own ladder — each is left open at realm 0 rather than given a realm
   floor that would be wrong for the player it is actually for. Gating on something other than realm
@@ -329,7 +331,9 @@ deferred half and not the half that says what was done about it.
   neither the schedule nor the engine — see the v1.0.10 entry above.) It blocked more than conversation: the beginner path stalls at its second stage, which asks
   for a `talk`, and the commission ladder runs inside `/talk`, so 137 of the 140 authored
   commissions could be neither offered nor finished.
-- **deferred (design)** — *An NPC nothing knows the location of is no longer offered anywhere.*
+- **fixed (v1.3.3, closed)** — *An NPC nothing knows the location of is no longer offered anywhere.*
+  Measured off the shipped content: all 574 catalogue NPCs carry a `location`, so the case cannot
+  arise with shipped content; left as is on the owner's call.
   `current_npc_location` answering `None` means "do not filter by location", and `/talk` honours
   that, so such an NPC used to appear in every room's picker and now appears in none. That is the
   safe side of rc.28's rule — never offering somebody `/talk` would allow costs discoverability,
@@ -363,19 +367,21 @@ deferred half and not the half that says what was done about it.
   declaration — so the Beast Tide Era did nothing whatever to beasts. Two are wired
   (`beast_encounter_rate` on the hunt margin, `recovery_rate` on v1.0.4's vitality recovery) and two
   are refused. See CLAUDE.md, "An era belongs to one world".
-- **deferred (design)** — *`secret_realm_frequency` has nowhere honest to land.* It would weight the
+- **fixed (v1.3.4)** — *`secret_realm_frequency` has nowhere honest to land.* Deleted from the vocabulary on
+  the owner's call; `unreadEraModifiers` is empty. Was: It would weight the
   `kind: "secret_realm"` branch of `eligibleUnexpectedEvents`, whose weights rc.53 deliberately
   balanced so each realm totals 3 and a deep realm is not both harder to reach and half as likely to
   open. Letting an era scale them would undo that balance silently, and doing it properly means
   deciding what an era should do to a realm that already fades once you outgrow its world. A
   mechanic, not a wiring. No era authors it, and `TestNoEraAuthorsAModifierNothingReads` refuses one
   that tries.
-- **deferred (design)** — *`market_volatility` has no prices to move.* Nothing in the game varies a
+- **fixed (v1.3.4)** — *`market_volatility` has no prices to move.* Deleted from the vocabulary on the
+  owner's call. Was: Nothing in the game varies a
   price at all: a shop price is content times a fixed markup, and an auction settles on bids. An era
   term would need a price mechanic to modify first, and inventing one to justify a modifier is
   backwards. Same refusal as above.
-- **deferred (harness)** — *The Discord half drives the reset leaf but cannot guarantee it reaches a
-  success.* Section 9b presses `/reset` last of all and accepts either the reset or its designed
+- **fixed (v1.3.4, accepted)** — *The Discord half drives the reset leaf but cannot guarantee it reaches a
+  success.* Accepted on the owner's call: the two harnesses together cover both outcomes. Section 9b presses `/reset` last of all and accepts either the reset or its designed
   refusal, reporting which. Since v1.0.14 nothing the sweep leaves behind refuses a reset, so the
   success path is the one it should now see; the refusal is still accepted for an anonymise column a
   reset has not been told how to release. The success path is driven end to end by
@@ -412,7 +418,8 @@ deferred half and not the half that says what was done about it.
   forty other structs with a `Name`, so a field sharing a read name passes unexamined. It never calls
   a read field unread, and it catches the uniquely-named orphan — which is what every finding of this
   class has been.
-- **deferred (planned)** — *Seven cultivation paths each name a skill, and the name reaches nothing.*
+- **fixed (v1.3.4)** — *Seven cultivation paths each name a skill, and the name reaches nothing.* `/sheet`
+  prints the skill under the path; `Path.Skill` moved to `fieldsReadByPresentation`. Was:
   `worlddata.Path.Skill` is parsed from `paths.<name>.skill` — Sword, Spiritual Arts, Martial Arts,
   Soul Arts, Beastcraft, Formations, Ghost Arts — and is read by no rule, no card and no Python
   reader. Each of the seven strings occurs **exactly once in the whole 2.5 MB content file**: its own
@@ -501,7 +508,9 @@ deferred half and not the half that says what was done about it.
   and four for ever after. `clanDiplomacy` is the step that forms one between two real households,
   written from both sides; `npcPoliticalMarriages` had done the same for `sect_relations` since
   rc.24, in the file whose own comment names the clan fault it did not fix.
-- **deferred (design)** — *A safe zone refuses a fight somebody chose to start, and nothing else.*
+- **fixed (v1.3.3)** — *A safe zone refuses a fight somebody chose to start, and nothing else.* The
+  ambush is said to happen on the house's own doorstep, where its protection ends (`auctionDoorstep`,
+  read by the leave reply and told to the narrator off the battle's `source`); the mechanic is unchanged.
   v1.0.6 put that rule in the engine, and it deliberately lets two involuntary fights through: a
   world event that lands in a town (rc.49's asymmetry) and the auction door ambush, which
   `auctionLeaveAction` stands at `EntranceLocation` — a safe zone for 47 of the 48 houses, since
@@ -510,7 +519,10 @@ deferred half and not the half that says what was done about it.
   is whether a town being ambush-able *reads* right to a player who was just told the place is
   protected; moving the ambush to the first unprotected ground the fugitive reaches is a mechanic
   rather than a wiring, and wants its own change.
-- **deferred (design)** — *Nothing ends a clan relation.* `martial_clan_relations.active` is written
+- **fixed (v1.3.3)** — *Nothing ends a clan relation.* `endExhaustedClanRelations` runs after the tick's
+  drift: a treaty at or below zero ends and a rivalry opens from both sides at its opening score, with a
+  public history row; a rivalry at or above zero ends and nothing follows; a blood feud never ends by
+  drift. Was: `martial_clan_relations.active` is written
   1 by every INSERT, read by every SELECT, and set to 0 by nothing in the tree. So an alliance warms
   toward 100 and a rivalry cools toward −100 and neither can ever become the other, because no rule
   re-types a row either. What a broken alliance leaves behind — a rivalry, or simply nothing — is a
@@ -613,14 +625,18 @@ deferred half and not the half that says what was done about it.
   inside a SQL string. `modifier_vocabulary_test.go` holds the vocabulary from both sides with an
   empty allowlist, and its own drill found the last fault in it — pointing the content path at
   nothing made the whole test SKIP, green and useless, so a read that fails is a `t.Fatalf` now.
-- **deferred (design)** — *A Law control effect's modifiers are never applied to anybody.*
+- **fixed (v1.3.3)** — *A Law control effect's modifiers are never applied to anybody.* Schema 63 gives
+  `battles` an `opponent_modifiers_json`; `combat.technique` sums the landed effect's modifiers into it,
+  the counter-attack loses the `agility`/`body` taken and the flee roll gains the opponent's lost
+  `escape_bonus`. Was:
   `special_effects.spatial_lockdown` and `.spatial_strangulation` carry modifiers describing a
   *target*, and `combat.technique` resolves both mechanically (suppression turns, damage) while
   writing no `active_effects` row — a battle opponent is a name on `battles`, not a row anything
   can modify, and there are no PvP techniques. So the modifiers describe something the engine has
   nowhere to put. `combat.technique` names the effect that landed now, so the content reaches a
   player as prose; applying it is a mechanic rather than a wiring, and wants its own change.
-- **deferred (design)** — *`nine_yang_solar_body` scorches only through the purge.* Its drawback
+- **fixed (v1.3.3, closed)** — *`nine_yang_solar_body` scorches only through the purge.* Left as is on
+  the owner's call: the drawback fires where the content names the mechanism. Its drawback
   prose says "excess yang scorches the meridians" and v1.0.0-rc.58 gave it `fire_resistance -5`, so
   it bites on `alchemy.purge` and nowhere else. A physique that scorches on its own schedule needs a
   simulation pass over a body nothing currently ticks, which is a different change.
@@ -640,25 +656,32 @@ deferred half and not the half that says what was done about it.
   day, settled lazily on the authoritative path (not as a simulation step, which is flag-gated), with
   the leftover minutes carried and an active battle excluded. The rate is content and an unauthored
   one heals nobody. Schema 59 for the anchor, because `updated_at` moves on every write.
-- **deferred (content, v1.0.3)** — *The ghost inheritance prefers the wrong path.*
+- **fixed (v1.3.4)** — *The ghost inheritance prefers the wrong path.* It prefers the Ghost Cultivator now,
+  and the Stygian Ghost Scripture is an authored Heaven-grade Ghost Cultivator manual (realm 4, three
+  techniques, Demonic); the tomb's rooms favour both paths. Was:
   `inheritances.stygian_keeper_legacy` is "a forbidden soul inheritance dealing with ghosts, corpse
   echoes and the boundary between life and death", grants `stygian_ghost_scripture`, and lists
   `preferred_paths: ["Soul Cultivator"]` - written when the Ghost Cultivator had no manuals to
   prefer. The scripture is also an item with `sect_value: 450` and no `type`, so it is worth 3,650
   and does nothing; making it the path's high manual is the rc.50 shape (an authored, priced,
   granted thing with no mechanism behind it) and is a content decision, not a wiring.
-- **deferred (known limit, v1.0.3)** — *`Inheritance.PreferredPaths` is read by nothing.* The only
+- **fixed (v1.3.4)** — *`Inheritance.PreferredPaths` is read by nothing.* `grantInheritanceTx` reads it: a
+  cultivator of a preferred path has the inheritance's manual studied at once, anybody else is handed
+  the sealed copy. Was: The only
   `.PreferredPaths` reader in production Go is `secret_realm_actions.go:310`, which reads
   `SecretRealmRoom.PreferredPaths`. `field_readers_test.go` cannot tell the two apart - it is
   name-based and says so - so this is the documented blind spot doing exactly what its own docstring
   predicts rather than a gate failing.
-- **deferred (design)** — *An event scene is only visible to somebody who has reached that world.*
+- **fixed (v1.3.3, closed)** — *An event scene is only visible to somebody who has reached that world.*
+  Left as is on the owner's call: somebody below a world's floor cannot cross into it either.
   v1.0.0-rc.59 anchors an event's scene and its thread in that world's own feed, which is where
   rc.52 already sent the announcement, and retires `#event-scenes`. Those feeds are gated by the
   realm **access** role, so a scene in a world a player has not reached is now invisible to them
   where the shared channel was not. That is the trade the change makes rather than an oversight:
   an event is somewhere, and a cultivator who cannot reach the somewhere could not have joined it.
-- **deferred (design)** — *Moderation is a nudge on the engine's dispatch layer, not anti-cheat.*
+- **fixed (v1.3.3, closed)** — *Moderation is a nudge on the engine's dispatch layer, not anti-cheat.*
+  `PLAYER_MUTATIONS` in `test_authority_boundary` is empty, so every gameplay write already goes
+  through an engine action; the statement in `moderation.go` is accurate and the entry is closed.
   A muted or frozen player is blocked from the ~150 authoritative ops; raw `/v1/db` writes the
   bot makes on their behalf and the simulation runner are not intercepted. Stated in
   `moderation.go`; a stronger guarantee would need every presentation write to carry the actor.
@@ -699,7 +722,14 @@ deferred half and not the half that says what was done about it.
   that gate red — a check that pins how a rule is *written* failing exactly when the rule is fixed,
   which is v1.0.8's lesson, met for the fourth time in four releases — v1.0.9, v1.0.10 and v1.0.12
   each retired a hand-copy of the command tree's tuple for the same reason.
-- **deferred (design)** — *The leaf sweep counts a leaf pressed into a designed refusal as covered.*
+- **fixed (v1.3.5)** — *Which commands are used most.* Asked for as a way to put the most used
+  systems first in the menus; the owner then decided the numbers reorder nothing (the daily five stay
+  first, in the order they choose by hand) and reversed the earlier "no" to a usage log now that the
+  numbers themselves are wanted. `command_usage` (schema 64) counts presses per command path per UTC
+  day, server-wide, thirty days deep; three doors record it and `/admin server observability` shows
+  the top ten. `test_command_use_is_counted.py` holds that nothing drawing a panel reads the counts.
+- **deferred (known limit)** — *The leaf sweep counts a leaf pressed into a designed refusal as covered.*
+  Left open as a known limit on the owner's call (v1.3.4).
   This is rc.58's finding on the Discord side, and it is the reason `/battle challenge` was green for
   releases while no run had ever begun a battle: the sweep's contract is *"the reply is a result or a
   designed refusal"*, and a leaf that has only ever been refused has had only its refusal proved.

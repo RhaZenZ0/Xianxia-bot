@@ -73,7 +73,10 @@ class CommandCleanupTests(unittest.TestCase):
         self.assertIn('_hub_page("explore", "Act"', source)
         self.assertIn("**/world → Act → Explore**", source)
         self.assertIn("**/action**", source)
-        self.assertNotIn("**/explore**", source)
+        # `**/explore**` was forbidden while no such slash command existed; it
+        # is one of the daily five since v1.3.2 (`surface.DAILY_ACTIONS`), so a
+        # reply may name it, and `test_hint_paths.py` holds the name to the tree.
+        self.assertIn('"explore"', wiring[wiring.index("_DAILY_LEAVES"):wiring.index("DAILY_ACTIONS")])
         self.assertNotIn("**/act**", source)
 
     def test_deleted_configured_channels_are_treated_as_stale(self):

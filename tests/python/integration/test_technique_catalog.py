@@ -26,12 +26,12 @@ class TechniqueCatalogTests(unittest.IsolatedAsyncioTestCase):
         # 148 generated on the six-path cycle, 12 authored sect entry manuals
         # (v0.21.4; two per higher world since v0.39.0), 23 for the seventh path
         # the cycle never reached and 13 household traditions (both v1.0.3).
-        self.assertEqual(len(self.world.manuals), 196)
-        self.assertEqual(len(self.world.techniques), 678)
+        self.assertEqual(len(self.world.manuals), 197)  # +1 the Stygian Ghost Scripture (v1.3.4)
+        self.assertEqual(len(self.world.techniques), 681)
         evil_manuals = [m for m in self.world.manuals.values() if str(m.get("alignment", "")).lower() == "demonic"]
         evil_techniques = [t for t in self.world.techniques.values() if str((self.world.manuals.get(str(t.get("manual"))) or {}).get("alignment", "")).lower() == "demonic"]
-        self.assertEqual(len(evil_manuals), 52)  # +6 for the Ghost Cultivator (v1.0.3)
-        self.assertEqual(len(evil_techniques), 196)
+        self.assertEqual(len(evil_manuals), 53)  # +6 for the Ghost Cultivator (v1.0.3), +1 the Stygian Ghost Scripture (v1.3.4)
+        self.assertEqual(len(evil_techniques), 199)
         self.assertIn("blood_sea_palm", self.world.techniques)
         self.assertEqual(self.world.sects["Blood River Sect"]["alignment"], "Demonic")
         hidden = self.world.sects.get("Heaven-Devouring Demon Sect")
