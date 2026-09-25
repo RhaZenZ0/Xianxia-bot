@@ -115,6 +115,10 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 		result, err = adminQuestSave(conn, req.ActorID, req.Payload)
 	case "admin.audit":
 		result, err = adminAuditOnly(conn, req.ActorID, req.Payload)
+	case "admin.player.quest_progress":
+		result, err = adminQuestProgress(conn, catalog, req.ActorID, req.Payload)
+	case "admin.player.quest_complete":
+		result, err = adminQuestComplete(conn, catalog, req.ActorID, req.Payload)
 	case "admin.player.set_realm":
 		result, err = adminSetRealm(conn, req.ActorID, req.Payload)
 	case "admin.player.set_resource_caps":
@@ -473,22 +477,43 @@ func questProgress(conn *storage.Conn, catalog worlddata.Catalog, userID int64, 
 	if err := begin(conn); err != nil {
 		return nil, err
 	}
-	gameMinute, err := canonicalWorldGameMinute(conn)
-	if err != nil {
-		return nil, err
-	}
 	defer func() {
 		if conn.InTransaction() {
 			rollback(conn)
 		}
 	}()
+	transition, _, err := questProgressTx(conn, catalog, userID, p, false)
+	if err != nil {
+		return nil, err
+	}
+	if err := conn.Commit(); err != nil {
+		return nil, err
+	}
+	return transition, nil
+}
+
+// questProgressTx is one quest report inside the caller's transaction, and the
+// one statement of what finishing a quest does: a commission's resolution, or
+// an ordinary quest's reward, household standing and follow-on, then the
+// beginner-path catch-up. `quest.progress` and the GM's two quest levers
+// (quest_admin.go) all come through here, so a quest a GM completes is paid and
+// chained exactly as one a player finishes.
+//
+// forceComplete fills every objective to its count instead of matching an
+// event. found is false when the player holds no active quest by that key, and
+// nothing is written then.
+func questProgressTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, p questPayload, forceComplete bool) (map[string]any, bool, error) {
+	gameMinute, err := canonicalWorldGameMinute(conn)
+	if err != nil {
+		return nil, false, err
+	}
 	// v0.24.0: the terms come off the player's own row, not out of the payload.
 	// `terms_json` is selected only when it exists, so an engine pointed at a
 	// database Python has not migrated yet still runs - it simply falls back to
 	// reading the definition, which is all it could ever do before.
 	pinnedTerms, err := tableHasColumns(conn, "character_quests", questTermsColumn)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	columns := `progress_json,commission,variant_index`
 	if pinnedTerms {
@@ -498,12 +523,11 @@ func questProgress(conn *storage.Conn, catalog worlddata.Catalog, userID int64, 
 		`SELECT `+columns+` FROM character_quests WHERE user_id=? AND quest_key=? AND status='active'`,
 		[]any{userID, p.QuestKey})
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	row := firstRowMap(res)
 	if row == nil {
-		_ = conn.Commit()
-		return map[string]any{"touched": false, "complete": false}, nil
+		return map[string]any{"touched": false, "complete": false}, false, nil
 	}
 	progress := map[string]int64{}
 	if text, ok := row["progress_json"].(string); ok && text != "" {
@@ -511,26 +535,16 @@ func questProgress(conn *storage.Conn, catalog worlddata.Catalog, userID int64, 
 	}
 	terms, err := acceptedQuestTermsTx(conn, userID, p.QuestKey, i64(row["variant_index"]), row[questTermsColumn], gameMinute)
 	if err != nil {
-		return nil, err
+		return nil, true, err
 	}
-	payloadMap := map[string]any{"progress": progress, "objectives": terms.Objectives, "objective_type": p.ObjectiveType, "target": p.Target}
-	if p.Amount != nil {
-		payloadMap["amount"] = *p.Amount
-	}
-	encoded, _ := json.Marshal(payloadMap)
-	coreResp, coreErr := core.Apply(core.Request{APIVersion: core.APIVersion, Operation: "quest.progress", IdempotencyKey: fmt.Sprintf("go-quest-%d-%s-%d", userID, p.QuestKey, time.Now().UnixNano()), ActorID: fmt.Sprint(userID), ExpectedVersion: 0, Payload: encoded})
-	if coreErr != nil {
-		return nil, coreErr
-	}
-	transition, ok := coreResp.Result.(map[string]any)
-	if !ok {
-		return nil, errors.New("quest transition result malformed")
+	var transition map[string]any
+	if forceComplete {
+		transition = forcedQuestTransition(terms.Objectives)
+	} else if transition, err = matchQuestEvent(userID, p, progress, terms.Objectives); err != nil {
+		return nil, true, err
 	}
 	if touched, _ := transition["touched"].(bool); !touched {
-		if err := conn.Commit(); err != nil {
-			return nil, err
-		}
-		return transition, nil
+		return transition, true, nil
 	}
 	nextJSON, _ := json.Marshal(transition["progress"])
 	complete, _ := transition["complete"].(bool)
@@ -552,7 +566,7 @@ func questProgress(conn *storage.Conn, catalog worlddata.Catalog, userID int64, 
 	now := float64(time.Now().UnixNano()) / 1e9
 	_, err = conn.Execute(`UPDATE character_quests SET progress_json=?,status=?,completed_game_minute=?,updated_at=? WHERE user_id=? AND quest_key=?`, []any{string(nextJSON), status, completed, now, userID, p.QuestKey})
 	if err != nil {
-		return nil, err
+		return nil, true, err
 	}
 	// A commission that just finished its objectives resolves here rather
 	// than simply flipping status: paying the locked terms and moving
@@ -562,13 +576,13 @@ func questProgress(conn *storage.Conn, catalog worlddata.Catalog, userID int64, 
 	if complete && isCommission {
 		resolved, resolveErr := resolveCommissionTx(conn, catalog, userID, p.QuestKey, "completed", gameMinute, true)
 		if resolveErr != nil {
-			return nil, resolveErr
+			return nil, true, resolveErr
 		}
 		transition["commission"] = resolved
 	} else if complete {
 		granted, grantErr := grantQuestRewardTx(conn, catalog, userID, p.QuestKey, terms.Rewards)
 		if grantErr != nil {
-			return nil, grantErr
+			return nil, true, grantErr
 		}
 		transition["rewards_granted"] = granted
 		// A household errand brought home (v1.0.0-rc.32) also moves the
@@ -576,7 +590,7 @@ func questProgress(conn *storage.Conn, catalog worlddata.Catalog, userID int64, 
 		// key this is a no-op.
 		standing, standingErr := householdErrandCompletedTx(conn, userID, p.QuestKey, terms.Rewards)
 		if standingErr != nil {
-			return nil, standingErr
+			return nil, true, standingErr
 		}
 		if standing > 0 {
 			transition["household_standing"] = standing
@@ -588,12 +602,12 @@ func questProgress(conn *storage.Conn, catalog worlddata.Catalog, userID int64, 
 		// and finishing one must never put another in your hands by itself.
 		followOn, followErr := questFollowOnTx(conn, p.QuestKey)
 		if followErr != nil {
-			return nil, followErr
+			return nil, true, followErr
 		}
 		if followOn != "" {
 			handed, handErr := grantOrdinaryQuestTx(conn, userID, followOn, gameMinute)
 			if handErr != nil {
-				return nil, handErr
+				return nil, true, handErr
 			}
 			if handed {
 				transition["follow_on"] = followOn
@@ -614,18 +628,52 @@ func questProgress(conn *storage.Conn, catalog worlddata.Catalog, userID int64, 
 	if !isCommission {
 		caughtUp, catchErr := catchUpBeginnerPathTx(conn, catalog, userID, gameMinute)
 		if catchErr != nil {
-			return nil, catchErr
+			return nil, true, catchErr
 		}
 		if len(caughtUp) > 0 {
 			transition["caught_up"] = caughtUp
 		}
 	}
-	if err := conn.Commit(); err != nil {
-		return nil, err
-	}
 	transition["quest_key"] = p.QuestKey
 	transition["status"] = status
+	return transition, true, nil
+}
+
+// matchQuestEvent asks the core contract whether one reported event advances
+// the quest's objectives.
+func matchQuestEvent(userID int64, p questPayload, progress map[string]int64, objectives []map[string]any) (map[string]any, error) {
+	payloadMap := map[string]any{"progress": progress, "objectives": objectives, "objective_type": p.ObjectiveType, "target": p.Target}
+	if p.Amount != nil {
+		payloadMap["amount"] = *p.Amount
+	}
+	encoded, _ := json.Marshal(payloadMap)
+	coreResp, coreErr := core.Apply(core.Request{APIVersion: core.APIVersion, Operation: "quest.progress", IdempotencyKey: fmt.Sprintf("go-quest-%d-%s-%d", userID, p.QuestKey, time.Now().UnixNano()), ActorID: fmt.Sprint(userID), ExpectedVersion: 0, Payload: encoded})
+	if coreErr != nil {
+		return nil, coreErr
+	}
+	transition, ok := coreResp.Result.(map[string]any)
+	if !ok {
+		return nil, errors.New("quest transition result malformed")
+	}
 	return transition, nil
+}
+
+// forcedQuestTransition is every objective at its count - the shape the core
+// contract answers for a report that finished the quest.
+func forcedQuestTransition(objectives []map[string]any) map[string]any {
+	progress := map[string]int64{}
+	for _, objective := range objectives {
+		id, _ := objective["id"].(string)
+		if id == "" {
+			continue
+		}
+		required := i64(objective["count"])
+		if required < 1 {
+			required = 1
+		}
+		progress[id] = required
+	}
+	return map[string]any{"touched": true, "complete": true, "progress": progress}
 }
 
 type combatPayload struct {
