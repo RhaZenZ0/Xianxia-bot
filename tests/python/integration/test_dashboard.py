@@ -162,6 +162,29 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(detail["abode"], {}, "no property is an empty row, not a missing key")
         self.assertEqual(detail["bloodlines"], [])
 
+    async def test_player_detail_carries_the_quest_journal_the_quest_levers_act_on(self):
+        """The Quests card (v1.4.1) picks the quest and objective a lever needs,
+        so each held quest comes back with its objectives and how far along each is."""
+        self.assertTrue(await seed_character(
+            self.db, user_id=11, discord_name="tester-11", name="Tester Eleven",
+            origin="Greenriver Town", path="Sword Cultivator", spiritual_root="Fire",
+            concept="quest test", location="Greenriver Town",
+            attributes={"body": 2, "agility": 2, "spirit": 2, "insight": 2, "will": 2, "presence": 2},
+            qi_max=10, vitality_max=20,
+        ))
+        async with self.db._connect() as db:
+            await db.execute(
+                "INSERT OR REPLACE INTO quest_definitions(quest_key,title,objectives_json,rewards_json,status,created_at,updated_at) "
+                "VALUES('stuck_lesson','The Last Lesson','[{\"id\":\"x\",\"type\":\"family_lesson\",\"count\":1,\"label\":\"Take the lesson\"}]','{}','approved',0,0)")
+            await db.execute(
+                "INSERT INTO character_quests(user_id,quest_key,status,progress_json,created_at,updated_at) VALUES(11,'stuck_lesson','active','{}',0,0)")
+            await db.commit()
+        journal = {q["quest_key"]: q for q in (await self.store.player_detail(11))["quests"]}
+        self.assertEqual(journal["stuck_lesson"]["title"], "The Last Lesson")
+        self.assertEqual(journal["stuck_lesson"]["status"], "active")
+        self.assertEqual(journal["stuck_lesson"]["objectives"],
+                         [{"id": "x", "type": "family_lesson", "label": "Take the lesson", "count": 1, "progress": 0}])
+
     async def test_new_dashboard_api_routes_return_json(self):
         settings = DashboardSettings(self.path, "127.0.0.1", 0, "gm", "a-very-long-private-dashboard-token", admin_writes=False)
         dashboard = DashboardServer(settings)

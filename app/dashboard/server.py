@@ -59,6 +59,46 @@ log = logging.getLogger("xianxia.dashboard")
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def quest_journal(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """A player's quests as the Quests card draws them: each objective with its
+    count and how far along it is, read off the accepted terms first."""
+    journal = []
+    for row in rows:
+        objectives: list[Any] = []
+        for source, key in ((row.get("terms_json"), "objectives"), (row.get("objectives_json"), None)):
+            try:
+                decoded = json.loads(source or "null")
+            except (TypeError, ValueError):
+                continue
+            found = decoded.get(key) if key and isinstance(decoded, dict) else decoded
+            if isinstance(found, list) and found:
+                objectives = found
+                break
+        try:
+            progress = json.loads(row.get("progress_json") or "{}")
+        except (TypeError, ValueError):
+            progress = {}
+        if not isinstance(progress, dict):
+            progress = {}
+        journal.append({
+            "quest_key": row.get("quest_key"),
+            "title": row.get("title") or row.get("quest_key"),
+            "status": row.get("status"),
+            "commission": bool(row.get("commission")),
+            "objectives": [
+                {
+                    "id": str(o.get("id") or ""),
+                    "type": str(o.get("type") or ""),
+                    "label": str(o.get("label") or o.get("type") or ""),
+                    "count": max(1, int(o.get("count") or 1)),
+                    "progress": int(progress.get(str(o.get("id") or ""), 0) or 0),
+                }
+                for o in objectives if isinstance(o, dict)
+            ],
+        })
+    return journal
+
+
 @lru_cache(maxsize=1)
 def _aptitude_catalogue() -> dict[str, list[dict[str, str]]]:
     """What the Player Editor's two aptitude cards may offer (v1.0.11).
@@ -1065,12 +1105,24 @@ class ReadOnlyDashboardStore:
             )
             alchemy = await self._fetchone(db, "SELECT pill_toxicity FROM alchemy_state WHERE user_id=?", (one,))
             fate = await self._fetchone(db, "SELECT points,lifetime_earned,lifetime_spent FROM character_fate WHERE user_id=?", (one,))
+            # The Quests card (v1.4.1): the journal the two quest levers act on.
+            # Objectives are read off the terms the player accepted, falling
+            # back to the definition, the order quest.progress reads them in.
+            quest_rows = await self._fetchall(
+                db,
+                """SELECT q.quest_key,q.status,q.progress_json,q.commission,q.terms_json,
+                          d.title,d.objectives_json
+                   FROM character_quests q LEFT JOIN quest_definitions d ON d.quest_key=q.quest_key
+                   WHERE q.user_id=? ORDER BY q.status='active' DESC,q.updated_at DESC LIMIT 60""",
+                (one,),
+            )
             detail = {
                 "player": row, "inventory": inventory, "cooldowns": cooldowns, "scene": scene or {}, "conditions": conditions,
                 "wallets": wallets, "root": root or {}, "bloodlines": bloodlines, "physique": physique or {},
                 "aptitude_catalogue": aptitude_catalogue,
                 "tribulations": tribulations, "perfection": perfection, "beasts": beasts, "equipment": equipment,
                 "abode": abode or {}, "guests": guests, "alchemy": alchemy or {}, "fate": fate or {},
+                "quests": quest_journal(quest_rows),
             }
         # Outside the query session on purpose: this one is an HTTP round trip
         # to the engine, and a read session held open across it is a session
@@ -1868,6 +1920,8 @@ class AdminDashboardController:
         "world.advance_time": "admin.world.advance_time",
         "player.grant_currency": "admin.player.grant_currency",
         "player.karma": "admin.player.karma",
+        "player.quest_progress": "admin.player.quest_progress",
+        "player.quest_complete": "admin.player.quest_complete",
         "player.fate": "admin.player.fate",
         "player.teleport": "admin.player.teleport",
         "player.revive": "admin.player.revive",
