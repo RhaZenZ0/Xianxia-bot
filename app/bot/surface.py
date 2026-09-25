@@ -1176,6 +1176,10 @@ LOCATION_GATES: dict[str, tuple[str, ...]] = {
     "array_here": ("array use",),
     "protected_ground": ("battle challenge", "duel challenge"),
     "shrine": ("hunt", "mine"),
+    # A dig is refused under a counter and on an auction floor (v1.6.0, the
+    # owner's list). A waystation's yard carries its keeper's stall and is
+    # still road ground, so the engine exempts a road site and so does this.
+    "indoor_floor": ("mine",),
     "road_site": ("realmhub go",),
     "realm_entrance": ("secretrealm enter", "spatialkey"),
     "sect_gate": ("sect recruitment trial",),
@@ -1267,6 +1271,8 @@ async def _location_hidden_actions(interaction: discord.Interaction, c: dict) ->
         shut["protected_ground"] = "local formations suppress violence here"
     if str(place.get("road_site") or "") == "shrine":
         shut["shrine"] = "a shrine's ground is neither hunted nor dug"
+    if (_shop_at(here) and not place.get("road_site")) or WORLD.auction_house_at(here) is not None:
+        shut["indoor_floor"] = "a shop's floor or an auction hall is not dug — step out into the street"
     if str(place.get("road_site") or ""):
         shut["road_site"] = "a road-side site is left by its road, not by the realm gate"
     if not any(str(realm.get("location") or "") == here for realm in WORLD.secret_realms.values()):

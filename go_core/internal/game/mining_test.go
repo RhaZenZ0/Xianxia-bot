@@ -1,6 +1,7 @@
 package game
 
 import (
+	"sort"
 	"strings"
 	"testing"
 
@@ -121,31 +122,93 @@ func TestTheMineResultCarriesTheRollTheReplyPrints(t *testing.T) {
 	}
 }
 
+// Where a dig is refused is the owner's list (v1.6.0): a private place, a
+// shrine, a shop, an auction floor, and while an exploration event is open -
+// and nowhere else. Both directions are held, because a test that only asked
+// "is it refused here" would pass just as well for a seam refused everywhere.
 func TestNobodyDigsIndoorsOrOnAShrine(t *testing.T) {
 	world := batch4WorldPath(t)
 	catalog, err := worlddata.Load(world)
 	if err != nil {
 		t.Fatal(err)
 	}
-	shrine := ""
-	for name, loc := range catalog.Locations {
-		if loc.RoadSite == "shrine" {
-			shrine = name
-			break
+	names := make([]string, 0, len(catalog.Locations))
+	for name := range catalog.Locations {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	find := func(what string, match func(string) bool) string {
+		t.Helper()
+		for _, name := range names {
+			if match(name) {
+				return name
+			}
 		}
+		t.Fatalf("the content file carries no %s; the test cannot ask the question", what)
+		return ""
 	}
-	if shrine == "" {
-		t.Fatal("the content file carries no shrine; the test cannot ask the question")
-	}
+	shrine := find("shrine", func(n string) bool { return catalog.Locations[n].RoadSite == "shrine" })
+	shop := find("shop interior", func(n string) bool {
+		_, _, in := shopAt(catalog, n)
+		return in && catalog.Locations[n].RoadSite == ""
+	})
+	floor := find("auction floor", func(n string) bool { _, _, on := catalogHouseAt(catalog, n); return on })
 	for _, tc := range []struct{ location, refusal string }{
 		{"birth_family:1", "private residence"},
+		{"abode:42", "private residence"},
+		{"sect_abode:42", "private residence"},
 		{"personal_world:42", "private residence"},
 		{shrine, "shrine"},
+		{shop, "shop's floor"},
+		{floor, "auction floor"},
 	} {
 		err := mineErr(t, world, tc.location)
 		if err == nil || !strings.Contains(err.Error(), tc.refusal) {
 			t.Fatalf("at %s the dig answered %v, want a refusal naming %q", tc.location, err, tc.refusal)
 		}
+	}
+
+	// The other direction: the world's own ground is dug, from a town street
+	// to a hunting ground, so the refusals above cannot be a seam shut
+	// everywhere. Each is a real place from the shipped catalogue.
+	open := map[string]string{
+		"town street": find("town street", func(n string) bool {
+			l := catalog.Locations[n]
+			return l.RoadSite == "" && cityOf(catalog, n) == n && !isShopOrFloor(catalog, n)
+		}),
+		"ruin":           find("ruin", func(n string) bool { return catalog.Locations[n].RoadSite == "ruin" }),
+		"waystation":     find("waystation", func(n string) bool { return catalog.Locations[n].RoadSite == "waystation" }),
+		"hunting ground": find("hunting ground", func(n string) bool { return catalog.Locations[n].RoadSite == "hunting_ground" }),
+	}
+	for kind, location := range open {
+		if err := mineErr(t, world, location); err != nil {
+			t.Fatalf("a dig on a %s (%s) was refused: %v", kind, location, err)
+		}
+	}
+}
+
+func isShopOrFloor(catalog worlddata.Catalog, location string) bool {
+	_, _, in := shopAt(catalog, location)
+	_, _, on := catalogHouseAt(catalog, location)
+	return in || on
+}
+
+// An open exploration event is the one refusal that is about what you are
+// doing rather than where you stand: the event has to be worked or left first.
+func TestNobodyDigsWhileAnExplorationEventIsOpen(t *testing.T) {
+	world := batch4WorldPath(t)
+	path := setupBatch5AuthorityDB(t)
+	setupForageEffectAuthorityTables(t, path)
+	batch4Exec(t, path, `UPDATE characters SET location='Greenriver Town' WHERE user_id=42`)
+	batch4Exec(t, path, `INSERT INTO exploration_events(event_id,definition_id,title,location,state,expires_at) VALUES('ev1','def','A Strange Light','Greenriver Town','active',9e12)`)
+	batch4Exec(t, path, `INSERT INTO exploration_event_participants(event_id,user_id,status) VALUES('ev1',42,'active')`)
+	_, err := batch4ApplyErr(path, world, "exploration.mine", 42, 1, map[string]any{})
+	if err == nil || !strings.Contains(err.Error(), "active exploration event") {
+		t.Fatalf("a dig with an event open answered %v, want the open-event refusal", err)
+	}
+	batch4Exec(t, path, `UPDATE exploration_event_participants SET status='left' WHERE event_id='ev1'`)
+	if _, err := batch4ApplyErr(path, world, "exploration.mine", 42, 2, map[string]any{}); err != nil {
+		t.Fatalf("once the event was left the dig was still refused: %v", err)
 	}
 }
 
