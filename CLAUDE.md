@@ -4827,6 +4827,23 @@ The ambush wording is one function, `auctionDoorstep`, read by the leave result 
 narrator off the battle's `source` prefix, because the context line above it says violence cannot
 begin in a safe zone and the ambush stands in one for 47 of 48 houses.
 
+### The last of the punch list (v1.3.4)
+
+Five entries, one worth the paragraph. **The inheritance that preferred a path it could not
+serve.** `stygian_keeper_legacy` was written when the Ghost Cultivator had no manuals (the seventh
+path, v1.0.3), so it preferred the Soul Cultivator and granted a scripture that was a 3,650-stone
+item with no `type`. It is the Ghost Cultivator's now, and the scripture is authored as the path's
+high manual - Heaven grade, realm 4, Demonic, three techniques with karma costs, `market_excluded`
+like every other manual item (`test_every_manual_has_an_item_and_none_is_market_stock` holds that,
+and refused the first draft). `grantInheritanceTx` reads `PreferredPaths` for the first time: on a
+preferred path the manual's first-study row is written the way the household lesson writes it, so
+the scripture is usable at once; off-path the sealed copy goes into the bags. `manualForItem` finds
+the manual by its `item_id` over sorted keys, because manuals name their item and never the other
+way round. The Go test drives the shipped Stygian Lantern Tomb through the real catalogue for both
+paths, which is rc.58's rule: a fixture that rewrote this link is how the link stayed wrong for
+twelve releases. Two count gates (197 manuals, 681 techniques, 53 demonic) moved with the content,
+which is the v1.0.8 rule doing its job on an authored addition.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

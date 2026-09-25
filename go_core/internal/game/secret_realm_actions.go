@@ -166,7 +166,32 @@ func secretRealmEnterAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "secret_realm", EventType: "secret_realm_entered", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 }
 
-func grantInheritanceTx(conn *storage.Conn, userID int64, realmID string, inheritance worlddata.Inheritance, inheritanceID string, now float64) (map[string]any, error) {
+// manualForItem is the manual an item is the sealed copy of, or "" when the
+// item is not a manual. Manuals name their item (`item_id`), never the other
+// way round, and the walk is over sorted keys so two manuals naming one item
+// could not make the answer differ between runs.
+func manualForItem(catalog worlddata.Catalog, itemID string) string {
+	keys := make([]string, 0, len(catalog.TechniqueSystem.Manuals))
+	for id := range catalog.TechniqueSystem.Manuals {
+		keys = append(keys, id)
+	}
+	sort.Strings(keys)
+	for _, id := range keys {
+		if catalog.TechniqueSystem.Manuals[id].ItemID == itemID {
+			return id
+		}
+	}
+	return ""
+}
+
+// grantInheritanceTx hands a realm's inheritance over once. `preferred_paths`
+// (v1.3.4) is read here: an inheritance whose item is a manual is *studied* at
+// once by a cultivator of a path it prefers - the first-study row is written,
+// as the household lesson writes it, so the scripture's first technique is
+// usable the moment the last room is cleared - and merely handed over to
+// anybody else, who may study it the ordinary way. The field had been parsed
+// since the inheritances were written and read by nothing.
+func grantInheritanceTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, path, realmID string, inheritance worlddata.Inheritance, inheritanceID string, now float64) (map[string]any, error) {
 	existing, err := conn.Execute(`SELECT 1 FROM inheritances WHERE user_id=? AND inheritance_id=?`, []any{userID, inheritanceID})
 	if err != nil {
 		return nil, err
@@ -190,16 +215,32 @@ func grantInheritanceTx(conn *storage.Conn, userID int64, realmID string, inheri
 	if _, err = grantInsightXPTx(conn, userID, insight, now); err != nil {
 		return nil, err
 	}
+	preferred := stringInList(inheritance.PreferredPaths, path)
+	studied := ""
 	if inheritance.Item != "" {
 		if _, err = conn.Execute(`INSERT INTO inventory(user_id,item_id,quantity) VALUES(?,?,1) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=quantity+1`, []any{userID, inheritance.Item}); err != nil {
 			return nil, err
 		}
+		if preferred {
+			if manualID := manualForItem(catalog, inheritance.Item); manualID != "" {
+				row, e := manualRow(conn, userID, manualID)
+				if e != nil {
+					return nil, e
+				}
+				if row == nil {
+					if _, e = conn.Execute(`INSERT INTO character_manuals(user_id,manual_id,mastery,practice,learned_at,updated_at) VALUES(?,?,0,0,?,?)`, []any{userID, manualID, now, now}); e != nil {
+						return nil, e
+					}
+				}
+				studied = manualID
+			}
+		}
 	}
-	payload, _ := json.Marshal(map[string]any{"inheritance_id": inheritanceID, "source_realm_id": realmID, "bonuses": inheritance.Bonuses, "item": inheritance.Item})
+	payload, _ := json.Marshal(map[string]any{"inheritance_id": inheritanceID, "source_realm_id": realmID, "bonuses": inheritance.Bonuses, "item": inheritance.Item, "preferred_path": preferred, "studied": studied})
 	if _, err = conn.Execute(`INSERT INTO event_log(user_id,event_type,payload_json,created_at) VALUES(?,?,?,?)`, []any{userID, "inheritance_obtained", string(payload), now}); err != nil {
 		return nil, err
 	}
-	return map[string]any{"gained": true, "inheritance_id": inheritanceID, "name": inheritance.Name, "description": inheritance.Description, "bonuses": inheritance.Bonuses, "item": inheritance.Item}, nil
+	return map[string]any{"gained": true, "inheritance_id": inheritanceID, "name": inheritance.Name, "description": inheritance.Description, "bonuses": inheritance.Bonuses, "item": inheritance.Item, "preferred_path": preferred, "studied": studied}, nil
 }
 
 // secretRealmRareIntn is the dice for a room's rare find, behind the seam the
@@ -362,7 +403,7 @@ func secretRealmExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 			if !ok {
 				return authoritativeMutation{}, errors.New("secret realm inheritance definition is missing")
 			}
-			inheritanceResult, err := grantInheritanceTx(conn, userID, rid, inheritance, realm.InheritanceID, now)
+			inheritanceResult, err := grantInheritanceTx(conn, catalog, userID, c.Path, rid, inheritance, realm.InheritanceID, now)
 			if err != nil {
 				return authoritativeMutation{}, err
 			}

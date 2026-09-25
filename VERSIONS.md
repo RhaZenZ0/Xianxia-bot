@@ -6,6 +6,23 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.3.4** clears the last of the punch list: the Stygian Ghost Scripture is the Ghost Cultivator's high art and its inheritance knows whose it is, a path's skill is on the sheet, and two era keys that nothing could scale are gone.
+
+`inheritances.stygian_keeper_legacy` preferred the Soul Cultivator and granted a scripture that was a
+priced item doing nothing - written when the Ghost Cultivator had no manuals to prefer (v1.0.3). It
+prefers the Ghost Cultivator now, the scripture is an authored Heaven-grade Ghost Cultivator manual
+(realm 4, three techniques, every page costing karma), and the tomb's rooms favour both paths.
+`Inheritance.PreferredPaths` is read by the grant for the first time: a cultivator of a preferred
+path has the inheritance's manual studied at once, so its first technique is usable the moment the
+last room is cleared; anybody else is handed the sealed copy to study the ordinary way. `/sheet`
+prints each path's `skill` under the path, a field parsed and read by nothing for the life of the
+file. And `secret_realm_frequency` and `market_volatility` are deleted from the era vocabulary on
+the owner's call: nothing in the game varies a price, and the realm weights are balanced per realm.
+
+And two harness notes are settled without a change: the reset leaf's success path stays proven by
+the engine half and its refusal by the Discord half, and the sweep counting a designed refusal as
+coverage is recorded as a known limit.
+
 **1.3.3** settles the eight open rule decisions: a Law control technique now weakens the opponent it lands on, a clan treaty that runs out ends and leaves a rivalry, and an auction-door ambush is said to happen on the house's own doorstep.
 
 The owner read the research on the eight `deferred (design)` entries in `docs/TODO.md` and took
@@ -901,9 +918,9 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.3.3
+## Release status — v1.3.4
 
-- Current release: v1.3.3 - the eight open rule decisions settled: a Law control technique weakens its opponent (schema 63), a clan treaty that runs out ends and leaves a rivalry, the auction-door ambush is on the house's doorstep, five entries closed with reasons (see the changelog). Schema 63. Built on v1.3.2 - the daily five are one step each: `/cultivate`, `/explore`, `/hunt`, `/forage` and `/mine` are slash commands and a row of five buttons on the menu (see the changelog). Built on v1.3.1 - six rules the bot held are the engine's (a sponsor's presence, the sects a gate justifies, a city's board, a territory's ground, the forage wait, the quest chain catch-up on any action) and three more buttons are drawn only where they work (see the changelog). Built on v1.3.0 - ten of the owner's decisions: a failed craft returns half its makings, a hall teaches only what its world can make, the Nine-Echo Sword Wraith is a secret floor beneath its realm, `/reset` asks with the count, the Qi Body card shows the pool at every realm, thirty-three upper-world send-offs, no property inside a household, `heart` retired, the Starfall hall's buy line lowered (see the changelog). Built on v1.2.3 - the review's eight deferred claims settled: Vacuum refuses at once behind a half-written action, one array rule at both cultivation doors, one counter-attack TN, an undo undone again, a rank price under a merchant's wares, and a lot listed in its house's coin (see the changelog). Built on v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
+- Current release: v1.3.4 - the punch list cleared: the Stygian Ghost Scripture is the Ghost Cultivator's high manual and its inheritance reads `preferred_paths`, a path's skill is on the sheet, two dead era keys deleted (see the changelog). Built on v1.3.3 - the eight open rule decisions settled: a Law control technique weakens its opponent (schema 63), a clan treaty that runs out ends and leaves a rivalry, the auction-door ambush is on the house's doorstep, five entries closed with reasons (see the changelog). Schema 63. Built on v1.3.2 - the daily five are one step each: `/cultivate`, `/explore`, `/hunt`, `/forage` and `/mine` are slash commands and a row of five buttons on the menu (see the changelog). Built on v1.3.1 - six rules the bot held are the engine's (a sponsor's presence, the sects a gate justifies, a city's board, a territory's ground, the forage wait, the quest chain catch-up on any action) and three more buttons are drawn only where they work (see the changelog). Built on v1.3.0 - ten of the owner's decisions: a failed craft returns half its makings, a hall teaches only what its world can make, the Nine-Echo Sword Wraith is a secret floor beneath its realm, `/reset` asks with the count, the Qi Body card shows the pool at every realm, thirty-three upper-world send-offs, no property inside a household, `heart` retired, the Starfall hall's buy line lowered (see the changelog). Built on v1.2.3 - the review's eight deferred claims settled: Vacuum refuses at once behind a half-written action, one array rule at both cultivation doors, one counter-attack TN, an undo undone again, a rank price under a merchant's wares, and a lot listed in its house's coin (see the changelog). Built on v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
   Apprentice to Tier 9 Sovereign with each trade's own word in front (Pill, Forge, Talisman, Array,
   Herb, Ore, Beast, Artifact, Treasure). No schema.
 - v1.2.1: a beast can always evolve, a homestead can be upgraded in any world, and a dozen smaller wires from a deep review (see the changelog).

@@ -188,6 +188,10 @@ async def secret_explore(interaction: discord.Interaction) -> None:
                     f"+{int(bonuses.get('vitality_max') or 0)} Max Vitality, "
                     f"+{int(bonuses.get('insight_xp') or 0)} Insight XP."
                 )
+                if inheritance.get("studied"):
+                    text += f"\n📖 Your path is the one this legacy was written for: **{WORLD.item_names({str(inheritance.get('item')): 1})}** is studied and its first technique is yours at once."
+                elif inheritance.get("item"):
+                    text += f"\n📦 {WORLD.item_names({str(inheritance.get('item')): 1})} is in your bags; study it from **/cultivation → Arts → Study**."
             else:
                 text += "\n\nThe inheritance recognizes that you already carry this legacy and grants no duplicate permanent bonus."
         else:

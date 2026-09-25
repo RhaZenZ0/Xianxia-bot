@@ -42,10 +42,10 @@ class MaterialisedCatalogTests(unittest.TestCase):
         # 148 generated on the six-path cycle, one authored entry manual per
         # public sect (twelve since v0.39.0), 23 for the seventh path the cycle
         # never reached and 13 household traditions (both v1.0.3).
-        self.assertEqual(len(system["manuals"]), 196)
-        self.assertEqual(len(system["techniques"]), 678)
+        self.assertEqual(len(system["manuals"]), 197)  # +1 the Stygian Ghost Scripture (v1.3.4)
+        self.assertEqual(len(system["techniques"]), 681)
         demonic = [m for m in system["manuals"].values() if str(m.get("alignment", "")).casefold() == "demonic"]
-        self.assertEqual(len(demonic), 52)  # +6 for the Ghost Cultivator (v1.0.3)
+        self.assertEqual(len(demonic), 53)  # +6 for the Ghost Cultivator (v1.0.3), +1 the Stygian Ghost Scripture (v1.3.4)
 
     def test_every_manual_has_an_item_and_none_is_market_stock(self):
         data = json.loads(WORLD.read_text(encoding="utf-8"))

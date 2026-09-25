@@ -367,19 +367,21 @@ deferred half and not the half that says what was done about it.
   declaration — so the Beast Tide Era did nothing whatever to beasts. Two are wired
   (`beast_encounter_rate` on the hunt margin, `recovery_rate` on v1.0.4's vitality recovery) and two
   are refused. See CLAUDE.md, "An era belongs to one world".
-- **deferred (design)** — *`secret_realm_frequency` has nowhere honest to land.* It would weight the
+- **fixed (v1.3.4)** — *`secret_realm_frequency` has nowhere honest to land.* Deleted from the vocabulary on
+  the owner's call; `unreadEraModifiers` is empty. Was: It would weight the
   `kind: "secret_realm"` branch of `eligibleUnexpectedEvents`, whose weights rc.53 deliberately
   balanced so each realm totals 3 and a deep realm is not both harder to reach and half as likely to
   open. Letting an era scale them would undo that balance silently, and doing it properly means
   deciding what an era should do to a realm that already fades once you outgrow its world. A
   mechanic, not a wiring. No era authors it, and `TestNoEraAuthorsAModifierNothingReads` refuses one
   that tries.
-- **deferred (design)** — *`market_volatility` has no prices to move.* Nothing in the game varies a
+- **fixed (v1.3.4)** — *`market_volatility` has no prices to move.* Deleted from the vocabulary on the
+  owner's call. Was: Nothing in the game varies a
   price at all: a shop price is content times a fixed markup, and an auction settles on bids. An era
   term would need a price mechanic to modify first, and inventing one to justify a modifier is
   backwards. Same refusal as above.
-- **deferred (harness)** — *The Discord half drives the reset leaf but cannot guarantee it reaches a
-  success.* Section 9b presses `/reset` last of all and accepts either the reset or its designed
+- **fixed (v1.3.4, accepted)** — *The Discord half drives the reset leaf but cannot guarantee it reaches a
+  success.* Accepted on the owner's call: the two harnesses together cover both outcomes. Section 9b presses `/reset` last of all and accepts either the reset or its designed
   refusal, reporting which. Since v1.0.14 nothing the sweep leaves behind refuses a reset, so the
   success path is the one it should now see; the refusal is still accepted for an anonymise column a
   reset has not been told how to release. The success path is driven end to end by
@@ -416,7 +418,8 @@ deferred half and not the half that says what was done about it.
   forty other structs with a `Name`, so a field sharing a read name passes unexamined. It never calls
   a read field unread, and it catches the uniquely-named orphan — which is what every finding of this
   class has been.
-- **deferred (planned)** — *Seven cultivation paths each name a skill, and the name reaches nothing.*
+- **fixed (v1.3.4)** — *Seven cultivation paths each name a skill, and the name reaches nothing.* `/sheet`
+  prints the skill under the path; `Path.Skill` moved to `fieldsReadByPresentation`. Was:
   `worlddata.Path.Skill` is parsed from `paths.<name>.skill` — Sword, Spiritual Arts, Martial Arts,
   Soul Arts, Beastcraft, Formations, Ghost Arts — and is read by no rule, no card and no Python
   reader. Each of the seven strings occurs **exactly once in the whole 2.5 MB content file**: its own
@@ -653,14 +656,18 @@ deferred half and not the half that says what was done about it.
   day, settled lazily on the authoritative path (not as a simulation step, which is flag-gated), with
   the leftover minutes carried and an active battle excluded. The rate is content and an unauthored
   one heals nobody. Schema 59 for the anchor, because `updated_at` moves on every write.
-- **deferred (content, v1.0.3)** — *The ghost inheritance prefers the wrong path.*
+- **fixed (v1.3.4)** — *The ghost inheritance prefers the wrong path.* It prefers the Ghost Cultivator now,
+  and the Stygian Ghost Scripture is an authored Heaven-grade Ghost Cultivator manual (realm 4, three
+  techniques, Demonic); the tomb's rooms favour both paths. Was:
   `inheritances.stygian_keeper_legacy` is "a forbidden soul inheritance dealing with ghosts, corpse
   echoes and the boundary between life and death", grants `stygian_ghost_scripture`, and lists
   `preferred_paths: ["Soul Cultivator"]` - written when the Ghost Cultivator had no manuals to
   prefer. The scripture is also an item with `sect_value: 450` and no `type`, so it is worth 3,650
   and does nothing; making it the path's high manual is the rc.50 shape (an authored, priced,
   granted thing with no mechanism behind it) and is a content decision, not a wiring.
-- **deferred (known limit, v1.0.3)** — *`Inheritance.PreferredPaths` is read by nothing.* The only
+- **fixed (v1.3.4)** — *`Inheritance.PreferredPaths` is read by nothing.* `grantInheritanceTx` reads it: a
+  cultivator of a preferred path has the inheritance's manual studied at once, anybody else is handed
+  the sealed copy. Was: The only
   `.PreferredPaths` reader in production Go is `secret_realm_actions.go:310`, which reads
   `SecretRealmRoom.PreferredPaths`. `field_readers_test.go` cannot tell the two apart - it is
   name-based and says so - so this is the documented blind spot doing exactly what its own docstring
@@ -715,7 +722,8 @@ deferred half and not the half that says what was done about it.
   that gate red — a check that pins how a rule is *written* failing exactly when the rule is fixed,
   which is v1.0.8's lesson, met for the fourth time in four releases — v1.0.9, v1.0.10 and v1.0.12
   each retired a hand-copy of the command tree's tuple for the same reason.
-- **deferred (design)** — *The leaf sweep counts a leaf pressed into a designed refusal as covered.*
+- **deferred (known limit)** — *The leaf sweep counts a leaf pressed into a designed refusal as covered.*
+  Left open as a known limit on the owner's call (v1.3.4).
   This is rc.58's finding on the Discord side, and it is the reason `/battle challenge` was green for
   releases while no run had ever begun a battle: the sweep's contract is *"the reply is a result or a
   designed refusal"*, and a leaf that has only ever been refused has had only its refusal proved.
