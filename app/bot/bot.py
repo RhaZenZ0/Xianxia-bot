@@ -215,6 +215,13 @@ class XianxiaBot(commands.Bot):
             }}
         if owns_narration_action(action):
             return await dashboard_narration_control(action, payload)
+        # v1.4.0: the Server Update card asks what `check_for_release` last
+        # found, so release_channel.py stays the one comparison and GitHub is
+        # asked once per UPDATE_CHECK_HOURS rather than once per page load.
+        # A read of this process's own health entry; it changes nothing.
+        if action == "release":
+            return {"ok": True, "action": action,
+                    "result": dict(self.health_state.checks.get("release_channel") or {})}
         return await dashboard_discord_control(self, action, payload)
 
     async def _mark_startup_phase(self, phase: str, detail: dict | None = None) -> None:

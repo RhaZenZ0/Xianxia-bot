@@ -8,6 +8,7 @@ import json
 from functools import lru_cache
 import logging
 import os
+import time
 from dataclasses import dataclass
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -29,6 +30,7 @@ from ..ops.http_limits import (
     LoginThrottle,
 )
 from ..rules.worldtime import from_game_minutes
+from ..version import INSTALLED_VERSION
 from ..database.remote import GoDatabaseTransport, RemoteDatabaseError
 from ..ops.game_engine import GameEngineClient, GameEngineError
 
@@ -1822,6 +1824,43 @@ class ReadOnlyDashboardStore:
             return {"minds": minds, "history": npc_history, "simulation": sim}
 
 
+# A watcher that has not written its heartbeat for this long is reported as
+# not running. It writes one every five minutes, so this is three missed.
+UPDATE_WATCHER_STALE_SECONDS = 15 * 60
+
+
+def update_card_state(rows: dict[str, Any] | None, release: dict[str, Any] | None, now: float) -> dict[str, Any]:
+    """What the Server Update card shows (v1.4.0), from the engine's rows and
+    the bot's release check. Pure, so the two ways it can mislead are held by
+    a test: an unreachable bot is `null`, never "up to date", and a watcher
+    nobody has heard from is "not running", never "idle"."""
+    rows = dict(rows or {})
+    release = dict(release or {})
+    request = rows.get("update_request") if isinstance(rows.get("update_request"), dict) else None
+    result = rows.get("update_result") if isinstance(rows.get("update_result"), dict) else None
+    heartbeat = rows.get("update_watcher_heartbeat") if isinstance(rows.get("update_watcher_heartbeat"), dict) else None
+    seen: float | None = None
+    if heartbeat is not None:
+        try:
+            seen = max(0.0, float(now) - float(heartbeat.get("at") or 0))
+        except (TypeError, ValueError):
+            seen = None
+    reachable = bool(release.get("ok")) and "newest" in release
+    in_progress = bool(request) and str(request.get("status") or "") not in ("", "done", "failed")
+    return {
+        "installed_version": INSTALLED_VERSION,
+        "channel": str(release.get("channel") or "") or None,
+        "newest_on_channel": (str(release.get("newest")) if release.get("newest") else None) if reachable else None,
+        "update_available": bool(release.get("update_available")) if reachable else None,
+        "release_error": None if reachable else str(release.get("error") or "the bot has not answered"),
+        "request": request,
+        "result": result,
+        "watcher_seen_seconds_ago": None if seen is None else int(seen),
+        "watcher_running": seen is not None and seen < UPDATE_WATCHER_STALE_SECONDS,
+        "in_progress": in_progress,
+    }
+
+
 class AdminDashboardController:
     """Authenticated GM mutation surface backed by the authoritative Go engine."""
 
@@ -1838,6 +1877,10 @@ class AdminDashboardController:
         # engine writes the flag and the audit row; the controller pokes the
         # bot afterwards so its own door gate turns over at once.
         "server.maintenance_mode": "admin.server.maintenance_mode",
+        # v1.4.0: the GM asks for a software update; the watcher on the NAS
+        # runs it. The engine writes the request and its audit row; nothing in
+        # this process installs anything.
+        "server.request_update": "admin.server.request_update",
         "simulation.interval": "admin.simulation.interval",
         "player.set_realm": "admin.player.set_realm",
         "player.set_resource_caps": "admin.player.set_resource_caps",
@@ -2040,6 +2083,16 @@ class AdminDashboardController:
                 except Exception:
                     pass
             clock = await self.store._world_clock(db)
+            # v1.4.0: the update request, the last outcome and the watcher's
+            # heartbeat, as the engine wrote them. What the card makes of them
+            # is update_card_state, once the bot has said what is newest.
+            update_rows: dict[str, Any] = {}
+            for key in ("update_request", "update_result", "update_watcher_heartbeat"):
+                row = await self.store._fetchone(db, "SELECT value_json FROM world_state WHERE key=?", (key,))
+                try:
+                    update_rows[key] = json.loads(str((row or {}).get("value_json") or "null")) if row else None
+                except Exception:
+                    update_rows[key] = None
             currencies = [str(r["currency_id"]) for r in await self.store._fetchall(db, "SELECT DISTINCT currency_id FROM currency_wallets ORDER BY currency_id")]
             # NPC names + active world events, so the NPC/world-state admin controls
             # below can offer real dropdowns instead of free-text fields the GM has
@@ -2069,6 +2122,7 @@ class AdminDashboardController:
             "simulations": simulations,
             "automation": automation,
             "maintenance_mode": maintenance_mode,
+            "update_rows": update_rows,
             "audit": audit,
             "clock": clock,
             "npcs": npc_names,
@@ -2590,7 +2644,15 @@ class DashboardServer:
             if path == "/api/decisions":
                 await self._send_json(writer, 200, await self.store.decisions(limit=_qint(query, "limit", 150))); return
             if path == "/api/admin":
-                await self._send_json(writer, 200, await self.admin.snapshot()); return
+                snapshot = await self.admin.snapshot()
+                # v1.4.0: the Server Update card needs what the bot's release
+                # check found; the rows came with the snapshot.
+                try:
+                    release = dict((await self.discord.run_readonly("release", {})).get("result") or {})
+                except Exception as exc:
+                    release = {"ok": False, "error": str(exc)[:200]}
+                snapshot["update"] = update_card_state(snapshot.pop("update_rows", None), release, time.time())
+                await self._send_json(writer, 200, snapshot); return
             if path == "/api/discord":
                 await self._send_json(writer, 200, await self.discord.snapshot()); return
             if path == "/api/ai_routing":
