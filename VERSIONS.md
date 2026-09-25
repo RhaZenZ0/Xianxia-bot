@@ -6,6 +6,33 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.3.3** settles the eight open rule decisions: a Law control technique now weakens the opponent it lands on, a clan treaty that runs out ends and leaves a rivalry, and an auction-door ambush is said to happen on the house's own doorstep.
+
+The owner read the research on the eight `deferred (design)` entries in `docs/TODO.md` and took
+three changes and five closures. **A Law control effect reaches its target** (schema 63):
+`spatial_lockdown` and `spatial_strangulation` have carried modifiers describing a target since they
+were written, and a battle opponent is a name on `battles` rather than a row `active_effects` can
+address, so they reached nobody. `battles.opponent_modifiers_json` is the one place they can go; the
+technique sums the landed effect's modifiers into it, the opponent's counter-attack loses the
+`agility` and `body` taken, and the player's flee gains what the opponent's lost `escape_bonus` can no
+longer follow. The battle card and the technique reply name the debuff off the engine's own sum.
+Every read and write guards on the column, so a battle fought before the migration runs is fought
+without the debuff rather than refused. **A clan relation ends**: after the tick's drift, a treaty at
+or below zero goes inactive and a rivalry opens from both sides at its opening score, with a public
+history row; a rivalry at or above zero ends and nothing follows; a blood feud never ends by drift.
+**The ambush is at the doors**: the leave reply and the narrator are told the fight stands on the
+house's own doorstep, where its protection ends, rather than that violence cannot begin there.
+
+And the other five are closed on the owner's call with their reasons written into the entries: the
+curriculum stays realm-banded (each named system is refused by its real gate in the engine), an
+unlocated NPC cannot arise with shipped content (all 574 carry a location), an event scene stays with
+its world (nobody below the floor can cross into it either), the Nine-Yang body scorches only through
+the purge, and moderation's statement about itself is accurate because every gameplay write already
+goes through an engine action.
+
+- **Schema 63** adds `battles.opponent_modifiers_json`, the Law control debuff on a battle's opponent,
+  guarded on by every engine read and write so a battle fought before the migration is fought without it.
+
 **1.3.2** makes the five things a cultivator does every day one step each: `/cultivate`, `/explore`, `/hunt`, `/forage` and `/mine` are slash commands, and the menu carries them as a row of five buttons.
 
 Player feedback, with the `/cooldowns` reading pasted: *"For each command i have to go to 3 steps.
@@ -874,9 +901,9 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.3.2
+## Release status — v1.3.3
 
-- Current release: v1.3.2 - the daily five are one step each: `/cultivate`, `/explore`, `/hunt`, `/forage` and `/mine` are slash commands and a row of five buttons on the menu (see the changelog). Built on v1.3.1 - six rules the bot held are the engine's (a sponsor's presence, the sects a gate justifies, a city's board, a territory's ground, the forage wait, the quest chain catch-up on any action) and three more buttons are drawn only where they work (see the changelog). Built on v1.3.0 - ten of the owner's decisions: a failed craft returns half its makings, a hall teaches only what its world can make, the Nine-Echo Sword Wraith is a secret floor beneath its realm, `/reset` asks with the count, the Qi Body card shows the pool at every realm, thirty-three upper-world send-offs, no property inside a household, `heart` retired, the Starfall hall's buy line lowered (see the changelog). Built on v1.2.3 - the review's eight deferred claims settled: Vacuum refuses at once behind a half-written action, one array rule at both cultivation doors, one counter-attack TN, an undo undone again, a rank price under a merchant's wares, and a lot listed in its house's coin (see the changelog). Built on v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
+- Current release: v1.3.3 - the eight open rule decisions settled: a Law control technique weakens its opponent (schema 63), a clan treaty that runs out ends and leaves a rivalry, the auction-door ambush is on the house's doorstep, five entries closed with reasons (see the changelog). Schema 63. Built on v1.3.2 - the daily five are one step each: `/cultivate`, `/explore`, `/hunt`, `/forage` and `/mine` are slash commands and a row of five buttons on the menu (see the changelog). Built on v1.3.1 - six rules the bot held are the engine's (a sponsor's presence, the sects a gate justifies, a city's board, a territory's ground, the forage wait, the quest chain catch-up on any action) and three more buttons are drawn only where they work (see the changelog). Built on v1.3.0 - ten of the owner's decisions: a failed craft returns half its makings, a hall teaches only what its world can make, the Nine-Echo Sword Wraith is a secret floor beneath its realm, `/reset` asks with the count, the Qi Body card shows the pool at every realm, thirty-three upper-world send-offs, no property inside a household, `heart` retired, the Starfall hall's buy line lowered (see the changelog). Built on v1.2.3 - the review's eight deferred claims settled: Vacuum refuses at once behind a half-written action, one array rule at both cultivation doors, one counter-attack TN, an undo undone again, a rank price under a merchant's wares, and a lot listed in its house's coin (see the changelog). Built on v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
   Apprentice to Tier 9 Sovereign with each trade's own word in front (Pill, Forge, Talisman, Array,
   Herb, Ore, Beast, Artifact, Treasure). No schema.
 - v1.2.1: a beast can always evolve, a homestead can be upgraded in any world, and a dozen smaller wires from a deep review (see the changelog).

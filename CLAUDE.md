@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 62; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 63; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -4790,6 +4790,42 @@ the press, and `interaction_check` refuses the slash command by the same rule.
 keeps the next-step button the hub path used to earn. The Discord playtest presses the Daily row's
 Cultivate and holds that the panel opened and ran something, then drives each of the five as a
 slash command.
+
+### Eight decisions, three changes (v1.3.3)
+
+The eight `deferred (design)` entries in `docs/TODO.md` were researched one at a time - what the code
+does, the options, a recommendation - and the owner took three changes and closed five. Two things
+about the three are worth keeping.
+
+**The opponent is a row now, for one thing only.** A battle opponent has always been a name on
+`battles`, which is why `combat.technique` could resolve `spatial_lockdown` and write its authored
+modifiers nowhere (rc.58 named it and deferred it). Schema 63's `opponent_modifiers_json` is not an
+`active_effects` for NPCs - it is the sum of what Law control effects have done to *this* opponent,
+for the length of *this* battle, read by exactly two rules: the counter-attack loses `agility`+`body`
+(`counterAttackDebuff`, never positive), and the flee roll gains the opponent's lost `escape_bonus`,
+because on a target that stat is how far they can follow. `applyOpponentEffect` reads the effect's
+`modifiers` where a value is consumed, so `modifier_vocabulary_test.go` still counts the stats
+fetched. Every read and write guards on the column (`battleHasOpponentMods`), for v1.1.0's reason: in
+the compose stack the engine is healthy before db-init migrates, and a battle fought in that window
+is fought without the debuff rather than failing the turn. The test walks attack turns until the
+technique's own suppression runs out, because the technique suppresses the very counter that would
+show the debuff - a test that asserted on the first turn would pass against a tree that applied
+nothing.
+
+**Drift never crosses zero; a killing does.** `endExhaustedClanRelations` runs after the drift in
+`clans()`. The drift moves every score away from zero (+1 for a treaty, -1 for a rivalry or feud),
+so what brings a treaty to zero is `combat_aftermath.go` taking every relation of a house down when
+its head is killed - and until now nothing looked, so the alliance sat at 0 for ever, read by
+`family.support` as worthless. A treaty at or below zero ends and a rivalry opens from both sides at
+`clanRelationOpeningScore["rivalry"]` (the one map, so a rivalry born of a broken alliance is worth
+what one signed cold is), with a `clan_relation_ended` history row keyed on the minute so a long
+world can end the same pair twice; a rivalry at or above zero ends and nothing follows; a blood feud
+never ends here. The invented bootstrap partners carry no id and are written from the one side that
+exists.
+
+The ambush wording is one function, `auctionDoorstep`, read by the leave result and told to the
+narrator off the battle's `source` prefix, because the context line above it says violence cannot
+begin in a safe zone and the ambush stands in one for 47 of 48 houses.
 
 ## Testing conventions
 

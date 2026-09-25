@@ -280,3 +280,115 @@ func clanPairKey(a, b int64) string {
 	}
 	return fmt.Sprintf("%d:%d", a, b)
 }
+
+// clanRivalryOpens is the score a rivalry born of a broken treaty opens at:
+// the rivalry's own opening score, read off the one map, so a rivalry that
+// begins in a broken alliance is worth exactly what one signed cold is.
+func clanRivalryOpens() int64 { return clanRelationOpeningScore["rivalry"] }
+
+// endExhaustedClanRelations closes the relations that have run out (v1.3.3),
+// after the tick's drift. Drift only ever moves a score away from zero, so
+// what brings one there is an event - a head killed takes every relation of
+// the house down (`combat_aftermath.go`) - and until now nothing looked: an
+// alliance sat at 0, `family.support` read it as worthless, and `active` had
+// been written 1 by every INSERT and 0 by nothing. On the owner's call:
+//
+//   - a treaty (alliance, marriage_pact, trade_pact) at or below 0 ends, and a
+//     rivalry opens in its place from both sides, at the rivalry's own
+//     opening score, with a public history row; a house whose partner is
+//     already a rival or a feud gets no second row;
+//   - a rivalry at or above 0 ends, and nothing follows - a rivalry that has
+//     cooled to nothing is nothing;
+//   - a blood_feud never ends here. It came from a body (`combat_aftermath`
+//     owns it), and drift only deepens it.
+//
+// The invented bootstrap partners carry no family id, so their treaties end
+// the same way and their rivalry is written from the one side that exists.
+func endExhaustedClanRelations(conn *storage.Conn, gm int64, now float64) (int64, error) {
+	rows, err := conn.Execute(`SELECT r.relation_id,r.family_id,r.partner_family_id,r.partner_name,r.relation_type,r.relation_score,
+COALESCE(f.family_name,'') FROM martial_clan_relations r LEFT JOIN birth_families f ON f.family_id=r.family_id
+WHERE r.active=1 AND ((r.relation_type IN ('alliance','marriage_pact','trade_pact') AND r.relation_score<=0)
+   OR (r.relation_type='rivalry' AND r.relation_score>=0)) ORDER BY r.relation_id`, nil)
+	if err != nil {
+		return 0, err
+	}
+	ended := int64(0)
+	for _, row := range rows.Rows {
+		relationID, familyID := i64(row[0]), i64(row[1])
+		partnerID := int64(0)
+		if row[2] != nil {
+			partnerID = i64(row[2])
+		}
+		partner := strings.TrimSpace(fmt.Sprint(row[3]))
+		relation := strings.TrimSpace(fmt.Sprint(row[4]))
+		familyName := strings.TrimSpace(fmt.Sprint(row[6]))
+		if familyName == "" {
+			familyName = fmt.Sprintf("Family %d", familyID)
+		}
+		if _, err := conn.Execute(`UPDATE martial_clan_relations SET active=0,updated_at=? WHERE relation_id=?`, []any{now, relationID}); err != nil {
+			return ended, err
+		}
+		ended++
+		if err := recordClanRelationEnded(conn, familyID, familyName, partner, relation, gm, now); err != nil {
+			return ended, err
+		}
+		if relation == "rivalry" {
+			continue
+		}
+		// The broken treaty leaves a rivalry, from both sides where the
+		// partner is a real house - unless that pair is already rivals or
+		// feuding, in which case the treaty was the row that was out of date.
+		sides := [][2]any{{familyID, partnerID}}
+		if partnerID > 0 {
+			sides = append(sides, [2]any{partnerID, familyID})
+		}
+		for _, side := range sides {
+			var partnerArg any = side[1]
+			if i64(side[1]) == 0 {
+				partnerArg = nil
+			}
+			standing, err := conn.Execute(`SELECT COUNT(*) FROM martial_clan_relations WHERE family_id=? AND active=1
+AND relation_type IN ('rivalry','blood_feud') AND ((partner_family_id IS NOT NULL AND partner_family_id=?) OR (partner_family_id IS NULL AND partner_name=?))`,
+				[]any{side[0], partnerArg, partner})
+			if err != nil {
+				return ended, err
+			}
+			if i64(standing.Rows[0][0]) > 0 {
+				continue
+			}
+			name := partner
+			if i64(side[0]) != familyID {
+				name = familyName
+			}
+			if _, err := conn.Execute(`INSERT INTO martial_clan_relations(
+family_id,partner_family_id,partner_name,relation_type,relation_score,active,started_game_minute,updated_at)
+VALUES(?,?,?,'rivalry',?,1,?,?)`, []any{side[0], partnerArg, name, clanRivalryOpens(), gm, now}); err != nil {
+				return ended, err
+			}
+		}
+	}
+	return ended, nil
+}
+
+// recordClanRelationEnded is the world's memory that a relation ran out. Keyed
+// on the relation and the minute, so one treaty can end more than once across
+// a long world without the second ending vanishing into ON CONFLICT.
+func recordClanRelationEnded(conn *storage.Conn, familyID int64, familyName, partner, relation string, gm int64, now float64) error {
+	label := strings.ReplaceAll(relation, "_", " ")
+	title := familyName + "'s " + label + " with " + partner + " has ended"
+	summary := "The " + label + " between " + familyName + " and " + partner + " has run its course; the martial world no longer counts them as bound."
+	if relation != "rivalry" {
+		summary = "The " + label + " between " + familyName + " and " + partner + " has broken, and the two houses count each other rivals now."
+	}
+	sourceKey := fmt.Sprintf("clan_relation_ended:%d:%s:%s:%d", familyID, relation, partner, gm)
+	_, err := conn.Execute(`INSERT INTO world_history_events(
+source_key,event_type,title,summary,significance,visibility,location,world_name,faction,
+actor_type,actor_key,actor_name,target_type,target_key,target_name,related_user_id,
+related_npc_name,tags,game_minute,metadata_json,created_at,updated_at)
+VALUES(?,'clan_relation_ended',?,?,64,'public','','',?,'clan',?,?,'clan',?,?,NULL,'',?,?,'{}',?,?)
+ON CONFLICT(source_key) DO NOTHING`, []any{
+		sourceKey, title, summary, familyName, fmt.Sprint(familyID), familyName, partner, partner,
+		"clan " + relation + " ended", gm, now, now,
+	})
+	return err
+}

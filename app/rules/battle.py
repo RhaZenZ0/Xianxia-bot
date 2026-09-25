@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from typing import Any
+
 
 def vitality_percentage(current: int, maximum: int) -> int:
     cap = max(1, int(maximum))
@@ -47,3 +50,28 @@ def suppression_label(turns: int) -> str:
         return "None"
     suffix = "counter" if remaining == 1 else "counters"
     return f"🌌 Spatially suppressed • {remaining} {suffix} blocked"
+
+
+def opponent_debuff_label(raw: Any) -> str:
+    """The Law control debuff on a battle's opponent (v1.3.3), as the engine
+    summed it: ``{"agility": -3, "escape_bonus": -5}`` reads ``agility -3 ·
+    escape -5``. An absent, empty or unreadable value is nothing to say - a
+    battle fought before schema 63 carries none."""
+    mods = raw
+    if isinstance(raw, str):
+        try:
+            mods = json.loads(raw or "{}")
+        except (TypeError, ValueError):
+            return ""
+    if not isinstance(mods, dict) or not mods:
+        return ""
+    parts = []
+    for stat, value in sorted(mods.items()):
+        try:
+            number = int(round(float(value)))
+        except (TypeError, ValueError):
+            continue
+        if number == 0:
+            continue
+        parts.append(f"{str(stat).replace('_bonus', '').replace('_', ' ')} {number:+d}")
+    return " · ".join(parts)

@@ -115,6 +115,13 @@ func auctionEnterAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 
 var auctionPursuerNames = []string{"Black Veil Enforcer", "Silent Fang Cultivator", "Rival Young Master's Guard", "Shadow Market Hunter", "Masked Treasure Seeker"}
 
+// auctionDoorstep is where an auction-door ambush stands: on the house's own
+// doorstep, where its protection has already ended. The one statement of it,
+// read by the leave result and by the narrator through the battle's source.
+func auctionDoorstep(house string) string {
+	return "on the doorstep of " + house + ", where its protection ends"
+}
+
 func auctionLeaveAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p locationMinutePayload
 	if err := json.Unmarshal(raw, &p); err != nil {
@@ -148,7 +155,13 @@ func auctionLeaveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
-		incident := map[string]any{"risk_id": i64(risk["risk_id"]), "auction_id": i64(risk["auction_id"]), "item_id": fmt.Sprint(risk["item_id"]), "triggered": int64(roll) < chance}
+		// Where it happens is the house's own step (v1.3.3): every house says
+		// its protection ends at the front doors, and this is the one fight
+		// the safe-zone rule lets through on the street outside - so the
+		// result says so, and the narrator is told the same rather than that
+		// violence cannot begin here.
+		incident := map[string]any{"risk_id": i64(risk["risk_id"]), "auction_id": i64(risk["auction_id"]), "item_id": fmt.Sprint(risk["item_id"]), "triggered": int64(roll) < chance,
+			"where": auctionDoorstep(house.Name)}
 		if int64(roll) < chance {
 			itemID := fmt.Sprint(risk["item_id"])
 			item := catalog.Items[itemID]

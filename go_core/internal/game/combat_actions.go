@@ -48,6 +48,71 @@ type battleRow struct {
 	NPCRealm, NPCStage, PlayerHP, PlayerMax, NPCHP, NPCMax int64
 	Status, Location, Source, TargetKey                    string
 	Suppressed, Version                                    int64
+	// What a Law control technique has done to the opponent (v1.3.3): the
+	// effect's own modifiers, summed per stat, for the length of this battle.
+	// A battle opponent is a name on `battles`, not a row `active_effects`
+	// can address, so this column is the one place the engine has to put
+	// them. Absent (a world the engine reached before migration 63) reads as
+	// nothing applied.
+	OpponentMods map[string]float64
+}
+
+// battleOpponentModsColumn is schema 63's column. Every read and write guards
+// on it (v1.1.0's rule for `world_event_npcs.sect_name`): in the compose stack
+// the engine is healthy before db-init migrates, and a battle fought in that
+// window is fought without the debuff rather than failing the turn.
+const battleOpponentModsColumn = "opponent_modifiers_json"
+
+func battleHasOpponentMods(conn *storage.Conn) bool {
+	ok, err := tableHasColumns(conn, "battles", battleOpponentModsColumn)
+	return err == nil && ok
+}
+
+// opponentDebuff is the summed value of one stat on the opponent, 0 when none.
+func (b battleRow) opponentDebuff(stat string) int64 {
+	return int64(math.Round(b.OpponentMods[stat]))
+}
+
+// applyOpponentEffect folds a special effect's `modifiers` into the battle's
+// opponent debuff. The stats are the content's (`agility`, `escape_bonus`,
+// `body`), read where a value is consumed: `agility` and `body` weaken the
+// counter-attack, and `escape_bonus` on the *opponent* is how far they can
+// follow, so it is subtracted from what the player needs to get away.
+func (b *battleRow) applyOpponentEffect(effect map[string]any) {
+	if b.OpponentMods == nil {
+		b.OpponentMods = map[string]float64{}
+	}
+	mods, _ := effect["modifiers"].([]any)
+	for _, raw := range mods {
+		m, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		stat := strings.TrimSpace(fmt.Sprint(m["stat"]))
+		if stat == "" || fmt.Sprint(m["operation"]) != "add" {
+			continue
+		}
+		b.OpponentMods[stat] += toFloat(m["value"])
+	}
+}
+
+// counterAttackDebuff is what the opponent's counter-attack loses to the
+// effects on them: `agility` and `body`, the two stats the content writes on
+// a Law control effect's target. Never positive - a debuff is a debuff.
+func (b battleRow) counterAttackDebuff() int64 {
+	return minI64(0, b.opponentDebuff("agility")+b.opponentDebuff("body"))
+}
+
+func writeOpponentMods(conn *storage.Conn, b battleRow) error {
+	if !battleHasOpponentMods(conn) {
+		return nil
+	}
+	raw, err := json.Marshal(b.OpponentMods)
+	if err != nil {
+		return err
+	}
+	_, err = conn.Execute(`UPDATE battles SET `+battleOpponentModsColumn+`=? WHERE battle_id=?`, []any{string(raw), b.BattleID})
+	return err
 }
 
 func loadBattle(conn *storage.Conn, userID, battleID int64) (battleRow, error) {
@@ -66,7 +131,17 @@ func loadBattle(conn *storage.Conn, userID, battleID int64) (battleRow, error) {
 		return battleRow{}, errors.New("no active battle")
 	}
 	x := r.Rows[0]
-	return battleRow{i64(x[0]), i64(x[1]), fmt.Sprint(x[2]), i64(x[3]), i64(x[4]), i64(x[5]), i64(x[6]), i64(x[7]), i64(x[8]), fmt.Sprint(x[9]), fmt.Sprint(x[10]), fmt.Sprint(x[11]), fmt.Sprint(x[12]), i64(x[13]), i64(x[14])}, nil
+	b := battleRow{i64(x[0]), i64(x[1]), fmt.Sprint(x[2]), i64(x[3]), i64(x[4]), i64(x[5]), i64(x[6]), i64(x[7]), i64(x[8]), fmt.Sprint(x[9]), fmt.Sprint(x[10]), fmt.Sprint(x[11]), fmt.Sprint(x[12]), i64(x[13]), i64(x[14]), map[string]float64{}}
+	if battleHasOpponentMods(conn) {
+		m, e := conn.Execute(`SELECT `+battleOpponentModsColumn+` FROM battles WHERE battle_id=?`, []any{b.BattleID})
+		if e == nil && len(m.Rows) > 0 {
+			_ = json.Unmarshal([]byte(fmt.Sprint(m.Rows[0][0])), &b.OpponentMods)
+			if b.OpponentMods == nil {
+				b.OpponentMods = map[string]float64{}
+			}
+		}
+	}
+	return b, nil
 }
 func bval(r map[string]any, k string) bool { v, _ := r[k].(bool); return v }
 func combatCompanionBonus(conn *storage.Conn, userID int64) (int64, error) {
@@ -526,7 +601,9 @@ func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	}
 	defenseBonus := def
 	if style == "flee" {
-		mod := mods.value(c.Attributes["agility"], "agility") + realm*2 + stage/3 + resonance + lawBonus + comp + eag + escapeBonus
+		// A Law control effect on the opponent (v1.3.3): their `escape_bonus`
+		// is how far they can follow, so a lockdown's -5 is +5 to get away.
+		mod := mods.value(c.Attributes["agility"], "agility") + realm*2 + stage/3 + resonance + lawBonus + comp + eag + escapeBonus - b.opponentDebuff("escape_bonus")
 		r, e := roll2d10(mod, 11+b.NPCRealm*2+b.NPCStage/3)
 		if e != nil {
 			return authoritativeMutation{}, e
@@ -593,7 +670,7 @@ func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		b.Suppressed--
 		out["counter_suppressed"] = true
 	} else {
-		counter, e := roll2d10(4+b.NPCRealm*2+b.NPCStage/3, counterDefenceTN(realm, stage, defenseBonus, lawBonus, comp, resonance))
+		counter, e := roll2d10(4+b.NPCRealm*2+b.NPCStage/3+b.counterAttackDebuff(), counterDefenceTN(realm, stage, defenseBonus, lawBonus, comp, resonance))
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
@@ -749,14 +826,26 @@ func combatTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	// - so `special_effects.spatial_lockdown` and `.spatial_strangulation`
 	// reached a player through nothing at all. Carrying the effect's own name
 	// and description is what a panel needs to say which one it was.
+	var landedEffect map[string]any
 	if t.Effect != "" {
 		if effect, effectName, lookupErr := specialEffectPayload(catalog, t.Effect); lookupErr == nil {
 			out["effect_id"] = t.Effect
 			out["effect_name"] = effectName
 			out["effect_description"] = strings.TrimSpace(fmt.Sprint(effect["description"]))
+			landedEffect = effect
 		}
 	}
 	if bval(roll, "success") {
+		// And apply it (v1.3.3): the effect's modifiers describe the target,
+		// and the target is this battle's opponent. They ride the battle row
+		// for its length and are read by the counter-attack and the flee roll.
+		if landedEffect != nil {
+			b.applyOpponentEffect(landedEffect)
+			if e := writeOpponentMods(conn, b); e != nil {
+				return authoritativeMutation{}, e
+			}
+			out["opponent_modifiers"] = b.OpponentMods
+		}
 		margin := i64(roll["margin"])
 		turns := int64(1)
 		if margin >= 5 {
@@ -824,7 +913,7 @@ func combatTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 		b.Suppressed--
 		out["counter_suppressed"] = true
 	} else {
-		counter, e := roll2d10(4+b.NPCRealm*2+b.NPCStage/3, counterDefenceTN(realm, stage, def, lawBonus, compBonus, resonance))
+		counter, e := roll2d10(4+b.NPCRealm*2+b.NPCStage/3+b.counterAttackDebuff(), counterDefenceTN(realm, stage, def, lawBonus, compBonus, resonance))
 		if e != nil {
 			return authoritativeMutation{}, e
 		}

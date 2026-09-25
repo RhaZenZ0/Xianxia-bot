@@ -303,7 +303,9 @@ deferred half and not the half that says what was done about it.
   already async and pass `npcs_present`'s answer, the same resolver rc.28 wrote and v1.0.8 pointed
   the picker at. This was the third reader of one question; rc.28 fixed the cards and v1.0.8 the
   picker.
-- **deferred (design)** — *The curriculum is realm-banded, and some systems are not about realm.*
+- **fixed (v1.3.3, closed)** — *The curriculum is realm-banded, and some systems are not about realm.*
+  On the owner's call, left as is: each of the three is refused by its real gate in the engine, and a
+  second axis in the roster needs a precedence rule before it is worth having.
   The Ghost Cultivator's `ghost` page is path-specific, the hidden sect's door is a karma gate, and
   a profession's rank is its own ladder — each is left open at realm 0 rather than given a realm
   floor that would be wrong for the player it is actually for. Gating on something other than realm
@@ -329,7 +331,9 @@ deferred half and not the half that says what was done about it.
   neither the schedule nor the engine — see the v1.0.10 entry above.) It blocked more than conversation: the beginner path stalls at its second stage, which asks
   for a `talk`, and the commission ladder runs inside `/talk`, so 137 of the 140 authored
   commissions could be neither offered nor finished.
-- **deferred (design)** — *An NPC nothing knows the location of is no longer offered anywhere.*
+- **fixed (v1.3.3, closed)** — *An NPC nothing knows the location of is no longer offered anywhere.*
+  Measured off the shipped content: all 574 catalogue NPCs carry a `location`, so the case cannot
+  arise with shipped content; left as is on the owner's call.
   `current_npc_location` answering `None` means "do not filter by location", and `/talk` honours
   that, so such an NPC used to appear in every room's picker and now appears in none. That is the
   safe side of rc.28's rule — never offering somebody `/talk` would allow costs discoverability,
@@ -501,7 +505,9 @@ deferred half and not the half that says what was done about it.
   and four for ever after. `clanDiplomacy` is the step that forms one between two real households,
   written from both sides; `npcPoliticalMarriages` had done the same for `sect_relations` since
   rc.24, in the file whose own comment names the clan fault it did not fix.
-- **deferred (design)** — *A safe zone refuses a fight somebody chose to start, and nothing else.*
+- **fixed (v1.3.3)** — *A safe zone refuses a fight somebody chose to start, and nothing else.* The
+  ambush is said to happen on the house's own doorstep, where its protection ends (`auctionDoorstep`,
+  read by the leave reply and told to the narrator off the battle's `source`); the mechanic is unchanged.
   v1.0.6 put that rule in the engine, and it deliberately lets two involuntary fights through: a
   world event that lands in a town (rc.49's asymmetry) and the auction door ambush, which
   `auctionLeaveAction` stands at `EntranceLocation` — a safe zone for 47 of the 48 houses, since
@@ -510,7 +516,10 @@ deferred half and not the half that says what was done about it.
   is whether a town being ambush-able *reads* right to a player who was just told the place is
   protected; moving the ambush to the first unprotected ground the fugitive reaches is a mechanic
   rather than a wiring, and wants its own change.
-- **deferred (design)** — *Nothing ends a clan relation.* `martial_clan_relations.active` is written
+- **fixed (v1.3.3)** — *Nothing ends a clan relation.* `endExhaustedClanRelations` runs after the tick's
+  drift: a treaty at or below zero ends and a rivalry opens from both sides at its opening score, with a
+  public history row; a rivalry at or above zero ends and nothing follows; a blood feud never ends by
+  drift. Was: `martial_clan_relations.active` is written
   1 by every INSERT, read by every SELECT, and set to 0 by nothing in the tree. So an alliance warms
   toward 100 and a rivalry cools toward −100 and neither can ever become the other, because no rule
   re-types a row either. What a broken alliance leaves behind — a rivalry, or simply nothing — is a
@@ -613,14 +622,18 @@ deferred half and not the half that says what was done about it.
   inside a SQL string. `modifier_vocabulary_test.go` holds the vocabulary from both sides with an
   empty allowlist, and its own drill found the last fault in it — pointing the content path at
   nothing made the whole test SKIP, green and useless, so a read that fails is a `t.Fatalf` now.
-- **deferred (design)** — *A Law control effect's modifiers are never applied to anybody.*
+- **fixed (v1.3.3)** — *A Law control effect's modifiers are never applied to anybody.* Schema 63 gives
+  `battles` an `opponent_modifiers_json`; `combat.technique` sums the landed effect's modifiers into it,
+  the counter-attack loses the `agility`/`body` taken and the flee roll gains the opponent's lost
+  `escape_bonus`. Was:
   `special_effects.spatial_lockdown` and `.spatial_strangulation` carry modifiers describing a
   *target*, and `combat.technique` resolves both mechanically (suppression turns, damage) while
   writing no `active_effects` row — a battle opponent is a name on `battles`, not a row anything
   can modify, and there are no PvP techniques. So the modifiers describe something the engine has
   nowhere to put. `combat.technique` names the effect that landed now, so the content reaches a
   player as prose; applying it is a mechanic rather than a wiring, and wants its own change.
-- **deferred (design)** — *`nine_yang_solar_body` scorches only through the purge.* Its drawback
+- **fixed (v1.3.3, closed)** — *`nine_yang_solar_body` scorches only through the purge.* Left as is on
+  the owner's call: the drawback fires where the content names the mechanism. Its drawback
   prose says "excess yang scorches the meridians" and v1.0.0-rc.58 gave it `fire_resistance -5`, so
   it bites on `alchemy.purge` and nowhere else. A physique that scorches on its own schedule needs a
   simulation pass over a body nothing currently ticks, which is a different change.
@@ -652,13 +665,16 @@ deferred half and not the half that says what was done about it.
   `SecretRealmRoom.PreferredPaths`. `field_readers_test.go` cannot tell the two apart - it is
   name-based and says so - so this is the documented blind spot doing exactly what its own docstring
   predicts rather than a gate failing.
-- **deferred (design)** — *An event scene is only visible to somebody who has reached that world.*
+- **fixed (v1.3.3, closed)** — *An event scene is only visible to somebody who has reached that world.*
+  Left as is on the owner's call: somebody below a world's floor cannot cross into it either.
   v1.0.0-rc.59 anchors an event's scene and its thread in that world's own feed, which is where
   rc.52 already sent the announcement, and retires `#event-scenes`. Those feeds are gated by the
   realm **access** role, so a scene in a world a player has not reached is now invisible to them
   where the shared channel was not. That is the trade the change makes rather than an oversight:
   an event is somewhere, and a cultivator who cannot reach the somewhere could not have joined it.
-- **deferred (design)** — *Moderation is a nudge on the engine's dispatch layer, not anti-cheat.*
+- **fixed (v1.3.3, closed)** — *Moderation is a nudge on the engine's dispatch layer, not anti-cheat.*
+  `PLAYER_MUTATIONS` in `test_authority_boundary` is empty, so every gameplay write already goes
+  through an engine action; the statement in `moderation.go` is accurate and the entry is closed.
   A muted or frozen player is blocked from the ~150 authoritative ops; raw `/v1/db` writes the
   bot makes on their behalf and the simulation runner are not intercepted. Stated in
   `moderation.go`; a stronger guarantee would need every presentation write to carry the actor.

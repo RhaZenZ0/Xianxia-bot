@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 62
+SCHEMA_VERSION = 63
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -2658,6 +2658,23 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             # report (`catchUpBeginnerPathTx`, called from `questProgress`).
             """UPDATE quest_definitions SET seed_json='{"follow_on": "beginner_iron"}'
                 WHERE quest_key='beginner_lesson' AND seed_json='{"follow_on": "road_to_a_sect"}'""",
+        ),
+    ),
+    (
+        63,
+        "a_law_control_effect_reaches_its_target",
+        (
+            # v1.3.3: `special_effects.spatial_lockdown` and `.spatial_strangulation`
+            # carry modifiers describing a *target*, and a battle opponent is a
+            # name on `battles` rather than a row `active_effects` can address -
+            # so they reached nobody. This column is the one place the engine
+            # has to put them: the effect's modifiers summed per stat, for the
+            # length of the battle, read by the counter-attack and the flee
+            # roll. The base DDL does not carry it (rc.57: a column a migration
+            # adds is the migration's alone), and the engine guards every read
+            # and write on it, so a battle fought before this runs is fought
+            # without the debuff rather than failing the turn.
+            "ALTER TABLE battles ADD COLUMN opponent_modifiers_json TEXT NOT NULL DEFAULT '{}'",
         ),
     ),
 )
