@@ -160,6 +160,8 @@ h3{font-size:14px}
 .npc-grid,.family-grid,.sect-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
 .npc-card,.family-card,.sect-card{cursor:pointer}
 .npc-card:hover,.family-card:hover,.sect-card:hover{border-color:#806d40}
+.npc-link{cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+.npc-link:hover{color:#f4d98f}
 
 /* ---------- controls ---------- */
 .btn{border:1px solid var(--line);background:#151a22;color:#cdd5e1;border-radius:8px;

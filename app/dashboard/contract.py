@@ -16,11 +16,10 @@ DASHBOARD_API_VERSION = 2
 # capability: the panel reads a payload field it already read, of a different
 # shape, and a GM has no era lever to gain - the clock is the engine's and
 # `/admin world advancetime` already moves it.
-# Schema 61 (v1.1.0) reviewed, and it changes no card: `world_event_npcs`
-# gains `sect_name`/`can_recommend` and `world_event_nodes` gains
-# `reveals_sect`, stamped at spawn for a recruitment delegation. No dashboard
-# reader selects either table's columns by name, and a GM has no lever over a
-# running event's cast; the Discord event panel is what reads them.
+# Schema 61 (v1.1.0) reviewed: `world_event_npcs` gains `sect_name`/
+# `can_recommend` and `world_event_nodes` gains `reveals_sect`, stamped at
+# spawn for a recruitment delegation. Since v1.6.0 the NPCs page's Event Casts
+# section reads the cast with both columns; a GM still has no lever over it.
 # Schema 64 (v1.3.5) adds `command_usage`, a presentation counter of command
 # presses per day; the dashboard reads no view over it.
 # Schema 65 (v1.5.0) adds `player_stalls`, `stall_listings` and `stall_sales`,
@@ -32,6 +31,8 @@ DASHBOARD_REVIEWED_SCHEMA_VERSION = 65
 
 DASHBOARD_GET_API_PATHS = frozenset({
     "/api/overview", "/api/capabilities", "/api/timeline", "/api/npcs", "/api/npc",
+    "/api/npc_population", "/api/npc_families", "/api/npc_society", "/api/npc_deeds",
+    "/api/sect_members", "/api/sect_recruitment", "/api/sect_holdings",
     "/api/families", "/api/sects", "/api/conflicts", "/api/events", "/api/players", "/api/player",
     "/api/cultivation", "/api/crafting", "/api/exploration", "/api/commissions", "/api/quests",
     "/api/economy", "/api/dynasties",
@@ -51,8 +52,15 @@ DASHBOARD_VIEW_ENDPOINTS = {
     "overview": "/api/overview",
     "timeline": "/api/timeline",
     "npcs": "/api/npcs",
+    "npc_population": "/api/npc_population",
+    "npc_families": "/api/npc_families",
+    "npc_society": "/api/npc_society",
+    "npc_deeds": "/api/npc_deeds",
     "families": "/api/families",
     "sects": "/api/sects",
+    "sect_members": "/api/sect_members",
+    "sect_recruitment": "/api/sect_recruitment",
+    "sect_holdings": "/api/sect_holdings",
     "conflicts": "/api/conflicts",
     "events": "/api/events",
     "players": "/api/players",
@@ -80,6 +88,39 @@ DASHBOARD_VIEW_ENDPOINTS = {
 # by the matching dashboard view.  A schema bump also trips the review marker
 # above, forcing this registry to be reviewed before release.
 DASHBOARD_SYSTEM_TABLES = {
+    # The NPCs head (v1.6.0). Each page owns the tables it is the dashboard's
+    # only full reader of; `npc_civilization_state` and the life tables are
+    # read by other views too, but one owner per table is the rule here.
+    "npcs": (
+        "world_event_npcs",
+    ),
+    "npc_population": (
+        "npc_civilization_state",
+    ),
+    "npc_families": (
+        "npc_life_state", "npc_descendants",
+    ),
+    "npc_society": (
+        "npc_social_relations", "npc_disciple_bonds", "npc_registry",
+    ),
+    "npc_deeds": (
+        "npc_graves",
+    ),
+    # The Sects head (v1.6.0). `sect_abodes` stays with `crafting`, which
+    # registered it first; Holdings reads it without owning it.
+    "sects": (
+        "sect_politics_state", "sect_factions", "sect_relations", "sect_politics_events",
+    ),
+    "sect_members": (
+        "sect_membership", "sect_lineage", "disciple_requests",
+    ),
+    "sect_recruitment": (
+        "sect_recruitment_attempts", "sect_recommendations", "character_sect_discoveries",
+        "hidden_sect_membership",
+    ),
+    "sect_holdings": (
+        "sect_manors", "sect_manor_projects", "sect_treasury",
+    ),
     "families": (
         "birth_family_household_threads",
     ),
