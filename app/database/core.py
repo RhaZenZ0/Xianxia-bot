@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 64
+SCHEMA_VERSION = 65
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -101,6 +101,7 @@ OPERATIONAL_REQUIRED_TABLES = frozenset(
         "characters",
         "civilization_events",
         "civilization_regions",
+        "command_usage",
         "content_items",
         "content_locations",
         "content_manuals",
@@ -163,6 +164,7 @@ OPERATIONAL_REQUIRED_TABLES = frozenset(
         "player_family_invites",
         "player_family_members",
         "player_scene_state",
+        "player_stalls",
         "playtest_items",
         "profession_progress",
         "pvp_challenges",
@@ -182,7 +184,6 @@ OPERATIONAL_REQUIRED_TABLES = frozenset(
         "schema_migrations",
         "schema_version",
         "seclusion_sessions",
-        "command_usage",
         "secret_realm_runs",
         "sect_abodes",
         "sect_factions",
@@ -203,6 +204,8 @@ OPERATIONAL_REQUIRED_TABLES = frozenset(
         "slow_query_log",
         "soul_legacy",
         "spirit_beasts",
+        "stall_listings",
+        "stall_sales",
         "startup_events",
         "storage_containers",
         "storage_inventory",
@@ -216,6 +219,7 @@ OPERATIONAL_REQUIRED_TABLES = frozenset(
         "wild_beast_encounters",
         "witness_records",
         "world_action_events",
+        "world_crossings",
         "world_era_events",
         "world_eras",
         "world_event_actions",
@@ -223,7 +227,6 @@ OPERATIONAL_REQUIRED_TABLES = frozenset(
         "world_event_nodes",
         "world_event_npcs",
         "world_event_participation",
-        "world_crossings",
         "world_events",
         "world_history_events",
         "world_simulation_state",
@@ -2697,6 +2700,65 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                 PRIMARY KEY (path, day)
             )""",
             "CREATE INDEX IF NOT EXISTS idx_command_usage_day ON command_usage(day)",
+        ),
+    ),
+    (
+        65,
+        "a_stall_in_the_city",
+        (
+            # v1.5.0: a cultivator's own market stall in a city's street.
+            # Standing listings that sell while the owner is away - to other
+            # cultivators and, bounded, to the world's own people. The goods
+            # are held in escrow the way an auction lot is: `stall.list` takes
+            # them out of the bag and withdraw/close put them back. Every
+            # table hangs off `characters` with foreign keys on, so a seller
+            # who is erased takes the stall and its goods with them exactly
+            # as an auction seller takes their lots; `stall_sales` is the
+            # seller's ledger and `buyer_user_id` is anonymised rather than
+            # deleted, because the sale happened and only who bought is
+            # personal. The tables live in this migration alone (rc.57).
+            """CREATE TABLE IF NOT EXISTS player_stalls (
+                user_id INTEGER PRIMARY KEY,
+                city TEXT NOT NULL,
+                name TEXT NOT NULL,
+                currency_id TEXT NOT NULL,
+                opened_game_minute INTEGER NOT NULL DEFAULT 0,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL,
+                FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_player_stalls_city ON player_stalls(city)",
+            """CREATE TABLE IF NOT EXISTS stall_listings (
+                listing_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                city TEXT NOT NULL,
+                item_id TEXT NOT NULL,
+                quantity INTEGER NOT NULL,
+                unit_price INTEGER NOT NULL,
+                currency_id TEXT NOT NULL,
+                listed_game_minute INTEGER NOT NULL DEFAULT 0,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL,
+                UNIQUE(user_id, item_id),
+                FOREIGN KEY(user_id) REFERENCES player_stalls(user_id) ON DELETE CASCADE
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_stall_listings_city ON stall_listings(city, quantity)",
+            """CREATE TABLE IF NOT EXISTS stall_sales (
+                sale_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                item_id TEXT NOT NULL,
+                quantity INTEGER NOT NULL,
+                unit_price INTEGER NOT NULL,
+                currency_id TEXT NOT NULL,
+                fee INTEGER NOT NULL DEFAULT 0,
+                buyer_user_id INTEGER,
+                buyer_npc_name TEXT NOT NULL DEFAULT '',
+                sold_game_minute INTEGER NOT NULL DEFAULT 0,
+                created_at REAL NOT NULL,
+                FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE,
+                FOREIGN KEY(buyer_user_id) REFERENCES characters(user_id) ON DELETE SET NULL
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_stall_sales_seller ON stall_sales(user_id, sale_id)",
         ),
     ),
 )
@@ -6786,6 +6848,16 @@ class Database:
     async def get_abode(self,owner_user_id:int)->dict[str,Any]|None:
         async with self._connect() as db:
             db.row_factory=aiosqlite.Row; cur=await db.execute("SELECT * FROM cave_abodes WHERE user_id=?",(owner_user_id,)); row=await cur.fetchone(); return dict(row) if row else None
+
+    async def get_player_stall(self,user_id:int)->dict[str,Any]|None:
+        """The cultivator's own market stall (v1.5.0), or None. Read by the
+        panel's hidden-action provider to decide whether the stall's doors are
+        drawn; the engine's `stall.status` is the full view."""
+        async with self._connect() as db:
+            db.row_factory=aiosqlite.Row
+            cur=await db.execute("SELECT user_id,city,name,currency_id FROM player_stalls WHERE user_id=?",(user_id,))
+            row=await cur.fetchone()
+            return dict(row) if row else None
 
     async def get_abode_by_location(self,location_key:str)->dict[str,Any]|None:
         async with self._connect() as db:

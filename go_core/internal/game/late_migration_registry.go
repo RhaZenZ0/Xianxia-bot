@@ -132,6 +132,16 @@ func applyLateMigrationAction(conn *storage.Conn, catalog worlddata.Catalog, use
 		return itemUseActionGo(conn, catalog, userID, raw)
 	case "sect.abode.upgrade":
 		return sectAbodeUpgradeAction(conn, catalog, userID, raw)
+	case "stall.open":
+		return stallOpenAction(conn, catalog, userID, raw)
+	case "stall.list":
+		return stallListAction(conn, catalog, userID, raw)
+	case "stall.withdraw":
+		return stallWithdrawAction(conn, catalog, userID, raw)
+	case "stall.buy":
+		return stallBuyAction(conn, catalog, userID, raw)
+	case "stall.close":
+		return stallCloseAction(conn, catalog, userID, raw)
 	default:
 		return authoritativeMutation{}, fmt.Errorf("unsupported late migration operation: %s", op)
 	}

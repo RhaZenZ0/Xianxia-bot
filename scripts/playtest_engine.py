@@ -680,6 +680,57 @@ async def run(url: str, token: str, db_path: str) -> Report:
     if inn:
         await step(report, "walk to the inn", act("exploration.travel", PLAYER, {"destination": inn, "mode": "known"}))
 
+    # ---- 11b. a stall in the street (v1.5.0) -----------------------------------
+    # A cultivator at Foundation Establishment keeps a stall in a city's
+    # street; goods on it sell while they are away, to cultivators at the asking
+    # price and to the town under its bounds. The buyer of the earlier sections
+    # keeps the stall here and the player buys from it, so the player's own
+    # realm - which later sections set and read - is left alone; the buyer's
+    # realm is raised for the section and put back after it.
+    keeper_before = dict(await db.get_character(BUYER) or {})
+    for uid in (PLAYER, BUYER):
+        await step(report, f"teleport {uid} to the capital's street for the stall", gm("admin.player.teleport", {"user_id": uid, "location": capital, "reason": "playtest"}))
+    await step(report, "the keeper stands at Foundation Establishment", gm("admin.player.set_realm", {"user_id": BUYER, "realm_index": 2, "phase": 1, "reason": "playtest: a stall asks for it"}))
+    await step(report, "the keeper carries four pills to sell", gm("admin.player.adjust_item", {"user_id": BUYER, "item_id": "recovery_pill", "quantity": 4, "reason": "playtest"}))
+    no_stall = await step(report, "stall.status before opening one", query("stall.status", BUYER, {}))
+    report.add("PASS" if no_stall is not None and no_stall.get("available") and no_stall.get("stall") is None else "FAIL", "no stall yet, and the read says so rather than refusing", f"{(no_stall or {}).get('stall')}")
+    await step(report, "a stall asks for Foundation Establishment", act("stall.open", PLAYER, {"name": "Too Early"}), expect_error="asks for")
+    opened = await step(report, "stall.open in the capital's street", act("stall.open", BUYER, {"name": "Bidder's Table"}))
+    if opened is not None:
+        report.add("PASS" if opened.get("city") == capital and opened.get("currency_id") == "low_spirit_stone" else "FAIL", "the stall stands in the capital, priced in the Mortal stone", f"{opened.get('city')} / {opened.get('currency_id')}")
+        await step(report, "a second stall is refused", act("stall.open", BUYER, {"name": "Another"}), expect_error="already keep")
+        listed = await step(report, "stall.list four pills at 6", act("stall.list", BUYER, {"item_id": "recovery_pill", "quantity": 4, "unit_price": 6}))
+        listing_id = int((listed or {}).get("listing_id") or 0)
+        keeper_bag = dict(await db.get_inventory(BUYER) or {})
+        report.add("PASS" if int(keeper_bag.get("recovery_pill", 0)) == 0 else "FAIL", "the goods are in escrow, not in the bag", f"keeper carries {keeper_bag.get('recovery_pill', 0)}")
+        if listed is not None:
+            report.add("PASS" if listed.get("npc_may_buy") else "FAIL", "at 6 the town may buy (the cheapest Mortal shelf sells the pill dearer)", f"npc_ceiling={listed.get('npc_ceiling')}")
+        board = await step(report, "stall.board as the player", query("stall.board", PLAYER, {}))
+        seen = [s for s in list((board or {}).get("stalls") or []) if str(s.get("name")) == "Bidder's Table"]
+        report.add("PASS" if seen and any(int(l.get("listing_id") or 0) == listing_id for l in list(seen[0].get("listings") or [])) else "FAIL", "the board names the stall and its listing", f"{len(list((board or {}).get('stalls') or []))} stall(s)")
+        await step(report, "the keeper cannot buy from their own stall", act("stall.buy", BUYER, {"listing_id": listing_id, "quantity": 1}), expect_error="own stall")
+        bought = await step(report, "stall.buy one pill as the player", act("stall.buy", PLAYER, {"listing_id": listing_id, "quantity": 1}))
+        if bought is not None:
+            report.add("PASS" if int(bought.get("total") or 0) == 6 and int(bought.get("seller_paid") or 0) + int(bought.get("fee") or 0) == 6 else "FAIL", "the price is the asking price and the city's cut comes out of it", f"total={bought.get('total')} paid={bought.get('seller_paid')} fee={bought.get('fee')}")
+        status = await step(report, "stall.status after the sale", query("stall.status", BUYER, {}))
+        sales = list((status or {}).get("recent_sales") or [])
+        report.add("PASS" if sales and not sales[0].get("buyer_is_npc") else "FAIL", "the keeper's ledger records a cultivator's purchase", f"{len(sales)} sale(s)")
+        # The town shops at the stall on the economy tick: three left, so it may
+        # take up to the roster's daily budget and must leave the last. Whether
+        # anybody buys is a roll and is reported, not asserted.
+        forced = await step(report, "force dynamic_economy for the town's shopping", engine.force_simulation("dynamic_economy", 1))
+        status = dict(await query("stall.status", BUYER, {}) or {})
+        town = [s for s in list(status.get("recent_sales") or []) if s.get("buyer_is_npc")]
+        left = next((int(l.get("quantity") or 0) for l in list(status.get("listings") or []) if int(l.get("listing_id") or 0) == listing_id), 0)
+        report.add("PASS", "the town's shopping, as it came", f"{len(town)} purchase(s) by the town; {left} left on the stall ({str((forced or {}).get('summary') or '')[:80]})")
+        report.add("PASS" if left >= 1 else "FAIL", "the town never takes the last unit", f"{left} left")
+        withdrawn = await step(report, "stall.withdraw the rest", act("stall.withdraw", BUYER, {"listing_id": listing_id}))
+        keeper_bag = dict(await db.get_inventory(BUYER) or {})
+        report.add("PASS" if withdrawn is not None and int(keeper_bag.get("recovery_pill", 0)) == int(withdrawn.get("quantity") or -1) else "FAIL", "withdrawn goods come back into the bag", f"keeper carries {keeper_bag.get('recovery_pill', 0)}")
+        closed = await step(report, "stall.close", act("stall.close", BUYER, {}))
+        report.add("PASS" if closed is not None and (await query("stall.status", BUYER, {})).get("stall") is None else "FAIL", "the stall is gone after close", f"{closed}")
+    await step(report, "the keeper's realm is put back", gm("admin.player.set_realm", {"user_id": BUYER, "realm_index": int(keeper_before.get("realm_index") or 0), "phase": int(keeper_before.get("phase") or 1), "reason": "playtest: back to where the run had them"}))
+
     # ---- 12. the roads, the higher worlds, the trade (v0.39.0) --------------
     # A site on every road: walking the Greenriver-Riverguard road finds the
     # shrine on it, the shrine is half a leg from either end and leads back

@@ -6,6 +6,32 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.5.0** gives a cultivator at Foundation Establishment a market stall in a city's street: goods laid on it sell while the owner is away, to other cultivators at the asking price and - bounded - to the town, and the homestead's merchant hall, built and raised for twenty releases and read by nothing, is what grows it.
+
+Trade between two players needed both at one inn at one time, and the auction floor needs bids
+and a timer; on a small server in several time zones neither is "leave it and go". `stall.open`
+(realm 2, in a city or any part of one - a gate is its city) sets a stall up in the street, priced
+in the money of the world it stands in; `stall.list` takes goods out of the bag into escrow the way
+an auction lot is held, `stall.withdraw` and `stall.close` put them back, `stall.buy` pays the
+seller through the one wallet door and reports the `trade` objective, and `stall.board` and
+`stall.status` are the reads - the city's stalls, your own with its last ten sales. The city takes
+a tenth of each sale, less a point per merchant-hall level; the hall also adds a listing slot per
+level over the two everybody has. `/economy → Market Stalls` is the page; Board and Buy open at
+realm 0 (buying is the owner's "Shop"), the rest at Foundation Establishment, and every tending
+door is drawn only in a city and only for somebody who keeps a stall.
+
+**The town shops too, and four bounds keep that from printing stones**, on the owner's call: a
+townsperson never takes the last unit of a listing (two or more left, one bought, re-read after
+every buy); never pays more than one coin under the cheapest content shelf for that item in that
+coin, so an item no shop sells is never bought and buy-off-one-shelf-sell-to-the-town cannot loop;
+pays out of its own finite `npc_civilization_state.wealth`; and buys at most
+`npc_buys_per_city_per_day` (3) per city per day, three days caught up at most. It runs at the end
+of `dynamic_economy`, pays through the same `game.StallSaleTx` a cultivator's purchase does, and
+the travelling merchants never touch a stall. A stall is not a shelf: nothing a player asks enters
+the band `cheapestShelfPrice`/`highestKeeperBuy` hold every counter inside, and
+`TestAStallIsNotAShelf` reads their signatures to hold it. `stall_system` in `content/world.json`
+is the roster (realm, slots, fee, town budget). No new environment key.
+
 **1.4.1** gives the Player Editor a Quests card, so a GM can finish a quest a player is stuck on.
 
 Reported from play: a cultivator passed the household lesson while "The Last Lesson" was not yet
@@ -58,6 +84,9 @@ count cannot be read. It is the one reader of the counts; `test_command_use_is_c
 that nothing which draws a panel reads them, because the numbers were asked for to be seen and not
 to reorder anything.
 
+- **Schema 65** adds `player_stalls`, `stall_listings` and `stall_sales` - a cultivator's stall in a city's
+  street, its escrowed listings and the seller's ledger; every one hangs off `characters` with foreign
+  keys, so an erased seller takes the stall with them, and a buyer is anonymised on the ledger.
 - **Schema 64** adds `command_usage(path, day, presses)`, a presentation counter of command presses
   per UTC day, pruned by the maintenance cleanup at thirty days.
 
@@ -973,9 +1002,9 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.4.1
+## Release status — v1.5.0
 
-- Current release: v1.4.1 - a GM can finish or advance a player's quest from the Player Editor's new Quests card, through the same path a player's own report takes (see the changelog). Built on v1.4.0 - a GM updates the server from the dashboard: an audited request, a watcher on the NAS running `update.sh --upgrade`, and the outcome on the card (see the changelog). Built on v1.3.5 - command use is counted (schema 64) and the ten most used commands are on `/admin server observability`; nothing is reordered for it (see the changelog). Built on v1.3.4 - the punch list cleared: the Stygian Ghost Scripture is the Ghost Cultivator's high manual and its inheritance reads `preferred_paths`, a path's skill is on the sheet, two dead era keys deleted (see the changelog). Built on v1.3.3 - the eight open rule decisions settled: a Law control technique weakens its opponent (schema 63), a clan treaty that runs out ends and leaves a rivalry, the auction-door ambush is on the house's doorstep, five entries closed with reasons (see the changelog). Schema 63. Built on v1.3.2 - the daily five are one step each: `/cultivate`, `/explore`, `/hunt`, `/forage` and `/mine` are slash commands and a row of five buttons on the menu (see the changelog). Built on v1.3.1 - six rules the bot held are the engine's (a sponsor's presence, the sects a gate justifies, a city's board, a territory's ground, the forage wait, the quest chain catch-up on any action) and three more buttons are drawn only where they work (see the changelog). Built on v1.3.0 - ten of the owner's decisions: a failed craft returns half its makings, a hall teaches only what its world can make, the Nine-Echo Sword Wraith is a secret floor beneath its realm, `/reset` asks with the count, the Qi Body card shows the pool at every realm, thirty-three upper-world send-offs, no property inside a household, `heart` retired, the Starfall hall's buy line lowered (see the changelog). Built on v1.2.3 - the review's eight deferred claims settled: Vacuum refuses at once behind a half-written action, one array rule at both cultivation doors, one counter-attack TN, an undo undone again, a rank price under a merchant's wares, and a lot listed in its house's coin (see the changelog). Built on v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
+- Current release: v1.5.0 - a cultivator at Foundation Establishment keeps a market stall in a city's street (schema 65): standing listings that sell while they are away, to cultivators and - never the last unit, never above the shelf, out of its own wealth - to the town; the homestead's merchant hall grows it (see the changelog). Built on v1.4.1 - a GM can finish or advance a player's quest from the Player Editor's new Quests card, through the same path a player's own report takes (see the changelog). Built on v1.4.0 - a GM updates the server from the dashboard: an audited request, a watcher on the NAS running `update.sh --upgrade`, and the outcome on the card (see the changelog). Built on v1.3.5 - command use is counted (schema 64) and the ten most used commands are on `/admin server observability`; nothing is reordered for it (see the changelog). Built on v1.3.4 - the punch list cleared: the Stygian Ghost Scripture is the Ghost Cultivator's high manual and its inheritance reads `preferred_paths`, a path's skill is on the sheet, two dead era keys deleted (see the changelog). Built on v1.3.3 - the eight open rule decisions settled: a Law control technique weakens its opponent (schema 63), a clan treaty that runs out ends and leaves a rivalry, the auction-door ambush is on the house's doorstep, five entries closed with reasons (see the changelog). Schema 63. Built on v1.3.2 - the daily five are one step each: `/cultivate`, `/explore`, `/hunt`, `/forage` and `/mine` are slash commands and a row of five buttons on the menu (see the changelog). Built on v1.3.1 - six rules the bot held are the engine's (a sponsor's presence, the sects a gate justifies, a city's board, a territory's ground, the forage wait, the quest chain catch-up on any action) and three more buttons are drawn only where they work (see the changelog). Built on v1.3.0 - ten of the owner's decisions: a failed craft returns half its makings, a hall teaches only what its world can make, the Nine-Echo Sword Wraith is a secret floor beneath its realm, `/reset` asks with the count, the Qi Body card shows the pool at every realm, thirty-three upper-world send-offs, no property inside a household, `heart` retired, the Starfall hall's buy line lowered (see the changelog). Built on v1.2.3 - the review's eight deferred claims settled: Vacuum refuses at once behind a half-written action, one array rule at both cultivation doors, one counter-attack TN, an undo undone again, a rank price under a merchant's wares, and a lot listed in its house's coin (see the changelog). Built on v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
   Apprentice to Tier 9 Sovereign with each trade's own word in front (Pill, Forge, Talisman, Array,
   Herb, Ore, Beast, Artifact, Treasure). No schema.
 - v1.2.1: a beast can always evolve, a homestead can be upgraded in any world, and a dozen smaller wires from a deep review (see the changelog).

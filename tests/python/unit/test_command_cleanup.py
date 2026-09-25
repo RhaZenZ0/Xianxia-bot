@@ -59,7 +59,9 @@ class CommandCleanupTests(unittest.TestCase):
         # `tests/python/unit/test_commands_reach_a_player.py`, which is the gate
         # that makes an absence loud.
         # 84 since v1.2.0: `/mine` joined, the seam beside the hills.
-        self.assertEqual(len(ast.literal_eval(migrated_node.value)), 84)
+        # 85 since v1.5.0: `/stall` joined, a cultivator's own counter in a
+        # city's street.
+        self.assertEqual(len(ast.literal_eval(migrated_node.value)), 85)
         self.assertNotIn("tree.remove_command", source)
         self.assertIn('"alchemy": alchemy_group', source)
         self.assertIn('_hub_page("alchemy", "Alchemy"', source)

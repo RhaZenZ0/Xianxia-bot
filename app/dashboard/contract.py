@@ -23,7 +23,12 @@ DASHBOARD_API_VERSION = 2
 # running event's cast; the Discord event panel is what reads them.
 # Schema 64 (v1.3.5) adds `command_usage`, a presentation counter of command
 # presses per day; the dashboard reads no view over it.
-DASHBOARD_REVIEWED_SCHEMA_VERSION = 64
+# Schema 65 (v1.5.0) adds `player_stalls`, `stall_listings` and `stall_sales`,
+# a cultivator's market stall in a city's street. The dashboard reads no view
+# over them and carries no lever: a GM's erasure and reset already take a
+# stall with the character, and an `admin.stall.close` lever is deferred until
+# a GM asks for one (docs/TODO.md).
+DASHBOARD_REVIEWED_SCHEMA_VERSION = 65
 
 DASHBOARD_GET_API_PATHS = frozenset({
     "/api/overview", "/api/capabilities", "/api/timeline", "/api/npcs", "/api/npc",

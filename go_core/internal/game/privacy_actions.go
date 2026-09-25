@@ -56,7 +56,7 @@ const erasedUserSentinel int64 = 0
 // schema 49, and the classification test fails if the schema grows another.
 var erasureSubjectColumns = map[string]bool{
 	"user_id": true, "actor_id": true, "admin_user_id": true,
-	"bidder_user_id": true, "challenger_user_id": true, "claimed_by_user_id": true,
+	"bidder_user_id": true, "buyer_user_id": true, "challenger_user_id": true, "claimed_by_user_id": true,
 	"current_bidder_user_id": true,
 	"disciple_user_id":       true, "founded_by_user_id": true, "founder_user_id": true,
 	"from_user_id": true, "guest_user_id": true, "invitee_user_id": true,
@@ -87,6 +87,9 @@ var erasureAnonymise = map[string]string{
 		"place and the road is still standing there, used by other players and by the world's own " +
 		"people. Only which cultivator did it is personal, so that is the part that goes; the gate " +
 		"itself is keyed on `location_key`, which is why an erasure cannot unmake one",
+	"stall_sales.buyer_user_id": "the seller's own ledger (v1.5.0) - the sale happened and the " +
+		"seller was paid for it; only who bought is personal, so that is the part that goes, and the " +
+		"row goes with the seller when the seller is erased",
 	"npc_graves.claimed_by_user_id": "world canon - somebody was lost, died out there and was " +
 		"eventually found, and the grave goes on saying so. Only which cultivator reached it first " +
 		"is personal, so that is the part that goes; the grave stays emptied, because it was - " +

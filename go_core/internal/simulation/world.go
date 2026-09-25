@@ -644,7 +644,13 @@ price_index=MAX(0.25,MIN(4.0,1.0 + ((demand-supply)*1.0/MAX(20,supply))/2.5)),la
 			count = i64(row["n"])
 		}
 	}
-	return fmt.Sprintf("batch-repriced %d regional market listings", count), nil
+	// The town shops at the players' stalls (v1.5.0, npc_stalls.go), after
+	// the markets have moved: bounded, below the shelf, never the last unit.
+	bought, err := r.npcStallPurchases(conn, steps, gm)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("batch-repriced %d regional market listings; %d stall purchase(s) by the town", count, bought), nil
 }
 
 func (r *Runner) sects(conn *storage.Conn, steps, gm int64) (string, error) {

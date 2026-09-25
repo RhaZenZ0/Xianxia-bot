@@ -98,6 +98,7 @@ PAGES: dict[str, int] = {
     "combat / Boss Raids": 3,
     "combat / Bounty Hunter": 3,
     "economy / Local Market": 2,
+    "economy / Market Stalls": 2,
     "economy / Auction House": 2,
     "economy / Merchants": 2,
     "economy / Trade": 2,
@@ -170,6 +171,10 @@ LEAVES: dict[str, int] = {
     "family leave": 0,
     # Reads that are a page's own front door without being named `status`.
     "sect recruitment info": 0,
+    # The stalls' page waits, but buying from one is the owner's "Shop"
+    # (v1.5.0), and the board is how a player learns the city keeps any.
+    "stall board": 0,
+    "stall buy": 0,
     "bounty": 0,
     "provenance": 0,
     # The hidden sect's door is its own karma gate, not a realm one; the
