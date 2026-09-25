@@ -337,7 +337,7 @@ async def choose(actor: Any, result: Any, placeholder: str, *, value: str | None
 
 
 async def answer_steps(actor: Any, result: Any, *, picks: dict[str, Any] | None = None, fields: dict[str, str] | None = None,
-                       limit: int = 6) -> Any:
+                       limit: int = 6, confirm: bool = False) -> Any:
     """Walk the hub's input steps as a player would: each picker the hub sends
     is answered from `picks` (placeholder prefix -> option label, or an entity
     handle for a member/channel picker), each modal from `fields` (label ->
@@ -358,6 +358,15 @@ async def answer_steps(actor: Any, result: Any, *, picks: dict[str, Any] | None 
             result = await actor.submit_modal(result, values)
             continue
         message = result.response.message if result.response is not None else None
+        if confirm and message is not None:
+            # A danger leaf (Close, Withdraw) asks "Are you sure?" first; with
+            # confirm the player says yes, once per button.
+            button = next((n for n in _walk(message.components) if n.get("type") == 2 and not n.get("disabled")
+                           and str(n.get("custom_id")) not in answered and str(n.get("label") or "").startswith("Yes, ")), None)
+            if button is not None:
+                answered.add(str(button["custom_id"]))
+                result = await actor.click(message, custom_id=str(button["custom_id"]))
+                continue
         select = select_by_placeholder(message.components, "") if message is not None else None
         if select is None or str(select.get("custom_id")) in answered:
             # A picker answered once and still on screen is the deferred
@@ -1240,27 +1249,32 @@ async def run(url: str, token: str, db_path: str) -> Report:
         # take them back, take it down - driven at the curriculum's ceiling,
         # which section 6 has already raised the player to.
         async def stall():
+            # Driven through the panel: /stall is a hub group, never a tree
+            # command, so v1.5.0's slash calls could not reach it at all.
             was_at = str((await DB.get_character(int(player.id)) or {}).get("location") or "")
             await ENGINE.action("admin.player.teleport", int(gm.id), {"user_id": int(player.id), "location": "Greenriver Town", "reason": "playtest: a city's street for the stall"})
             await ENGINE.action("admin.player.adjust_item", int(gm.id), {"user_id": int(player.id), "item_id": "recovery_pill", "quantity": 3, "reason": "playtest: goods for the stall"})
             await settle_patiently(env)
             economy = await open_hub(player, channels["begin-here"], "economy", env=env)
             await economy.goto("Market Stalls", env=env)
-            board = result_text(await economy.press("Board"))
-            expect("stall" in board.casefold(), f"the Board leaf did not read the city's stalls: {board[:300]}")
-            opened = result_text(await player.slash(channels["begin-here"], "stall open", name="Sim's Table"))
-            expect("is set up in" in opened, f"/stall open did not set the stall up: {opened[:300]}")
-            listed = result_text(await player.slash(channels["begin-here"], "stall list", item="recovery_pill", quantity=3, price=6))
-            expect("Listing **#" in listed, f"/stall list did not lay the goods out: {listed[:300]}")
-            board = result_text(await player.slash(channels["begin-here"], "stall board"))
-            expect("Sim's Table" in board and "Recovery Pill" in board, f"the board does not show the stall: {board[:300]}")
-            status = result_text(await player.slash(channels["begin-here"], "stall status"))
-            expect("On the stall" in status, f"/stall status does not list the goods: {status[:300]}")
-            listing = listed.split("Listing **#", 1)[1].split("**", 1)[0]
-            withdrawn = result_text(await player.slash(channels["begin-here"], "stall withdraw", listing=int(listing)))
-            expect("back into your bag" in withdrawn, f"/stall withdraw did not return the goods: {withdrawn[:300]}")
-            closed = result_text(await player.slash(channels["begin-here"], "stall close"))
-            expect("is taken down" in closed, f"/stall close did not take the stall down: {closed[:300]}")
+
+            async def leaf(label: str, **kwargs: Any) -> str:
+                result = await answer_steps(player, await economy.press(label), confirm=True, **kwargs)
+                await settle_patiently(env)
+                return result_text(result) + "\n" + economy.text()
+
+            opened = await leaf("Open", fields={"Name": "Sim's Table"})
+            expect("is set up in" in opened, f"Open did not set the stall up: {opened[:400]}")
+            listed = await leaf("List", picks={"": "Recovery Pill"}, fields={"Quantity": "3", "Price": "6"})
+            expect("Listing **#" in listed, f"List did not lay the goods out: {listed[:400]}")
+            board = await leaf("Board")
+            expect("Sim's Table" in board and "Recovery Pill" in board, f"the board does not show the stall: {board[:400]}")
+            status = await leaf("Status")
+            expect("On the stall" in status, f"Status does not list the goods: {status[:400]}")
+            withdrawn = await leaf("Withdraw", picks={"": "Recovery Pill"})
+            expect("back into your bag" in withdrawn, f"Withdraw did not return the goods: {withdrawn[:400]}")
+            closed = await leaf("Close")
+            expect("is taken down" in closed, f"Close did not take the stall down: {closed[:400]}")
             if was_at:
                 await ENGINE.action("admin.player.teleport", int(gm.id), {"user_id": int(player.id), "location": was_at, "reason": "playtest: back where the run had them"})
                 await settle_patiently(env)
