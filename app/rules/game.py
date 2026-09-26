@@ -265,11 +265,6 @@ class World:
             out["name"] = self.item_name(item_id)
         return out
 
-    def item_sect_value(self, item_id: str) -> int:
-        base, grade = split_item_grade(item_id)
-        _, rung = grade_rung(self.item_grades, grade)
-        return max(1, int(self.items.get(base, {}).get("sect_value", 1)) * int(rung.get("price_mult") or 1))
-
     @property
     def item_grades(self) -> dict:
         """The grade ladder (`item_grade_system`), for the item_grades helpers."""
