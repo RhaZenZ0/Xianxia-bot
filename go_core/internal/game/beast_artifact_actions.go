@@ -77,6 +77,7 @@ const (
 	// requirement above the cap is a stage no beast can reach; the SQL twin is
 	// what the two clamping UPDATEs spell, so the three cannot drift.
 	beastLoyaltyCap            = int64(100)
+	beastEvolvedLoyalty        = int64(15)
 	beastLoyaltyCapSQL         = "100"
 	artifactRefiningProfession = "Artifact Refining"
 	// What a bonding gains in resonance before the refiner's own skill.
@@ -450,13 +451,31 @@ func beastEvolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	// stage 5 and asked for a number no action could produce, and nothing caps
 	// the stage, so a beast there was told to do the impossible for ever.
 	need := minI64(beastLoyaltyCap, int64(60)+i64(row["evolution_stage"])*10)
+	if limit := beastRankLimit(EraWorldOf(catalog, character.Location)); i64(row["rank"]) >= limit {
+		return authoritativeMutation{}, fmt.Errorf("a beast in the %s can grow no stronger than rank %d; it is rank %d - take it to a higher world to evolve it further", EraWorldOf(catalog, character.Location), limit, i64(row["rank"]))
+	}
 	if i64(row["loyalty"]) < need {
 		return authoritativeMutation{}, fmt.Errorf("loyalty %d is below evolution requirement %d", i64(row["loyalty"]), need)
 	}
+	// Every evolution also costs beast cores: 1 a level below rank 10, then 8
+	// a level from 10, 16 from 20, and so on (v1.7.3, on the owner's call).
+	cores := beastLevelCores(i64(row["rank"]))
+	if cores > 0 {
+		short, err := consumeInventoryTx(conn, userID, map[string]int64{"beast_core": cores})
+		if err != nil {
+			return authoritativeMutation{}, err
+		}
+		if len(short) > 0 {
+			return authoritativeMutation{}, fmt.Errorf("evolving past rank %d needs %d beast cores: missing %s", i64(row["rank"]), cores, describeMaterials(catalog, short))
+		}
+	}
+	// An evolution spends the bond (v1.7.3): it used to cost twenty loyalty,
+	// which one Train and one beast core bought back, so a beast at the capped
+	// requirement evolved every few minutes. It drops to beastEvolvedLoyalty.
 	now := float64(time.Now().UnixNano()) / 1e9
 	if _, err = conn.Execute(
-		`UPDATE spirit_beasts SET evolution_stage=evolution_stage+1,rank=rank+1,loyalty=MAX(25,loyalty-20),updated_at=? WHERE user_id=? AND beast_id=?`,
-		[]any{now, userID, p.BeastID},
+		`UPDATE spirit_beasts SET evolution_stage=evolution_stage+1,rank=rank+1,loyalty=?,updated_at=? WHERE user_id=? AND beast_id=?`,
+		[]any{beastEvolvedLoyalty, now, userID, p.BeastID},
 	); err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -469,7 +488,7 @@ func beastEvolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		return authoritativeMutation{}, err
 	}
 	result := map[string]any{
-		"beast": row, "profession_progress": prog,
+		"beast": row, "profession_progress": prog, "cores_spent": cores,
 		"game_minute": gameMinute, "location": character.Location,
 	}
 	return authoritativeMutation{
@@ -673,4 +692,43 @@ func artifactAwakenAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 			EntityID: p.ItemID, GameMinute: gameMinute, Payload: result,
 		},
 	}, nil
+}
+
+// beastRankLimit is how strong a beast may evolve in a world (v1.7.3, on the
+// owner's call): 25 in the Mortal World, 50 Spiritual, 75 Immortal, and
+// 100 in the Celestial World, which is the highest rank a beast can reach. Evolving adds
+// one rank and nothing else bounded it. A beast already above the limit keeps
+// its rank; it simply cannot evolve again until it stands in a higher world.
+// A world this table does not name is held to the Mortal limit.
+var beastRankLimits = map[string]int64{
+	"Mortal World":    25,
+	"Spiritual World": 50,
+	"Immortal World":  75,
+	"Celestial World": 100,
+}
+
+func beastRankLimit(world string) int64 {
+	if limit, ok := beastRankLimits[world]; ok {
+		return limit
+	}
+	return beastRankLimits[DefaultEraWorld]
+}
+
+// beastLevelCores is what evolving a beast out of a rank costs in beast
+// cores: 1 a level below rank 10, then 8 a level for every tenth the rank
+// has reached (10->11 costs 8, 20->21 costs 16).
+func beastLevelCores(rank int64) int64 {
+	if rank < 10 {
+		return 1
+	}
+	return 8 * (rank / 10)
+}
+
+// beastMilestoneBonus is what a beast's milestones add to its owner's rolls,
+// on top of the ordinary rank/stage/loyalty term: +2 for each tenth rank.
+func beastMilestoneBonus(rank int64) int64 {
+	if rank < 10 {
+		return 0
+	}
+	return 2 * (rank / 10)
 }

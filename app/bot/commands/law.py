@@ -21,7 +21,7 @@ from ..registry import registered_group_command
 from ..services import QUESTS
 from ..status_cards import _ELEMENT_MARKS
 from ..runtime import _explain_engine_error, DB, ENGINE, WORLD, current_world_time, log, reply_long, require_character, respond, serialized_user_action
-from .battle import _battle_panel, _execute_battle_law_technique
+from .battle import _battle_panel, _execute_battle_law_technique, _execute_battle_manual_technique
 
 
 # ---------- Law / Dao cultivation ----------
@@ -286,38 +286,12 @@ async def manual_technique(interaction:discord.Interaction,technique:str)->None:
     battle=await DB.get_active_battle(interaction.user.id)
     if not battle:
         await interaction.response.send_message("That technique currently requires an active battle target.",ephemeral=False);return
-    if int(battle.get('npc_hp',0))<=0:
-        await interaction.response.send_message("The opponent is already defeated. Choose **Spare** or **Kill**.",ephemeral=False);return
-    wt=await current_world_time()
-    try:
-        envelope=await ENGINE.authoritative_action(
-            "manual.technique",interaction.user.id,
-            {"technique_id":technique},
-            action_id=f"discord:{interaction.id}:manual.technique",
-        )
-    except GameEngineError as exc:
-        await interaction.response.send_message(str(exc),ephemeral=False);return
-    resolved=dict(envelope.get("result") or {})
-    qi_cost=int(resolved.get('qi_cost',0));vit_cost=int(resolved.get('vitality_cost',0));damage=int(resolved.get('damage',0));heal=int(resolved.get('heal',0));suppress=int(resolved.get('suppress_turns',0));nhp=int(resolved.get('npc_hp',0))
-    crime=dict(resolved.get('crime') or {});social_note=""
-    if crime:
-        social_note=f"⚖️ Crime record **#{crime.get('crime_id')}** opened with **{crime.get('evidence',0)}% evidence**."
-        if crime.get('bounty_id') is not None: social_note += " A bounty was issued."
-    updated=await DB.get_battle(int(battle['battle_id']),user_id=interaction.user.id,active_only=True) or {**battle,'npc_hp':nhp}
+    text=await _execute_battle_manual_technique(interaction,battle,technique)
+    updated=await DB.get_battle(int(battle['battle_id']),user_id=interaction.user.id,active_only=True) or battle
     c=await DB.get_character(interaction.user.id) or c
-    impacts=list(resolved.get('impacts') or [])
-    result=[f"🌑 **{t['name']}** — {t.get('description','')}",f"Cost: **{qi_cost} Qi**"+(f" + **{vit_cost} Vitality**" if vit_cost else "")]
-    if damage: result.append(f"💥 Damage: **{damage}** • Opponent Vitality: **{nhp}**")
-    if heal: result.append(f"🩸 Forced recovery: **+{heal} Vitality**")
-    if suppress: result.append(f"⛓️ Suppression: **{suppress} turn(s)**")
-    if bool(resolved.get('forbidden')):
-        result.append(f"☯️ Karma: **{int(resolved.get('karma_score',0)):+d}**")
-        result.append("👁️ The forbidden art was **witnessed**." if bool(resolved.get('witnessed')) else "🌫️ The forbidden art was mostly **concealed**.")
-    if impacts: result.extend(["🌍 **World reaction:**",*[f"• {x}" for x in impacts[:6]]])
-    if social_note: result.append(social_note)
-    if nhp<=0: result.append("🏆 **Opponent defeated.** You must still choose **Spare** or **Kill**.")
-    embed,view=await _battle_panel(interaction.user.id,c,updated,result_text="\n".join(result))
-    await interaction.response.send_message(embed=embed,view=view)
+    embed,view=await _battle_panel(interaction.user.id,c,updated,result_text=text)
+    if interaction.response.is_done(): await interaction.followup.send(embed=embed,view=view)
+    else: await interaction.response.send_message(embed=embed,view=view)
 
 
 # ---------- Persistent injuries / deviations ----------

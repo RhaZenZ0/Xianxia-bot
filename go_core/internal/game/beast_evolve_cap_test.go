@@ -29,6 +29,7 @@ func TestABeastAtTheLoyaltyCapCanAlwaysEvolve(t *testing.T) {
 		user_id,name,species,rank,element,intelligence,temperament,bloodline,evolution_stage,
 		loyalty,contract_type,active,techniques_json,created_at,updated_at
 	) VALUES(42,'Cloudpaw','Wind Lynx',6,'Wind',10,'bonded','Common',5,100,'equality',1,'[]',0,0)`)
+	batch4Exec(t, path, `INSERT INTO inventory(user_id,item_id,quantity) VALUES(42,'beast_core',1)`)
 	got, err := evolveBeast(t, path, world, 0)
 	if err != nil {
 		t.Fatalf("a beast at the loyalty cap was refused: %v", err)
@@ -36,6 +37,10 @@ func TestABeastAtTheLoyaltyCapCanAlwaysEvolve(t *testing.T) {
 	beast, _ := got["beast"].(map[string]any)
 	if storage.ParseInt(beast["evolution_stage"]) != 6 {
 		t.Fatalf("evolution_stage=%v want 6", beast["evolution_stage"])
+	}
+	// v1.7.3: an evolution spends the bond, so the next one is a long climb.
+	if got := storage.ParseInt(beast["loyalty"]); got != beastEvolvedLoyalty {
+		t.Fatalf("loyalty after evolving is %d, want %d - one Train and a core must not buy the next stage back", got, beastEvolvedLoyalty)
 	}
 }
 
@@ -53,5 +58,54 @@ func TestTheEvolutionRequirementNeverNamesANumberAboveTheCap(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "requirement 100") || strings.Contains(err.Error(), "110") {
 		t.Fatalf("the refusal must ask for the cap and nothing above it: %v", err)
+	}
+}
+
+func TestABeastCannotOutgrowTheWorldItStandsIn(t *testing.T) {
+	for world, limit := range beastRankLimits {
+		if limit != map[string]int64{"Mortal World": 25, "Spiritual World": 50, "Immortal World": 75, "Celestial World": 100}[world] {
+			t.Fatalf("%s limit is %d", world, limit)
+		}
+	}
+	path := setupBatch4AuthorityDB(t)
+	setupStage4CompanionTables(t, path)
+	world := batch4WorldPath(t)
+	batch4Exec(t, path, `INSERT INTO spirit_beasts(
+		user_id,name,species,rank,element,intelligence,temperament,bloodline,evolution_stage,
+		loyalty,contract_type,active,techniques_json,created_at,updated_at
+	) VALUES(42,'Cloudpaw','Wind Lynx',25,'Wind',10,'bonded','Common',5,100,'equality',1,'[]',0,0)`)
+	_, err := evolveBeast(t, path, world, 0)
+	if err == nil || !strings.Contains(err.Error(), "rank 25") {
+		t.Fatalf("a rank-25 beast in the Mortal World evolved: %v", err)
+	}
+	if beastRankLimit("Spiritual World") != 50 || beastRankLimit("nowhere") != 25 {
+		t.Fatal("the limit is not read per world")
+	}
+}
+
+func TestFromRankTenEveryLevelCostsCores(t *testing.T) {
+	if beastLevelCores(9) != 1 || beastLevelCores(0) != 1 || beastLevelCores(10) != 8 || beastLevelCores(15) != 8 || beastLevelCores(20) != 16 {
+		t.Fatal("cores are 1 a level below 10, 8 from rank 10, 16 from 20")
+	}
+	if beastMilestoneBonus(9) != 0 || beastMilestoneBonus(10) != 2 || beastMilestoneBonus(25) != 4 {
+		t.Fatal("milestone bonus is +2 per tenth rank")
+	}
+	path := setupBatch4AuthorityDB(t)
+	setupStage4CompanionTables(t, path)
+	world := batch4WorldPath(t)
+	batch4Exec(t, path, `INSERT INTO spirit_beasts(
+		user_id,name,species,rank,element,intelligence,temperament,bloodline,evolution_stage,
+		loyalty,contract_type,active,techniques_json,created_at,updated_at
+	) VALUES(42,'Cloudpaw','Wind Lynx',10,'Wind',10,'bonded','Common',5,100,'equality',1,'[]',0,0)`)
+	if _, err := evolveBeast(t, path, world, 0); err == nil || !strings.Contains(err.Error(), "8 beast cores") {
+		t.Fatalf("10 -> 11 went without cores: %v", err)
+	}
+	batch4Exec(t, path, `INSERT INTO inventory(user_id,item_id,quantity) VALUES(42,'beast_core',8)`)
+	got, err := evolveBeast(t, path, world, 1)
+	if err != nil {
+		t.Fatalf("10 -> 11 with eight cores was refused: %v", err)
+	}
+	if beast, _ := got["beast"].(map[string]any); storage.ParseInt(beast["rank"]) != 11 {
+		t.Fatalf("rank is %v, want 11", beast["rank"])
 	}
 }

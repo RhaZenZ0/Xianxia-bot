@@ -469,6 +469,9 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 		// rather than propagated, exactly as `ensureRoadTransitReadyTx` is
 		// called for its effect above.
 		_, _ = settleVitalityRecoveryTx(conn, catalog, req.ActorID, actionGameMinute)
+		// A beast made before the v1.7.3 rank rules is settled under them
+		// once (schema 67). Same contract as the settle above: no refusal.
+		_ = settleGrandfatheredBeastsTx(conn, catalog, req.ActorID)
 		// A graduate is caught up on any action at all (v1.3.1). The chain
 		// catch-up used to run only at the end of a quest report, so a
 		// player holding no quest - one who finished the path before a stage
