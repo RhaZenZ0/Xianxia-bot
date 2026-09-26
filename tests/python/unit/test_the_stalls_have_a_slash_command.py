@@ -60,5 +60,23 @@ class TheStallsHaveASlashCommand(unittest.TestCase):
             self.assertIsNotNone(surface._tree_command(name), name)
 
 
+class TheRaidsHaveSlashCommands(unittest.TestCase):
+    """`/boss` and `/party` (v1.7.10): asked "where is the boss command
+    located?", the answer was a hub page, because neither group had ever been
+    registered - the `/stall` fault twice over."""
+
+    GROUPS = {"boss": {"list", "start", "status", "act", "claim"}, "party": {"create", "join", "leave"}}
+
+    def test_each_is_a_tree_command_resolving_to_the_hub_pages_group(self):
+        surface = _surface()
+        for name, wanted in self.GROUPS.items():
+            with self.subTest(name=name):
+                self.assertIn(name, surface.TREE_COMMANDS, f"/{name} is not registered with Discord")
+                group = surface._tree_command(name)
+                self.assertIs(group, surface._GROUP_ACTION_ROOTS[name])
+                leaves = {c.name for c in group.commands}
+                self.assertTrue(wanted <= leaves, sorted(leaves))
+
+
 if __name__ == "__main__":
     unittest.main()

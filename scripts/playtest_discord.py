@@ -1058,6 +1058,16 @@ async def run(url: str, token: str, db_path: str) -> Report:
         if daily:
             report.add("PASS", "daily five", ", ".join("/" + r for r in daily))
 
+        # ---- 4a'. the raids are slash commands (v1.7.10) ------------------------
+        async def raid_commands():
+            for name in ("boss list", "boss status"):
+                reply = result_text(await player.slash(channels["begin-here"], name))
+                expect(reply.strip(), f"/{name} answered nothing")
+                for failure in WIRING_FAILURE_TEXTS:
+                    expect(failure not in reply, f"/{name} raised: {reply[:400]}")
+            return "/boss list, /boss status"
+        await step(report, "/boss is a slash command of its own", raid_commands())
+
         # ---- 5. home, and the doors it hides ------------------------------------
         async def inside():
             panel = await open_hub(player, channels["begin-here"], "family")
@@ -1311,8 +1321,9 @@ async def run(url: str, token: str, db_path: str) -> Report:
         # take them back, take it down - driven at the curriculum's ceiling,
         # which section 6 has already raised the player to.
         async def stall():
-            # Driven through the panel: /stall is a hub group, never a tree
-            # command, so v1.5.0's slash calls could not reach it at all.
+            # Driven through the panel, which is the harder door: /stall has
+            # been a tree command too since v1.7.4, and v1.5.0's slash calls
+            # could not reach it then.
             was_at = str((await DB.get_character(int(player.id)) or {}).get("location") or "")
             await ENGINE.action("admin.player.teleport", int(gm.id), {"user_id": int(player.id), "location": "Greenriver Town", "reason": "playtest: a city's street for the stall"})
             # A pill needs the Alchemy certificate to go on a stall (v1.7.1) and

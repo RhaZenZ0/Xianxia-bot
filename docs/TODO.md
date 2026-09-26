@@ -16,6 +16,11 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.7.10)** — *No `/boss` or `/party`.* Both groups backed a Combat hub page and were never
+  in `TREE_COMMANDS`, so the names a player types reached nothing (v1.7.4's `/stall`). Registered.
+- **deferred (design)** — *The other hub-only groups.* `_GROUP_ACTION_ROOTS` holds some fifty groups
+  and only `stall`, `boss` and `party` are slash commands; each more is one more entry in Discord's
+  command list, so which of them earn a typed name is the owner's call, not a wiring.
 - **fixed (v1.7.8)** — *A solo raid.* On the owner's call `/boss start` with no party forms a party
   of one marked `raid_only` (schema 68), closed when the raid is won, lost or cleared by a GM, and a
   party of one fights the boss at 70% of its health (`bossSoloHPScale`). A party made by hand is
