@@ -16,6 +16,15 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **deferred (design)** — *The spirit stat on gear reaches no rule.* Every piece in
+  `EQUIPMENT_DEFINITIONS` carries `spirit`, the engine sums it in `combatEquipment` and
+  `equipmentPowerRows`, and nothing reads the sum. Since v1.7.5 no surface shows it, on the owner's
+  call, so the descriptions promise only what a fight does. Whether to wire it (a technique's power, a
+  sense check) or remove it is a mechanic, not a wiring.
+- **fixed (v1.7.5)** — *Say what a weapon, armour or beast gives.* Every surface that shows gear
+  names its attack, defence and agility at its grade (agility as boss-raid hit chance, the only real
+  percentage), the equipment card sums them into what they do, and a beast's card names its 1v1
+  bonus. Graded gear read "No stat modifiers" on the equipment card and is fixed with it.
 - **fixed (v1.7.1)** — *A trade's goods need that trade's certificate at a stall.* On the owner's
   call: anyone at the realm floor may open a stall, but an item a recipe makes is listed only by
   somebody who has passed an examination of that trade in this life - any rank, because a rank rises

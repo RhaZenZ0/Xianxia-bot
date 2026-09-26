@@ -212,7 +212,9 @@ class EquipmentOptionTests(unittest.TestCase):
         start = self.bot.index("async def equipment_bind_hub_options")
         body = self.bot[start : start + 1600]
         self.assertIn("DB.get_inventory(", body)
-        self.assertIn("EQUIPMENT_DEFINITIONS.get(", body)
+        # equipment_definition is the grade-aware door (v1.7.5): a bare
+        # EQUIPMENT_DEFINITIONS.get missed every graded id.
+        self.assertIn("equipment_definition(", body)
 
     def test_every_empty_equipment_picker_explains_the_prerequisite(self):
         # "Equip has no available equipment id options right now" is true and

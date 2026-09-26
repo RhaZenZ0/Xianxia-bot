@@ -5310,6 +5310,35 @@ footer lesson (v1.0.8) in a different card. The Request button was never gated o
 `update.sh` asks GitHub itself, so an update requested during the stale window installed v1.7.2
 anyway; only the words were wrong.
 
+### What a weapon gives, said where it is sold (v1.7.5)
+
+Asked for as "a description to each weapon or beast, or armour, how much and what chance they give".
+The numbers were all in the tree and none was printed where a player decides: the equipment card
+listed raw ATK/DEF/Spirit/Agility, and a shop, a merchant's pack, the market and a stall printed a
+name and a price. `describe_equipment` in `app/rules/advanced_runtime.py` is the one line, drawn at
+the item's grade on every one of those surfaces; `equipment_totals_line` says what the equipped sum
+does; `companion_bonus` is the beast's. Each is a display twin of an engine expression, and
+`test_gear_says_what_it_gives.py` reads those expressions out of the Go source.
+
+**Only one number on gear is a chance**, and the line says so: each point of agility is one point of
+boss-raid hit chance (`65 + agi*2 + equip["agility"] - ...`, clamped 15-95). Attack and defence ride
+a 2d10 roll against a TN, so they are shown as `+N` rather than as odds nobody computed.
+**Spirit is shown nowhere**: the engine sums it and no rule reads the sum, so advertising it would
+be a promise the tree does not keep. That decision is in `docs/TODO.md`.
+
+**The graded lookup is the finding.** `equipment_status` looked a carried id up with a bare
+`EQUIPMENT_DEFINITIONS.get`, and `spirit_iron_sword@high` is not a key there, so every graded weapon
+and armour read "No stat modifiers" while the engine was already counting its grade (its lookups go
+through `itemBaseID`). v1.7.0's `itemDef` door fixed that class for `catalog.Items` in Go and
+`World.item_definition` for `WORLD.items`; the equipment table was the third catalogue and had no
+door. `equipment_definition` is its door now, and the gate forbids a bare `.get` in any command.
+
+`beast_active` reads the bonus off the engine's own reply rather than the local table, because
+`test_authority_boundary` forbids that mutation handler a read of `spirit_beasts` - and the engine
+already returns the row. Two older gates pinned the spellings this replaced (`EQUIPMENT_DEFINITIONS.get(`
+in the bind picker, `definition.get("indestructible")` in the card); each holds the rule now, the
+second by describing the Bugslayer Sword.
+
 ### The command the answer named (v1.7.4)
 
 Asked for the stall commands, the answer was `/stall board`, `/stall buy` and the rest, and the owner

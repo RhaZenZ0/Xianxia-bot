@@ -14,6 +14,7 @@ from discord import app_commands
 from ...rules.black_market import access_reason as black_market_access_reason
 from ...ops.game_engine import GameEngineError
 from ..locations import _known_locations, _location_is_visible, _world_is_unlocked, location_autocomplete
+from ...rules.advanced_runtime import describe_equipment
 from ...rules.progression_systems import profession_rank
 from ...rules.trade_receipt import format_trade_receipt
 from ..auction_feed import announce_lot, refresh_lot
@@ -430,6 +431,13 @@ def _merchant_where(row:dict[str,Any])->str:
     return where
 
 
+def _gear_line(item_id:Any,indent:str="  ")->str:
+    """What a weapon, armour or accessory gives, on its own line under the
+    row that sells it (v1.7.5); nothing for anything that is not gear."""
+    gear=describe_equipment(str(item_id or ""),ladder=WORLD.item_grades)
+    return f"\n{indent}{gear}" if gear else ""
+
+
 def _merchant_stock_lines(row:dict[str,Any])->list[str]:
     """The shop's own wares first (🛒), then what was bought off an auction
     floor and carried along (🏮)."""
@@ -437,7 +445,8 @@ def _merchant_stock_lines(row:dict[str,Any])->list[str]:
     lines=[]
     for line in list(row.get("stock") or []):
         icon="🛒" if str(line.get("source"))=="wares" else "🏮"
-        lines.append(f"    {icon} {WORLD.item_name(str(line.get('item_id') or ''))} ×{int(line.get('quantity') or 0)} — {int(line.get('price') or 0)} {currency} each")
+        lines.append(f"    {icon} {WORLD.item_name(str(line.get('item_id') or ''))} ×{int(line.get('quantity') or 0)} — {int(line.get('price') or 0)} {currency} each"
+                     f"{_gear_line(line.get('item_id'),'      ')}")
     return lines or ["    • an empty pack — the shop restocks at home, and nothing has been bought from the floors yet"]
 
 
@@ -580,7 +589,8 @@ async def shop_browse(interaction:discord.Interaction)->None:
     stock=list(shop.get("stock") or [])
     for line in stock:
         made=" · made here" if bool(line.get("made_here")) else ""
-        lines.append(f"• {WORLD.item_name(str(line.get('item_id') or ''))} ×{int(line.get('quantity') or 0)} — {int(line.get('price') or 0)} {currency}{made}")
+        lines.append(f"• {WORLD.item_name(str(line.get('item_id') or ''))} ×{int(line.get('quantity') or 0)} — {int(line.get('price') or 0)} {currency}{made}"
+                     f"{_gear_line(line.get('item_id'))}")
     if not stock:
         lines.append("• nothing left - the shelf refills on the shop's own clock")
     lines.append("")
@@ -734,7 +744,7 @@ def _stall_listing_line(row:dict[str,Any],coin:str)->str:
     here=row.get("price_here")
     far=f" · **{int(here)}** from where you stand" if here is not None and int(here)!=unit else ""
     return (f"• #{int(row.get('listing_id') or 0)} **{WORLD.item_name(str(row.get('item_id') or ''))}** ×{int(row.get('quantity') or 0)}"
-            f" — {unit} {coin} each{far}{town}")
+            f" — {unit} {coin} each{far}{town}{_gear_line(row.get('item_id'))}")
 
 
 def _stall_roads(hops:Any)->str:
@@ -1364,7 +1374,8 @@ async def market_prices_command(interaction:discord.Interaction,item:str|None=No
         await interaction.response.send_message(
             f"💹 **{WORLD.item_name(item)} — {location}**\n"
             f"Buy: **{quote['buy_price']:,} {WORLD.currency_name(str(quote['currency_id']))}** • Sell: **{quote['sell_price']:,}**\n"
-            f"Supply **{quote['supply']}** • Demand **{quote['demand']}** • Price index **x{float(quote['price_index']):.2f}**",
+            f"Supply **{quote['supply']}** • Demand **{quote['demand']}** • Price index **x{float(quote['price_index']):.2f}**"
+            f"{_gear_line(item,'')}",
             ephemeral=False,
         );return
     rows=await SIM.market_rows(location,18)
@@ -1373,7 +1384,8 @@ async def market_prices_command(interaction:discord.Interaction,item:str|None=No
     lines=[f"💹 **Dynamic Market — {location}**"]
     for row in rows:
         price=max(1,int(round(int(row['base_price'])*float(row['price_index']))))
-        lines.append(f"• **{WORLD.item_name(str(row['item_id']))}** — {price:,} {WORLD.currency_name(str(row['currency_id']))} • supply {row['supply']} / demand {row['demand']} • x{float(row['price_index']):.2f}")
+        lines.append(f"• **{WORLD.item_name(str(row['item_id']))}** — {price:,} {WORLD.currency_name(str(row['currency_id']))} • supply {row['supply']} / demand {row['demand']} • x{float(row['price_index']):.2f}"
+                     f"{_gear_line(row['item_id'])}")
     await reply_long(interaction,"\n".join(lines),ephemeral=False)
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import Any
 
 import discord
 from discord import app_commands
@@ -20,6 +21,7 @@ from ..runtime import (
     serialized_user_action,
 )
 from ...ops.game_engine import GameEngineError
+from ...rules.advanced_runtime import companion_bonus
 from ...rules.progression_systems import profession_rank
 
 
@@ -45,9 +47,22 @@ async def beast_status(interaction: discord.Interaction) -> None:
     for row in rows:
         lines.append(
             f"\n{'⭐ ' if row.get('active') else ''}**#{row['beast_id']} {row['name']}** ({row['species']})\n"
-            f"Rank **{row['rank']}** • {row['element']} • Loyalty **{row['loyalty']}** • Evolution **{row['evolution_stage']}** • Contract **{row['contract_type']}**"
+            f"Rank **{row['rank']}** • {row['element']} • Loyalty **{row['loyalty']}** • Evolution **{row['evolution_stage']}** • Contract **{row['contract_type']}**\n"
+            f"{_companion_line(row)}"
         )
+    lines.append(
+        "\n-# A beast's bonus is half its rank, plus its evolution stage, plus one for every 40 loyalty. "
+        "Only the ⭐ active beast fights beside you, and only in one-on-one battles, not boss raids."
+    )
     await reply_long(interaction, "\n".join(lines), ephemeral=False)
+
+
+def _companion_line(row: Any) -> str:
+    """What one beast adds in a fight (v1.7.5): the engine's
+    `combatCompanionBonus`, twinned in `companion_bonus`."""
+    bonus = companion_bonus(row.get("rank"), row.get("evolution_stage"), row.get("loyalty"))
+    when = "while active" if row.get("active") else "if made active"
+    return f"🐾 **{bonus:+d}** to your attack, flee and defence rolls {when} (1v1 battles)"
 
 
 @registered_group_command(beast_group, name="encounters", description="View subdued wild beasts currently available for taming")
@@ -74,6 +89,10 @@ async def beast_encounters(interaction: discord.Interaction) -> None:
             f"\n`#{row['encounter_id']}` **{row['species']}** • Rank {row['rank']} • {row['element']} • "
             f"{row['temperament']} • taming TN **{row['taming_tn']}** • leaves in **{remaining} game minutes**"
         )
+    lines.append(
+        "\n-# Taming rolls 2d10 + spirit + presence + half your will against the TN, "
+        "+4 for a Beast Binder, +1 for each beast already bonded (up to 4) and + your Beast Taming rank."
+    )
     await reply_long(interaction, "\n".join(lines), ephemeral=False)
 
 
@@ -212,7 +231,7 @@ async def beast_active(interaction: discord.Interaction, beast_id: int) -> None:
     if not c:
         return
     try:
-        await ENGINE.authoritative_action(
+        envelope = await ENGINE.authoritative_action(
             "beast.active",
             interaction.user.id,
             {"beast_id": int(beast_id)},
@@ -221,7 +240,10 @@ async def beast_active(interaction: discord.Interaction, beast_id: int) -> None:
     except GameEngineError as exc:
         await interaction.followup.send(str(exc), ephemeral=False)
         return
-    await interaction.followup.send(
-        "🐉 Active companion changed. Its rank, evolution and loyalty now contribute to normal battle exchanges.",
-        ephemeral=False,
-    )
+    # The engine answers with the beast's own row; the bonus is read off it.
+    row = dict((envelope or {}).get("result") or {})
+    chosen = " Its rank, evolution and loyalty now contribute to one-on-one battles."
+    if row.get("rank") is not None:
+        bonus = companion_bonus(row.get("rank"), row.get("evolution_stage"), row.get("loyalty"))
+        chosen = f" **{row.get('name') or 'Your beast'}** now adds **{bonus:+d}** to your attack, flee and defence rolls in one-on-one battles."
+    await interaction.followup.send(f"🐉 Active companion changed.{chosen}", ephemeral=False)
