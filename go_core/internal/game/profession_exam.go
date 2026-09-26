@@ -140,6 +140,44 @@ func professionExamRecordsTx(conn *storage.Conn, userID, life int64, trade strin
 	return false, lastFail, nil
 }
 
+// tradeCertifiedTx says whether this life holds any examination of the trade
+// (v1.7.1): a pass at any rank counts, because a rank rises on crafting alone
+// and a cultivator can reach the second rank without ever sitting the first.
+// A pass in an earlier life does not, the way the examination's own record is
+// kept per life - samsara wipes the trade, and the certificate with it.
+func tradeCertifiedTx(conn *storage.Conn, userID, life int64, trade string) (bool, error) {
+	if !tableExistsTx(conn, "event_log") {
+		return false, nil
+	}
+	res, err := conn.Execute(`SELECT payload_json FROM event_log WHERE user_id=? AND event_type=?`, []any{userID, professionExamEvent})
+	if err != nil {
+		return false, err
+	}
+	for _, row := range res.Rows {
+		var rec professionExamRecord
+		if len(row) == 0 || json.Unmarshal([]byte(fmt.Sprint(row[0])), &rec) != nil {
+			continue
+		}
+		if rec.Passed && rec.Life == life && strings.EqualFold(rec.Trade, trade) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// firstProfessionExam is the lowest rank a trade examines, which is the one
+// a refusal names as the way in.
+func firstProfessionExam(catalog worlddata.Catalog, trade string) (worlddata.ProfessionExam, bool) {
+	var first worlddata.ProfessionExam
+	found := false
+	for _, exam := range catalog.ProfessionExams[trade] {
+		if !found || exam.Rank < first.Rank {
+			first, found = exam, true
+		}
+	}
+	return first, found
+}
+
 func recordProfessionExamTx(conn *storage.Conn, userID int64, rec professionExamRecord) error {
 	encoded, _ := json.Marshal(rec)
 	_, err := conn.Execute(`INSERT INTO event_log(user_id,event_type,payload_json,created_at) VALUES(?,?,?,?)`,

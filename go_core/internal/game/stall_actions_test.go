@@ -60,6 +60,13 @@ CREATE TABLE IF NOT EXISTS stall_sales (
     FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE,
     FOREIGN KEY(buyer_user_id) REFERENCES characters(user_id) ON DELETE SET NULL
 );
+CREATE TABLE IF NOT EXISTS event_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    event_type TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at REAL NOT NULL
+);
 `
 
 func setupStallDB(t *testing.T) string {
@@ -75,6 +82,13 @@ func setupStallDB(t *testing.T) string {
 	}
 	// Foundation Establishment for both, which is what a stall asks for.
 	if _, err := conn.Execute(`UPDATE characters SET realm_index=2 WHERE user_id IN (42,43)`, nil); err != nil {
+		t.Fatal(err)
+	}
+	// 42 sells pills in these tests, and since v1.7.1 a stall sells a trade's
+	// goods only for somebody who holds its certificate, so 42 has passed the
+	// first Alchemy examination in this life. 43 holds none; the rule itself
+	// is driven against 43 in stall_certificate_test.go.
+	if err := certifyForStall(conn, 42, "Alchemy", 1, 1); err != nil {
 		t.Fatal(err)
 	}
 	if err := conn.Commit(); err != nil {

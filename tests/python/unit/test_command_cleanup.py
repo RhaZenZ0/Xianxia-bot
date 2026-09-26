@@ -7,6 +7,7 @@ from tests.support import (
     bot_source_files,
 )
 import ast
+import textwrap
 import unittest
 
 
@@ -230,18 +231,33 @@ class CommandCleanupTests(unittest.TestCase):
         holds the other half - that the lock is applied outside the
         `channel is None` branch at all.
         """
+        # v1.7.1: the rule, not its spelling. The old checks pinned the create
+        # branch's conditional expression and counted one `set_permissions(`,
+        # so letting the bot allow itself first (rc.52) and merging rather than
+        # replacing the lock (v1.0.11) turned them red while the rule held.
+        # What is held now is the rule: every overwrite written here sits
+        # under `if name in READ_ONLY_BASE_CHANNELS`, names only @everyone or
+        # the bot itself, and none replaces an overwrite wholesale.
         setup_block = bot_function_source("ensure_base_xianxia_channels")
-        self.assertIn("if name in READ_ONLY_BASE_CHANNELS else {}", setup_block)
-        for line in setup_block.splitlines():
-            if "set_permissions(" not in line:
-                continue
-            self.assertIn("guild.default_role", setup_block,
-                          "the lock must apply to @everyone and nobody else")
-        self.assertEqual(setup_block.count("set_permissions("), 1,
-                         "one lock, in one place")
-        # Still never a blanket permission rewrite: no overwrite object is
-        # built for a channel that already exists.
-        self.assertEqual(setup_block.count("PermissionOverwrite("), 1)
+        tree = ast.parse(textwrap.dedent(setup_block))
+        writers = {"merge_overwrite", "set_permissions", "PermissionOverwrite"}
+
+        def name_of(call: ast.Call) -> str:
+            func = call.func
+            return func.attr if isinstance(func, ast.Attribute) else func.id if isinstance(func, ast.Name) else ""
+
+        every = [node for node in ast.walk(tree) if isinstance(node, ast.Call) and name_of(node) in writers]
+        guarded: list[ast.Call] = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.If) and "READ_ONLY_BASE_CHANNELS" in ast.unparse(node.test):
+                guarded += [c for c in ast.walk(node) if isinstance(c, ast.Call) and name_of(c) in writers]
+        self.assertTrue(every, "the reader found no overwrite at all; the gate is broken, not the tree")
+        self.assertEqual({id(c) for c in every}, {id(c) for c in guarded},
+                         "an overwrite is written outside `if name in READ_ONLY_BASE_CHANNELS`")
+        self.assertEqual([ast.unparse(c) for c in every if name_of(c) == "set_permissions"], [],
+                         "a lock that replaces an overwrite drops whatever else it carried (v1.0.11)")
+        targets = {ast.unparse(c.args[1]) for c in every if name_of(c) == "merge_overwrite"}
+        self.assertEqual(targets, {"guild.me", "guild.default_role"})
 
     def test_reusable_hub_framework_enforces_owner_and_uses_registered_handlers(self):
         source = HUBS.read_text(encoding="utf-8")

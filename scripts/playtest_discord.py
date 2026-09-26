@@ -492,6 +492,48 @@ async def answer_generically(hubs: Any, actor: Any, action: Any, result: Any, *,
     return result, "+".join(how) or "ran"
 
 
+# The bot's two unconditional periodic workers, by the attribute `setup_hook`
+# stores each task under.
+PERIODIC_WORKERS = ("event_expiry_task", "operational_health_task")
+
+
+async def quiet_the_periodic_workers(bot: Any, env: Any) -> list[str]:
+    """Let the periodic workers run once at boot, then stop them for the sweep.
+
+    `event_expiry_worker` wakes every thirty real seconds and runs the
+    simulation tick - and since v1.7.0 the auction and stall card syncs after
+    it - and `operational_health_worker` probes every table the same way. A
+    tick holds the engine's write lock for seconds, so a press that landed
+    during one waited behind it and failed its five-second settle (v1.7.1):
+    "bot did not settle after INTERACTION_CREATE", naming whichever leaf the
+    wall clock picked - `/admin player unmute` in one run, `/family` in the
+    next. Nothing the harness asserts depends on either worker after boot,
+    which is why the update check, the Quest Forge and the route audit are
+    already switched off in `_configure`; these two have no switch, so they are
+    stopped here instead.
+
+    Two ways of keeping them running failed first, and both are worth knowing.
+    Declaring their engine calls `env.external_wait` still left each answer's
+    wake as an active callback, so a worker calling back to back never gave a
+    settle its quiet gap. Holding a worker's next call while the harness
+    pressed parked it between a write's execute and its commit - holding
+    SQLite's write lock (v1.2.3) - so the pressed leaf's own INSERT waited five
+    seconds behind it. A cancel is only safe where neither can happen, so it is
+    made after a settle, which returns only once both are asleep: parked in
+    their sleeps, never inside a transaction. Their first iteration - one tick,
+    both card syncs, one health probe - has run by then.
+    """
+    await settle_patiently(env)
+    stopped = []
+    for name in PERIODIC_WORKERS:
+        task = getattr(bot, name, None)
+        if task is not None and not task.done():
+            task.cancel()
+            stopped.append(name)
+    await settle_patiently(env)
+    return stopped
+
+
 async def settle_patiently(env: Any, *, attempts: int = 8) -> None:
     """Wait for the bot's outstanding work in short settles rather than one
     long one (see the note at `simcord.run`). A leaf that asks the engine for
@@ -663,6 +705,10 @@ async def run(url: str, token: str, db_path: str) -> Report:
         synced = await step(report, "the bot booted through every startup phase and synced its commands", boot())
         if synced:
             report.add("PASS", f"{len(synced)} commands are registered with the guild", ", ".join(sorted(synced)))
+        stopped = await step(report, "the periodic workers ran once and are stopped for the sweep", quiet_the_periodic_workers(bot, env))
+        if stopped is not None:
+            report.add("PASS" if sorted(stopped) == sorted(PERIODIC_WORKERS) else "FAIL",
+                       "both periodic workers were running and are stopped", ", ".join(stopped) or "none")
 
         # ---- 2. the server -----------------------------------------------------
         async def refused_admin():
@@ -1269,7 +1315,11 @@ async def run(url: str, token: str, db_path: str) -> Report:
             # command, so v1.5.0's slash calls could not reach it at all.
             was_at = str((await DB.get_character(int(player.id)) or {}).get("location") or "")
             await ENGINE.action("admin.player.teleport", int(gm.id), {"user_id": int(player.id), "location": "Greenriver Town", "reason": "playtest: a city's street for the stall"})
-            await ENGINE.action("admin.player.adjust_item", int(gm.id), {"user_id": int(player.id), "item_id": "recovery_pill", "quantity": 3, "reason": "playtest: goods for the stall"})
+            # A pill needs the Alchemy certificate to go on a stall (v1.7.1) and
+            # nothing earlier in this run sits an examination, so the pill is
+            # withheld and a raw material is what is sold.
+            await ENGINE.action("admin.player.adjust_item", int(gm.id), {"user_id": int(player.id), "item_id": "recovery_pill", "quantity": 1, "reason": "playtest: a pill the stall must refuse"})
+            await ENGINE.action("admin.player.adjust_item", int(gm.id), {"user_id": int(player.id), "item_id": "beast_core", "quantity": 3, "reason": "playtest: goods for the stall"})
             await settle_patiently(env)
             economy = await open_hub(player, channels["begin-here"], "economy", env=env)
             await economy.goto("Market Stalls", env=env)
@@ -1281,7 +1331,9 @@ async def run(url: str, token: str, db_path: str) -> Report:
 
             opened = await leaf("Open", fields={"Name": "Sim's Table"})
             expect("is set up in" in opened, f"Open did not set the stall up: {opened[:400]}")
-            listed = await leaf("List", picks={"": "Recovery Pill"}, fields={"Quantity": "3", "Price": "6"})
+            # The List picker offers only what the stall will take (v1.7.1), so
+            # the pill is not among its options and Status names it instead.
+            listed = await leaf("List", picks={"": "Beast Core"}, fields={"Quantity": "3", "Price": "6"})
             expect("Listing **#" in listed, f"List did not lay the goods out: {listed[:400]}")
             # v1.7.0: the stall's card is in its world's market channel.
             market_row = next((r for r in await DB.get_stall_channels(guild.id) if str(r["world_name"]) == "Mortal World"), None)
@@ -1289,10 +1341,11 @@ async def run(url: str, token: str, db_path: str) -> Report:
             expect(market_row is not None and card is not None and int(card["channel_id"]) == int(market_row["channel_id"]),
                    f"no card for the stall in the Mortal World's market channel: {card} / {market_row}")
             board = await leaf("Board")
-            expect("Sim's Table" in board and "Recovery Pill" in board, f"the board does not show the stall: {board[:400]}")
+            expect("Sim's Table" in board and "Beast Core" in board, f"the board does not show the stall: {board[:400]}")
             status = await leaf("Status")
             expect("On the stall" in status, f"Status does not list the goods: {status[:400]}")
-            withdrawn = await leaf("Withdraw", picks={"": "Recovery Pill"})
+            expect("Not for your stall yet" in status and "Recovery Pill" in status, f"Status does not say the pill needs a certificate: {status[:600]}")
+            withdrawn = await leaf("Withdraw", picks={"": "Beast Core"})
             expect("back into your bag" in withdrawn, f"Withdraw did not return the goods: {withdrawn[:400]}")
             closed = await leaf("Close")
             expect("is taken down" in closed, f"Close did not take the stall down: {closed[:400]}")
@@ -1301,7 +1354,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
             if was_at:
                 await ENGINE.action("admin.player.teleport", int(gm.id), {"user_id": int(player.id), "location": was_at, "reason": "playtest: back where the run had them"})
                 await settle_patiently(env)
-            return "opened, listed, on the board, withdrawn, closed"
+            return "opened, a pill refused for want of a certificate, cores listed, on the board, withdrawn, closed"
         await step(report, "/economy → Market Stalls: a stall is opened, stocked, seen on the board, emptied and taken down", stall())
 
         # ---- 8. every leaf of every hub ------------------------------------------

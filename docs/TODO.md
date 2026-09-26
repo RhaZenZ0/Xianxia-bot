@@ -16,15 +16,15 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
-- **deferred (next release)** — *A trade's goods need that trade's certificate at a stall.* On the
-  owner's call: anyone at the realm floor may open a stall, but listing an item a recipe makes needs
-  an examination of that trade passed in this life - any rank, because a rank rises on crafting alone
-  and somebody can reach rank 2 without sitting rank 1. Raw materials stay sellable, a trade with no
-  authored examination locks nothing, and listings already standing are left alone. The engine check
-  goes in `stallListAction` beside `itemTrade`; the `/stall list` picker offers only what the engine
-  would take (rc.46). Consequence to state in the notes: a shop-bought pill is a recipe's output too,
-  so an uncertified character cannot resell one at a stall; the shop counters still buy it. Deferred
-  because the owner asked for it as its own release after v1.6.0.
+- **fixed (v1.7.1)** — *A trade's goods need that trade's certificate at a stall.* On the owner's
+  call: anyone at the realm floor may open a stall, but an item a recipe makes is listed only by
+  somebody who has passed an examination of that trade in this life - any rank, because a rank rises
+  on crafting alone and somebody can reach the second without sitting the first. Raw materials stay
+  anybody's, a trade that authors no examination locks nothing, and listings already standing are
+  left alone. `stallCertificateTx` is the one statement; `stall.status` reports what the seller may
+  list and the `/stall list` picker offers only that. Stated in the notes: a shop-bought pill is a
+  recipe's output too, so an uncertified character cannot resell one at a stall; the counters still
+  buy it.
 - **fixed (v1.6.0)** — *More NPC and sect overview on the GM dashboard.* Asked for as heads of their
   own, like World and Players. NPCs carries the roster, Population & Whereabouts, Marriage & Family,
   Society and Deeds & Fates; Sects carries Sect Politics, Members & Lineage, Recruitment and

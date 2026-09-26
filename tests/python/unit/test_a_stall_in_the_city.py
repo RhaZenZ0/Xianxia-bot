@@ -124,3 +124,42 @@ class TheEngineDoorsExist(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class APickerOffersOnlyWhatTheListingTakes(unittest.TestCase):
+    """v1.7.1: a trade's goods go on a stall only for somebody holding its
+    certificate. The engine says which carried items those are; the `/stall
+    list` picker must offer exactly those (rc.46) and restate no rule."""
+
+    def _picker(self, status, inventory):
+        import asyncio
+        from types import SimpleNamespace
+        with patch.dict(os.environ, ENV):
+            from app.bot.commands import economy
+
+        async def fake_status(_uid):
+            if isinstance(status, Exception):
+                raise status
+            return status
+
+        async def fake_inventory(_uid):
+            return dict(inventory)
+
+        interaction = SimpleNamespace(user=SimpleNamespace(id=43))
+        with patch.object(economy, "_stall_status", fake_status), patch.object(economy.DB, "get_inventory", fake_inventory):
+            choices = asyncio.run(economy.stall_item_autocomplete(interaction, ""))
+        return [c.value for c in choices]
+
+    def test_it_offers_the_engines_list_and_nothing_the_engine_would_refuse(self):
+        bag = {"recovery_pill": 3, "spirit_herb": 5}
+        self.assertEqual(self._picker({"sellable_items": ["spirit_herb"], "uncertified_items": ["recovery_pill"]}, bag), ["spirit_herb"])
+        self.assertEqual(sorted(self._picker({"sellable_items": ["recovery_pill", "spirit_herb"]}, bag)), ["recovery_pill", "spirit_herb"])
+
+    def test_an_unreachable_engine_offers_the_bag_rather_than_nothing(self):
+        bag = {"recovery_pill": 3, "spirit_herb": 5}
+        self.assertEqual(sorted(self._picker(RuntimeError("engine down"), bag)), ["recovery_pill", "spirit_herb"])
+
+    def test_the_list_command_uses_it(self):
+        source = ECONOMY.read_text(encoding="utf-8")
+        self.assertIn("@app_commands.autocomplete(item=stall_item_autocomplete)", source)
+

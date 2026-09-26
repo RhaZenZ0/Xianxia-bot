@@ -32,7 +32,7 @@ from ..discovery import (
 )
 from ..formatting import human_duration, roll_line
 from ..hubs import register_hub_option_hint, HubDynamicOption, register_hub_option_provider
-from ..locations import _known_locations, access_realm_index, destination_groups, location_autocomplete, npcs_present
+from ..locations import _known_locations, access_realm_index, destination_groups, npcs_present
 from ..registry import ACTIONS, VIEW_RESTORERS, registered_group_command, registered_root_command
 from ..runtime import (
     DB,
@@ -1761,8 +1761,30 @@ def _discord_arrival_display(result: dict) -> str:
     return f"game minute {int(result.get('arrival_game_minute') or 0)}"
 
 
+async def travel_destination_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    """`/travel go`'s picker, over the rows the hub's Go picker draws (v1.7.1).
+
+    It used the shared `location_autocomplete` - every known place, in
+    alphabetical order - so from inside a shop it offered the gates, districts
+    and cities the engine refuses with "the shop door opens onto ...". Both
+    doors now read `destination_groups`, which asks `door_allows`, so the slash
+    command and the panel cannot offer different places.
+    """
+    c = await DB.get_character(interaction.user.id)
+    if not c:
+        return []
+    known = await _known_locations(interaction.user.id, c)
+    needle = str(current or "").casefold().strip()
+    rows = destination_groups(str(c.get("location") or ""), known, access_realm_index(c))
+    return [
+        app_commands.Choice(name=f"{name} — {description}"[:100], value=name[:100])
+        for name, _emoji, description, _order in rows
+        if not needle or needle in name.casefold()
+    ][:25]
+
+
 @registered_group_command(travel_group, name="go", description="Travel to another known location")
-@app_commands.autocomplete(destination=location_autocomplete)
+@app_commands.autocomplete(destination=travel_destination_autocomplete)
 @serialized_user_action
 async def travel(interaction: discord.Interaction, destination: str) -> None:
     await interaction.response.defer(ephemeral=False)

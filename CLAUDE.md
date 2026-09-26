@@ -5123,6 +5123,136 @@ rc.59, and every reader of a default walks `CHANNEL_MESSAGE_KEYS`, which did not
 gate that holds every channel to having a blurb (`test_every_channel_says_what_it_is`) was green over
 text nobody could see. A default no slot names is decoration; the slot is there now.
 
+### The step that passed while recording nothing (engine playtest, v1.7.1)
+
+**The engine playtest had been red for five releases, and the first step to fail was green.** It
+ended 29 of ~930 steps failed, all from three steps written before v1.3.1 moved three bounds out of
+the bot and into the engine: `sect.discover` was sent a named list from Greenriver Town before the
+player stood at any gate, the sponsor was asked from the town, and both territory claims were made
+from the town. v1.7.0's merge already moved the player to the gate, the buyer to the foothills and
+both claimants to the hills. Two halves were still missing, and they are the ones worth keeping.
+**The discover had passed while recording nothing**, because an empty `discovered` is not an error,
+and the trial after it refused "sect has not been discovered" with twenty-five later steps failing
+far from the cause; it is held to having found the sect now. A step that can succeed at doing
+nothing is the rc.47 gate that cannot see what it forbids, one level down in a harness. **And the
+sponsor's step still hung on the hour**: Inquisitor Shen Rui keeps Greenriver Town and walks to the
+foothills only in the afternoon, so walking the buyer there turned a step that failed every
+afternoon into one that failed every morning. He is moved with `admin.npc.relocate` and put back,
+because somebody away from home keeps no schedule (`npcWhereaboutsTx`), so the step is the same at
+every hour.
+
+### A trade's goods need its certificate at a stall (v1.7.1)
+
+On the owner's call, the stall gained a rule about **who**: an item a recipe makes is listed only by
+somebody who has passed an examination of that trade in this life; raw materials, which no recipe
+makes, are anybody's. `stallCertificateTx` in `stall_actions.go` is the one statement, and three
+decisions are in it.
+
+- **Any rank, not the first.** `advanceProfessionTx` raises a rank on XP alone and
+  `profession.exam` only ever examines the rank a candidate currently holds, so somebody who crafted
+  past rank 1 before sitting it can never sit it. A "first examination exactly" rule would lock them
+  out of selling for good; `tradeCertifiedTx` accepts a pass at any rank.
+- **Per life.** The examination's own record is kept per life (rc.45) and samsara wipes
+  `profession_progress`, so a certificate does not carry either; the life read is `soulLifeTx`, the
+  one the examination writes.
+- **A certificate nobody can earn locks nothing.** A trade that authors no examination - every
+  gathering word the nine tiers carry - is not a lock, because a door shut for ever is not a rule.
+  Listings already standing are not taken down (rc.56).
+
+The picker is rc.46's rule: `stall.status` returns `sellable_items` and `uncertified_items` off the
+same helper, and `stall_item_autocomplete` offers only the first - it never restates which items a
+recipe makes. It falls back to the whole bag when the engine does not answer, because a picker that
+empties on a hiccup reads as a player with nothing to sell, and the listing still refuses. The
+stall fixture certifies its seller in Alchemy, so the older tests still describe a pill-seller, and
+the rule is driven against the uncertified character; its drills disable the check and drop the
+life comparison, and each fails on the case it should. Both playtests now try a pill first, hold the
+refusal, and sell beast cores - raw, and dear enough on the shelves for the town to buy at 6.
+
+**It covers every grade by construction.** v1.7.0 grades only a recipe's output and `itemTrade`
+reads the base id, so `qi_pill@high` is Alchemy work like `qi_pill`. That broke v1.7.0's own harness
+step, which listed a High pill from the same uncertified keeper - and no GM lever passes an
+examination, so no certified seller can be staged there without a roll. The harness holds the
+refusal instead, and what the town pays moved to Go, where the fixture certifies its seller: a
+Go-owned rule is proved in Go, and the harness proves the wire.
+
+**And the town buys every grade now, on the owner's call.** v1.7.0 let the town buy only what some
+shelf sells, so High and finer went to cultivators alone. `NPCStallCeiling` keeps "one coin under
+the cheapest shelf" and gives a grade no shelf carries a reference: its Low item's cheapest shelf at
+the grade's worth, the `PriceMult` `itemDef` already prices every grade by - so a High recovery pill
+(Low shelf 11, x4) is bought at 43 or less. It opens no loop, which is the only thing the ceiling is
+for: no shelf and no merchant sells the grade, so the only way to have one to sell is to make it,
+and a craft that pays is not a mint (v1.0.17). An ungraded item no shelf sells still has no
+reference and is still never bought. `TestTheTownBuysAGradeNoShelfSellsAtItsWorth` holds the price
+and the coin above it; its drill takes the branch out and prints `npc_ceiling:0`.
+
+### A leaf that waited out somebody else's tick (Discord playtest, v1.7.1)
+
+Reported as the one failure of a full run: *"/admin player unmute timed out waiting for the bot to
+settle"*. The next run named `/family` instead, and that is the finding: **no leaf was slow.** The
+stuck tasks SimCord printed were `XianxiaBot.event_expiry_worker` and
+`operational_health_worker`, each in an "unknown wait (Future)" - an HTTP round trip to the engine.
+The first wakes every thirty real seconds and runs the simulation tick, and since v1.7.0 the auction
+and stall card syncs after it, so a press that landed during a tick waited for the whole tick and ran
+out its five-second settle. Which leaf failed was decided by the wall clock.
+
+rc.35 already says the settle timeout must stay at its default, and it still must: a longer deadline
+makes the periodic workers' sleeps count as runnable. Nothing the harness asserts depends on either
+worker after boot, which is why `_configure` already switches off the update check, the Quest Forge
+and the route audit. These two have no switch, so `quiet_the_periodic_workers` lets their first
+iteration run (one tick, both card syncs, one health probe), settles, and cancels them. Nothing
+under `app/` changed.
+
+**Two gentler fixes failed first, and the second is the one worth remembering.** Declaring the
+workers' engine calls `env.external_wait` left each answer's wake as an active callback, so a worker
+calling back to back never gave a settle its quiet gap. Holding a worker's *next* call while the
+harness pressed was worse: it could park the worker between a write's execute and its commit, which
+holds SQLite's write lock (v1.2.3), and the pressed leaf's own INSERT waited 5,036 ms behind it. **A
+worker may only be stopped where it holds nothing**, so the cancel comes after a settle. A settle
+returns only once both workers are parked in their thirty-second sleeps, never inside a transaction.
+
+### The bot locked itself out of its own channel (v1.7.1)
+
+The same run logged `403 Missing Permissions` posting `#updates`' description, and the reason is a
+rule this file already states twice. `ensure_base_xianxia_channels` made the four read-only base
+channels read-only by denying `@everyone` Send Messages and never allowed the bot first. Discord
+applies an `@everyone` channel deny to a bot that is not Administrator, so on such a server the bot
+could not post the release notes rc.59 built `#updates` for. That is rc.52's *"the bot allows itself
+before it denies anybody"*, followed by `ensure_realm_hub_overwrites` and the cultivator gate and
+missed here. And the repair path relocked with `set_permissions(@everyone, send_messages=False)`,
+which **replaces** the overwrite (v1.0.11): on `#expeditions` and `#player-homes` that dropped the
+cultivator gate's `view_channel=False` every time Repair ran after the gate, showing the anchors to
+everybody. Both paths allow the bot first now, and the repair merges through `merge_overwrite`.
+`test_stage7_dashboard_owned_channels_only_change_what_the_dashboard_asked_for` had pinned the old
+conditional expression and counted one `set_permissions(`, so it went red on the correction (the
+v1.0.8 shape). It holds the rule by AST now: every overwrite sits under `if name in
+READ_ONLY_BASE_CHANNELS`, names only `@everyone` or the bot, and none is a `set_permissions`. Its drill
+puts the replacing call back and names it.
+
+### The shop door, a second time (v1.7.1)
+
+Reported again from play: *"Travel failed: the shop door opens onto Cloudblade City"*, from inside
+Cloudblade Talisman Hall. v1.0.13 fixed the first report of this by making the street sort near the
+top (the `0 or 50` hop count) and **never stopped the picker offering the rest**. From inside a shop
+`explorationTravelAction` allows the street and the city's other shops and nothing else, and the
+picker listed every gate, district, road site and city the player knew, gates and districts first.
+The rule was rc.46's (a surface must not offer what the engine will refuse), and the fix a release
+ago corrected an ordering inside a list that should not have held those rows at all.
+
+Asked to check every shop exit, the drill answers it: with the filter taken out, **all 104 door
+shops** (everything but the waystation stalls, which are road sites and have no door) offer a refused
+place. **164,169 rows across the catalogue** are refused at the door, because the same shape reached
+another city's gates, districts and shops from anywhere and the inside of an auction hall.
+`door_allows` in `app/bot/locations.py` is the twin of the four door checks at the top of the
+travel action, and `destination_groups` asks it for every row. From a shop the street is the first
+row, labelled as the way out. `/travel go` had its own door: it used the shared
+`location_autocomplete`, every known place alphabetically, so it gets
+`travel_destination_autocomplete` over the same rows the panel draws.
+
+`test_a_shop_door_opens_onto_its_street.py` computes the rules a third time off the raw content file
+(v1.0.9), holds the twin to them over every pair of the 477 locations, holds every shop's picker to
+offering only allowed places with the street first, and holds that the Go refusals it twins are still
+in the source.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

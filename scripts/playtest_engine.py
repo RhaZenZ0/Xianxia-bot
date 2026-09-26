@@ -325,25 +325,32 @@ async def run(url: str, token: str, db_path: str) -> Report:
     # ---- 3. join a sect and study the gift ---------------------------------
     sect = "Azure Cloud Sect"
     rec = dict(world["sects"][sect]["recruitment"])
-    # A client's list of sects is ignored since v1.3.1: the engine derives what
-    # is discovered from the places the player knows, so the gate is stood on first.
+    # Arrive, then discover (v1.7.1). Since v1.3.1 the engine derives the
+    # sects from the gates a cultivator knows and reads a caller's list only
+    # to narrow it, so the old order - a named list sent from Greenriver Town,
+    # then the teleport - recorded nothing and still passed, and the trial
+    # below refused "sect has not been discovered" with 25 steps failing after
+    # it. The discover is held to having found the sect, so it cannot go quiet.
     await step(report, "teleport to the trial", gm("admin.player.teleport", {"user_id": PLAYER, "location": rec["location"], "reason": "playtest"}))
-    await step(report, "sect.discover", engine.action("sect.discover", PLAYER, {"discovery_kind": "recruitment_route"}))
+    found = await step(report, "sect.discover", engine.action("sect.discover", PLAYER, {"discovery_kind": "recruitment_route"}))
+    if found is not None:
+        known = set((found or {}).get("discovered") or []) | set((found or {}).get("already_known") or [])
+        report.add("PASS" if sect in known else "FAIL", "standing at the gate discovers the sect", ", ".join(sorted(known)) or "nothing")
     # The trial is dice, and it used to be asserted on: twelve attempts with a
     # GM cooldown reset between them, and a FAIL if none passed. At the
     # created character's numbers that is a 3.5% flake per run, which is the
     # rule in CLAUDE.md exactly - never assert that a random thing happened.
     # Certain by the scenario instead. `sectTrialActionGo` rolls
-    #   primary   2d10 + body + 2*realm + phase/3   vs max(10, 15 - rep/25)
-    #   secondary 2d10 + insight + spirit/2 + realm vs max(8, TN - 1)
-    # and passes on both, or on a combined margin >= 2. (The content's
-    # base_tn 14 and path bonus are not read - the TNs are 15 and 14,
-    # hardcoded; the engine's recommendation bonus rides both rolls since
-    # v1.1.0, and there is none here.) No GM lever writes attributes or grants an effect;
-    # the one that moves the roll is the realm. A Sword Cultivator (body 2,
-    # insight 1, spirit 2) at realm 7 stage 9 has, on the worst dice,
-    #   primary margin   2 + 2 + 14 + 3 - 15 = 6
-    #   secondary margin 2 + 1 + 1 + 7 - 14 = -3   -> combined 3 >= 2: pass.
+    #   primary   2d10 + body + 2*realm + phase/3 + bonus   vs max(10, base_tn - rep/25)
+    #   secondary 2d10 + insight + spirit/2 + realm + bonus vs max(8, TN - 1)
+    # and passes on both, or on a combined margin >= 2. Since v1.2.3 the TN
+    # and the bonus are the sect's own tuning (`sectTrialTuningTx`): the
+    # Azure Cloud Sect's base_tn is 14, and a Sword Cultivator is +2 there.
+    # No GM lever writes attributes or grants an effect; the one that moves
+    # the roll is the realm. A Sword Cultivator (body 2, insight 1, spirit 2)
+    # at realm 7 stage 9 has, on the worst dice,
+    #   primary margin   2 + 2 + 14 + 3 + 2 - 14 = 9
+    #   secondary margin 2 + 1 + 1 + 7 + 2 - 13 = 0   -> both pass.
     # The gift does not change with the realm (the sect's own manual is
     # preferred), and the realm is put back right after so nothing
     # downstream meets a different character.
@@ -699,7 +706,12 @@ async def run(url: str, token: str, db_path: str) -> Report:
     for uid in (PLAYER, BUYER):
         await step(report, f"teleport {uid} to the capital's street for the stall", gm("admin.player.teleport", {"user_id": uid, "location": capital, "reason": "playtest"}))
     await step(report, "the keeper stands at Foundation Establishment", gm("admin.player.set_realm", {"user_id": BUYER, "realm_index": 2, "phase": 1, "reason": "playtest: a stall asks for it"}))
-    await step(report, "the keeper carries four pills to sell", gm("admin.player.adjust_item", {"user_id": BUYER, "item_id": "recovery_pill", "quantity": 4, "reason": "playtest"}))
+    # A trade's goods sell at a stall only for somebody holding its
+    # certificate (v1.7.1), and no GM lever passes an examination, so the
+    # keeper carries a pill to be refused and beast cores - a raw material no
+    # recipe makes, dear enough on the shelves for the town to buy at 6 - to sell.
+    await step(report, "the keeper carries a pill", gm("admin.player.adjust_item", {"user_id": BUYER, "item_id": "recovery_pill", "quantity": 1, "reason": "playtest"}))
+    await step(report, "the keeper carries four beast cores to sell", gm("admin.player.adjust_item", {"user_id": BUYER, "item_id": "beast_core", "quantity": 4, "reason": "playtest"}))
     no_stall = await step(report, "stall.status before opening one", query("stall.status", BUYER, {}))
     report.add("PASS" if no_stall is not None and no_stall.get("available") and no_stall.get("stall") is None else "FAIL", "no stall yet, and the read says so rather than refusing", f"{(no_stall or {}).get('stall')}")
     await step(report, "a stall asks for Foundation Establishment", act("stall.open", PLAYER, {"name": "Too Early"}), expect_error="asks for")
@@ -707,24 +719,31 @@ async def run(url: str, token: str, db_path: str) -> Report:
     if opened is not None:
         report.add("PASS" if opened.get("city") == capital and opened.get("currency_id") == "low_spirit_stone" else "FAIL", "the stall stands in the capital, priced in the Mortal stone", f"{opened.get('city')} / {opened.get('currency_id')}")
         await step(report, "a second stall is refused", act("stall.open", BUYER, {"name": "Another"}), expect_error="already keep")
-        listed = await step(report, "stall.list four pills at 6", act("stall.list", BUYER, {"item_id": "recovery_pill", "quantity": 4, "unit_price": 6}))
+        await step(report, "an uncertified keeper cannot list a pill", act("stall.list", BUYER, {"item_id": "recovery_pill", "quantity": 1, "unit_price": 6}), expect_error="certificate")
+        offered = dict(await query("stall.status", BUYER, {}) or {})
+        report.add("PASS" if "beast_core" in list(offered.get("sellable_items") or []) and "recovery_pill" in list(offered.get("uncertified_items") or []) else "FAIL",
+                   "the status says what the keeper may list", f"sellable={offered.get('sellable_items')} withheld={offered.get('uncertified_items')}")
+        listed = await step(report, "stall.list four beast cores at 6", act("stall.list", BUYER, {"item_id": "beast_core", "quantity": 4, "unit_price": 6}))
         listing_id = int((listed or {}).get("listing_id") or 0)
         keeper_bag = dict(await db.get_inventory(BUYER) or {})
-        report.add("PASS" if int(keeper_bag.get("recovery_pill", 0)) == 0 else "FAIL", "the goods are in escrow, not in the bag", f"keeper carries {keeper_bag.get('recovery_pill', 0)}")
+        report.add("PASS" if int(keeper_bag.get("beast_core", 0)) == 0 and int(keeper_bag.get("recovery_pill", 0)) == 1 else "FAIL",
+                   "the goods are in escrow, and the refused pill never left the bag", f"keeper carries {keeper_bag.get('beast_core', 0)} cores, {keeper_bag.get('recovery_pill', 0)} pill")
         if listed is not None:
-            report.add("PASS" if listed.get("npc_may_buy") else "FAIL", "at 6 the town may buy (the cheapest Mortal shelf sells the pill dearer)", f"npc_ceiling={listed.get('npc_ceiling')}")
-        # A player's stall deals in any grade (v1.7.0), and the town never buys
-        # what no shelf sells, so a High pill is for cultivators only.
+            report.add("PASS" if listed.get("npc_may_buy") else "FAIL", "at 6 the town may buy (the cheapest Mortal shelf sells the core dearer)", f"npc_ceiling={listed.get('npc_ceiling')}")
+        # A player's stall deals in any grade (v1.7.0), and a grade is only a
+        # recipe's output, so the certificate (v1.7.1) covers every grade too:
+        # the uncertified keeper is refused a High pill as surely as a Low one.
+        # What the town pays for a grade no shelf sells (its Low shelf at the
+        # grade's worth, v1.7.1) is held in Go
+        # (TestTheTownBuysAGradeNoShelfSellsAtItsWorth), where a certified
+        # seller is staged rather than rolled for.
         await step(report, "the keeper carries a High pill", gm("admin.player.adjust_item", {"user_id": BUYER, "item_id": "qi_pill@high", "quantity": 1, "reason": "playtest: a graded listing"}))
-        high = await step(report, "stall.list a High pill", act("stall.list", BUYER, {"item_id": "qi_pill@high", "quantity": 1, "unit_price": 90}))
-        if high is not None:
-            report.add("PASS" if not high.get("npc_may_buy") else "FAIL", "the town will not buy a grade no shelf sells", f"npc_ceiling={high.get('npc_ceiling')}")
-            await step(report, "stall.withdraw the High pill", act("stall.withdraw", BUYER, {"listing_id": int(high.get("listing_id") or 0)}))
+        await step(report, "an uncertified keeper cannot list a High pill either", act("stall.list", BUYER, {"item_id": "qi_pill@high", "quantity": 1, "unit_price": 90}), expect_error="certificate")
         board = await step(report, "stall.board as the player", query("stall.board", PLAYER, {}))
         seen = [s for s in list((board or {}).get("stalls") or []) if str(s.get("name")) == "Bidder's Table"]
         report.add("PASS" if seen and any(int(l.get("listing_id") or 0) == listing_id for l in list(seen[0].get("listings") or [])) else "FAIL", "the board names the stall and its listing", f"{len(list((board or {}).get('stalls') or []))} stall(s)")
         await step(report, "the keeper cannot buy from their own stall", act("stall.buy", BUYER, {"listing_id": listing_id, "quantity": 1}), expect_error="own stall")
-        bought = await step(report, "stall.buy one pill as the player", act("stall.buy", PLAYER, {"listing_id": listing_id, "quantity": 1}))
+        bought = await step(report, "stall.buy one beast core as the player", act("stall.buy", PLAYER, {"listing_id": listing_id, "quantity": 1}))
         if bought is not None:
             report.add("PASS" if int(bought.get("total") or 0) == 6 and int(bought.get("seller_paid") or 0) + int(bought.get("fee") or 0) == 6 else "FAIL", "the price is the asking price and the city's cut comes out of it", f"total={bought.get('total')} paid={bought.get('seller_paid')} fee={bought.get('fee')}")
         status = await step(report, "stall.status after the sale", query("stall.status", BUYER, {}))
@@ -756,7 +775,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         report.add("PASS" if left >= 1 else "FAIL", "the town never takes the last unit", f"{left} left")
         withdrawn = await step(report, "stall.withdraw the rest", act("stall.withdraw", BUYER, {"listing_id": listing_id}))
         keeper_bag = dict(await db.get_inventory(BUYER) or {})
-        report.add("PASS" if withdrawn is not None and int(keeper_bag.get("recovery_pill", 0)) == int(withdrawn.get("quantity") or -1) else "FAIL", "withdrawn goods come back into the bag", f"keeper carries {keeper_bag.get('recovery_pill', 0)}")
+        report.add("PASS" if withdrawn is not None and int(keeper_bag.get("beast_core", 0)) == int(withdrawn.get("quantity") or -1) else "FAIL", "withdrawn goods come back into the bag", f"keeper carries {keeper_bag.get('beast_core', 0)}")
         closed = await step(report, "stall.close", act("stall.close", BUYER, {}))
         report.add("PASS" if closed is not None and (await query("stall.status", BUYER, {})).get("stall") is None else "FAIL", "the stall is gone after close", f"{closed}")
     await step(report, "the keeper's realm is put back", gm("admin.player.set_realm", {"user_id": BUYER, "realm_index": int(keeper_before.get("realm_index") or 0), "phase": int(keeper_before.get("phase") or 1), "reason": "playtest: back to where the run had them"}))
@@ -1635,12 +1654,22 @@ async def run(url: str, token: str, db_path: str) -> Report:
         await step(report, f"grant {item_id} x{qty} for the sect", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": item_id, "quantity": qty, "reason": "playtest"}))
     await step(report, "grant 1000 stones for the homestead", gm("admin.player.grant_currency", {"user_id": PLAYER, "currency_id": "low_spirit_stone", "amount": 1000, "reason": "playtest"}))
     await step(report, "a master must outrank the disciple", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 1, "phase": 1, "reason": "playtest"}))
-    # The sponsor must be standing where the ask is made (engine-side since v1.3.1).
-    await step(report, "the buyer walks to the inquisitor", gm("admin.player.teleport", {"user_id": BUYER, "location": "Cloudspine Foothills", "reason": "playtest"}))
-    recommended = await step(report, "sect.recruitment.recommendation from the inquisitor", act("sect.recruitment.recommendation", BUYER, {"npc_name": "Inquisitor Shen Rui", "sect_name": sect}))
-    await step(report, "the buyer walks back", gm("admin.player.teleport", {"user_id": BUYER, "location": "Greenriver Town", "reason": "playtest"}))
+    # A sponsor is asked in person (v1.3.1), and the inquisitor keeps
+    # Greenriver Town but walks to the foothills in the afternoon, so asking
+    # from the town passed or failed on the hour the run reached this step.
+    # Somebody away from home stands where the simulation says and keeps no
+    # schedule, so he is moved there with the GM's lever, asked there, and put
+    # back, which makes the step the same at every hour (v1.7.1).
+    sponsor, sponsor_ground = "Inquisitor Shen Rui", "Cloudspine Foothills"
+    await audited("admin.npc.relocate", {"npc_name": sponsor, "location": sponsor_ground, "reason": "playtest: a sponsor asked in person"},
+                  name="admin.npc.relocate the inquisitor to the foothills")
+    await step(report, "the buyer walks to the inquisitor", gm("admin.player.teleport", {"user_id": BUYER, "location": sponsor_ground, "reason": "playtest"}))
+    recommended = await step(report, "sect.recruitment.recommendation from the inquisitor", act("sect.recruitment.recommendation", BUYER, {"npc_name": sponsor, "sect_name": sect}))
     if recommended is not None:
         report.add("PASS", "the recommendation is a roll, reported", f"success={recommended.get('success')} total={(recommended.get('roll') or {}).get('total')}")
+    await audited("admin.npc.relocate", {"npc_name": sponsor, "location": town, "reason": "playtest: home again"},
+                  name="admin.npc.relocate the inquisitor home")
+    await step(report, "the buyer walks back to the town", gm("admin.player.teleport", {"user_id": BUYER, "location": town, "reason": "playtest"}))
     await step(report, "the sect assigns a residence (the door /sect abode uses)", db.ensure_sect_abode(PLAYER, sect_name=sect, name="Playtest Residence", base_location=gate))
     await step(report, "to the mountain gate", gm("admin.player.teleport", {"user_id": PLAYER, "location": gate, "reason": "playtest"}))
     inside = await step(report, "sect.abode.enter", act("sect.abode.enter", PLAYER, {}))
@@ -1697,13 +1726,14 @@ async def run(url: str, token: str, db_path: str) -> Report:
         severed = await step(report, "discipleship.leave", act("discipleship.leave", BUYER, {}))
         if severed is not None:
             report.add("PASS" if severed.get("severed") else "FAIL", "the disciple leaves", str(severed.get("severed")))
-    # A territory is claimed from its own ground (engine-side since v1.3.1).
+    # A territory is claimed standing in its region (v1.3.1); both claims were
+    # made from the town and refused (v1.7.1).
     await step(report, "to the hills to claim them", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Cloudspine Foothills", "reason": "playtest"}))
     claimed = await step(report, "territory.claim the hills", act("territory.claim", PLAYER, {"territory_key": "Cloudspine Foothills"}))
     if claimed is not None:
         report.add("PASS" if claimed.get("claimed") else "FAIL", "a neutral territory is claimed", str(claimed.get("controller_key")))
     await audited("admin.player.set_sect", {"user_id": BUYER, "sect_name": "Crimson Furnace Sect", "rank_name": "Outer Disciple", "rank_level": 10, "reason": "playtest"}, name="admin.player.set_sect the buyer into the Crimson Furnace")
-    await step(report, "the buyer to the hills", gm("admin.player.teleport", {"user_id": BUYER, "location": "Cloudspine Foothills", "reason": "playtest"}))
+    await step(report, "the buyer to the hills to contest them", gm("admin.player.teleport", {"user_id": BUYER, "location": "Cloudspine Foothills", "reason": "playtest"}))
     contested = await step(report, "territory.claim the hills for a second sect", act("territory.claim", BUYER, {"territory_key": "Cloudspine Foothills"}))
     war_id = int((contested or {}).get("war_id") or 0)
     if contested is not None:
@@ -1716,9 +1746,11 @@ async def run(url: str, token: str, db_path: str) -> Report:
                 ops = dict(acted.get("operations") or {})
                 report.add("PASS", "the tactic's roll, reported", f"status={acted.get('status')} siege={ops.get('siege_progress')} morale={ops.get('attacker_morale')}/{ops.get('defender_morale')}")
         await either("war.act again waits, or the war is over", act("war.act", PLAYER, {"war_id": war_id, "tactic": "repel"}), "still on cooldown", "active war not found")
+    # Both walked to the hills to claim them; the homestead below is founded
+    # where its founder stands, and the buyer visits it in the town.
+    for uid, who in ((PLAYER, "the founder"), (BUYER, "the buyer")):
+        await step(report, f"{who} back to the town", gm("admin.player.teleport", {"user_id": uid, "location": town, "reason": "playtest"}))
     await audited("admin.player.set_sect_rank", {"user_id": PLAYER, "rank_name": "Deacon", "rank_level": 40, "reason": "playtest"}, name="admin.player.set_sect_rank Deacon")
-    # A homestead is founded where its owner stands, and the claim left them in the hills.
-    await step(report, "back to the town from the hills", gm("admin.player.teleport", {"user_id": PLAYER, "location": town, "reason": "playtest"}))
     home = await step(report, "abode.establish a homestead", act("abode.establish", PLAYER, {"name": "Playtest Homestead", "property_type": "homestead"}))
     if home is not None:
         report.add("PASS" if str(home.get("base_location")) == town else "FAIL", "the homestead stands in the town", str(home.get("base_location")))

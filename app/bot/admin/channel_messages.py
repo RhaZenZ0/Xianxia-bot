@@ -19,7 +19,7 @@ import discord
 from discord import app_commands
 
 from ...version import RELEASE_VERSION
-from ..channels import _resolve_text_channel
+from ..channels import _resolve_text_channel, merge_overwrite
 from ..runtime import DB, log
 
 BASE_CHANNEL_SETUP_CHOICES = [
@@ -590,10 +590,14 @@ async def ensure_base_xianxia_channels(
         channel = configured or next((item for item in guild.text_channels if item.name == name), None)
         if channel is None and can_create:
             try:
-                overwrites = (
-                    {guild.default_role: discord.PermissionOverwrite(send_messages=False)}
-                    if name in READ_ONLY_BASE_CHANNELS else {}
-                )
+                # The bot allows itself before it denies anybody (rc.52): an
+                # `@everyone` deny binds a bot that is not Administrator, and
+                # `#updates` is where it posts the release notes (v1.7.1).
+                overwrites: dict[Any, discord.PermissionOverwrite] = {}
+                if name in READ_ONLY_BASE_CHANNELS:
+                    if guild.me is not None:
+                        overwrites[guild.me] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+                    overwrites[guild.default_role] = discord.PermissionOverwrite(send_messages=False)
                 channel = await guild.create_text_channel(
                     name, category=category, topic=spec.topic[:1024],
                     overwrites=overwrites, reason="Xianxia RP base channel setup",
@@ -623,10 +627,19 @@ async def ensure_base_xianxia_channels(
             except discord.HTTPException:
                 log.exception("Could not move #%s into %s", name, category.name)
         if name in READ_ONLY_BASE_CHANNELS:
+            # Merged, never replaced (v1.0.11): `set_permissions` with bare
+            # kwargs writes a fresh overwrite, which on `#expeditions` and
+            # `#player-homes` would drop the cultivator gate's
+            # `view_channel=False`. And the bot allows itself first (rc.52),
+            # or a bot without Administrator cannot post in its own channel.
             try:
-                await channel.set_permissions(
-                    guild.default_role, send_messages=False, reason="Xianxia RP base channel setup")
-                if name not in repaired:
+                changed = False
+                if guild.me is not None:
+                    changed = await merge_overwrite(channel, guild.me, reason="Xianxia RP base channel setup",
+                                                    view_channel=True, send_messages=True)
+                changed = await merge_overwrite(channel, guild.default_role, reason="Xianxia RP base channel setup",
+                                                send_messages=False) or changed
+                if changed and name not in repaired:
                     repaired.append(name)
             except discord.HTTPException:
                 log.exception("Could not re-lock #%s", name)
