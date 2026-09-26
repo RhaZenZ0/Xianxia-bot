@@ -2269,7 +2269,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         grown = await step(report, "beast.evolve at loyalty 100", act("beast.evolve", PLAYER, {"beast_id": beast_id}))
         if grown is not None:
             b = dict(grown.get("beast") or {})
-            report.add("PASS" if int(b.get("evolution_stage") or 0) == 1 and int(b.get("loyalty") or 0) == 80 else "FAIL", "evolution is certain past the threshold and costs twenty loyalty", f"stage={b.get('evolution_stage')} loyalty={b.get('loyalty')}")
+            report.add("PASS" if int(b.get("evolution_stage") or 0) == 1 and int(b.get("loyalty") or 0) == 15 else "FAIL", "evolution is certain past the threshold and drops loyalty to fifteen", f"stage={b.get('evolution_stage')} loyalty={b.get('loyalty')}")
         await step(report, "beast.evolve again at 80", act("beast.evolve", PLAYER, {"beast_id": beast_id}))
         await step(report, "a third evolution wants 80 and finds 60", act("beast.evolve", PLAYER, {"beast_id": beast_id}), expect_error="below evolution requirement")
     else:

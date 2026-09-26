@@ -77,6 +77,7 @@ const (
 	// requirement above the cap is a stage no beast can reach; the SQL twin is
 	// what the two clamping UPDATEs spell, so the three cannot drift.
 	beastLoyaltyCap            = int64(100)
+	beastEvolvedLoyalty        = int64(15)
 	beastLoyaltyCapSQL         = "100"
 	artifactRefiningProfession = "Artifact Refining"
 	// What a bonding gains in resonance before the refiner's own skill.
@@ -453,10 +454,13 @@ func beastEvolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if i64(row["loyalty"]) < need {
 		return authoritativeMutation{}, fmt.Errorf("loyalty %d is below evolution requirement %d", i64(row["loyalty"]), need)
 	}
+	// An evolution spends the bond (v1.7.3): it used to cost twenty loyalty,
+	// which one Train and one beast core bought back, so a beast at the capped
+	// requirement evolved every few minutes. It drops to beastEvolvedLoyalty.
 	now := float64(time.Now().UnixNano()) / 1e9
 	if _, err = conn.Execute(
-		`UPDATE spirit_beasts SET evolution_stage=evolution_stage+1,rank=rank+1,loyalty=MAX(25,loyalty-20),updated_at=? WHERE user_id=? AND beast_id=?`,
-		[]any{now, userID, p.BeastID},
+		`UPDATE spirit_beasts SET evolution_stage=evolution_stage+1,rank=rank+1,loyalty=?,updated_at=? WHERE user_id=? AND beast_id=?`,
+		[]any{beastEvolvedLoyalty, now, userID, p.BeastID},
 	); err != nil {
 		return authoritativeMutation{}, err
 	}
