@@ -91,11 +91,11 @@ func TestAnUnreadablePaceIsTheDefault(t *testing.T) {
 		}
 	}
 	t.Setenv(travelTimePercentKey, "100")
-	if got := scaledTravelWait(90); got != 90 {
+	if got := scaledTravelWait(nil, 90); got != 90 {
 		t.Fatalf("at 100 a 90-minute road waits %d", got)
 	}
 	t.Setenv(travelTimePercentKey, "0")
-	if got := scaledTravelWait(90); got != 0 {
+	if got := scaledTravelWait(nil, 90); got != 0 {
 		t.Fatalf("at 0 a 90-minute road waits %d", got)
 	}
 }
@@ -107,4 +107,28 @@ func isGateOf(t *testing.T, world, place, city string) bool {
 		t.Fatal(err)
 	}
 	return cityOf(catalog, place) == city
+}
+
+// The GM sets the pace from the dashboard (v1.7.3): the stored choice beats
+// the .env baseline, the roads wait what it says, and the write is audited.
+func TestTheGMsTravelPaceBeatsTheEnvAndIsAudited(t *testing.T) {
+	t.Setenv(travelTimePercentKey, "")
+	path, world := instantTravelDB(t)
+	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS admin_audit_log(audit_id INTEGER PRIMARY KEY AUTOINCREMENT,admin_user_id INTEGER NOT NULL,action TEXT,target TEXT,before_json TEXT,after_json TEXT,reason TEXT,created_at REAL)`)
+	if _, err := applyAdminRaw(t, path, "admin.world.set_travel_pace", 7, map[string]any{"percent": 101, "reason": "t"}); err == nil {
+		t.Fatal("a pace above 100 was stored")
+	}
+	if _, err := applyAdminRaw(t, path, "admin.world.set_travel_pace", 7, map[string]any{"percent": 50, "reason": "t"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := storage.ParseInt(scalar(t, path, `SELECT COUNT(*) FROM admin_audit_log WHERE action='admin.world.set_travel_pace'`)); got != 1 {
+		t.Fatalf("audit rows %d, want 1", got)
+	}
+	result := batch4Result(t, batch4Apply(t, path, world, "exploration.travel", 1, map[string]any{
+		"destination": "Azure Crown Imperial City", "mode": "known",
+	}))
+	travel, wait := storage.ParseInt(result["travel_minutes"]), storage.ParseInt(result["wait_minutes"])
+	if travel <= 0 || wait != travel*50/100 {
+		t.Fatalf("travel=%d wait=%d, want half the road at the stored pace", travel, wait)
+	}
 }
