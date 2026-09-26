@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -42,10 +42,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go_core/go.mod
           cache: true
+          # go_core has no external dependencies and so no go.sum, which is
+          # setup-go's default cache key: without this the cache never restores.
+          cache-dependency-path: go_core/go.mod
       - run: sudo apt-get update && sudo apt-get install --yes libsqlite3-dev
       - run: test -z "$(gofmt -l go_core)"
       - run: cd go_core && CGO_ENABLED=1 go vet ./...
@@ -54,12 +57,17 @@ jobs:
       # rather than repeated here, so CI and `make lint` cannot drift apart.
       # vet finds none of the dead code it does: six names with no caller at
       # all had accumulated by v1.0.0 and vet passed on every one of them.
+      #
+      # setup-go v7 exports GOTOOLCHAIN=local, and the pinned tools can need a
+      # newer Go than go.mod's (staticcheck 2026.2.1 wants 1.26). `make tools`
+      # runs under Go's default GOTOOLCHAIN=auto, so the two installs say auto
+      # to build the tools the same way; vet and the tests stay on go.mod's.
       - name: Install staticcheck at the pinned version
         run: |
           version="$(sed -n 's/^STATICCHECK_VERSION ?= //p' Makefile)"
           test -n "$version" || { echo 'Makefile no longer pins STATICCHECK_VERSION' >&2; exit 1; }
           echo "staticcheck $version"
-          go install "honnef.co/go/tools/cmd/staticcheck@$version"
+          GOTOOLCHAIN=auto go install "honnef.co/go/tools/cmd/staticcheck@$version"
       - run: cd go_core && CGO_ENABLED=1 staticcheck ./...
 
       # `make audit`, which is kept out of `make lint` and `make check` because
@@ -72,7 +80,7 @@ jobs:
           version="$(sed -n 's/^GOVULNCHECK_VERSION ?= //p' Makefile)"
           test -n "$version" || { echo 'Makefile no longer pins GOVULNCHECK_VERSION' >&2; exit 1; }
           echo "govulncheck $version"
-          go install "golang.org/x/vuln/cmd/govulncheck@$version"
+          GOTOOLCHAIN=auto go install "golang.org/x/vuln/cmd/govulncheck@$version"
       - run: cd go_core && CGO_ENABLED=1 govulncheck ./...
 
       - run: cd go_core && CGO_ENABLED=1 go test -race ./...
@@ -148,7 +156,7 @@ jobs:
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
           echo "asset=xianxia_rp_v${version}.zip" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Release manifest is current
@@ -181,7 +189,7 @@ jobs:
           fi
           printf '\n\nInstall on the NAS: `./update.sh --fetch` then `./update.sh --install`, or `./update.sh --upgrade`.\n' >> /tmp/notes.md
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           name: Xianxia RP v${{ steps.version.outputs.version }}
           prerelease: ${{ steps.version.outputs.prerelease }}
