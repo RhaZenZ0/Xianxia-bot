@@ -63,7 +63,7 @@ func TestTheEvolutionRequirementNeverNamesANumberAboveTheCap(t *testing.T) {
 
 func TestABeastCannotOutgrowTheWorldItStandsIn(t *testing.T) {
 	for world, limit := range beastRankLimits {
-		if limit != map[string]int64{"Mortal World": 20, "Spiritual World": 40, "Immortal World": 60, "Celestial World": 80}[world] {
+		if limit != map[string]int64{"Mortal World": 20, "Spiritual World": 40, "Immortal World": 60, "Celestial World": 100}[world] {
 			t.Fatalf("%s limit is %d", world, limit)
 		}
 	}
