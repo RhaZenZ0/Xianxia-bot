@@ -5310,6 +5310,29 @@ footer lesson (v1.0.8) in a different card. The Request button was never gated o
 `update.sh` asks GitHub itself, so an update requested during the stale window installed v1.7.2
 anyway; only the words were wrong.
 
+### A place in the wilds of a city (v1.7.7)
+
+Asked "how can players start a raid", and the answer was that two of the three could not be: Moonfen
+Marsh and Cloudspine Foothills carried no `roads`, no city's roads named them, and no writer of
+`character_location_discoveries` ever did - so the Drowned Serpent, the Nine-Echo Sword Wraith, and
+the Verdant Immortal Grotto and Sword Grave whose entrances they are, were reached by a GM teleport
+and nothing else. Of the fifteen road-less places in the catalogue these were the only two nothing
+discovered: twelve are sect gates `revealSectRouteTx` names and three are rebirth places travel
+never needs.
+
+**A road was the wrong fix, and the content gates are why.** Every one of the 53 roads already
+carries its one road site and the gate holds it to one; a new road would move `stallDistanceHops`,
+`WhereAnNPCCanWalk` and the lexicographic site pickers several tests lean on. `wilds_of` names the
+city a road-less place lies beside - Moonfen City and Cloudblade City, on the owner's call, over the
+NPC schedules that treat both as Greenriver's outskirts - and `wildsCandidates` offers it to an
+explore by somebody who knows that city. Travel is the road-less jump sect gates already take. It
+is deliberately not `outside_location`, which `cityOf` and the stalls read as *part of* the city.
+
+`discoveryCandidates` is the explore's whole candidate list now, pulled out so a test can ask it
+directly; `TestEveryLairAndRealmEntranceCanBeReached` holds every boss lair and realm entrance to
+being on a road, beside one, a sect's gate, or in the wilds of a city the roads reach, and its
+drill - `wilds_of` deleted from the content - names both places.
+
 ### Who starts a raid (v1.7.6)
 
 `boss.start` checked a party, a lair and the secret floor's inheritance, and two things more were
