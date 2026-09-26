@@ -546,6 +546,64 @@ func bossLair(catalog worlddata.Catalog, t bossTemplateGo) (location, realmID st
 	return t.Location, ""
 }
 
+// bossSoloHPScale is what a boss's health is scaled by for a party of one
+// (v1.7.8, on the owner's call): a lone cultivator fights a weaker boss than
+// the 0.8 + 0.2n a party does, which at n = 1 was the whole base.
+const bossSoloHPScale = 0.7
+
+// bossHPScale is how a boss's base health scales with the party that starts
+// it: a party of one faces bossSoloHPScale, a larger party 0.8 + 0.2 a member.
+func bossHPScale(members int) float64 {
+	if members <= 1 {
+		return bossSoloHPScale
+	}
+	return .8 + .2*float64(members)
+}
+
+// partiesHaveRaidOnly reports whether schema 68 has run. In the compose stack
+// the engine is healthy before db-init migrates, so a raid started in that
+// window finds no column and is refused the old way rather than failing.
+func partiesHaveRaidOnly(conn *storage.Conn) bool {
+	ok, err := tableHasColumns(conn, "parties", "raid_only")
+	return err == nil && ok
+}
+
+// raidOnlyPartyTx makes the party of one a solo raid is fought in: the caller
+// as leader, marked raid_only so closeFinishedRaidOnlyPartiesTx closes it.
+func raidOnlyPartyTx(conn *storage.Conn, userID int64) (map[string]any, error) {
+	if !partiesHaveRaidOnly(conn) {
+		return nil, errors.New("active party required")
+	}
+	r, e := conn.Execute(`SELECT name FROM characters WHERE user_id=?`, []any{userID})
+	if e != nil {
+		return nil, e
+	}
+	name := strings.TrimSpace(fmt.Sprint(firstRowMap(r)["name"]))
+	if name == "" || name == "<nil>" {
+		name = "A cultivator"
+	}
+	now := nowSeconds()
+	c, e := conn.Execute(`INSERT INTO parties(leader_user_id,name,status,raid_only,created_at,updated_at) VALUES(?,?,'active',1,?,?)`, []any{userID, name + "'s raid", now, now})
+	if e != nil {
+		return nil, e
+	}
+	if _, e = conn.Execute(`INSERT INTO party_members(party_id,user_id,role,joined_at) VALUES(?,?,'leader',?)`, []any{c.LastInsertID, userID, now}); e != nil {
+		return nil, e
+	}
+	return activePartyRow(conn, userID)
+}
+
+// closeFinishedRaidOnlyPartiesTx closes every party made for a raid whose raid
+// is over - won, lost or cleared by a GM - so its members are free to join
+// another. It never fails the action it follows: before schema 68 there is
+// nothing to close.
+func closeFinishedRaidOnlyPartiesTx(conn *storage.Conn, now float64) {
+	if !partiesHaveRaidOnly(conn) {
+		return
+	}
+	_, _ = conn.Execute(`UPDATE parties SET status='disbanded',updated_at=? WHERE raid_only=1 AND status='active' AND NOT EXISTS (SELECT 1 FROM boss_encounters e WHERE e.party_id=parties.party_id AND e.status='active')`, []any{now})
+}
+
 func bossStartActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p bossStartPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
@@ -559,8 +617,17 @@ func bossStartActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
+	soloParty := false
 	if party == nil {
-		return authoritativeMutation{}, errors.New("active party required")
+		// A cultivator with no party raids alone (v1.7.8): a party of one is
+		// made for the raid and marked raid_only, so it is closed when the
+		// raid ends. Every refusal below rolls it back with the rest of the
+		// action, so a refused start leaves no party behind.
+		party, e = raidOnlyPartyTx(conn, userID)
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		soloParty = true
 	}
 	// Only the leader starts a raid (v1.7.6). The command has said so since it
 	// was written and nothing held it, so any member could pull the whole
@@ -610,8 +677,7 @@ func bossStartActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int
 			return authoritativeMutation{}, fmt.Errorf("the floor beneath the %s opens only to somebody who has walked the realm to its end; enter it and clear its last room first", t.Location)
 		}
 	}
-	scale := .8 + .2*float64(len(members))
-	hp := int64(math.Round(float64(t.MaxHP) * scale))
+	hp := int64(math.Round(float64(t.MaxHP) * bossHPScale(len(members))))
 	now := nowSeconds()
 	c, e := conn.Execute(`INSERT INTO boss_encounters(party_id,template_key,location,boss_name,boss_hp,boss_hp_max,phase_index,round_index,status,version,started_game_minute,created_at,updated_at) VALUES(?,?,?,?,?,?,0,1,'active',0,?,?,?)`, []any{pid, p.TemplateKey, lair, t.Name, hp, hp, p.GameMinute, now, now})
 	if e != nil {
@@ -623,7 +689,7 @@ func bossStartActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int
 			return authoritativeMutation{}, e
 		}
 	}
-	result := map[string]any{"encounter_id": c.LastInsertID, "party_id": pid, "boss_name": t.Name, "boss_hp": hp, "boss_hp_max": hp, "round_index": 1}
+	result := map[string]any{"encounter_id": c.LastInsertID, "party_id": pid, "boss_name": t.Name, "boss_hp": hp, "boss_hp_max": hp, "round_index": 1, "solo_party": soloParty}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "boss", EventType: "boss.start", EntityType: "boss_encounter", EntityID: fmt.Sprint(c.LastInsertID), GameMinute: p.GameMinute, Payload: result}}, nil
 }
 func bossActActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
@@ -848,6 +914,10 @@ func bossActActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	}
 	if e != nil {
 		return authoritativeMutation{}, e
+	}
+	if status == "victory" || status == "defeat" {
+		// A party made for this raid is closed with it (v1.7.8).
+		closeFinishedRaidOnlyPartiesTx(conn, now)
 	}
 	rr, _ = conn.Execute(`SELECT * FROM boss_encounters WHERE encounter_id=?`, []any{p.EncounterID})
 	out := firstRowMap(rr)

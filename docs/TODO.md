@@ -16,6 +16,10 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.7.8)** — *A solo raid.* On the owner's call `/boss start` with no party forms a party
+  of one marked `raid_only` (schema 68), closed when the raid is won, lost or cleared by a GM, and a
+  party of one fights the boss at 70% of its health (`bossSoloHPScale`). A party made by hand is
+  never closed by its raid.
 - **fixed (v1.7.6)** — *Who may start a raid.* The leader alone, on the owner's call, with every
   member at the boss's own `RealmIndex`, which every template carried and nothing read. A party of
   one is still a party, so a solo player raids by creating one.

@@ -61,12 +61,13 @@ async def boss_list(interaction: discord.Interaction) -> None:
         )
     lines.append(
         "\n-# The party leader starts a raid with the whole party standing at the lair. "
-        "A party of one is a party: **/combat → Party → Create** and start it alone."
+        "Alone, just press Start: a party of one is formed for the raid and closed when it ends, "
+        "and a boss fought alone has less health than one a party faces."
     )
     await reply_long(interaction, "\n".join(lines), ephemeral=False)
 
 
-@registered_group_command(boss_group, name="start", description="Party leader starts a persistent multi-phase boss encounter")
+@registered_group_command(boss_group, name="start", description="Start a boss raid - as your party's leader, or alone")
 @serialized_user_action
 async def boss_start(interaction: discord.Interaction, boss: str) -> None:
     await interaction.response.defer(ephemeral=False)
@@ -84,8 +85,14 @@ async def boss_start(interaction: discord.Interaction, boss: str) -> None:
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
+    # A lone cultivator is given a party of one for the raid (v1.7.8); the
+    # engine says so, and closes it when the raid ends.
+    alone = (
+        "\nYou face it alone: a party of one was formed for this raid and closes when the raid ends."
+        if result.get("solo_party") else ""
+    )
     await interaction.followup.send(
-        f"👹 **Boss Encounter #{result.get('encounter_id')} — {result.get('boss_name', 'Boss')}** begins with **{result.get('boss_hp', 0)}/{result.get('boss_hp_max', 0)} HP**.",
+        f"👹 **Boss Encounter #{result.get('encounter_id')} — {result.get('boss_name', 'Boss')}** begins with **{result.get('boss_hp', 0)}/{result.get('boss_hp_max', 0)} HP**.{alone}",
         ephemeral=False,
     )
 

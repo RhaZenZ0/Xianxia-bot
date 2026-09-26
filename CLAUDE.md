@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 67; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 68; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -5309,6 +5309,29 @@ a cached "up to date" that does not say its age reads exactly like a live one - 
 footer lesson (v1.0.8) in a different card. The Request button was never gated on the answer, and
 `update.sh` asks GitHub itself, so an update requested during the stale window installed v1.7.2
 anyway; only the words were wrong.
+
+### A raid for one (schema 68, v1.7.8)
+
+Asked for as "and solo raid" after v1.7.6 said a party of one was already a party. It was, but a
+solo player had to make one by hand and was then left in it: `party.create` and `party.join` refuse
+anybody in an active party, so after the raid they were shut out of every other party until they
+remembered `/party leave`. On the owner's call `bossStartActionGo` makes the party itself when the
+caller has none, and a party of one fights the boss at `bossSoloHPScale` (0.7) of its health, where
+`0.8 + 0.2n` had put it at the whole base.
+
+**The mark is a column, not a name.** `parties.raid_only` (schema 68, default 0) is what tells a
+party made for a raid from one a person made; the party's name says whose raid it is and is read by
+nothing, because a name is not a reader. `closeFinishedRaidOnlyPartiesTx` is the one close, and it
+closes every raid-only party with no active encounter, so it needs no encounter id and is called
+where a raid ends: a victory or defeat in `boss.act`, and `admin.player.clear_battle`. It never
+fails the action it follows. A refused start rolls the new party back with the rest of the action,
+so a player below the boss's realm is not left in a party they never asked for.
+
+**It degrades the v1.1.0 way.** In the compose stack the engine is healthy before db-init migrates,
+so `partiesHaveRaidOnly` guards the column: in that window a lone cultivator is refused "active
+party required", exactly as before, rather than the action failing. The boss list says a boss
+fought alone is weaker without restating the number - the start reply prints the boss's real HP,
+which is the engine's own answer.
 
 ### A place in the wilds of a city (v1.7.7)
 

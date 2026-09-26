@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 67
+SCHEMA_VERSION = 68
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -2807,6 +2807,19 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             # beast made afterwards takes the default 1, already settled.
             "ALTER TABLE spirit_beasts ADD COLUMN grandfathered INTEGER NOT NULL DEFAULT 1",
             "UPDATE spirit_beasts SET grandfathered=0",
+        ),
+    ),
+    (
+        68,
+        "a_party_made_for_one_raid",
+        (
+            # v1.7.8: /boss start with no party makes a party of one for the
+            # raid, and 1 marks it so the engine closes it when the raid ends
+            # (a victory, a defeat or a GM clearing it) - otherwise the player
+            # would sit in it and be refused every other party until they
+            # left by hand. Every party that already exists was made by a
+            # person and keeps the default 0.
+            "ALTER TABLE parties ADD COLUMN raid_only INTEGER NOT NULL DEFAULT 0",
         ),
     ),
 )

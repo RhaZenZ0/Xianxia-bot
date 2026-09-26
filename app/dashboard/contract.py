@@ -31,7 +31,10 @@ DASHBOARD_API_VERSION = 2
 # market-stalls channel per world and a live card per stall in it. Both are
 # Discord bindings the Server Setup card provisions, reports and tears down
 # beside the world-events feeds; neither is a gameplay table.
-DASHBOARD_REVIEWED_SCHEMA_VERSION = 67
+# Schema 67 (v1.7.7) adds `spirit_beasts.grandfathered` and schema 68 (v1.7.8)
+# `parties.raid_only`: engine bookkeeping on tables the dashboard already
+# shows, with nothing for a GM to read or set.
+DASHBOARD_REVIEWED_SCHEMA_VERSION = 68
 
 DASHBOARD_GET_API_PATHS = frozenset({
     "/api/overview", "/api/capabilities", "/api/timeline", "/api/npcs", "/api/npc",
