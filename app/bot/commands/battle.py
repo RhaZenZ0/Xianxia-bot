@@ -19,6 +19,7 @@ from typing import Any
 import discord
 from discord import app_commands
 
+from ...rules.sect import sect_points_line
 from ...rules.battle import matchup_label, opponent_debuff_label, suppression_label, vitality_band, vitality_bar
 from ...ops.game_engine import GameEngineError
 from ...rules.worldtime import MINUTES_PER_YEAR
@@ -404,10 +405,12 @@ async def _finish_battle(interaction:discord.Interaction,outcome:str,*,expected_
             log.exception("Quest progress update failed after a battle")
     if result.get("event_manifestation"):
         verb="disperse" if outcome=="kill" else "drive off"
+        points_line=sect_points_line(result.get("sect_points"))
         await _battle_reply(
             interaction,
             content=(f"⚔️ **You {verb} the hostile manifestation.** It was part of the live event, not a persistent NPC life. "
-                     "Your victory has been recorded as canonical event participation and will contribute to the event aftermath."),
+                     "Your victory has been recorded as canonical event participation and will contribute to the event aftermath."
+                     +(f"\n{points_line}" if points_line else "")),
             view=None,ephemeral=False,edit_panel=edit_panel,
         )
         return

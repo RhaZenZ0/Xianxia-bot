@@ -32,6 +32,9 @@ type sectTrialPayload struct {
 type sectItemPayload struct {
 	ItemID   string `json:"item_id"`
 	Quantity int64  `json:"quantity"`
+	// Source (v1.8.0) is "issued" for the sect's own stock; empty is the
+	// treasury, what members donated.
+	Source string `json:"source"`
 }
 type discipleRequestPayload struct {
 	MasterUserID int64 `json:"master_user_id"`
@@ -486,6 +489,11 @@ func sectTrialActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	var granted map[string]any
 	if outcome == "pass" || outcome == "conditional_pass" {
 		_, e = conn.Execute(`INSERT INTO sect_membership(user_id,sect_name,rank_name,rank_level,joined_at) VALUES(?,?,'Outer Disciple',10,?) ON CONFLICT(user_id) DO UPDATE SET sect_name=excluded.sect_name,rank_name=excluded.rank_name,rank_level=excluded.rank_level,joined_at=excluded.joined_at`, []any{userID, p.SectName, now})
+		// A new sect is a new count (v1.8.0): rank is earned in the sect it
+		// is held in.
+		if e == nil && sectEarnedColumn(conn) {
+			_, e = conn.Execute(`UPDATE sect_membership SET contribution_earned=0 WHERE user_id=?`, []any{userID})
+		}
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
@@ -571,10 +579,39 @@ func sectEconomyActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID i
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
-		points := p.Quantity * unit
-		_, _ = conn.Execute(`UPDATE sect_membership SET contribution_points=contribution_points+?,influence=influence+? WHERE user_id=?`, []any{points, max64(1, points/10), userID})
+		// Something the donor's certified trade makes is worth more to the
+		// sect (v1.8.0): the crafted multiplier, read off the content. And no
+		// unit earns more than it costs on a shelf, so a point is never cheaper
+		// than a stone (sectDonationCap).
+		crafted, e := sectCraftedDonation(conn, catalog, userID, p.ItemID)
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		perUnit := unit
+		if crafted > 1 {
+			perUnit = int64(math.Round(float64(unit) * crafted))
+			out["crafted_bonus"] = crafted
+		}
+		if limit, capped := sectDonationCap(catalog, p.ItemID); capped && perUnit > limit {
+			perUnit = max64(1, limit)
+			out["capped_at_shelf"] = limit
+		}
+		points := p.Quantity * perUnit
+		promoted, e := creditSectContributionTx(conn, catalog, userID, points, max64(1, points/10))
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		if promoted != "" {
+			out["promoted_to"] = promoted
+		}
 		_, _ = conn.Execute(`UPDATE sect_lineage SET attention=attention+? WHERE disciple_user_id=?`, []any{max64(1, points/20), userID})
 		out["points"] = points
+	} else if strings.TrimSpace(p.Source) == "issued" {
+		issued, e := sectIssuedRedeemTx(conn, catalog, userID, mem, p.ItemID, p.Quantity)
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		out = issued
 	} else {
 		r, e := conn.Execute(`SELECT resources FROM sect_politics_state WHERE sect_name=?`, []any{sect})
 		if e != nil {
@@ -584,15 +621,7 @@ func sectEconomyActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID i
 		if x := firstRowMap(r); x != nil {
 			resources = i64(x["resources"])
 		}
-		mult := 1.0
-		if resources < 25 {
-			mult = 1.60
-		} else if resources < 50 {
-			mult = 1.35
-		} else if resources < 80 {
-			mult = 1.20
-		}
-		unit = max64(1, int64(math.Round(float64(unit)*mult)))
+		unit = max64(1, int64(math.Round(float64(unit)*sectRedeemPressureMult(resources))))
 		cost := unit * p.Quantity
 		points := i64(mem["contribution_points"])
 		if points < cost {

@@ -131,6 +131,13 @@ async def use_item_command(interaction: discord.Interaction, item: str) -> None:
             f"🌿 Lifespan permanently extended by **{int(state['life_extension_years'])} years** "
             f"(medicine/herb extension total: **{int(state.get('life_extension_total', 0))} years**)."
         )
+    if int(state.get("vitality_max_gain", 0)):
+        lines.append(
+            f"🦴 Marrow tempered: max Vitality permanently **+{int(state['vitality_max_gain'])}** → "
+            f"**{int(state.get('vitality', 0))}/{int(state.get('vitality_max', 0))}** "
+            f"({int(state.get('tempering_used', 0))} of {int(state.get('tempering_allowance', 0))} at "
+            f"{state.get('body_realm_name') or 'this body realm'}; the next body realm opens more)."
+        )
     if state.get("effect_name"):
         lines.append(f"Effect applied: **{state['effect_name']}**.")
     homeward = dict(state.get("homeward") or {})

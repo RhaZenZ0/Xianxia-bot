@@ -544,7 +544,7 @@ func awakenSoulMemoryGo(conn *storage.Conn, userID, amount int64, now float64) (
 	}
 	return map[string]any{"memory_seed": seed, "awakened_memory": aw}, nil
 }
-func rewardMasterGo(conn *storage.Conn, disciple int64, realmChanged bool, now float64) (map[string]any, error) {
+func rewardMasterGo(conn *storage.Conn, catalog worlddata.Catalog, disciple int64, realmChanged bool, now float64) (map[string]any, error) {
 	att, contrib, influence, xp := int64(2), int64(1), int64(0), int64(3)
 	if realmChanged {
 		att, contrib, influence, xp = 5, 4, 2, 8
@@ -561,13 +561,18 @@ func rewardMasterGo(conn *storage.Conn, disciple int64, realmChanged bool, now f
 	if _, err = conn.Execute(`UPDATE sect_lineage SET attention=attention+? WHERE disciple_user_id=?`, []any{att, disciple}); err != nil {
 		return nil, err
 	}
-	if _, err = conn.Execute(`UPDATE sect_membership SET contribution_points=contribution_points+?,influence=influence+? WHERE user_id=?`, []any{contrib, influence, mid}); err != nil {
+	promoted, err := creditSectContributionTx(conn, catalog, mid, contrib, influence)
+	if err != nil {
 		return nil, err
 	}
 	if _, err = conn.Execute(`UPDATE characters SET insight_xp=insight_xp+?,updated_at=? WHERE user_id=?`, []any{xp, now, mid}); err != nil {
 		return nil, err
 	}
-	return map[string]any{"master_user_id": mid, "master_name": name, "attention": att, "contribution": contrib, "influence": influence, "insight_xp": xp}, nil
+	out := map[string]any{"master_user_id": mid, "master_name": name, "attention": att, "contribution": contrib, "influence": influence, "insight_xp": xp}
+	if promoted != "" {
+		out["master_promoted_to"] = promoted
+	}
+	return out, nil
 }
 func recordAscensionHistory(conn *storage.Conn, userID int64, c mechanicsCharacter, body bool, fromWorld, toWorld string, newRealm int64, realmLabel string, gameMinute int64, now float64) error {
 	mode := "qi"
@@ -792,7 +797,7 @@ func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, user
 			return authoritativeMutation{}, err
 		}
 		result["soul_legacy"] = legacy
-		master, err := rewardMasterGo(conn, userID, newRealm != realm, now)
+		master, err := rewardMasterGo(conn, catalog, userID, newRealm != realm, now)
 		if err != nil {
 			return authoritativeMutation{}, err
 		}

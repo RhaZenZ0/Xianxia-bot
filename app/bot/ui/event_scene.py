@@ -18,6 +18,7 @@ from typing import Any
 import discord
 
 from ...ops.game_engine import GameEngineError
+from ...rules.sect import sect_points_line
 from ..character_state import announce_quest_progress, record_quest_progress
 from ..channels import _event_archive_minutes, _report_game_ui_error, _resolve_text_channel, event_scene_parent, world_event_channel
 from ..registry import EVENT_HANDLERS, VIEW_RESTORERS
@@ -431,6 +432,8 @@ class EventSceneView(discord.ui.View):
         if int(first.get("karma_delta",0)): reward_details.append(f"Karma {int(first['karma_delta']):+d} → {int(first.get('karma_score',0)):+d}")
         if int(first.get("fate_delta",0)): reward_details.append(f"Fate {int(first['fate_delta']):+d} → {int(first.get('fate',0))}/9")
         if reward_details: lines.append("First-participation outcome: "+" • ".join(reward_details))
+        points_line=sect_points_line(outcome.get("sect_points"))
+        if points_line: lines.append(points_line)
         await interaction.response.send_message("\n".join(lines),ephemeral=False)
 
     async def engage_node(self, interaction: discord.Interaction, node_key: str) -> None:
@@ -470,6 +473,8 @@ class EventSceneView(discord.ui.View):
             lines.append(f"{int(outcome.get('remaining',0))} of {int(outcome.get('total',0))} left here.")
         else:
             lines.append(f"You fail to {verb} it. Nothing is taken; it is still there.")
+        points_line=sect_points_line(outcome.get("sect_points"))
+        if points_line: lines.append(points_line)
         site=dict(outcome.get("site") or {})
         if site.get("total"):
             lines.append(f"Site progress: **{int(site.get('percent',0))}%** — {int(site.get('cleared',0))}/{int(site.get('total',0))} handled.")

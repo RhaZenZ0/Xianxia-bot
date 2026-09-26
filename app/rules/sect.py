@@ -176,3 +176,18 @@ SECT KINSHIP AND FORMS OF ADDRESS
 - In normal English narration and dialogue, use the English address as the default: Master, Grandmaster, Senior Brother, Junior Brother, Senior Sister, Junior Sister, Martial Uncle, Martial Aunt, Martial Nephew/Niece, Senior, or Junior.
 - Pinyin/Hanzi terms are flavor only. Use them sparingly when a character explicitly prefers them or when the scene is teaching terminology.
 """.strip()
+
+
+def sect_points_line(points: dict[str, Any] | None) -> str:
+    """The line a reply prints for contribution points the engine paid
+    (v1.8.0): a commission for your own sect, a world event in its world.
+    Everything in it comes from the engine's result; nothing is computed."""
+    points = dict(points or {})
+    earned = int(points.get("points") or 0)
+    if earned <= 0:
+        return ""
+    line = f"🏯 **+{earned}** contribution to the **{points.get('sect') or 'sect'}**"
+    promoted = str(points.get("promoted_to") or "")
+    if promoted:
+        line += f" — you are now a **{promoted}**"
+    return line + "."

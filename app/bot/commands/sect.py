@@ -886,23 +886,42 @@ async def sect_politics(interaction: discord.Interaction) -> None:
     await reply_long(interaction, "\n".join(lines), ephemeral=False)
 
 
-@registered_group_command(sect_group, name="treasury", description="Inspect resources currently available to your sect")
+async def _sect_exchange(user_id:int)->dict[str,Any]:
+    """What this member may redeem, at the engine's price (v1.8.0)."""
+    return dict(await ENGINE.action("sect.exchange",user_id,{}) or {})
+
+
+@registered_group_command(sect_group, name="treasury", description="Your sect's stock: what it issues by rank and what members donated")
 async def sect_treasury(interaction:discord.Interaction)->None:
     if not await require_character(interaction):return
-    membership=await DB.get_sect_membership(interaction.user.id)
-    if not membership:
+    try:
+        exchange=await _sect_exchange(interaction.user.id)
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
+    if not exchange.get("member"):
         await interaction.response.send_message("You are not a sect member.",ephemeral=False);return
-    treasury=await DB.get_sect_treasury(str(membership['sect_name']))
-    lines=[f"📦 **{membership['sect_name']} Treasury**",f"Your contribution points: **{membership.get('contribution_points',0)}**"]
+    # Every price, rank and threshold below is the engine's; this only prints.
+    lines=[f"📦 **{exchange.get('sect_name')} — Exchange & Treasury**",
+           f"You are a **{exchange.get('rank_name')}** • contribution points **{int(exchange.get('contribution_points') or 0)}**"]
+    nxt=dict(exchange.get("next_rank") or {})
+    if nxt and "contribution_earned" in exchange:
+        lines.append(f"-# Earned in this sect: **{int(exchange['contribution_earned'])}** — "
+                     f"**{nxt.get('rank_name')}** at {int(nxt.get('earned') or 0)}. Spending points never lowers it.")
+    issued=list(exchange.get("issued") or [])
+    if issued:
+        lines.append("\n**Issued by the sect** — never out of stock")
+        for row in issued:
+            tag=" *(this sect only)*" if row.get("sect_only") else ""
+            if row.get("eligible"):
+                lines.append(f"• {row.get('name')} — **{int(row.get('points') or 0)} CP**{tag}")
+            else:
+                lines.append(f"• 🔒 {row.get('name')} — {int(row.get('points') or 0)} CP, needs **{row.get('min_rank_name')}**{tag}")
+    treasury=list(exchange.get("treasury") or [])
+    lines.append("\n**Donated by members**"+(f" — redemption ×{float(exchange.get('pressure_mult') or 1):.2f} while resources are short" if float(exchange.get('pressure_mult') or 1)>1 else ""))
     if not treasury: lines.append("*No contributed materials are currently stocked.*")
-    else:
-        sim_state=await SIM.sect_status(str(membership['sect_name']))
-        resources=int((sim_state or {}).get('resources',50))
-        pressure_mult=1.60 if resources<25 else 1.35 if resources<50 else 1.20 if resources<80 else 1.00
-        lines.append(f"Autonomous resource pressure: **{resources}** • redemption multiplier **x{pressure_mult:.2f}**")
-        for item_id,qty in treasury.items():
-            cost=max(1,int(round(WORLD.item_sect_value(item_id)*pressure_mult)))
-            lines.append(f"• {WORLD.item_name(item_id)} x{qty} — **{cost} CP each**")
+    for row in treasury:
+        lines.append(f"• {row.get('name')} x{int(row.get('quantity') or 0)} — **{int(row.get('unit_cost') or 0)} CP each**")
+    lines.append("-# Redeem with **/sect → Holdings → Redeem**. Earn points by donating, by your sect's commissions and by world events in its world.")
     await reply_long(interaction,"\n".join(lines),ephemeral=False)
 
 
@@ -918,13 +937,43 @@ async def sect_contribute(interaction:discord.Interaction,item:str,quantity:app_
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
-    await interaction.followup.send(f"🏯 Contributed **{WORLD.item_name(item)} x{quantity}** to the sect treasury.",ephemeral=False)
+    lines=[f"🏯 Contributed **{WORLD.item_name(item)} x{quantity}** to the sect treasury — **+{int(result.get('points') or 0)}** contribution."]
+    if result.get("crafted_bonus"):
+        lines.append(f"-# Your own trade's work: ×{float(result['crafted_bonus']):g}.")
+    if result.get("capped_at_shelf"):
+        lines.append(f"-# The sect credits no more than a shop asks: {int(result['capped_at_shelf'])} a unit.")
+    if result.get("promoted_to"):
+        lines.append(f"🎖️ You are now a **{result['promoted_to']}**.")
+    await interaction.followup.send("\n".join(lines),ephemeral=False)
 
 
 async def sect_treasury_item_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[str]]:
+    """The sect's issued stock and its donated treasury, both priced by the
+    engine. An issued lot rides as `issued:<id>` so the redeem knows which
+    to ask for; a lot above the member's rank is listed with the rank it
+    needs, because a road nobody can see is a road nobody learns exists."""
+    needle=current.casefold().strip();out=[]
+    try:
+        exchange=await _sect_exchange(interaction.user.id)
+    except Exception:
+        exchange={}
+    if exchange:
+        if not exchange.get("member"):return []
+        for row in list(exchange.get("issued") or []):
+            name=str(row.get("name") or row.get("item_id")); item_id=str(row.get("item_id"))
+            if needle and needle not in name.casefold() and needle not in item_id.casefold():continue
+            label=f"{name} — {int(row.get('points') or 0)} CP (sect-issued)" if row.get("eligible") else f"{name} — needs {row.get('min_rank_name')}"
+            out.append(app_commands.Choice(name=label[:100],value=f"issued:{item_id}"[:100]))
+        for row in list(exchange.get("treasury") or []):
+            name=str(row.get("name") or row.get("item_id")); item_id=str(row.get("item_id"))
+            if needle and needle not in name.casefold() and needle not in item_id.casefold():continue
+            out.append(app_commands.Choice(name=f"{name} x{int(row.get('quantity') or 0)} — {int(row.get('unit_cost') or 0)} CP"[:100],value=item_id[:100]))
+        return out[:25]
+    # The engine did not answer: the treasury alone, so the picker is never
+    # empty on a hiccup. The redeem itself is still the engine's.
     membership=await DB.get_sect_membership(interaction.user.id)
     if not membership:return []
-    treasury=await DB.get_sect_treasury(str(membership['sect_name']));needle=current.casefold().strip();out=[]
+    treasury=await DB.get_sect_treasury(str(membership['sect_name']))
     for item_id,qty in treasury.items():
         name=WORLD.item_name(item_id)
         if not needle or needle in name.casefold() or needle in item_id.casefold():out.append(app_commands.Choice(name=f"{name} x{qty}"[:100],value=item_id[:100]))
@@ -939,11 +988,17 @@ async def sect_redeem(interaction:discord.Interaction,item:str,quantity:app_comm
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
-        envelope=await ENGINE.authoritative_action("sect.redeem",interaction.user.id,{"item_id":item,"quantity":int(quantity)},action_id=f"discord:{interaction.id}:sect.redeem")
+        payload:dict[str,Any]={"item_id":item,"quantity":int(quantity)}
+        if item.startswith("issued:"):
+            payload={"item_id":item.removeprefix("issued:"),"quantity":int(quantity),"source":"issued"}
+        envelope=await ENGINE.authoritative_action("sect.redeem",interaction.user.id,payload,action_id=f"discord:{interaction.id}:sect.redeem")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
-    await interaction.followup.send(f"🏯 Redeemed **{WORLD.item_name(item)} x{quantity}** from the sect treasury.",ephemeral=False)
+    where="issued by the sect" if result.get("source")=="issued" else "from the sect treasury"
+    await interaction.followup.send(
+        f"🏯 Redeemed **{WORLD.item_name(str(payload['item_id']))} x{quantity}** {where} for **{int(result.get('cost') or 0)} CP** "
+        f"({int(result.get('remaining_points') or 0)} left).",ephemeral=False)
 
 
 @registered_group_command(sect_manor_group, name="status", description="Inspect your sect's shared manor, facilities and recent construction")

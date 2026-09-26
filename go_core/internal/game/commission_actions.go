@@ -571,6 +571,17 @@ func resolveCommissionTx(conn *storage.Conn, catalog worlddata.Catalog, userID i
 		"variant_index": variantIndex, "rewards_granted": granted, "standing": standing,
 		"resolved_game_minute": gameMinute, "charged": charge,
 	}
+	// A member's finished work for their own sect is contribution (v1.8.0),
+	// in points per stone of what it paid.
+	if outcome == "completed" && charge && def.RequiresSect != "" {
+		points, pointsErr := sectCommissionPointsTx(conn, catalog, userID, def.RequiresSect, i64(granted["spirit_stones"]))
+		if pointsErr != nil {
+			return nil, pointsErr
+		}
+		if points != nil {
+			out["sect_points"] = points
+		}
+	}
 	// An outsider's finished work for a sect is standing with that sect
 	// (v1.1.0). A disciple who took it gets nothing extra here: the standing is
 	// the way in, and they are already in.

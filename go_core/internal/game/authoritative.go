@@ -219,6 +219,8 @@ var authoritativeQueries = map[string]bool{
 	"shop.browse":               true,
 	"stall.board":               true,
 	"stall.status":              true,
+	// v1.8.0: what a sect member may redeem, at the engine's price.
+	"sect.exchange": true,
 	// v0.30.0: the world-status reads that app/simulation/world.py ran as raw
 	// SQL, plus the market prices and the equipment power Python still
 	// computed. Listed in world_status_queries.go.
@@ -839,6 +841,20 @@ func applyAuthoritativeQuery(databasePath, worldPath string, req ActionRequest) 
 			gm = 0
 		}
 		result, qerr := SecretRealmRotationView(conn, catalog, gm)
+		if qerr != nil {
+			return ActionResponse{}, qerr
+		}
+		v, _ := eventledger.CurrentActorVersion(conn, req.ActorID)
+		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
+	case "sect.exchange":
+		if strings.TrimSpace(worldPath) == "" {
+			return ActionResponse{}, errors.New("world catalog path is required")
+		}
+		catalog, loadErr := worlddata.Load(worldPath)
+		if loadErr != nil {
+			return ActionResponse{}, loadErr
+		}
+		result, qerr := sectExchangeQuery(conn, catalog, req.ActorID)
 		if qerr != nil {
 			return ActionResponse{}, qerr
 		}

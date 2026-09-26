@@ -1249,7 +1249,7 @@ class ReadOnlyDashboardStore:
         async with self._connect() as db:
             members = await self._fetchall(
                 db,
-                """SELECT sm.user_id,sm.sect_name,sm.rank_name,sm.rank_level,sm.joined_at,sm.contribution_points,sm.influence,
+                """SELECT sm.user_id,sm.sect_name,sm.rank_name,sm.rank_level,sm.joined_at,sm.contribution_points,sm.contribution_earned,sm.influence,
                           c.name,c.discord_name,c.life_status,c.realm_index,c.phase,c.location
                    FROM sect_membership sm JOIN characters c ON c.user_id=sm.user_id
                    ORDER BY sm.sect_name,sm.rank_level DESC,c.realm_index DESC,c.name""",

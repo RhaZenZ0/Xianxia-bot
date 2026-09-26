@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 68
+SCHEMA_VERSION = 69
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -2820,6 +2820,20 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             # left by hand. Every party that already exists was made by a
             # person and keeps the default 0.
             "ALTER TABLE parties ADD COLUMN raid_only INTEGER NOT NULL DEFAULT 0",
+        ),
+    ),
+    (
+        69,
+        "sect_contribution_earned",
+        (
+            # v1.8.0: a member rises to Inner and then Core Disciple on the
+            # contribution they have earned in their sect, which spending never
+            # lowers - so it cannot be the balance. The engine writes it beside
+            # contribution_points through one door. A member who was in a sect
+            # before it existed has earned at least what they still hold, so
+            # that is the floor they start from.
+            "ALTER TABLE sect_membership ADD COLUMN contribution_earned INTEGER NOT NULL DEFAULT 0",
+            "UPDATE sect_membership SET contribution_earned=MAX(0,contribution_points)",
         ),
     ),
 )

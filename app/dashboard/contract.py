@@ -33,8 +33,10 @@ DASHBOARD_API_VERSION = 2
 # beside the world-events feeds; neither is a gameplay table.
 # Schema 67 (v1.7.7) adds `spirit_beasts.grandfathered` and schema 68 (v1.7.8)
 # `parties.raid_only`: engine bookkeeping on tables the dashboard already
-# shows, with nothing for a GM to read or set.
-DASHBOARD_REVIEWED_SCHEMA_VERSION = 68
+# shows, with nothing for a GM to read or set. Schema 69 (v1.8.0) adds
+# `sect_membership.contribution_earned`, the lifetime count that promotes a
+# member: read on Sects -> Members beside the balance, never written here.
+DASHBOARD_REVIEWED_SCHEMA_VERSION = 69
 
 DASHBOARD_GET_API_PATHS = frozenset({
     "/api/overview", "/api/capabilities", "/api/timeline", "/api/npcs", "/api/npc",
