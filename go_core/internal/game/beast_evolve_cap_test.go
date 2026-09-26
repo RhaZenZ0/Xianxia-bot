@@ -29,6 +29,7 @@ func TestABeastAtTheLoyaltyCapCanAlwaysEvolve(t *testing.T) {
 		user_id,name,species,rank,element,intelligence,temperament,bloodline,evolution_stage,
 		loyalty,contract_type,active,techniques_json,created_at,updated_at
 	) VALUES(42,'Cloudpaw','Wind Lynx',6,'Wind',10,'bonded','Common',5,100,'equality',1,'[]',0,0)`)
+	batch4Exec(t, path, `INSERT INTO inventory(user_id,item_id,quantity) VALUES(42,'beast_core',1)`)
 	got, err := evolveBeast(t, path, world, 0)
 	if err != nil {
 		t.Fatalf("a beast at the loyalty cap was refused: %v", err)
@@ -83,8 +84,8 @@ func TestABeastCannotOutgrowTheWorldItStandsIn(t *testing.T) {
 }
 
 func TestFromRankTenEveryLevelCostsCores(t *testing.T) {
-	if beastLevelCores(9) != 0 || beastLevelCores(10) != 8 || beastLevelCores(15) != 8 || beastLevelCores(20) != 16 {
-		t.Fatal("cores are 8 a level from rank 10, 16 from 20")
+	if beastLevelCores(9) != 1 || beastLevelCores(0) != 1 || beastLevelCores(10) != 8 || beastLevelCores(15) != 8 || beastLevelCores(20) != 16 {
+		t.Fatal("cores are 1 a level below 10, 8 from rank 10, 16 from 20")
 	}
 	if beastMilestoneBonus(9) != 0 || beastMilestoneBonus(10) != 2 || beastMilestoneBonus(25) != 4 {
 		t.Fatal("milestone bonus is +2 per tenth rank")

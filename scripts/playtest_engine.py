@@ -2266,6 +2266,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
             report.add("PASS" if int(woken.get("active") or 0) == 1 else "FAIL", "the beast walks beside them", f"active={woken.get('active')}")
         await audited("admin.player.set_beast_stats", {"user_id": PLAYER, "beast_id": beast_id, "loyalty": 100, "reason": "playtest"})
         await step(report, "the lever wants a field", gm("admin.player.set_beast_stats", {"user_id": PLAYER, "beast_id": beast_id, "reason": "playtest"}), expect_error="loyalty or evolution_stage is required")
+        await step(report, "grant beast cores for the evolution", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": "beast_core", "quantity": 8, "reason": "playtest"}))
         grown = await step(report, "beast.evolve at loyalty 100", act("beast.evolve", PLAYER, {"beast_id": beast_id}))
         if grown is not None:
             b = dict(grown.get("beast") or {})

@@ -457,8 +457,8 @@ func beastEvolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if i64(row["loyalty"]) < need {
 		return authoritativeMutation{}, fmt.Errorf("loyalty %d is below evolution requirement %d", i64(row["loyalty"]), need)
 	}
-	// From rank 10 every evolution also costs beast cores: 8 a level from
-	// rank 10, 16 from 20, and so on (v1.7.3, on the owner's call).
+	// Every evolution also costs beast cores: 1 a level below rank 10, then 8
+	// a level from 10, 16 from 20, and so on (v1.7.3, on the owner's call).
 	cores := beastLevelCores(i64(row["rank"]))
 	if cores > 0 {
 		short, err := consumeInventoryTx(conn, userID, map[string]int64{"beast_core": cores})
@@ -714,11 +714,11 @@ func beastRankLimit(world string) int64 {
 }
 
 // beastLevelCores is what evolving a beast out of a rank costs in beast
-// cores: nothing below rank 10, then 8 a level for every tenth the rank has
-// reached (10->11 costs 8, 20->21 costs 16).
+// cores: 1 a level below rank 10, then 8 a level for every tenth the rank
+// has reached (10->11 costs 8, 20->21 costs 16).
 func beastLevelCores(rank int64) int64 {
 	if rank < 10 {
-		return 0
+		return 1
 	}
 	return 8 * (rank / 10)
 }

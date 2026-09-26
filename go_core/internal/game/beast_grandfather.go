@@ -13,9 +13,11 @@ import (
 //
 //   - A rank above its owner's limit is lowered to it: the limit of the world
 //     their realm belongs to, or of where they stand if that is higher.
-//   - Every level it climbed from rank 10 up is paid for now, in ascending
-//     order, out of the owner's beast cores (beastLevelCores); it stops at the
-//     first level the bag cannot pay for.
+//   - Every level it climbed by evolving is paid for now, in ascending order,
+//     out of the owner's beast cores (beastLevelCores); it stops at the first
+//     level the bag cannot pay for. What it climbed is its evolution_stage, so
+//     it began at rank - evolution_stage: a beast tamed at rank 12 never
+//     climbed 0..11 and owes nothing for them.
 //
 // Then the mark is cleared, so it runs once per beast. It never returns an
 // error the caller needs: a failed settle leaves the mark for the next action,
@@ -27,7 +29,7 @@ func settleGrandfatheredBeastsTx(conn *storage.Conn, catalog worlddata.Catalog, 
 	if err != nil || !ok {
 		return err
 	}
-	rows, err := conn.Execute(`SELECT beast_id,rank FROM spirit_beasts WHERE user_id=? AND grandfathered=0 ORDER BY beast_id`, []any{userID})
+	rows, err := conn.Execute(`SELECT beast_id,rank,evolution_stage FROM spirit_beasts WHERE user_id=? AND grandfathered=0 ORDER BY beast_id`, []any{userID})
 	if err != nil || len(rows.Rows) == 0 {
 		return err
 	}
@@ -49,10 +51,14 @@ func settleGrandfatheredBeastsTx(conn *storage.Conn, catalog worlddata.Catalog, 
 	now := float64(time.Now().UnixNano()) / 1e9
 	for _, r := range rows.Rows {
 		beastID, rank := i64(r[0]), i64(r[1])
+		start := rank - i64(r[2])
+		if start < 0 {
+			start = 0
+		}
 		if rank > limit {
 			rank = limit
 		}
-		for level := int64(10); level < rank; level++ {
+		for level := start; level < rank; level++ {
 			short, err := consumeInventoryTx(conn, userID, map[string]int64{"beast_core": beastLevelCores(level)})
 			if err != nil {
 				return err

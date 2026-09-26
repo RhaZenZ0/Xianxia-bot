@@ -47,23 +47,24 @@ func grandfatherBeastAt(t *testing.T, cores int64, rank int64, realm int64) (int
 }
 
 func TestAnOldBeastPaysForItsLevels(t *testing.T) {
-	// Rank 16: six levels climbed from 10 at 8 cores each = 48.
-	if rank, mark, left := grandfatherBeast(t, 50, 16); rank != 16 || mark != 1 || left != 2 {
+	// Rank 16, stage 16: 0..9 at 1 each, then 10..15 at 8 each = 10 + 48.
+	if rank, mark, left := grandfatherBeast(t, 60, 16); rank != 16 || mark != 1 || left != 2 {
 		t.Fatalf("rank=%d mark=%d cores left=%d, want 16/1/2", rank, mark, left)
 	}
-	// 20 cores pays two levels (10->11, 11->12) and stops at 12.
-	if rank, mark, left := grandfatherBeast(t, 20, 16); rank != 12 || mark != 1 || left != 4 {
+	// 30 cores pays 0..9 and two levels past 10, and stops at 12.
+	if rank, mark, left := grandfatherBeast(t, 30, 16); rank != 12 || mark != 1 || left != 4 {
 		t.Fatalf("rank=%d mark=%d left=%d, want 12/1/4", rank, mark, left)
 	}
-	// No cores: kept at 10, which cost nothing to reach.
-	if rank, _, _ := grandfatherBeast(t, 0, 16); rank != 10 {
-		t.Fatalf("rank=%d, want 10", rank)
+	// No cores: back to where it was tamed.
+	if rank, _, _ := grandfatherBeast(t, 0, 16); rank != 0 {
+		t.Fatalf("rank=%d, want 0", rank)
 	}
 }
 
 func TestAnOldBeastIsLoweredToItsWorldsLimit(t *testing.T) {
-	// Rank 35 in the Mortal World: lowered to 20, then 10 levels x 8 = 80.
-	if rank, _, left := grandfatherBeast(t, 80, 35); rank != 20 || left != 0 {
+	// Rank 35, stage 16 (tamed at 19) in the Mortal World: lowered to 20,
+	// then only 19 -> 20 is owed, at 8.
+	if rank, _, left := grandfatherBeast(t, 8, 35); rank != 20 || left != 0 {
 		t.Fatalf("rank=%d cores left=%d, want 20/0", rank, left)
 	}
 }
@@ -84,8 +85,9 @@ func TestTheOwnersRealmDecidesTheLimitBeforeWhereTheyStand(t *testing.T) {
 		t.Fatal("the catalogue carries no Spiritual World realm; the test is broken, not the tree")
 	}
 	// Standing in the Mortal World at a Spiritual World realm: 35 is under 40,
-	// so it keeps its rank and pays for 10..34 (10x8 + 10x16 + 5x24 = 360).
-	if rank, _, left := grandfatherBeastAt(t, 360, 35, spiritual); rank != 35 || left != 0 {
+	// so it keeps its rank and pays for 19..34, the sixteen levels it evolved
+	// (1x8 + 10x16 + 5x24 = 288).
+	if rank, _, left := grandfatherBeastAt(t, 288, 35, spiritual); rank != 35 || left != 0 {
 		t.Fatalf("rank=%d cores left=%d, want 35/0 - a Spiritual cultivator at home was held to the Mortal limit", rank, left)
 	}
 }
