@@ -26,9 +26,15 @@ package game
 // because a misspelled setting must not make every road refuse.
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
+	"time"
+
+	"xianxia/core/internal/storage"
 )
 
 const (
@@ -49,12 +55,73 @@ func travelTimePercentFromEnv() int64 {
 	return percent
 }
 
+// travelTimePercentTx is the pace the world is set to: the GM's stored choice
+// (world_state['travel_pace'], v1.7.9) when there is one, else the .env
+// baseline - the rule WORLD_TIME_SCALE and the narration chain already follow.
+// An unreadable row is the baseline, never an error: a road must not refuse
+// because a setting is damaged.
+func travelTimePercentTx(conn *storage.Conn) int64 {
+	if conn != nil {
+		if res, err := conn.Execute(`SELECT value_json FROM world_state WHERE key='travel_pace'`, nil); err == nil {
+			if row := firstRowMap(res); row != nil {
+				var stored struct {
+					Percent *int64 `json:"percent"`
+				}
+				if text, ok := row["value_json"].(string); ok && json.Unmarshal([]byte(text), &stored) == nil &&
+					stored.Percent != nil && *stored.Percent >= 0 && *stored.Percent <= 100 {
+					return *stored.Percent
+				}
+			}
+		}
+	}
+	return travelTimePercentFromEnv()
+}
+
+// adminWorldSetTravelPace stores the share of a road's length a traveller
+// waits, 0-100, audited. It moves no journey already under way: a transit row
+// carries its own arrival minute.
+func adminWorldSetTravelPace(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
+	p, err := decodeMap(raw)
+	if err != nil {
+		return nil, err
+	}
+	value, ok := p["percent"]
+	if !ok {
+		return nil, errors.New("percent is required")
+	}
+	percent := storage.ParseInt(value)
+	if percent < 0 || percent > 100 {
+		return nil, errors.New("percent must be between 0 and 100")
+	}
+	if err := begin(conn); err != nil {
+		return nil, err
+	}
+	defer func() {
+		if conn.InTransaction() {
+			rollback(conn)
+		}
+	}()
+	before := travelTimePercentTx(conn)
+	encoded, _ := json.Marshal(map[string]any{"percent": percent})
+	now := float64(time.Now().UnixNano()) / 1e9
+	if _, err = conn.Execute(`INSERT INTO world_state(key,value_json,updated_at) VALUES('travel_pace',?,?) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at`, []any{string(encoded), now}); err != nil {
+		return nil, err
+	}
+	if err := auditAdmin(conn, adminUserID, "admin.world.set_travel_pace", "travel_pace", map[string]any{"percent": before}, map[string]any{"percent": percent}, fmt.Sprint(p["reason"])); err != nil {
+		return nil, err
+	}
+	if err := conn.Commit(); err != nil {
+		return nil, err
+	}
+	return map[string]any{"percent": percent, "previous": before}, nil
+}
+
 // scaledTravelWait is the wait a road of this length costs at the configured
 // pace. A road with no length waits nothing at any pace, and a pace of 0 waits
 // nothing on any road.
-func scaledTravelWait(travelMinutes int64) int64 {
+func scaledTravelWait(conn *storage.Conn, travelMinutes int64) int64 {
 	if travelMinutes <= 0 {
 		return 0
 	}
-	return travelMinutes * travelTimePercentFromEnv() / 100
+	return travelMinutes * travelTimePercentTx(conn) / 100
 }

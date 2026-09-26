@@ -688,7 +688,11 @@ class NavigationGroupingTests(unittest.TestCase):
         placed = [view for views in groups.values() for view in views]
         self.assertEqual(sorted(placed), sorted(DASHBOARD_VIEW_ENDPOINTS))
         self.assertEqual(len(placed), len(set(placed)), "a view is listed in two groups")
-        self.assertEqual(len(groups), 7, f"expected seven groups, got {list(groups)}")
+        self.assertEqual(len(groups), 8, f"expected eight groups, got {list(groups)}")
+        # The Player Editor is a head of its own (v1.7.9), apart from the
+        # levers that act on the world or the server.
+        self.assertEqual(groups["Player Admin"], ["player_editor"])
+        self.assertNotIn("player_editor", groups["Admin"])
         # NPCs and Sects are heads of their own (v1.6.0), between the world
         # and the players, and neither page is left behind under World.
         self.assertEqual(list(groups)[:4], ["World", "NPCs", "Sects", "Players"])
@@ -702,7 +706,7 @@ class NavigationGroupingTests(unittest.TestCase):
         # it decides what every player reads, so it belongs on this side.
         # The Player Editor (v1.0.0-rc.37) is where one character's levers
         # went; it writes through the same audited engine actions.
-        self.assertEqual(groups["Admin"], ["discord", "narration", "player_editor", "admin"])
+        self.assertEqual(groups["Admin"], ["discord", "narration", "admin"])
 
     def test_the_shell_carries_the_pieces_the_page_template_needs(self):
         for required in ('id="navFilter"', 'id="crumb"', 'id="railToggle"', 'id="worldClock"', 'id="drawer"'):
