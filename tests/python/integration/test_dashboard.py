@@ -689,7 +689,7 @@ class NavigationGroupingTests(unittest.TestCase):
         self.assertEqual(sorted(placed), sorted(DASHBOARD_VIEW_ENDPOINTS))
         self.assertEqual(len(placed), len(set(placed)), "a view is listed in two groups")
         self.assertEqual(len(groups), 8, f"expected eight groups, got {list(groups)}")
-        # The Player Editor is a head of its own (v1.7.3), apart from the
+        # The Player Editor is a head of its own (v1.7.9), apart from the
         # levers that act on the world or the server.
         self.assertEqual(groups["Player Admin"], ["player_editor"])
         self.assertNotIn("player_editor", groups["Admin"])

@@ -109,7 +109,7 @@ func isGateOf(t *testing.T, world, place, city string) bool {
 	return cityOf(catalog, place) == city
 }
 
-// The GM sets the pace from the dashboard (v1.7.3): the stored choice beats
+// The GM sets the pace from the dashboard (v1.7.9): the stored choice beats
 // the .env baseline, the roads wait what it says, and the write is audited.
 func TestTheGMsTravelPaceBeatsTheEnvAndIsAudited(t *testing.T) {
 	t.Setenv(travelTimePercentKey, "")

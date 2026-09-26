@@ -515,7 +515,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     await step(report, "grant the player road stones", gm("admin.player.grant_currency", {"user_id": PLAYER, "currency_id": "low_spirit_stone", "amount": 300, "reason": "playtest"}))
     await step(report, "teleport the player to Riverguard City", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Riverguard City", "reason": "playtest"}))
     capital = "Azure Crown Imperial City"
-    # v1.7.3: the GM sets the road's pace from the dashboard; the stored
+    # v1.7.9: the GM sets the road's pace from the dashboard; the stored
     # choice beats the .env baseline and this one journey waits half the road.
     await step(report, "a pace above 100 is refused", gm("admin.world.set_travel_pace", {"percent": 101, "reason": "playtest"}), expect_error="between 0 and 100")
     await audited("admin.world.set_travel_pace", {"percent": 50, "reason": "playtest"})

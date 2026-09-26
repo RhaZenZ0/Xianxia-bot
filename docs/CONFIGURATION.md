@@ -289,7 +289,7 @@ journey between neighbouring towns put a cultivator in transit for a real half
 hour and refused every other action until arrival; anything in between scales
 that wait. The road's length is still reported as `travel_minutes` whatever the
 setting, because the toll is priced on it. Read by the **Go engine**, and
-compose passes it in. Since v1.7.3 it is the baseline rather than the last word:
+compose passes it in. Since v1.7.9 it is the baseline rather than the last word:
 the GM dashboard's Admin Console → Travel Time card stores a pace in the engine
 (audited), and a stored pace wins until it is changed there. `REINCARNATION_BASE_SAMSARA_YEARS` and
 `REINCARNATION_MAX_WAIT_SECONDS` shape how long a dead character waits in

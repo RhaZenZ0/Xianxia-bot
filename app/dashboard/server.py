@@ -2385,7 +2385,7 @@ class AdminDashboardController:
         "player.revive": "admin.player.revive",
         "player.clear_battle": "admin.player.clear_battle",
         "automation.set": "admin.automation.set",
-        # v1.7.3: how long a road journey actually waits, as a share of its
+        # v1.7.9: how long a road journey actually waits, as a share of its
         # length. Stored by the engine in world_state['travel_pace'] with an
         # audit row; the .env TRAVEL_TIME_PERCENT is only the baseline.
         "world.travel_pace": "admin.world.set_travel_pace",
@@ -2598,7 +2598,7 @@ class AdminDashboardController:
                     }
                 except Exception:
                     pass
-            # v1.7.3: the travel pace the GM stored, or None when the world is
+            # v1.7.9: the travel pace the GM stored, or None when the world is
             # still on the .env baseline - which only the engine can read, so
             # the card says "baseline" rather than guessing a number.
             travel_pace: int | None = None

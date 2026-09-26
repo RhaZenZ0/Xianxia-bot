@@ -56,7 +56,7 @@ func travelTimePercentFromEnv() int64 {
 }
 
 // travelTimePercentTx is the pace the world is set to: the GM's stored choice
-// (world_state['travel_pace'], v1.7.3) when there is one, else the .env
+// (world_state['travel_pace'], v1.7.9) when there is one, else the .env
 // baseline - the rule WORLD_TIME_SCALE and the narration chain already follow.
 // An unreadable row is the baseline, never an error: a road must not refuse
 // because a setting is damaged.
