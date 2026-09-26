@@ -5228,6 +5228,31 @@ v1.0.8 shape). It holds the rule by AST now: every overwrite sits under `if name
 READ_ONLY_BASE_CHANNELS`, names only `@everyone` or the bot, and none is a `set_permissions`. Its drill
 puts the replacing call back and names it.
 
+### The shop door, a second time (v1.7.1)
+
+Reported again from play: *"Travel failed: the shop door opens onto Cloudblade City"*, from inside
+Cloudblade Talisman Hall. v1.0.13 fixed the first report of this by making the street sort near the
+top (the `0 or 50` hop count) and **never stopped the picker offering the rest**. From inside a shop
+`explorationTravelAction` allows the street and the city's other shops and nothing else, and the
+picker listed every gate, district, road site and city the player knew, gates and districts first.
+The rule was rc.46's (a surface must not offer what the engine will refuse), and the fix a release
+ago corrected an ordering inside a list that should not have held those rows at all.
+
+Asked to check every shop exit, the drill answers it: with the filter taken out, **all 104 door
+shops** (everything but the waystation stalls, which are road sites and have no door) offer a refused
+place. **164,169 rows across the catalogue** are refused at the door, because the same shape reached
+another city's gates, districts and shops from anywhere and the inside of an auction hall.
+`door_allows` in `app/bot/locations.py` is the twin of the four door checks at the top of the
+travel action, and `destination_groups` asks it for every row. From a shop the street is the first
+row, labelled as the way out. `/travel go` had its own door: it used the shared
+`location_autocomplete`, every known place alphabetically, so it gets
+`travel_destination_autocomplete` over the same rows the panel draws.
+
+`test_a_shop_door_opens_onto_its_street.py` computes the rules a third time off the raw content file
+(v1.0.9), holds the twin to them over every pair of the 477 locations, holds every shop's picker to
+offering only allowed places with the street first, and holds that the Go refusals it twins are still
+in the source.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

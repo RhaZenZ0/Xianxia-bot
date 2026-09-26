@@ -470,6 +470,41 @@ def here_summary(location: str, limit: int = 180, *, present: Sequence[str] | No
     return what[:limit]
 
 
+def door_allows(current: str, destination: str) -> bool:
+    """Whether `exploration.travel`'s door rules let a walk go from `current`
+    to `destination` - the Python twin of the four checks at the top of
+    `explorationTravelAction`, so the travel picker never offers a place the
+    engine refuses on the doorstep (rc.46; v1.7.1).
+
+    - an auction hall is never walked into, and its warded door leads only
+      onto its own street;
+    - a shop is entered from anywhere in its city, and nowhere else;
+    - a shop's door opens onto its city's street and nowhere else, so from
+      inside one the street and the city's other shops are the whole list;
+    - a gate or district is walked to from anywhere in its city.
+
+    A waystation's stall is the waystation itself (a road site), so neither
+    shop rule applies to one. The engine remains the refusal: this only
+    decides what a picker draws. `test_a_shop_door_opens_onto_its_street.py`
+    rewrites the rules off the Go source's own content and holds this to them
+    over every pair of locations in the catalogue.
+    """
+    cur = WORLD.locations.get(current) or {}
+    dest = WORLD.locations.get(destination) or {}
+    if dest.get("auction_house"):
+        return False
+    if cur.get("auction_house"):
+        return destination == str(cur.get("outside_location") or "Greenriver Town")
+    origin = _city_of_location(current)
+    if dest.get("shop") and not dest.get("road_site"):
+        return origin == str(dest.get("outside_location") or "")
+    if cur.get("shop") and not cur.get("road_site"):
+        return destination == str(cur.get("outside_location") or "")
+    if dest.get("district"):
+        return origin == str(dest.get("outside_location") or "")
+    return True
+
+
 def destination_groups(current: str, known: set[str] | list[str], realm_index: int) -> list[tuple[str, str, str, int]]:
     """The travel picker's rows (v0.40.0): (name, group, description, order).
 
@@ -500,9 +535,14 @@ def destination_groups(current: str, known: set[str] | list[str], realm_index: i
         if name == current:
             continue
         data = WORLD.locations.get(name)
-        if not data or int(data.get("min_realm_index", 0)) > int(realm_index) or data.get("auction_house"):
+        if not data or int(data.get("min_realm_index", 0)) > int(realm_index) or not door_allows(current, name):
             continue
-        if site_leg and name in site_leg:
+        if name == city and current != city:
+            # Standing inside the city - a shop, a gate, a district - the
+            # street itself is the first way out, and from a shop it is the
+            # only one besides the city's other shops (v1.7.1).
+            rows.append((name, "🚪", "out onto the street" if here.get("shop") else "the city's own streets", -1))
+        elif site_leg and name in site_leg:
             rows.append((name, "🛣️", "half a leg from here · the road's end", 5))
         elif data.get("district") and str(data.get("outside_location")) == city:
             kind = "inn" if data.get("district") == "inn" else ("gate" if data.get("gate") else "district")
