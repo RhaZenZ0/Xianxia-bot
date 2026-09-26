@@ -32,7 +32,7 @@ type itemUsePayload struct {
 // Storage upgrades and array deployment have their own actions.
 func itemHasActiveUse(item worlddata.Item) bool {
 	u := item.Use
-	return u.Instant.QiRestore > 0 || u.Instant.VitalityRestore > 0 || len(u.Effect) > 0 || u.LifespanYears > 0 || u.Homeward || u.Waymark
+	return u.Instant.QiRestore > 0 || u.Instant.VitalityRestore > 0 || len(u.Effect) > 0 || u.LifespanYears > 0 || u.Homeward || u.Waymark || temperingItem(item)
 }
 
 // isPillItem is app/rules/alchemy.py is_pill: a "pill" tag on the effect, or
@@ -62,7 +62,8 @@ func pillToxicityValue(itemID string, item worlddata.Item) int64 {
 	if item.PillToxicity != nil {
 		return maxI64(0, *item.PillToxicity)
 	}
-	if item.Use.LifespanYears > 0 {
+	// A permanent gain - years or marrow - is the most taxing medicine there is.
+	if item.Use.LifespanYears > 0 || temperingItem(item) {
 		return 24
 	}
 	tags := map[string]bool{}
@@ -215,6 +216,17 @@ func itemUseActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 		}
 	}
 
+	// 0c. marrow tempering (v1.8.0) - refused before it is spent, in a
+	// battle or once this body realm's allowance is used.
+	var tempering *marrowTemperingPlan
+	if temperingItem(item) {
+		plan, e := planMarrowTemperingTx(conn, catalog, userID, item, grade)
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		tempering = &plan
+	}
+
 	// 1. consume - one from the carried inventory, the row goes at zero.
 	r, e := conn.Execute(`SELECT quantity FROM inventory WHERE user_id=? AND item_id=?`, []any{userID, p.ItemID})
 	if e != nil {
@@ -281,6 +293,17 @@ func itemUseActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 		if len(total.Rows) > 0 {
 			out["life_extension_years"] = years
 			out["life_extension_total"] = i64(total.Rows[0][0])
+		}
+	}
+
+	// 3b. marrow tempering - the maximum and the current value together.
+	if tempering != nil {
+		tempered, e := applyMarrowTemperingTx(conn, userID, p.ItemID, *tempering, now)
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		for k, v := range tempered {
+			out[k] = v
 		}
 	}
 

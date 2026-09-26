@@ -1185,6 +1185,13 @@ func combatFinalizeAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 			return authoritativeMutation{}, recErr
 		}
 		out["event_participation"] = state
+		points, pointsErr := sectEventPointsTx(conn, catalog, userID, eventKey, contribution, i64(state["contribution"]))
+		if pointsErr != nil {
+			return authoritativeMutation{}, pointsErr
+		}
+		if points != nil {
+			out["sect_points"] = points
+		}
 		if progress, progErr := worldEventSiteProgressTx(conn, eventKey); progErr == nil && len(progress) > 0 {
 			out["site"] = progress
 		}

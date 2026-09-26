@@ -177,6 +177,15 @@ func worldEventActAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	out["success"] = success
 	out["roll"] = roll
 	out["state"] = state
+	if success {
+		points, pointsErr := sectEventPointsTx(conn, catalog, userID, eventKey, contribution, i64(state["contribution"]))
+		if pointsErr != nil {
+			return authoritativeMutation{}, pointsErr
+		}
+		if points != nil {
+			out["sect_points"] = points
+		}
+	}
 
 	if success {
 		claim, e := conn.Execute(`INSERT OR IGNORE INTO event_claims(user_id,event_key,claimed_at) VALUES(?,?,?)`, []any{userID, eventKey, now})

@@ -26930,6 +26930,409 @@
       "flight": 5,
       "flight_name": "a divine-herb gathering gourd",
       "market_excluded": true
+    },
+    "marrow_tempering_pill": {
+      "name": "Marrow-Tempering Pill",
+      "description": "A dense grey-gold pill that is swallowed hot. It burns down into the marrow and leaves the body able to hold more of itself; the marrow will only take so much at any one body realm.",
+      "sect_value": 60,
+      "base_price": 180,
+      "market_excluded": true,
+      "use": {
+        "vitality_max_percent": 10,
+        "vitality_max_min": 2,
+        "consume": true
+      }
+    },
+    "marrow_tempering_pill_method": {
+      "name": "Marrow-Tempering Pill — Method Slip",
+      "description": "A jade slip carrying the method for Marrow-Tempering Pill. The jade holds one impression of the method and goes blank as it is taken, so the reading is the end of the slip.",
+      "sect_value": 120,
+      "base_price": 360,
+      "teaches_recipe": "Marrow-Tempering Pill"
+    },
+    "cloud_sword_intent_talisman": {
+      "name": "Cloud-Sword Intent Talisman",
+      "description": "A strip of cloud-white paper folded around a sliver of the sect's practice sword. Burned, it lends the sword intent the Azure Cloud teaches its own.",
+      "sect_value": 45,
+      "base_price": 90,
+      "market_excluded": true,
+      "use": {
+        "effect_key": "cloud_sword_intent_talisman",
+        "name": "Cloud-Sword Intent Talisman",
+        "duration_game_minutes": 240,
+        "consume": true,
+        "effect": {
+          "description": "A strip of cloud-white paper folded around a sliver of the sect's practice sword. Burned, it lends the sword intent the Azure Cloud teaches its own.",
+          "modifiers": [
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "agility",
+              "operation": "add",
+              "value": 1
+            }
+          ],
+          "tags": [
+            "talisman",
+            "sect"
+          ]
+        }
+      }
+    },
+    "furnace_heart_pill": {
+      "name": "Furnace-Heart Pill",
+      "description": "A pill still warm from the sect's great furnace. The hands steady over a cauldron and the flesh remembers that fire is a tool.",
+      "sect_value": 45,
+      "base_price": 90,
+      "market_excluded": true,
+      "use": {
+        "effect_key": "furnace_heart_pill",
+        "name": "Furnace-Heart Pill",
+        "duration_game_minutes": 240,
+        "consume": true,
+        "effect": {
+          "description": "A pill still warm from the sect's great furnace. The hands steady over a cauldron and the flesh remembers that fire is a tool.",
+          "modifiers": [
+            {
+              "stat": "alchemy_bonus",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "fire_resistance",
+              "operation": "add",
+              "value": 5
+            }
+          ],
+          "tags": [
+            "pill",
+            "sect"
+          ]
+        }
+      }
+    },
+    "frost_moon_array_chalk": {
+      "name": "Frost-Moon Array Chalk",
+      "description": "Chalk ground from moon-frost stone. Lines drawn with it stay cold and exact, and the mind that draws them stays cold with them.",
+      "sect_value": 45,
+      "base_price": 90,
+      "market_excluded": true,
+      "use": {
+        "effect_key": "frost_moon_array_chalk",
+        "name": "Frost-Moon Array Chalk",
+        "duration_game_minutes": 240,
+        "consume": true,
+        "effect": {
+          "description": "Chalk ground from moon-frost stone. Lines drawn with it stay cold and exact, and the mind that draws them stays cold with them.",
+          "modifiers": [
+            {
+              "stat": "formation_bonus",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "will",
+              "operation": "add",
+              "value": 1
+            }
+          ],
+          "tags": [
+            "formation",
+            "sect"
+          ]
+        }
+      }
+    },
+    "serpent_coil_antidote": {
+      "name": "Serpent-Coil Antidote",
+      "description": "The clan's own counter-venom, taken before a purge. It teaches the blood to throw off poison and the body to slip a grip.",
+      "sect_value": 45,
+      "base_price": 90,
+      "market_excluded": true,
+      "use": {
+        "effect_key": "serpent_coil_antidote",
+        "name": "Serpent-Coil Antidote",
+        "duration_game_minutes": 240,
+        "consume": true,
+        "effect": {
+          "description": "The clan's own counter-venom, taken before a purge. It teaches the blood to throw off poison and the body to slip a grip.",
+          "modifiers": [
+            {
+              "stat": "detox_power",
+              "operation": "add",
+              "value": 20
+            },
+            {
+              "stat": "escape_bonus",
+              "operation": "add",
+              "value": 2
+            }
+          ],
+          "tags": [
+            "antidote",
+            "sect"
+          ]
+        }
+      }
+    },
+    "blood_river_essence": {
+      "name": "Blood-River Essence",
+      "description": "A vial of refined battlefield blood. Drunk, it drives the body's cultivation and quickens it for violence.",
+      "sect_value": 45,
+      "base_price": 90,
+      "market_excluded": true,
+      "use": {
+        "effect_key": "blood_river_essence",
+        "name": "Blood-River Essence",
+        "duration_game_minutes": 240,
+        "consume": true,
+        "effect": {
+          "description": "A vial of refined battlefield blood. Drunk, it drives the body's cultivation and quickens it for violence.",
+          "modifiers": [
+            {
+              "stat": "body_cultivation_gain",
+              "operation": "mul",
+              "value": 1.25
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 1
+            }
+          ],
+          "tags": [
+            "essence",
+            "sect"
+          ]
+        }
+      }
+    },
+    "soul_lantern_wick": {
+      "name": "Soul-Lantern Wick",
+      "description": "A wick cut from a pavilion soul-lantern. Its pale flame shows the spirit what is hidden and keeps the heart's demons at arm's length.",
+      "sect_value": 45,
+      "base_price": 90,
+      "market_excluded": true,
+      "use": {
+        "effect_key": "soul_lantern_wick",
+        "name": "Soul-Lantern Wick",
+        "duration_game_minutes": 240,
+        "consume": true,
+        "effect": {
+          "description": "A wick cut from a pavilion soul-lantern. Its pale flame shows the spirit what is hidden and keeps the heart's demons at arm's length.",
+          "modifiers": [
+            {
+              "stat": "sense_precision",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "heart_demon_resistance",
+              "operation": "add",
+              "value": 15
+            }
+          ],
+          "tags": [
+            "lantern",
+            "sect"
+          ]
+        }
+      }
+    },
+    "meridian_jade_pill": {
+      "name": "Meridian-Jade Pill",
+      "description": "A translucent green pill that settles along the meridians and holds them open while the qi runs.",
+      "sect_value": 45,
+      "base_price": 90,
+      "market_excluded": true,
+      "use": {
+        "effect_key": "meridian_jade_pill",
+        "name": "Meridian-Jade Pill",
+        "duration_game_minutes": 240,
+        "consume": true,
+        "effect": {
+          "description": "A translucent green pill that settles along the meridians and holds them open while the qi runs.",
+          "modifiers": [
+            {
+              "stat": "cultivation_gain",
+              "operation": "mul",
+              "value": 1.25
+            },
+            {
+              "stat": "insight",
+              "operation": "add",
+              "value": 1
+            }
+          ],
+          "tags": [
+            "pill",
+            "sect"
+          ]
+        }
+      }
+    },
+    "beastblood_hunting_musk": {
+      "name": "Beastblood Hunting Musk",
+      "description": "A musk the valley's hunters rub into their collars. Beasts misjudge the wearer, and the wearer does not misjudge beasts.",
+      "sect_value": 45,
+      "base_price": 90,
+      "market_excluded": true,
+      "use": {
+        "effect_key": "beastblood_hunting_musk",
+        "name": "Beastblood Hunting Musk",
+        "duration_game_minutes": 240,
+        "consume": true,
+        "effect": {
+          "description": "A musk the valley's hunters rub into their collars. Beasts misjudge the wearer, and the wearer does not misjudge beasts.",
+          "modifiers": [
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "escape_bonus",
+              "operation": "add",
+              "value": 2
+            }
+          ],
+          "tags": [
+            "musk",
+            "sect"
+          ]
+        }
+      }
+    },
+    "heavenblade_whetstone": {
+      "name": "Heavenblade Whetstone",
+      "description": "A whetstone worn smooth by a thousand immortal-gold blades. Worked across an edge, it lends the smith's hands the sect's own discipline.",
+      "sect_value": 45,
+      "base_price": 90,
+      "market_excluded": true,
+      "use": {
+        "effect_key": "heavenblade_whetstone",
+        "name": "Heavenblade Whetstone",
+        "duration_game_minutes": 240,
+        "consume": true,
+        "effect": {
+          "description": "A whetstone worn smooth by a thousand immortal-gold blades. Worked across an edge, it lends the smith's hands the sect's own discipline.",
+          "modifiers": [
+            {
+              "stat": "forging_bonus",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 1
+            }
+          ],
+          "tags": [
+            "whetstone",
+            "sect"
+          ]
+        }
+      }
+    },
+    "ashen_lotus_incense": {
+      "name": "Ashen Lotus Incense",
+      "description": "Incense rolled from lotus ash. Its smoke quiets the heart until the demons in it have nothing to hold on to.",
+      "sect_value": 45,
+      "base_price": 90,
+      "market_excluded": true,
+      "use": {
+        "effect_key": "ashen_lotus_incense",
+        "name": "Ashen Lotus Incense",
+        "duration_game_minutes": 240,
+        "consume": true,
+        "effect": {
+          "description": "Incense rolled from lotus ash. Its smoke quiets the heart until the demons in it have nothing to hold on to.",
+          "modifiers": [
+            {
+              "stat": "heart_demon_resistance",
+              "operation": "add",
+              "value": 25
+            },
+            {
+              "stat": "will",
+              "operation": "add",
+              "value": 1
+            }
+          ],
+          "tags": [
+            "incense",
+            "sect"
+          ]
+        }
+      }
+    },
+    "mandate_scroll": {
+      "name": "Mandate Scroll",
+      "description": "A scroll of the Academy's commentaries on the mandate of heaven. Read before meditation, it makes every insight go further.",
+      "sect_value": 45,
+      "base_price": 90,
+      "market_excluded": true,
+      "use": {
+        "effect_key": "mandate_scroll",
+        "name": "Mandate Scroll",
+        "duration_game_minutes": 240,
+        "consume": true,
+        "effect": {
+          "description": "A scroll of the Academy's commentaries on the mandate of heaven. Read before meditation, it makes every insight go further.",
+          "modifiers": [
+            {
+              "stat": "insight_gain",
+              "operation": "mul",
+              "value": 1.25
+            },
+            {
+              "stat": "insight",
+              "operation": "add",
+              "value": 1
+            }
+          ],
+          "tags": [
+            "scroll",
+            "sect"
+          ]
+        }
+      }
+    },
+    "void_serpent_scale": {
+      "name": "Void-Serpent Scale",
+      "description": "A black scale shed by one of the cult's void serpents. Held under the tongue, it hardens the body and loosens its place in space.",
+      "sect_value": 45,
+      "base_price": 90,
+      "market_excluded": true,
+      "use": {
+        "effect_key": "void_serpent_scale",
+        "name": "Void-Serpent Scale",
+        "duration_game_minutes": 240,
+        "consume": true,
+        "effect": {
+          "description": "A black scale shed by one of the cult's void serpents. Held under the tongue, it hardens the body and loosens its place in space.",
+          "modifiers": [
+            {
+              "stat": "body",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "escape_bonus",
+              "operation": "add",
+              "value": 3
+            }
+          ],
+          "tags": [
+            "scale",
+            "sect"
+          ]
+        }
+      }
     }
   },
   "recipes": {
@@ -27342,6 +27745,19 @@
         "waymark_talisman": 1
       },
       "min_level": 1
+    },
+    "Marrow-Tempering Pill": {
+      "profession": "Alchemy",
+      "tn": 18,
+      "cost": {
+        "spirit_herb": 4,
+        "moonveil_herb": 2,
+        "beast_core": 2
+      },
+      "output": {
+        "marrow_tempering_pill": 1
+      },
+      "min_level": 2
     }
   },
   "perfection": {
@@ -30561,6 +30977,165 @@
       ],
       "disciples_per_lot": 2,
       "cap": 60
+    },
+    "exchange": {
+      "description": "Every sect issues its own stock to members for contribution points, at a fixed multiple of each item's sect value. Better stock unlocks with sect rank, and each sect keeps one item of its own for its members alone. A member rises to Inner and then Core Disciple on the contribution they have earned over their time in the sect; spending points never lowers it.",
+      "points_per_sect_value": 3,
+      "stock": [
+        {
+          "item_id": "swift_wind_talisman",
+          "min_rank_level": 10
+        },
+        {
+          "item_id": "stone_skin_talisman",
+          "min_rank_level": 10
+        },
+        {
+          "item_id": "spirit_focus_talisman",
+          "min_rank_level": 10
+        },
+        {
+          "item_id": "guiding_chalk_array",
+          "min_rank_level": 10
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "min_rank_level": 10
+        },
+        {
+          "item_id": "spatial_pouch",
+          "min_rank_level": 10
+        },
+        {
+          "item_id": "minor_qi_gathering_array_disk",
+          "min_rank_level": 20
+        },
+        {
+          "item_id": "minor_warding_array_disk",
+          "min_rank_level": 20
+        },
+        {
+          "item_id": "crystal_ward_talisman",
+          "min_rank_level": 20
+        },
+        {
+          "item_id": "wind_gourd",
+          "min_rank_level": 20
+        },
+        {
+          "item_id": "marrow_tempering_pill",
+          "min_rank_level": 20
+        },
+        {
+          "item_id": "golden_edge_talisman",
+          "min_rank_level": 30
+        },
+        {
+          "item_id": "moonveil_concealment_array",
+          "min_rank_level": 30
+        },
+        {
+          "item_id": "spatial_ring",
+          "min_rank_level": 30
+        },
+        {
+          "item_id": "longevity_pill",
+          "min_rank_level": 30
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "min_rank_level": 30
+        }
+      ],
+      "sect_stock": {
+        "Azure Cloud Sect": [
+          {
+            "item_id": "cloud_sword_intent_talisman",
+            "min_rank_level": 20
+          }
+        ],
+        "Crimson Furnace Sect": [
+          {
+            "item_id": "furnace_heart_pill",
+            "min_rank_level": 20
+          }
+        ],
+        "Frozen Moon Palace": [
+          {
+            "item_id": "frost_moon_array_chalk",
+            "min_rank_level": 20
+          }
+        ],
+        "Black Serpent Clan": [
+          {
+            "item_id": "serpent_coil_antidote",
+            "min_rank_level": 20
+          }
+        ],
+        "Blood River Sect": [
+          {
+            "item_id": "blood_river_essence",
+            "min_rank_level": 20
+          }
+        ],
+        "Corpse Lantern Pavilion": [
+          {
+            "item_id": "soul_lantern_wick",
+            "min_rank_level": 20
+          }
+        ],
+        "Jade Meridian Sect": [
+          {
+            "item_id": "meridian_jade_pill",
+            "min_rank_level": 20
+          }
+        ],
+        "Thousand Beast Valley": [
+          {
+            "item_id": "beastblood_hunting_musk",
+            "min_rank_level": 20
+          }
+        ],
+        "Heavenblade Immortal Sect": [
+          {
+            "item_id": "heavenblade_whetstone",
+            "min_rank_level": 20
+          }
+        ],
+        "Ashen Lotus Pavilion": [
+          {
+            "item_id": "ashen_lotus_incense",
+            "min_rank_level": 20
+          }
+        ],
+        "Celestial Mandate Academy": [
+          {
+            "item_id": "mandate_scroll",
+            "min_rank_level": 20
+          }
+        ],
+        "Void Serpent Cult": [
+          {
+            "item_id": "void_serpent_scale",
+            "min_rank_level": 20
+          }
+        ]
+      },
+      "earning": {
+        "commission_points_per_stone": 1,
+        "crafted_multiplier": 1.5,
+        "event_points_cap": 30
+      },
+      "promotion": [
+        {
+          "rank_level": 20,
+          "earned": 600
+        },
+        {
+          "rank_level": 30,
+          "earned": 3000
+        }
+      ]
     }
   },
   "sects": {
@@ -58089,6 +58664,12 @@
           "quantity": 1,
           "price": 45,
           "made_here": false
+        },
+        {
+          "item_id": "marrow_tempering_pill_method",
+          "quantity": 1,
+          "price": 450,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58107,7 +58688,8 @@
         "heart_calming_pill@mid": 10,
         "qi_replenishment_pill@mid": 10,
         "moonveil_recovery_pill@mid": 30,
-        "spirit_condensation_pill@mid": 34
+        "spirit_condensation_pill@mid": 34,
+        "marrow_tempering_pill": 40
       }
     },
     "azure_crown_talisman_hall": {
@@ -58860,7 +59442,8 @@
         "dawnlotus_vitality_pill@mid": 74,
         "immortal_marrow_pill@mid": 88,
         "heavenpetal_elixir@mid": 186,
-        "starlight_dao_pill@mid": 218
+        "starlight_dao_pill@mid": 218,
+        "marrow_tempering_pill": 40
       }
     },
     "celestial_mandate_talisman_hall": {
@@ -59332,7 +59915,8 @@
         "dawnlotus_vitality_pill": 37,
         "immortal_marrow_pill": 44,
         "heavenpetal_elixir": 93,
-        "starlight_dao_pill": 109
+        "starlight_dao_pill": 109,
+        "marrow_tempering_pill": 40
       }
     },
     "cloudblade_forge": {
@@ -59734,7 +60318,8 @@
         "dawnlotus_vitality_pill": 37,
         "immortal_marrow_pill": 44,
         "heavenpetal_elixir": 93,
-        "starlight_dao_pill": 109
+        "starlight_dao_pill": 109,
+        "marrow_tempering_pill": 40
       }
     },
     "divine_herb_talisman_hall": {
@@ -61015,6 +61600,12 @@
           "quantity": 1,
           "price": 36,
           "made_here": false
+        },
+        {
+          "item_id": "marrow_tempering_pill_method",
+          "quantity": 1,
+          "price": 360,
+          "made_here": false
         }
       ],
       "buys": {
@@ -61022,7 +61613,8 @@
         "moonveil_herb": 2,
         "beast_core": 2,
         "recovery_pill": 4,
-        "qi_pill": 4
+        "qi_pill": 4,
+        "marrow_tempering_pill": 40
       }
     },
     "greenriver_provisions": {
@@ -61329,7 +61921,8 @@
         "heart_calming_pill": 5,
         "qi_replenishment_pill": 5,
         "moonveil_recovery_pill": 15,
-        "spirit_condensation_pill": 17
+        "spirit_condensation_pill": 17,
+        "marrow_tempering_pill": 40
       }
     },
     "hundred_herb_talisman_hall": {
@@ -61577,7 +62170,8 @@
         "moonveil_recovery_pill": 15,
         "spirit_condensation_pill": 17,
         "dawnlotus_vitality_pill": 37,
-        "immortal_marrow_pill": 44
+        "immortal_marrow_pill": 44,
+        "marrow_tempering_pill": 40
       }
     },
     "ironbanner_forge": {
@@ -61771,7 +62365,8 @@
         "moonveil_recovery_pill": 15,
         "spirit_condensation_pill": 17,
         "dawnlotus_vitality_pill": 37,
-        "immortal_marrow_pill": 44
+        "immortal_marrow_pill": 44,
+        "marrow_tempering_pill": 40
       }
     },
     "jade_cauldron_talisman_hall": {
@@ -62121,7 +62716,8 @@
         "heart_calming_pill": 5,
         "qi_replenishment_pill": 5,
         "moonveil_recovery_pill": 15,
-        "spirit_condensation_pill": 17
+        "spirit_condensation_pill": 17,
+        "marrow_tempering_pill": 40
       }
     },
     "jadewood_apothecary": {
@@ -62189,6 +62785,12 @@
           "quantity": 1,
           "price": 36,
           "made_here": false
+        },
+        {
+          "item_id": "marrow_tempering_pill_method",
+          "quantity": 1,
+          "price": 360,
+          "made_here": false
         }
       ],
       "buys": {
@@ -62196,7 +62798,8 @@
         "moonveil_herb": 2,
         "beast_core": 2,
         "recovery_pill": 4,
-        "qi_pill": 4
+        "qi_pill": 4,
+        "marrow_tempering_pill": 40
       }
     },
     "jadewood_talisman_hall": {
@@ -62498,7 +63101,8 @@
         "dawnlotus_vitality_pill": 37,
         "immortal_marrow_pill": 44,
         "heavenpetal_elixir": 93,
-        "starlight_dao_pill": 109
+        "starlight_dao_pill": 109,
+        "marrow_tempering_pill": 40
       }
     },
     "lunar_veil_talisman_hall": {
@@ -62689,7 +63293,8 @@
         "moonveil_recovery_pill": 15,
         "spirit_condensation_pill": 17,
         "dawnlotus_vitality_pill": 37,
-        "immortal_marrow_pill": 44
+        "immortal_marrow_pill": 44,
+        "marrow_tempering_pill": 40
       }
     },
     "mandate_crown_provisions": {
@@ -63242,6 +63847,12 @@
           "quantity": 1,
           "price": 36,
           "made_here": false
+        },
+        {
+          "item_id": "marrow_tempering_pill_method",
+          "quantity": 1,
+          "price": 360,
+          "made_here": false
         }
       ],
       "buys": {
@@ -63249,7 +63860,8 @@
         "moonveil_herb": 2,
         "beast_core": 2,
         "recovery_pill": 4,
-        "qi_pill": 4
+        "qi_pill": 4,
+        "marrow_tempering_pill": 40
       }
     },
     "moonfrost_talisman_hall": {
@@ -63406,7 +64018,8 @@
         "heart_calming_pill": 5,
         "qi_replenishment_pill": 5,
         "moonveil_recovery_pill": 15,
-        "spirit_condensation_pill": 17
+        "spirit_condensation_pill": 17,
+        "marrow_tempering_pill": 40
       }
     },
     "nine_heavens_forge": {
@@ -63806,7 +64419,8 @@
         "dawnlotus_vitality_pill@mid": 74,
         "immortal_marrow_pill@mid": 88,
         "heavenpetal_elixir@mid": 186,
-        "starlight_dao_pill@mid": 218
+        "starlight_dao_pill@mid": 218,
+        "marrow_tempering_pill": 40
       }
     },
     "nine_heavens_talisman_hall": {
@@ -64626,6 +65240,12 @@
           "quantity": 1,
           "price": 36,
           "made_here": false
+        },
+        {
+          "item_id": "marrow_tempering_pill_method",
+          "quantity": 1,
+          "price": 360,
+          "made_here": false
         }
       ],
       "buys": {
@@ -64633,7 +65253,8 @@
         "moonveil_herb": 2,
         "beast_core": 2,
         "recovery_pill": 4,
-        "qi_pill": 4
+        "qi_pill": 4,
+        "marrow_tempering_pill": 40
       }
     },
     "ruined_constellation_array_workshop": {
@@ -65828,7 +66449,8 @@
         "moonveil_recovery_pill@mid": 30,
         "spirit_condensation_pill@mid": 34,
         "dawnlotus_vitality_pill@mid": 74,
-        "immortal_marrow_pill@mid": 88
+        "immortal_marrow_pill@mid": 88,
+        "marrow_tempering_pill": 40
       }
     },
     "spirit_jade_talisman_hall": {

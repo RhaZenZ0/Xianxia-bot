@@ -456,6 +456,15 @@ func worldEventEngageAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 		return authoritativeMutation{}, err
 	}
 	out["state"] = state
+	if success {
+		points, pointsErr := sectEventPointsTx(conn, catalog, userID, eventKey, contribution, i64(state["contribution"]))
+		if pointsErr != nil {
+			return authoritativeMutation{}, pointsErr
+		}
+		if points != nil {
+			out["sect_points"] = points
+		}
+	}
 
 	progress, err := worldEventSiteProgressTx(conn, eventKey)
 	if err != nil {

@@ -139,6 +139,13 @@ type ItemUse struct {
 	// read inside the household, it returns them to that mark.
 	Homeward bool `json:"homeward"`
 	Waymark  bool `json:"waymark"`
+
+	// VitalityMaxPercent (v1.8.0) is the Marrow-Tempering Pill: a permanent
+	// rise in max vitality of this share of the current maximum, and never
+	// less than VitalityMaxMin. How many a body realm will take is the
+	// engine's rule (marrowTemperingPerBodyRealm), not the item's.
+	VitalityMaxPercent int64 `json:"vitality_max_percent"`
+	VitalityMaxMin     int64 `json:"vitality_max_min"`
 }
 type Item struct {
 	Name string  `json:"name"`
@@ -787,6 +794,55 @@ type SectTribute struct {
 	Cap int64 `json:"cap"`
 }
 
+// SectExchange is what a sect issues to its own members for contribution
+// points (v1.8.0), beside the treasury they stock by donating.
+//
+// Until now `sect.redeem` could hand back only what somebody had handed in, so
+// a sect's "shop" was whatever its members happened to donate, and usually
+// nothing. Issued stock is never out: the sect makes it, and prices it at
+// PointsPerSectValue times the item's own sect value, so an item is worth the
+// same to a sect whichever way it moves. Stock is open to every sect;
+// SectStock is each sect's own, for its members alone.
+type SectExchange struct {
+	PointsPerSectValue int64                        `json:"points_per_sect_value"`
+	Stock              []SectExchangeLot            `json:"stock"`
+	SectStock          map[string][]SectExchangeLot `json:"sect_stock"`
+	Earning            SectExchangeEarning          `json:"earning"`
+	Promotion          []SectPromotionRung          `json:"promotion"`
+}
+
+// SectPromotionRung is one rank a member reaches on the contribution they
+// have earned in their sect - never the balance, which spending lowers.
+type SectPromotionRung struct {
+	RankLevel int64 `json:"rank_level"`
+	Earned    int64 `json:"earned"`
+}
+
+// SectExchangeLot is one item a sect issues and the rank that unlocks it.
+type SectExchangeLot struct {
+	ItemID       string `json:"item_id"`
+	MinRankLevel int64  `json:"min_rank_level"`
+}
+
+// SectExchangeEarning is how contribution points are earned beyond a
+// donation: a commission for your own sect pays points per stone of its
+// reward, a donation of something your certified trade makes is worth
+// CraftedMultiplier times its sect value, and a world event in your sect's
+// world pays its contribution up to EventPointsCap per event. A ratio the
+// content leaves out pays nothing.
+type SectExchangeEarning struct {
+	CommissionPointsPerStone float64 `json:"commission_points_per_stone"`
+	CraftedMultiplier        float64 `json:"crafted_multiplier"`
+	EventPointsCap           int64   `json:"event_points_cap"`
+}
+
+// Lots returns every lot a member of sectName may be issued: the common
+// stock, then that sect's own.
+func (x SectExchange) Lots(sectName string) []SectExchangeLot {
+	out := append([]SectExchangeLot{}, x.Stock...)
+	return append(out, x.SectStock[sectName]...)
+}
+
 type SectDefinition struct {
 	Alignment string `json:"alignment"`
 	Hidden    bool   `json:"hidden"` // the Heaven-Devouring Demon Sect: no public trial, no entry manual
@@ -1150,6 +1206,24 @@ func (c Catalog) SectTribute() SectTribute {
 	var out SectTribute
 	if err := json.Unmarshal(encoded, &out); err != nil {
 		return SectTribute{}
+	}
+	return out
+}
+
+// SectExchange reads the exchange block out of `sect_system`, the way
+// SectTribute reads the tribute. An absent or unreadable block issues nothing.
+func (c Catalog) SectExchange() SectExchange {
+	raw, ok := c.SectSystem["exchange"]
+	if !ok {
+		return SectExchange{}
+	}
+	encoded, err := json.Marshal(raw)
+	if err != nil {
+		return SectExchange{}
+	}
+	var out SectExchange
+	if err := json.Unmarshal(encoded, &out); err != nil {
+		return SectExchange{}
 	}
 	return out
 }

@@ -153,6 +153,15 @@ if __name__ == "__main__":
     unittest.main()
 
 
+# Recipes authored after migration 46. The migration is a frozen list of the
+# methods that existed the day the learning step shipped, so a method written
+# later was never anybody's to keep; it is learned from its slip or its
+# examination like any other. A new entry here is a new decision, with its reason.
+AUTHORED_AFTER_THE_LEARNING_STEP = {
+    "Marrow-Tempering Pill": "v1.8.0 - taught by the Tier 2 Alchemy examination and its slip",
+}
+
+
 class GrandfatheringDrill(unittest.IsolatedAsyncioTestCase):
     """Nobody loses a method they could already work (v1.0.0-rc.20).
 
@@ -193,6 +202,9 @@ class GrandfatheringDrill(unittest.IsolatedAsyncioTestCase):
 
         # Everything an Alchemy 3 could work the day before is still theirs...
         for name, recipe in recipes.items():
+            if name in AUTHORED_AFTER_THE_LEARNING_STEP:
+                self.assertNotIn(name, known, f"{name} was authored after migration 46 and cannot be grandfathered")
+                continue
             if recipe["profession"] == "Alchemy" and int(recipe["min_level"]) <= 3:
                 self.assertIn(name, known, f"{name} was taken away from a level-3 alchemist")
         # ...and the entry methods of every craft, which anyone could make.
