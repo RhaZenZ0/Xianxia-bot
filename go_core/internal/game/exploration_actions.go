@@ -1641,7 +1641,7 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 	// only the wait puts a traveller in transit.
 	waitMinutes := int64(0)
 	if roadConnection {
-		waitMinutes = scaledTravelWait(travelMinutes)
+		waitMinutes = scaledTravelWait(conn, travelMinutes)
 	}
 	arrivalGameMinute := p.GameMinute + waitMinutes
 	if roadConnection && waitMinutes > 0 {
