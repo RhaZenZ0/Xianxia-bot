@@ -427,11 +427,13 @@ def build() -> str:
               "and the read-only lock each had to move or lock a channel that already existed, and "
               "until rc.59 none of them did. Walk them on a guild with history, not on a new one.", "",
               "| Loop | Live |", "|---|---|",
-              "| Full Setup (or Repair) leaves eight categories, in order: Start Here, Announcements, Realm Capitals, World Events, Auction Houses, Cultivation World, Feedback, Admin | [ ] |",
+              "| Full Setup (or Repair) leaves nine categories, in order: Start Here, Announcements, Realm Capitals, World Events, Auction Houses, Market Stalls, Cultivation World, Feedback, Admin | [ ] |",
               "| channels that already existed have moved into their new categories, not only the ones the run created | [ ] |",
               "| an ordinary member cannot post in #xianxia-info, #expeditions, #player-homes or #updates, including ones that predate the release | [ ] |",
               "| no new #event-scenes is created; an event's scene anchors in its world's own feed, and an existing one keeps the blurb saying it is retired | [ ] |",
               "| #updates is silent on a guild whose marker was NULL, and the release after this one posts there once | [ ] |",
+              "| an ordinary member cannot post in a world's market-stalls channel, and a stall listed in that world shows its card there within a tick | [ ] |",
+              "| an NPC's consignment appears as a card in its auction house's channel after a tick, naming the NPC as seller | [ ] |",
               "",
               "### Upgrading the deployment", "",
               "Which channel depends on the tag: a version with no `-` in it is published as GitHub's "

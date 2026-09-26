@@ -604,6 +604,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         SERVER_AUCTION_CATEGORY,
         SERVER_BASE_CATEGORY,
         SERVER_EVENT_CATEGORY,
+        SERVER_STALL_CATEGORY,
         SERVER_REALM_CATEGORY,
         SERVER_WORLD_CATEGORY,
     )
@@ -767,11 +768,26 @@ async def run(url: str, token: str, db_path: str) -> Report:
                        f"#{capital} sits in {getattr(made[capital].category, 'name', None)!r}")
                 expect(getattr(made[feed].category, "name", None) == SERVER_EVENT_CATEGORY,
                        f"#{feed} sits in {getattr(made[feed].category, 'name', None)!r}")
+                # v1.7.0: the world's market, in its own category, read-only -
+                # the access role sees it and cannot post in it.
+                market = str(hub["stalls_channel_name"])
+                expect(market in made, f"no market-stalls channel for {world}")
+                expect(getattr(made[market].category, "name", None) == SERVER_STALL_CATEGORY,
+                       f"#{market} sits in {getattr(made[market].category, 'name', None)!r}")
+                overwrites = made[market].overwrites or {}
+                access = discord.utils.get(live.roles, name=_realm_access_role_name(world))
+                expect(access is not None and getattr(overwrites.get(access), "view_channel", None) is True,
+                       f"#{market} never allowed {_realm_access_role_name(world)}")
+                expect(getattr(overwrites.get(access), "send_messages", None) is False
+                       and getattr(overwrites.get(live.default_role), "send_messages", None) is False,
+                       f"#{market} is not read-only")
             auctions = sorted(c.name for c in live.text_channels
                               if getattr(c.category, "name", None) == SERVER_AUCTION_CATEGORY)
             expect(len(auctions) == 9, f"{len(auctions)} auction channels, expected 9: {auctions}")
             rows = {str(r["world_name"]) for r in await DB.get_world_event_channels(guild.id)}
             expect(rows == set(REALM_HUBS), f"bound worlds {sorted(rows)}")
+            markets = {str(r["world_name"]) for r in await DB.get_stall_channels(guild.id)}
+            expect(markets == set(REALM_HUBS), f"bound markets {sorted(markets)}")
 
             # The gate actually closed, not merely "no exception". SimCord gives
             # the bot every permission except administrator, so a channel
@@ -811,7 +827,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
                     expect(getattr(overwrites.get(live.default_role), "send_messages", None) is False,
                            f"#{target.name} is no longer read-only: the gate replaced the anchor's own overwrite")
             return (f"{len(wanted)} categories in order, every base channel in its own, "
-                    f"4 capitals, 4 world feeds, {len(auctions)} auction channels, all gated")
+                    f"4 capitals, 4 world feeds, 4 markets, {len(auctions)} auction channels, all gated")
         built = await step(report, "the dashboard's Full Setup creates every category and per-world channel", full_setup())
         if built:
             report.add("PASS", "what Full Setup built", built)
@@ -1267,6 +1283,11 @@ async def run(url: str, token: str, db_path: str) -> Report:
             expect("is set up in" in opened, f"Open did not set the stall up: {opened[:400]}")
             listed = await leaf("List", picks={"": "Recovery Pill"}, fields={"Quantity": "3", "Price": "6"})
             expect("Listing **#" in listed, f"List did not lay the goods out: {listed[:400]}")
+            # v1.7.0: the stall's card is in its world's market channel.
+            market_row = next((r for r in await DB.get_stall_channels(guild.id) if str(r["world_name"]) == "Mortal World"), None)
+            card = next((r for r in await DB.list_stall_cards(guild.id) if int(r["user_id"]) == int(player.id)), None)
+            expect(market_row is not None and card is not None and int(card["channel_id"]) == int(market_row["channel_id"]),
+                   f"no card for the stall in the Mortal World's market channel: {card} / {market_row}")
             board = await leaf("Board")
             expect("Sim's Table" in board and "Recovery Pill" in board, f"the board does not show the stall: {board[:400]}")
             status = await leaf("Status")
@@ -1275,6 +1296,8 @@ async def run(url: str, token: str, db_path: str) -> Report:
             expect("back into your bag" in withdrawn, f"Withdraw did not return the goods: {withdrawn[:400]}")
             closed = await leaf("Close")
             expect("is taken down" in closed, f"Close did not take the stall down: {closed[:400]}")
+            gone = next((r for r in await DB.list_stall_cards(guild.id) if int(r["user_id"]) == int(player.id)), None)
+            expect(gone is None, f"the card outlived the stall: {gone}")
             if was_at:
                 await ENGINE.action("admin.player.teleport", int(gm.id), {"user_id": int(player.id), "location": was_at, "reason": "playtest: back where the run had them"})
                 await settle_patiently(env)

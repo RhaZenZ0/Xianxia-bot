@@ -1,4 +1,4 @@
-"""Item grades (v1.6.0), the presentation half.
+"""Item grades (v1.7.0), the presentation half.
 
 A crafted item carries a grade, stored as a suffix on its id: ``qi_pill@high``.
 The bare id is the first grade (Low), so everything written before grades

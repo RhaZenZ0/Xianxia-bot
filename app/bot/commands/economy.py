@@ -729,7 +729,7 @@ def _stall_listing_line(row:dict[str,Any],coin:str)->str:
     ceiling=int(row.get("npc_ceiling") or 0)
     town=f" · townsfolk pay up to {ceiling}" if ceiling and int(row.get("unit_price") or 0)<=ceiling else ""
     unit=int(row.get("unit_price") or 0)
-    # A stall is in reach from anywhere (v1.6.0) and the engine quotes what a
+    # A stall is in reach from anywhere (v1.7.0) and the engine quotes what a
     # listing costs from where the caller stands; the board prints its quote.
     here=row.get("price_here")
     far=f" · **{int(here)}** from where you stand" if here is not None and int(here)!=unit else ""

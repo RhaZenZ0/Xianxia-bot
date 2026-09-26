@@ -878,7 +878,7 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
     if quality_label:
         prefix = "⚗️ Batch quality" if profession == "Alchemy" else "✨ Craft quality"
         quality_line = f"\n{prefix}: **{quality_label}**"
-        # The grade (v1.6.0): what the quality made, and when the crafter's
+        # The grade (v1.7.0): what the quality made, and when the crafter's
         # rank held it back, what the roll had reached and the rank that makes it.
         grade = str(resolved.get("grade") or "")
         reached = str(resolved.get("grade_reached") or "")

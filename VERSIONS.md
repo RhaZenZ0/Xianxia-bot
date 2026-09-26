@@ -6,7 +6,7 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
-**1.6.0** gives every crafted item a grade - Low, Mid, High, Superior or Transcendent - made by how well the craft went and capped by the crafter's rank, and makes every player's stall reachable from anywhere in the world, dearer by the road.
+**1.7.0** gives every crafted item a grade - Low, Mid, High, Superior or Transcendent - made by how well the craft went and capped by the crafter's rank, makes every player's stall reachable from anywhere in the world, dearer by the road, and gives each world a market-stalls channel with a live card for every stall.
 
 The quality ladder a craft rolls has always had names (ordinary, refined, fine, superior,
 flawless, masterwork) and spent them on one thing: a larger Alchemy batch. Nothing read quality
@@ -44,6 +44,22 @@ rises `distance_percent_per_hop` (5%) per road. Another world, or a private plac
 that; a household is measured from its town. The surcharge is split three ways - a third to the
 seller, a third to the city's cut, the rest the courier's - and the town's own buyers stand in the
 stall's city and pay none. Tending a stall is still done in its city.
+
+Each world has a read-only market-stalls channel now (schema 66), in a new **🧺 Market Stalls**
+category beside the auction floors, visible to cultivators who have reached that world. The bot keeps
+one card per open stall there - its keeper, its city, its coin and every listing - edited when goods
+are listed, bought or withdrawn and taken down when the stall closes, and brought up to date after
+every tick, which is when the town does its own buying. A reset or an erasure takes the card with the
+stall. The dashboard's Server Setup creates, gates and reports the four channels, and Teardown
+removes them.
+
+The auction channels were quiet for a reason, reported as "no updates on auction channel": a lot
+card was posted in exactly one place, a player's own `/auction sell`. Every lot the world listed
+itself - an NPC's find, a grave-robber's keepsake, consigned to the nearest house - sat on the floor
+with no card. The tick now posts the card for any open lot that has none, naming its NPC seller
+rather than "None". It still needs the house's channel: a server that never ran Full Setup or Repair
+has no auction channels to post in. And `#updates`' own description, written in v1.0.0 and never
+posted because nothing named its slot, is posted now.
 
 **1.6.0** gives the GM dashboard an NPCs head and a Sects head, so a GM can see the world's people and its sects the way they already see players, and it stops anybody digging for ore inside a shop or on an auction floor.
 
@@ -142,6 +158,9 @@ count cannot be read. It is the one reader of the counts; `test_command_use_is_c
 that nothing which draws a panel reads them, because the numbers were asked for to be seen and not
 to reorder anything.
 
+- **Schema 66** adds `stall_channels` (one read-only market-stalls channel per world, the
+  `world_event_channels` shape) and `stall_card_messages` (the live card per open stall) - Discord ids
+  only; the stall is the `player_stalls` row the engine owns.
 - **Schema 65** adds `player_stalls`, `stall_listings` and `stall_sales` - a cultivator's stall in a city's
   street, its escrowed listings and the seller's ledger; every one hangs off `characters` with foreign
   keys, so an erased seller takes the stall with them, and a buyer is anonymised on the ledger.
@@ -1060,9 +1079,9 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.6.0
+## Release status — v1.7.0
 
-- Current release: v1.6.0 - the GM dashboard gains an NPCs head and a Sects head (reads only), three faults on the old pages are fixed, and a dig is refused in a shop or on an auction floor (see the changelog). Built on v1.5.0 - a cultivator at Foundation Establishment keeps a market stall in a city's street (schema 65): standing listings that sell while they are away, to cultivators and - never the last unit, never above the shelf, out of its own wealth - to the town; the homestead's merchant hall grows it (see the changelog). Built on v1.4.1 - a GM can finish or advance a player's quest from the Player Editor's new Quests card, through the same path a player's own report takes (see the changelog). Built on v1.4.0 - a GM updates the server from the dashboard: an audited request, a watcher on the NAS running `update.sh --upgrade`, and the outcome on the card (see the changelog). Built on v1.3.5 - command use is counted (schema 64) and the ten most used commands are on `/admin server observability`; nothing is reordered for it (see the changelog). Built on v1.3.4 - the punch list cleared: the Stygian Ghost Scripture is the Ghost Cultivator's high manual and its inheritance reads `preferred_paths`, a path's skill is on the sheet, two dead era keys deleted (see the changelog). Built on v1.3.3 - the eight open rule decisions settled: a Law control technique weakens its opponent (schema 63), a clan treaty that runs out ends and leaves a rivalry, the auction-door ambush is on the house's doorstep, five entries closed with reasons (see the changelog). Schema 63. Built on v1.3.2 - the daily five are one step each: `/cultivate`, `/explore`, `/hunt`, `/forage` and `/mine` are slash commands and a row of five buttons on the menu (see the changelog). Built on v1.3.1 - six rules the bot held are the engine's (a sponsor's presence, the sects a gate justifies, a city's board, a territory's ground, the forage wait, the quest chain catch-up on any action) and three more buttons are drawn only where they work (see the changelog). Built on v1.3.0 - ten of the owner's decisions: a failed craft returns half its makings, a hall teaches only what its world can make, the Nine-Echo Sword Wraith is a secret floor beneath its realm, `/reset` asks with the count, the Qi Body card shows the pool at every realm, thirty-three upper-world send-offs, no property inside a household, `heart` retired, the Starfall hall's buy line lowered (see the changelog). Built on v1.2.3 - the review's eight deferred claims settled: Vacuum refuses at once behind a half-written action, one array rule at both cultivation doors, one counter-attack TN, an undo undone again, a rank price under a merchant's wares, and a lot listed in its house's coin (see the changelog). Built on v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
+- Current release: v1.7.0 - crafted items carry a grade, Low to Transcendent, by the craft's quality capped by rank; keepers deal in Low and Mid, a player's stall in any grade, reachable from anywhere at 5% a road; each world has a read-only market-stalls channel with a live card per stall (schema 66), and every open auction lot gets its card (see the changelog). Built on v1.6.0 - the GM dashboard gains an NPCs head and a Sects head (reads only), three faults on the old pages are fixed, and a dig is refused in a shop or on an auction floor (see the changelog). Built on v1.5.0 - a cultivator at Foundation Establishment keeps a market stall in a city's street (schema 65): standing listings that sell while they are away, to cultivators and - never the last unit, never above the shelf, out of its own wealth - to the town; the homestead's merchant hall grows it (see the changelog). Built on v1.4.1 - a GM can finish or advance a player's quest from the Player Editor's new Quests card, through the same path a player's own report takes (see the changelog). Built on v1.4.0 - a GM updates the server from the dashboard: an audited request, a watcher on the NAS running `update.sh --upgrade`, and the outcome on the card (see the changelog). Built on v1.3.5 - command use is counted (schema 64) and the ten most used commands are on `/admin server observability`; nothing is reordered for it (see the changelog). Built on v1.3.4 - the punch list cleared: the Stygian Ghost Scripture is the Ghost Cultivator's high manual and its inheritance reads `preferred_paths`, a path's skill is on the sheet, two dead era keys deleted (see the changelog). Built on v1.3.3 - the eight open rule decisions settled: a Law control technique weakens its opponent (schema 63), a clan treaty that runs out ends and leaves a rivalry, the auction-door ambush is on the house's doorstep, five entries closed with reasons (see the changelog). Schema 63. Built on v1.3.2 - the daily five are one step each: `/cultivate`, `/explore`, `/hunt`, `/forage` and `/mine` are slash commands and a row of five buttons on the menu (see the changelog). Built on v1.3.1 - six rules the bot held are the engine's (a sponsor's presence, the sects a gate justifies, a city's board, a territory's ground, the forage wait, the quest chain catch-up on any action) and three more buttons are drawn only where they work (see the changelog). Built on v1.3.0 - ten of the owner's decisions: a failed craft returns half its makings, a hall teaches only what its world can make, the Nine-Echo Sword Wraith is a secret floor beneath its realm, `/reset` asks with the count, the Qi Body card shows the pool at every realm, thirty-three upper-world send-offs, no property inside a household, `heart` retired, the Starfall hall's buy line lowered (see the changelog). Built on v1.2.3 - the review's eight deferred claims settled: Vacuum refuses at once behind a half-written action, one array rule at both cultivation doors, one counter-attack TN, an undo undone again, a rank price under a merchant's wares, and a lot listed in its house's coin (see the changelog). Built on v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
   Apprentice to Tier 9 Sovereign with each trade's own word in front (Pill, Forge, Talisman, Array,
   Herb, Ore, Beast, Artifact, Treasure). No schema.
 - v1.2.1: a beast can always evolve, a homestead can be upgraded in any world, and a dozen smaller wires from a deep review (see the changelog).

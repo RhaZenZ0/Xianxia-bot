@@ -448,7 +448,7 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	} else {
 		qkey, qlabel, xpbonus, qpoints, _ = craftQuality(margin, success)
 	}
-	// The grade (v1.6.0). Quality used to multiply an alchemy batch and do
+	// The grade (v1.7.0). Quality used to multiply an alchemy batch and do
 	// nothing for the other three trades; it is spent on the grade of what is
 	// made now, capped by the crafter's rank in this trade.
 	gradeIndex, gradeReached := craftGradeIndex(catalog, qkey, margin, level)

@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 65; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 66; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -5036,7 +5036,7 @@ shut every one of them. A road site is exempt in the engine and in the panel ali
 `test_a_button_is_drawn_where_it_works.py` computes the engine's rule a third time over all 477
 locations and holds the panel's Mine hide to it.
 
-### A grade is a suffix, and one door reads it (`item_grade.go`, v1.6.0)
+### A grade is a suffix, and one door reads it (`item_grade.go`, v1.7.0)
 
 Asked for: items graded Low / Mid / High / Superior / Transcendent, NPC shops dealing only in the
 lowest, player stalls in any. The owner's calls: crafted items only (the recipe outputs), grade by
@@ -5084,6 +5084,44 @@ half and been cheaper than the middle of its world. Another world or a private p
 measured from its town. The surcharge is split a third to the seller, a third to the city's cut
 (which like the fee goes into no purse) and the rest a courier sink; `StallSaleTx`, the town's
 door, passes zero because the town stands in the stall's city.
+
+### Every open lot gets a card, and every stall a card of its own (schema 66, v1.7.0)
+
+Reported as *"I have got no updates on auction channel"*. `announce_lot` posted a lot's card in
+**exactly one place**, a player's own `/auction sell`, and the tick's `settle_lots` only ever edited
+cards that already existed. Every lot the world listed itself - `npc_finds.go` consigning an NPC's
+find or a grave-robber's keepsake to the nearest house - sat on the floor with no card, and on a
+small server that is most of the floor: the same missing wire as `/learn` (rc.43) and the peach
+(rc.50), a finished mechanism nothing pointed at. `sync_lots` posts a card for every open lot that
+has none, skipping houses with no bound channel so an unbound server costs nothing a tick, and the
+card names `seller_npc_name` - it would have read *"Seller: None"*, the `engine —` footer lesson
+(v1.0.8) in a card. The card still needs the house's channel: a server that never ran Full Setup or
+Repair has no auction channels to post in, and nothing here changes that.
+
+**The stall channels are `world_event_channels` again, with one rule it does not have.** One per
+world (`stalls_channel_name` on `REALM_HUBS`, so a fifth world is one entry), in a new **🧺 Market
+Stalls** category after the auction floors, gated by the access role, created only behind
+`create_missing`, re-parented when found elsewhere. The new rule is **read-only**, and it
+deliberately does not go through `ensure_realm_hub_overwrites`: that grants the role the full member
+set, send included, so a read-only overwrite written after it would be flipped back on every Repair
+and written again - churn a "Repair creates nothing new" check cannot see. Every overwrite is
+`merge_overwrite`, lifted out of the cultivator gate (v1.0.11) so there is one statement of *merge,
+never replace*, and the bot allows itself first (rc.52). `test_stall_channels.py` reads the calls in
+source order, because `ast.walk` is breadth-first and "which call comes first" was the assertion.
+
+**One card per stall, kept by three doors.** Each stall command refreshes its keeper's card after
+the engine agreed (a buy refreshes the *seller's*); `sync_stalls` refreshes every card after the
+tick, which is when the town buys (`npc_stalls.go` tells Python only a count) and which also takes
+down the card of a stall that went some way no command saw; and a reset or an erasure reads the card
+before the engine sweeps the row that names it and deletes the message after - v1.0.8's thread rule,
+because `stall_card_messages` is keyed on `user_id` and the sweep takes it. **The tick would otherwise
+edit every card every tick**, so `_LAST_SAID` remembers what each card last said in this process and
+leaves an unchanged one alone; a command refresh forces the edit, and a restart edits each card once.
+
+**`#updates`' blurb had never been posted.** `DEFAULT_CHANNEL_MESSAGES["updates"]` has existed since
+rc.59, and every reader of a default walks `CHANNEL_MESSAGE_KEYS`, which did not name it - so the
+gate that holds every channel to having a blurb (`test_every_channel_says_what_it_is`) was green over
+text nobody could see. A default no slot names is decoration; the slot is there now.
 
 ## Testing conventions
 

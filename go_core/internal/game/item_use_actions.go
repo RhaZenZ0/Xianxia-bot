@@ -160,7 +160,7 @@ func itemUseActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	if !ok {
 		return authoritativeMutation{}, errors.New("unknown item")
 	}
-	// A grade (v1.6.0) multiplies what the item does - its restores, the
+	// A grade (v1.7.0) multiplies what the item does - its restores, the
 	// years it adds, its modifiers and how long they last - and nothing else:
 	// a stronger pill is not a cleaner one, so its toxicity is the base's.
 	// The base id keys the effect, so a Mid pill replaces a Low one's effect

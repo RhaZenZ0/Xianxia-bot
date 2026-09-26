@@ -558,7 +558,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
             want = dict(buys[0])
             await step(report, "grant the item the keeper wants", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": str(want.get("item_id")), "quantity": 2, "reason": "playtest"}))
             await step(report, f"shop.sell {want.get('item_id')}", act("shop.sell", PLAYER, {"item_id": str(want.get("item_id")), "quantity": 1}))
-        # Item grades (v1.6.0): a keeper deals in Low and Mid and refuses
+        # Item grades (v1.7.0): a keeper deals in Low and Mid and refuses
         # anything finer, whatever the shop buys; a High pill is still a pill,
         # and using one lands its effect.
         await step(report, "grant a High Qi Nourishing Pill", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": "qi_pill@high", "quantity": 2, "reason": "playtest: a graded item"}))
@@ -713,7 +713,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         report.add("PASS" if int(keeper_bag.get("recovery_pill", 0)) == 0 else "FAIL", "the goods are in escrow, not in the bag", f"keeper carries {keeper_bag.get('recovery_pill', 0)}")
         if listed is not None:
             report.add("PASS" if listed.get("npc_may_buy") else "FAIL", "at 6 the town may buy (the cheapest Mortal shelf sells the pill dearer)", f"npc_ceiling={listed.get('npc_ceiling')}")
-        # A player's stall deals in any grade (v1.6.0), and the town never buys
+        # A player's stall deals in any grade (v1.7.0), and the town never buys
         # what no shelf sells, so a High pill is for cultivators only.
         await step(report, "the keeper carries a High pill", gm("admin.player.adjust_item", {"user_id": BUYER, "item_id": "qi_pill@high", "quantity": 1, "reason": "playtest: a graded listing"}))
         high = await step(report, "stall.list a High pill", act("stall.list", BUYER, {"item_id": "qi_pill@high", "quantity": 1, "unit_price": 90}))
@@ -730,7 +730,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         status = await step(report, "stall.status after the sale", query("stall.status", BUYER, {}))
         sales = list((status or {}).get("recent_sales") or [])
         report.add("PASS" if sales and not sales[0].get("buyer_is_npc") else "FAIL", "the keeper's ledger records a cultivator's purchase", f"{len(sales)} sale(s)")
-        # A stall is in reach from anywhere (v1.6.0); what distance costs is a
+        # A stall is in reach from anywhere (v1.7.0); what distance costs is a
         # surcharge a road. The player steps off every road in the Mortal World
         # - same world, so no purse converts - reads the board's quote and buys
         # at it, and the result names the roads and the courier's share.

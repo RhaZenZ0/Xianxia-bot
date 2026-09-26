@@ -270,7 +270,7 @@ func TestABuyerPaysAndTheSellerIsPaidInTheStallsWorldCurrency(t *testing.T) {
 	if got := stallCount(t, path, `SELECT COUNT(*) FROM currency_wallets WHERE user_id=42 AND currency_id<>'low_spirit_stone'`); got != 0 {
 		t.Fatal("the sale was paid in the seller's current world's money rather than the stall's")
 	}
-	// A stall is in reach from anywhere (v1.6.0), and distance is priced, not
+	// A stall is in reach from anywhere (v1.7.0), and distance is priced, not
 	// refused. The marsh is in Greenriver's world and on no road, so it counts
 	// as half the cross-world distance: 10 roads, +50%. On a 20-stone pill
 	// that is 10 more: a third to the seller, a third to the city's cut, and

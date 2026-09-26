@@ -8,7 +8,7 @@ import (
 	"xianxia/core/internal/worlddata"
 )
 
-// Item grades (v1.6.0).
+// Item grades (v1.7.0).
 //
 // A crafted item carries one of the grades in `item_grade_system`, stored as a
 // suffix on its id: "qi_pill@high". The bare id is the first grade, so every
@@ -268,7 +268,7 @@ func gradedEffectPayload(payload map[string]any, mult float64) map[string]any {
 // equipmentQualityMult is what a bound item's stored quality multiplies its
 // stats by. It was two formulas - 1+(q-100)/200 in solo combat and the gear
 // card, q/100 in group combat - that agreed only at 100, the one value anything
-// had ever written. A grade writes others (v1.6.0), so there is one now.
+// had ever written. A grade writes others (v1.7.0), so there is one now.
 func equipmentQualityMult(quality int64) float64 {
 	return math.Max(0.5, 1+(float64(quality)-100)/200)
 }

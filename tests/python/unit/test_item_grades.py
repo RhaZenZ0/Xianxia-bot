@@ -1,4 +1,4 @@
-"""Item grades, the presentation half (v1.6.0).
+"""Item grades, the presentation half (v1.7.0).
 
 A crafted item carries its grade as a suffix on its id (``qi_pill@high``), and
 the bare id is the first grade. The engine owns what a grade does; the bot

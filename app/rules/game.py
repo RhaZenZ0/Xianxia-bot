@@ -233,13 +233,13 @@ class World:
         return str(effect.get("category", "")) == CONTROL_EFFECT_CATEGORY
 
     def item_name(self, item_id: str) -> str:
-        """An item's name at its grade (v1.6.0): "Qi Pill (High)"; Low is bare."""
+        """An item's name at its grade (v1.7.0): "Qi Pill (High)"; Low is bare."""
         base = base_item_id(item_id)
         name = str(self.items.get(base, {}).get("name", base.replace("_", " ").title()))
         return graded_name(name, self.item_grades, item_id)
 
     def item_definition(self, item_id: str) -> dict[str, Any]:
-        """An item's definition at its grade (v1.6.0): the base entry, named at
+        """An item's definition at its grade (v1.7.0): the base entry, named at
         its grade and priced at it. A graded id is not a key of ``items``, so a
         bare ``items.get`` answers nothing for it; this is the door a reader of
         a carried id goes through. What a grade does to a use is the engine's

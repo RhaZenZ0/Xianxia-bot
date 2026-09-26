@@ -398,7 +398,7 @@ func shopSellAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	// A keeper deals in the two grades a shelf carries (v1.6.0). Anything
+	// A keeper deals in the two grades a shelf carries (v1.7.0). Anything
 	// finer is priced by players, at a stall or on the auction floor.
 	if itemGradeIndex(catalog, p.ItemID) >= keeperGradeCeiling {
 		return authoritativeMutation{}, fmt.Errorf("a keeper will not price %s; sell it at a market stall or on the auction floor", itemDisplayName(catalog, p.ItemID))

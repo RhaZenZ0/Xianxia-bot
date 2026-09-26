@@ -897,7 +897,7 @@ class CityShopContentTests(unittest.TestCase):
                 self.assertGreater(int(shop["restock_minutes"]), 0)
 
     def _a_keeper_deals_in_low_and_mid(self, shop, capital, item_id, base, grade):
-        """Item grades (v1.6.0), on the owner's call: every town deals in Low,
+        """Item grades (v1.7.0), on the owner's call: every town deals in Low,
         a capital also in Mid, and no keeper in anything finer. A graded line is
         a crafted item's, and sits beside its Low twin at twice its price."""
         if not grade:

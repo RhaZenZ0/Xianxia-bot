@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Author the capitals' Mid-grade shelf lines into content/world.json (v1.6.0).
+"""Author the capitals' Mid-grade shelf lines into content/world.json (v1.7.0).
 
 A crafted item carries a grade, Low to Transcendent, stored as `<id>@<grade>`
 with the bare id as Low. On the owner's call, NPC shops deal in the two lowest

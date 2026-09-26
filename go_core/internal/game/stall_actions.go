@@ -428,7 +428,7 @@ func stallBuyAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 	if sellerID == userID {
 		return authoritativeMutation{}, errors.New("you cannot buy from your own stall")
 	}
-	// A stall is in reach from anywhere (v1.6.0); what distance costs is a
+	// A stall is in reach from anywhere (v1.7.0); what distance costs is a
 	// surcharge per road between the buyer and it, not a refusal.
 	city := fmt.Sprint(listing["city"])
 	hops := stallDistanceHops(catalog, stallBuyerWhereTx(conn, c.Location), city)
@@ -516,7 +516,7 @@ func stallCloseAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 // down, so a one-coin sale is the seller's whole. It never debits anybody: the
 // buyer's side - a cultivator's purse or an NPC's wealth - is the caller's.
 //
-// `surcharge` is what distance added on top of the asking price (v1.6.0),
+// `surcharge` is what distance added on top of the asking price (v1.7.0),
 // already debited from the buyer. It is split three ways: a third to the
 // seller, a third to the city's cut (which, like the cut itself, goes into no
 // purse), and the rest - the courier's - leaves the economy.
@@ -673,7 +673,7 @@ func stallSurchargePerUnit(catalog worlddata.Catalog, unit, hops int64) int64 {
 	return unit * hops * stallRulesFor(catalog).DistancePercentPerHop / 100
 }
 
-// stallBoardQuery is every stall there is (v1.6.0: a stall is in reach from
+// stallBoardQuery is every stall there is (v1.7.0: a stall is in reach from
 // anywhere), nearest first, each listing carrying what it costs from where the
 // caller stands - its price plus the distance surcharge. It never refuses:
 // a world with no stalls is an empty board.
