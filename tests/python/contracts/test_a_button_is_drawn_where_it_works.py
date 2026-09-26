@@ -222,6 +222,48 @@ class TheSeamIsDugOnTheWorldsGround(unittest.TestCase):
                 self.assertNotIn("/mine", hides(place), f"a dig works at {place}")
 
 
+class TheEnvoysReceiveInTheHall(unittest.TestCase):
+    """Where Envoys is drawn (v1.7.2): only in a realm capital's temple quarter,
+    `sectRecruitmentEnvoysActionGo`'s one place. Reported from play as "no
+    sect envoys in the /world > city options" - the curriculum held the leaf
+    back, and opening it everywhere would draw a button the engine refuses at
+    every gate, district and street but one per capital. Away from the hall the
+    line names the hall, which is what the engine's refusal says."""
+
+    @staticmethod
+    def go_hall(location: str) -> str:
+        """The hall the engine finds for somebody standing here, written from
+        the Go: the capital `cityOf` names, then its first `temple` district
+        in `cityPartsOf`'s sorted order."""
+        city = go_city_of(location)
+        if not (LOCATIONS.get(city) or {}).get("realm_hub"):
+            return ""
+        parts = sorted(n for n, v in LOCATIONS.items() if v.get("district") and v.get("outside_location") == city)
+        return next((n for n in parts if LOCATIONS[n].get("district") == "temple"), "")
+
+    def test_the_reader_finds_every_capitals_hall(self):
+        """Asserted before it is trusted (rc.57)."""
+        capitals = [n for n, v in LOCATIONS.items() if v.get("realm_hub")]
+        self.assertTrue(capitals, "no realm capital in the content file; the test is broken, not the tree")
+        for capital in capitals:
+            with self.subTest(capital=capital):
+                self.assertTrue(self.go_hall(capital), f"{capital} has no temple quarter for the envoys")
+
+    def test_envoys_is_drawn_exactly_where_the_engine_answers(self):
+        drawn_wrong = []
+        for name in sorted(LOCATIONS):
+            answers = bool(self.go_hall(name)) and name == self.go_hall(name)
+            if ("/city envoys" in hides(name)) == answers:
+                drawn_wrong.append(name)
+        self.assertEqual(drawn_wrong[:10], [], f"{len(drawn_wrong)} places draw Envoys where the engine disagrees")
+
+    def test_away_from_the_hall_the_line_names_it(self):
+        hall = self.go_hall("Azure Crown Imperial City South Gate")
+        self.assertTrue(hall)
+        self.assertIn(hall, hides("Azure Crown Imperial City South Gate")["/city envoys"])
+        self.assertIn("realm capital", hides("Greenriver Town")["/city envoys"])
+
+
 class TheCopiesStayCopies(unittest.TestCase):
     def test_every_boss_lair_is_the_engines(self):
         """`bossTemplatesGo` and `BOSS_TEMPLATES` both say where each great

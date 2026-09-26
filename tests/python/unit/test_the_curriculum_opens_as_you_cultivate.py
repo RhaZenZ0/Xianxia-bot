@@ -138,19 +138,32 @@ class TheFirstHourIsNeverGated(unittest.TestCase):
         beyond = [key for key in handed if key and key not in stages]
         self.assertIn("road_to_a_sect", beyond,
                       "the beginner path no longer hands over the road into a sect; the gate is broken, not the tree")
-        doors = {
-            # objective type -> every leaf that reports it; one ungated is enough
-            "sect_discovery": ("city envoys", "sect recruitment recommendation", "sect recruitment status"),
-            "sect_trial": ("sect recruitment trial",),
+        # v1.7.2: the leaf each objective's label *names*, not every reporter.
+        # This gate first counted a door as open when any reporter of the type
+        # was, and `sect recruitment recommendation` is open at realm 0 - so it
+        # stayed green while the label read "/world → City → Envoys", the one
+        # reporter the curriculum still held back until Foundation
+        # Establishment. Reported from play as "no sect envoys in the /world >
+        # city options". It is the v1.2.0 finding in the gate above, one quest
+        # down the chain: what a player reads is the label, so the label's door
+        # is the one that must be drawn.
+        named = {
+            "/world → City → Envoys": "city envoys",
+            "/sect → Recruitment → Trial": "sect recruitment trial",
         }
         offenders = []
+        read = 0
         for key in beyond:
             for objective in QUEST_DEFINITIONS.get(key, {}).get("objectives") or []:
-                leaves = doors.get(str(objective.get("type")), ())
-                if leaves and all(leaf in LEAVES for leaf in leaves):
-                    offenders.append(f"{key}: {objective.get('type')!r} is reported only by "
-                                     + ", ".join(f"{leaf!r} (realm {LEAVES[leaf]})" for leaf in leaves))
-        self.assertEqual(offenders, [], "a quest the beginner path hands over has no door open at realm 0:\n  "
+                label = str(objective.get("label") or "")
+                leaves = [leaf for path, leaf in named.items() if path in label]
+                self.assertTrue(leaves, f"{key}: no known door in the label {label!r}; name it in this map")
+                read += 1
+                for leaf in leaves:
+                    if leaf in LEAVES:
+                        offenders.append(f"{key}: the label names {leaf!r}, which opens at realm {LEAVES[leaf]}")
+        self.assertGreater(read, 0, "no handed-over objective was read; the gate is broken, not the tree")
+        self.assertEqual(offenders, [], "a quest the beginner path hands over names a door the curriculum hides:\n  "
                          + "\n  ".join(offenders))
 
     def test_the_way_out_is_never_gated(self):

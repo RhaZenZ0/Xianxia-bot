@@ -865,7 +865,8 @@ class NarratorContextBuilder:
                 "Its mechanical modifiers are already applied by Python."
             )
 
-        hub_info = realm_hub_by_location(location)
+        # A gate or district of the capital is the capital (v1.7.2).
+        hub_info = realm_hub_by_location(location, getattr(self.world, "locations", None))
         if hub_info:
             lines.append(f"Realm capital: canonical public gathering hub for {hub_info[0]}; public meetings and social scenes are expected here.")
 

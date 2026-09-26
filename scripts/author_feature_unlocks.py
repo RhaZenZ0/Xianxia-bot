@@ -164,6 +164,11 @@ LEAVES: dict[str, int] = {
     "city rumours": 0,
     "city board": 0,
     "city accept": 0,
+    # The hall that names every sect's gate (v1.7.2). `road_to_a_sect`, which
+    # the beginner path hands everybody, labels its first objective with this
+    # door, and the city page's own blurb promises it; held back to realm 2 it
+    # was a quest naming a button nobody could see.
+    "city envoys": 0,
     # The household's doors and its view: the path starts inside, steps out
     # through Leave, and comes back in through Enter.
     "family view": 0,

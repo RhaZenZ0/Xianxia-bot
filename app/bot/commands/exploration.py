@@ -23,7 +23,7 @@ from ...rules.progression_systems import profession_rank, profession_xp_needed
 from ...rules.realm_hubs import REALM_HUBS, realm_hub, realm_hub_by_location
 from ...rules.sect_manor import manor_craft_bonus
 from ...rules.sect_recruitment import recruitment_definition
-from ..channels import send_long_to_thread, world_of_location
+from ..channels import event_scene_parent, send_long_to_thread, world_of_location
 from ..character_state import record_quest_progress, announce_quest_progress
 from ..discovery import (
     LOCATION_DISCOVERY_IMAGES,
@@ -1674,16 +1674,25 @@ async def city_inn(interaction: discord.Interaction) -> None:
 
 
 async def _inn_thread(interaction: discord.Interaction, city: str, inn: str) -> discord.Thread | None:
-    """One public thread per city inn, in the world's realm-hub channel."""
+    """One public thread per city inn, where the city's cultivators can read it."""
     guild = interaction.guild
     if guild is None:
         return None
-    world = str(WORLD.locations.get(city, {}).get("world") or "")
-    rows = await DB.get_realm_hub_channels(guild.id)
-    row = next((r for r in rows if str(r.get("world_name")) == world), None)
-    if not row:
-        return None
-    channel = guild.get_channel(int(row["channel_id"]))
+    # Where everybody who can reach the city can read it (v1.7.2). A capital's
+    # channel is gated by its presence role, which only somebody standing in
+    # the capital holds - so it is right for the capital's own inn and was
+    # "#unknown" at the other forty-four. Every other inn hangs in its world's
+    # own feed, the door event scenes already use (rc.59), which the access
+    # role everybody in that world holds can see.
+    channel: discord.TextChannel | None = None
+    capital = realm_hub_by_location(city, WORLD.locations)
+    if capital:
+        rows = await DB.get_realm_hub_channels(guild.id)
+        row = next((r for r in rows if str(r.get("world_name")) == capital[0]), None)
+        found = guild.get_channel(int(row["channel_id"])) if row else None
+        channel = found if isinstance(found, discord.TextChannel) else None
+    else:
+        channel = await event_scene_parent(guild, city)
     if not isinstance(channel, discord.TextChannel):
         return None
     name = f"🍶 {inn}"[:100]
@@ -1863,7 +1872,7 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
         else:
             merchants+=f"\n🧳 **{row.get('name')}** is trading at **{row.get('location')}** along the way."
     meeting=""
-    hub_match=realm_hub_by_location(str(result.get("destination") or destination))
+    hub_match=realm_hub_by_location(str(result.get("arrived_at") or result.get("destination") or destination),WORLD.locations)
     if hub_match and interaction.guild:
         world_name,_hub=hub_match
         rows=await DB.get_realm_hub_channels(interaction.guild.id)

@@ -5253,6 +5253,44 @@ row, labelled as the way out. `/travel go` had its own door: it used the shared
 offering only allowed places with the street first, and holds that the Go refusals it twins are still
 in the source.
 
+### A quest named a door the curriculum hid, and a capital that ended at its gate (v1.7.2)
+
+Two reports from one player at Azure Crown Imperial City, and each is a rule this file already
+states, missed at one more site.
+
+**"No sect envoys in the /world > city options."** `road_to_a_sect`, which `beginner_gate` hands
+everybody, labels its first objective **/world → City → Envoys**, and the curriculum held
+`city envoys` back to realm 2 with the rest of `world / City`. v1.1.0's gate that walks the path's
+`follow_on` chain was green throughout, because it asked whether *any* reporter of the objective's
+type was open at realm 0 - and `sect recruitment recommendation` reports `sect_discovery` too and
+was open. So the quest named a button nobody could see while a different button could, in
+principle, advance it. That is the v1.0.13 hunt finding (*the quest named the one command that
+could not advance it*) seen from the curriculum: the label is the only part a player reads, so the
+gate holds **the door the label names** now, not the type. `city envoys` opens at 0, and
+`LOCATION_GATES["envoys_hall"]` draws it only in a capital's temple quarter - `envoys_hall` is the
+twin of `sectRecruitmentEnvoysActionGo` (the capital's first temple district in sorted order), held
+to it over all 477 locations - so opening it did not put a door on every city page that the engine
+refuses everywhere but four.
+
+**"No access to common room channel."** Two faults, and the second is the wider one.
+`presence_world_for` matched the capital's name exactly, so the South Gate and the Azure Crown Inn -
+a gate and a district of the capital - took the presence role off: v1.0.9's *a city's gate is that
+city*, missed in the one rule that decides who sees the capital channel. `city_of_place` in
+`app/rules/realm_hubs.py` is the `cityOf` twin now (locations injected, `rules` being below the
+bot), and `realm_hub_by_location` reads through it, so the narrator's "Realm capital" line and the
+travel reply's meeting-channel line agree with the role. Then, asked to check every location: the
+inn's common-room thread was always created in **its world's capital channel**, which only somebody
+standing in the capital can see - so at the forty-four inns outside a capital the card linked
+`#unknown` to every patron it was for. A capital's inn keeps the capital channel; every other inn
+hangs in its world's feed through `event_scene_parent`, the door event scenes already use (rc.59),
+gated by the access role everybody in that world holds. `test_every_inn_has_a_common_room_you_can_see.py`
+walks all forty-eight.
+
+**The presence test had pinned the fault's spelling**, `presence_world_for(character.get("location"))`,
+so the fix turned it red - the v1.0.8 lesson once more. It asserts the call hands over the location
+table now, and the rule is held behaviourally by `ACapitalsPartsAreTheCapital`, whose drill (drop the
+resolve) names the Azure Crown Treasure Exchange.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

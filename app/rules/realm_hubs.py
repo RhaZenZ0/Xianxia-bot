@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Mapping
 
 # The four worlds, and the one place they are enumerated. Every per-world loop
 # in the tree reads this: the access and presence roles, the capital channels,
@@ -85,8 +85,26 @@ def realm_hub(world_name: str) -> dict[str, Any] | None:
     return dict(hub) if hub else None
 
 
-def realm_hub_by_location(location: str) -> tuple[str, dict[str, Any]] | None:
-    target = str(location)
+def city_of_place(location: Any, locations: Mapping[str, Any] | None = None) -> str:
+    """The city a place is part of - the engine's `cityOf`, twinned.
+
+    A district, shop or auction house answers its `outside_location`; anything
+    else answers itself. `locations` is injected because `rules` imports
+    nothing above it; without it every place is its own city.
+    """
+    where = str(location or "").strip()
+    place = (locations or {}).get(where) or {}
+    if place.get("outside_location") and (place.get("district") or place.get("shop") or place.get("auction_house")):
+        return str(place["outside_location"])
+    return where
+
+
+def realm_hub_by_location(location: Any, locations: Mapping[str, Any] | None = None) -> tuple[str, dict[str, Any]] | None:
+    """The capital a place belongs to. Given `locations`, a gate, district,
+    shop or auction hall of a capital is that capital (v1.7.2)."""
+    target = city_of_place(location, locations)
+    if not target:
+        return None
     for world_name, hub in REALM_HUBS.items():
         if str(hub["location"]) == target:
             return world_name, dict(hub)
@@ -123,17 +141,22 @@ def realm_presence_role_name(world_name: str) -> str:
     return f"Xianxia • {hub.get('display_name') or world_name}"[:100]
 
 
-def presence_world_for(location: Any) -> str | None:
+def presence_world_for(location: Any, locations: Mapping[str, Any] | None = None) -> str | None:
     """Which world's capital the character is standing in, or None.
 
-    Exact match on the hub's location: a private residence inside a city, a
-    road, or any other place is not the capital, so the role comes off.
+    A gate, district, shop or auction hall of the capital is the capital
+    (v1.7.2): given the catalogue's `locations`, the place is first resolved to
+    its city the way the engine's `cityOf` does - `outside_location` when the
+    place is a district, shop or auction house. Matching the hub's name alone
+    took the role off at the South Gate and in the capital's own inn, whose
+    card links the very common room the role opens (reported as "no access to
+    common room channel") - v1.0.9's "a city's gate is that city", missed here.
+    A private residence, a road, or any other place is not the capital, so the
+    role comes off. `locations` is injected because `rules` imports nothing
+    above it; without it the match is exact.
     """
-    where = str(location or "").strip()
-    for world, hub in REALM_HUBS.items():
-        if where and where == str(hub.get("location") or ""):
-            return world
-    return None
+    hub = realm_hub_by_location(location, locations)
+    return hub[0] if hub else None
 
 
 # The channel permissions the presence role is granted on its capital. Everyone
