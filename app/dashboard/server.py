@@ -742,27 +742,20 @@ class ReadOnlyDashboardStore:
                 )
             locations = [r["current_location"] for r in await self._fetchall(db, "SELECT DISTINCT current_location FROM npc_civilization_state WHERE current_location<>'' ORDER BY current_location")]
             factions = [r["faction"] for r in await self._fetchall(db, "SELECT DISTINCT faction FROM npc_civilization_state WHERE faction<>'' ORDER BY faction")]
-            # Schema 48: where the ones nobody found ended up, and whether
-            # anybody has been to them. A GM asking "what happened to X" should
-            # not have to read the history table to find out.
-            #
-            # `robbed_by` is the world getting there first. The robbery row is
-            # `hidden` on purpose - nobody stood in the wilderness and watched,
-            # so it never reaches narrator RAG and no player is ever told - but
-            # a GM is not a player, and without this an emptied grave and an
-            # untouched one read identically in this table.
-            graves = await self._fetchall(
+            # A running world event's cast (schema 43): the militia captain to
+            # report to, the visiting elder who speaks for a sect (schema 61).
+            # They are deliberately not in the permanent catalogue, so no other
+            # view can show them, and they stop answering when the event closes -
+            # which is why this reads only an active event's rows.
+            event_casts = await self._fetchall_if_table(
                 db,
-                """SELECT g.npc_name,g.location,g.home_location,g.days_missing,g.keepsake_item,
-                          g.keepsake_stones,g.died_game_minute,g.claimed_by_user_id,g.claimed_game_minute,
-                          c.name AS claimed_by_name,
-                          (SELECT h.actor_name FROM world_history_events h
-                            WHERE h.event_type='npc_grave_robbery' AND h.target_name=g.npc_name
-                            ORDER BY h.game_minute DESC LIMIT 1) AS robbed_by
-                   FROM npc_graves g LEFT JOIN characters c ON c.user_id=g.claimed_by_user_id
-                   ORDER BY g.died_game_minute DESC LIMIT 100""",
+                "world_event_npcs",
+                """SELECT e.title AS event_title,e.event_type,e.location AS event_location,e.ends_at,
+                          n.event_key,n.name,n.title,n.role,n.location,n.sect_name,n.can_recommend
+                   FROM world_event_npcs n JOIN world_events e ON e.event_key=n.event_key
+                   WHERE e.active=1 ORDER BY e.ends_at DESC,n.name LIMIT 200""",
             )
-            return {"rows": rows, "locations": locations, "factions": factions, "graves": graves}
+            return {"rows": rows, "locations": locations, "factions": factions, "event_casts": event_casts}
 
     async def npc_detail(self, name: str) -> dict[str, Any]:
         async with self._connect() as db:
@@ -791,6 +784,323 @@ class ReadOnlyDashboardStore:
                 except Exception:
                     gm_definition = {"raw": str(catalog.get("data_json") or "")}
             return {"npc": row, "social": social, "disciples": disciples, "descendants": descendants, "history": history, "gm_definition": gm_definition}
+
+    # The NPCs head (v1.6.0). Four reads over the world's own people, each one
+    # page. They are plain SELECTs through the Go-owned query session like every
+    # other view; nothing here is a rule, so nothing here is recomputed that the
+    # engine owns. Ages and days are read against the world clock the engine
+    # reports, with the same year and day `npcs()` already uses.
+    _YEAR_MINUTES = 60 * 24 * 30 * 12
+    _DAY_MINUTES = 60 * 24
+
+    @classmethod
+    def _days_missing(cls, row: dict[str, Any], game_minute: int) -> int:
+        since = int(row.get("missing_since_game_minute") or 0)
+        if since <= 0 or str(row.get("status") or "") != "missing":
+            return 0
+        return max(0, int(game_minute) - since) // cls._DAY_MINUTES
+
+    @classmethod
+    def _age_years(cls, row: dict[str, Any], game_minute: int, *, start: str | None = "age_at_creation_years") -> float | None:
+        """Age from the birth minute; `start=None` for somebody born in the
+        world (a descendant), who began at nought rather than at a creation age."""
+        if row.get("birth_game_minute") is None:
+            return None
+        elapsed = max(0, int(game_minute) - int(row.get("birth_game_minute") or 0))
+        began = float(row.get(start) or 0) if start else 0.0
+        return round(began + elapsed / cls._YEAR_MINUTES, 1)
+
+    async def npc_population(self) -> dict[str, Any]:
+        """Population & Whereabouts: how many people the world holds, where they
+        stand, and who is somewhere they should not be - away from home,
+        missing, or stopped at a ceiling they cannot climb."""
+        async with self._connect() as db:
+            clock = await self._world_clock(db)
+            gm = int(clock["game_minute"])
+            by_status = {str(r["status"]): int(r["n"]) for r in await self._fetchall(
+                db, "SELECT status,COUNT(*) AS n FROM npc_civilization_state GROUP BY status")}
+            lives = await self._fetchall(
+                db,
+                """SELECT c.npc_name,c.current_location,c.world_name,l.birth_game_minute,l.age_at_creation_years,
+                          l.natural_lifespan_years,l.relationship_status,l.injury_severity
+                   FROM npc_civilization_state c JOIN npc_life_state l ON l.npc_name=c.npc_name
+                   WHERE c.status='alive'""",
+            )
+            ages: list[float] = []
+            near_end: list[dict[str, Any]] = []
+            for row in lives:
+                age = self._age_years(row, gm)
+                if age is None:
+                    continue
+                ages.append(age)
+                lifespan = float(row.get("natural_lifespan_years") or 0)
+                if lifespan > 0 and lifespan - age <= 5:
+                    near_end.append({
+                        "npc_name": row["npc_name"], "age_years": age, "natural_lifespan_years": lifespan,
+                        "remaining_years": round(lifespan - age, 1), "location": row.get("current_location"),
+                        "world_name": row.get("world_name"),
+                    })
+            near_end.sort(key=lambda r: (r["remaining_years"], r["npc_name"]))
+            summary = {
+                "alive": by_status.get("alive", 0),
+                "missing": by_status.get("missing", 0),
+                "dead": by_status.get("dead", 0),
+                "married": sum(1 for r in lives if r.get("relationship_status") == "married"),
+                "injured": sum(1 for r in lives if int(r.get("injury_severity") or 0) > 0),
+                "average_age": round(sum(ages) / len(ages), 1) if ages else None,
+                "near_end_of_lifespan": len(near_end),
+            }
+
+            async def grouped(column: str, order: str = "n DESC,key") -> list[dict[str, Any]]:
+                return await self._fetchall(
+                    db,
+                    f"SELECT {column} AS key,COUNT(*) AS n FROM npc_civilization_state WHERE status='alive' GROUP BY {column} ORDER BY {order}",
+                )
+
+            whereabouts = await self._fetchall(
+                db,
+                """SELECT c.current_location AS location,c.world_name,COUNT(*) AS npcs,
+                          r.population,r.prosperity,r.security,r.unrest
+                   FROM npc_civilization_state c LEFT JOIN civilization_regions r ON r.location=c.current_location
+                   WHERE c.status='alive' GROUP BY c.current_location ORDER BY npcs DESC,location LIMIT 300""",
+            )
+            away = await self._fetchall(
+                db,
+                """SELECT npc_name,home_location,current_location,world_name,status,activity,realm_index,phase
+                   FROM npc_civilization_state WHERE status<>'dead' AND current_location<>home_location
+                   ORDER BY npc_name LIMIT 300""",
+            )
+            # The two ceilings `npc_lives.go` writes into `activity`: a realm the
+            # world will not let anybody cross until a player opens a seam, and
+            # the talent a person was born with.
+            stalled = await self._fetchall(
+                db,
+                """SELECT npc_name,activity,realm_index,phase,profession,faction,current_location
+                   FROM npc_civilization_state
+                   WHERE status='alive' AND activity IN ('Stalled at the ascension gate','Has gone as far as their talent allows')
+                   ORDER BY realm_index DESC,phase DESC,npc_name LIMIT 300""",
+            )
+            missing = await self._fetchall(
+                db,
+                """SELECT npc_name,home_location,current_location,world_name,realm_index,phase,status,
+                          missing_since_game_minute,activity
+                   FROM npc_civilization_state WHERE status='missing' ORDER BY missing_since_game_minute,npc_name""",
+            )
+            for row in missing:
+                row["days_missing"] = self._days_missing(row, gm)
+            return {
+                "clock": clock,
+                "summary": summary,
+                "by_world": await grouped("world_name"),
+                "by_faction": await grouped("faction"),
+                "by_profession": await grouped("profession"),
+                "by_realm": await grouped("realm_index", "key"),
+                "whereabouts": whereabouts,
+                "away_from_home": away,
+                "stalled": stalled,
+                "missing": missing,
+                "near_end_of_lifespan": near_end[:300],
+            }
+
+    async def npc_families(self) -> dict[str, Any]:
+        """Marriage & Family: who is married to whom, who is courting, the
+        children the simulation has had, the widowed, and the relatives a
+        starter household carries."""
+        async with self._connect() as db:
+            clock = await self._world_clock(db)
+            gm = int(clock["game_minute"])
+            # One row per married pair. Both halves carry `married`, so the pair
+            # is listed from its alphabetically first partner - and a row whose
+            # partner does not say the same back is kept rather than hidden,
+            # because a one-sided marriage is a data fault a GM should see.
+            couples = await self._fetchall(
+                db,
+                """SELECT a.npc_name AS npc_a,a.spouse_name AS npc_b,a.children_count,
+                          ca.current_location AS location_a,ca.realm_index AS realm_a,ca.phase AS phase_a,ca.status AS status_a,
+                          cb.current_location AS location_b,cb.realm_index AS realm_b,cb.phase AS phase_b,cb.status AS status_b,
+                          s.started_game_minute AS married_since
+                   FROM npc_life_state a
+                   LEFT JOIN npc_civilization_state ca ON ca.npc_name=a.npc_name
+                   LEFT JOIN npc_civilization_state cb ON cb.npc_name=a.spouse_name
+                   LEFT JOIN npc_social_relations s ON s.relation_type='marriage'
+                        AND s.npc_a=MIN(a.npc_name,a.spouse_name) AND s.npc_b=MAX(a.npc_name,a.spouse_name)
+                   WHERE a.relationship_status='married'
+                     AND (a.npc_name<a.spouse_name OR NOT EXISTS(
+                          SELECT 1 FROM npc_life_state b
+                          WHERE b.npc_name=a.spouse_name AND b.relationship_status='married' AND b.spouse_name=a.npc_name))
+                   ORDER BY a.npc_name LIMIT 300""",
+            )
+            courtships = await self._fetchall(
+                db,
+                """SELECT s.npc_a,s.npc_b,s.affinity,s.trust,s.started_game_minute,s.last_interaction_game_minute,
+                          ca.current_location AS location_a,cb.current_location AS location_b
+                   FROM npc_social_relations s
+                   LEFT JOIN npc_civilization_state ca ON ca.npc_name=s.npc_a
+                   LEFT JOIN npc_civilization_state cb ON cb.npc_name=s.npc_b
+                   WHERE s.status='active' AND s.relation_type='courtship'
+                   ORDER BY s.affinity DESC,s.started_game_minute DESC LIMIT 200""",
+            )
+            weddings = await self._fetchall(
+                db,
+                """SELECT * FROM world_history_events WHERE event_type IN ('npc_marriage','npc_political_marriage')
+                   ORDER BY game_minute DESC,history_id DESC LIMIT 100""",
+            )
+            children = await self._fetchall(
+                db,
+                """SELECT d.*,c.current_location,
+                          (SELECT h.game_minute FROM world_history_events h
+                            WHERE h.event_type='npc_coming_of_age' AND h.actor_name=d.child_name
+                            ORDER BY h.game_minute DESC LIMIT 1) AS came_of_age_game_minute
+                   FROM npc_descendants d LEFT JOIN npc_civilization_state c ON c.npc_name=d.child_name
+                   ORDER BY d.birth_game_minute DESC LIMIT 300""",
+            )
+            for row in children:
+                row["age_years"] = self._age_years(row, gm, start=None)
+            widows = await self._fetchall(
+                db,
+                """SELECT l.npc_name,l.children_count,l.birth_game_minute,l.age_at_creation_years,l.last_social_game_minute,
+                          c.current_location,c.faction,c.status
+                   FROM npc_life_state l LEFT JOIN npc_civilization_state c ON c.npc_name=l.npc_name
+                   WHERE l.relationship_status='widowed' ORDER BY l.last_social_game_minute DESC,l.npc_name LIMIT 200""",
+            )
+            relatives = await self._fetchall_if_table(
+                db,
+                "birth_family_npcs",
+                """SELECT n.npc_id,n.family_id,n.name,n.relation,n.gender,n.status,n.realm_index,n.phase,
+                          f.family_name,f.location AS family_location
+                   FROM birth_family_npcs n JOIN birth_families f ON f.family_id=n.family_id
+                   ORDER BY f.family_name,n.status DESC,n.relation,n.name LIMIT 500""",
+            )
+            return {"clock": clock, "couples": couples, "courtships": courtships, "weddings": weddings,
+                    "children": children, "widows": widows, "relatives": relatives}
+
+    async def npc_society(self) -> dict[str, Any]:
+        """Society: feuds and friendships between NPCs, masters and disciples,
+        the people the world made for itself, and who stands in which sect."""
+        async with self._connect() as db:
+            # The same predicate Conflicts uses, so the two pages cannot
+            # disagree about what a feud is.
+            feuds = await self._fetchall(
+                db,
+                """SELECT * FROM npc_social_relations WHERE grudge>0 OR relation_type IN ('grudge','blood_feud','rival')
+                   ORDER BY grudge DESC,last_interaction_game_minute DESC LIMIT 200""",
+            )
+            friendships = await self._fetchall(
+                db,
+                """SELECT * FROM npc_social_relations
+                   WHERE status='active' AND grudge=0 AND relation_type NOT IN ('courtship','marriage','grudge','blood_feud','rival')
+                   ORDER BY affinity DESC,trust DESC LIMIT 200""",
+            )
+            disciple_bonds = await self._fetchall(
+                db,
+                """SELECT b.*,m.faction AS master_faction,m.current_location AS master_location
+                   FROM npc_disciple_bonds b LEFT JOIN npc_civilization_state m ON m.npc_name=b.master_name
+                   ORDER BY (b.status='active') DESC,b.started_game_minute DESC LIMIT 300""",
+            )
+            registry = await self._fetchall_if_table(
+                db,
+                "npc_registry",
+                """SELECT name,origin,role,realm,location,sect_affiliation,source_key,created_game_minute
+                   FROM npc_registry ORDER BY created_game_minute DESC,name LIMIT 300""",
+            )
+            registry_by_origin = await self._fetchall_if_table(
+                db, "npc_registry", "SELECT origin,COUNT(*) AS n FROM npc_registry GROUP BY origin ORDER BY n DESC,origin",
+            )
+            sect_members = await self._fetchall(
+                db,
+                "SELECT faction,COUNT(*) AS n FROM npc_civilization_state WHERE status='alive' GROUP BY faction ORDER BY n DESC,faction",
+            )
+            sect_ranks = await self._fetchall(
+                db,
+                """SELECT c.faction,l.sect_rank,COUNT(*) AS n
+                   FROM npc_civilization_state c JOIN npc_life_state l ON l.npc_name=c.npc_name
+                   WHERE c.status='alive' GROUP BY c.faction,l.sect_rank ORDER BY c.faction,n DESC,l.sect_rank""",
+            )
+            return {"feuds": feuds, "friendships": friendships, "disciple_bonds": disciple_bonds,
+                    "registry": registry, "registry_by_origin": registry_by_origin,
+                    "sect_members": sect_members, "sect_ranks": sect_ranks}
+
+    async def npc_deeds(self, *, limit: int = 150, q: str = "", event_type: str = "", visibility: str = "") -> dict[str, Any]:
+        """Deeds & Fates: everything NPCs did on their own, and how lives ended.
+
+        The feed deliberately has no visibility floor. An unwitnessed crime, a
+        grave robbed in the wilderness, is written `hidden` so it never reaches
+        narrator RAG and no player is told - but a GM is not a player, and a
+        feed that dropped those rows would show a GM the world the players see
+        rather than the one that happened."""
+        limit = max(1, min(500, int(limit)))
+        clauses = ["(event_type LIKE 'npc_%' OR actor_type='npc')"]
+        params: list[Any] = []
+        if q.strip():
+            needle = f"%{q.strip()}%"
+            clauses.append("(actor_name LIKE ? COLLATE NOCASE OR target_name LIKE ? COLLATE NOCASE OR related_npc_name LIKE ? COLLATE NOCASE OR title LIKE ? COLLATE NOCASE OR summary LIKE ? COLLATE NOCASE)")
+            params.extend([needle] * 5)
+        if event_type.strip():
+            clauses.append("event_type=?")
+            params.append(event_type.strip())
+        if visibility.strip():
+            clauses.append("visibility=?")
+            params.append(visibility.strip())
+        params.append(limit)
+        async with self._connect() as db:
+            clock = await self._world_clock(db)
+            gm = int(clock["game_minute"])
+            rows = await self._fetchall(
+                db,
+                "SELECT * FROM world_history_events WHERE " + " AND ".join(clauses)
+                + " ORDER BY game_minute DESC,significance DESC,history_id DESC LIMIT ?",
+                tuple(params),
+            )
+            event_types = [r["event_type"] for r in await self._fetchall(
+                db,
+                "SELECT DISTINCT event_type FROM world_history_events WHERE event_type LIKE 'npc_%' OR actor_type='npc' ORDER BY event_type",
+            )]
+            deaths = await self._fetchall(
+                db,
+                """SELECT l.npc_name,l.death_game_minute,l.cause_of_death,c.home_location,c.current_location,
+                          c.faction,c.realm_index,c.phase
+                   FROM npc_life_state l LEFT JOIN npc_civilization_state c ON c.npc_name=l.npc_name
+                   WHERE l.death_game_minute IS NOT NULL ORDER BY l.death_game_minute DESC,l.npc_name LIMIT 200""",
+            )
+            lost = await self._fetchall(
+                db,
+                """SELECT * FROM world_history_events WHERE event_type IN ('npc_missing_death','npc_presumed_dead')
+                   ORDER BY game_minute DESC,history_id DESC LIMIT 100""",
+            )
+            missing = await self._fetchall(
+                db,
+                """SELECT npc_name,home_location,current_location,world_name,status,missing_since_game_minute
+                   FROM npc_civilization_state WHERE status='missing' ORDER BY missing_since_game_minute,npc_name""",
+            )
+            for row in missing:
+                row["days_missing"] = self._days_missing(row, gm)
+            # Schema 48: where the ones nobody found ended up, and whether
+            # anybody has been to them. A GM asking "what happened to X" should
+            # not have to read the history table to find out.
+            #
+            # `robbed_by` is the world getting there first. The robbery row is
+            # `hidden` on purpose - nobody stood in the wilderness and watched,
+            # so it never reaches narrator RAG and no player is ever told - but
+            # a GM is not a player, and without this an emptied grave and an
+            # untouched one read identically in this table.
+            graves = await self._fetchall_if_table(
+                db,
+                "npc_graves",
+                """SELECT g.npc_name,g.location,g.home_location,g.days_missing,g.keepsake_item,
+                          g.keepsake_stones,g.died_game_minute,g.claimed_by_user_id,g.claimed_game_minute,
+                          c.name AS claimed_by_name,
+                          (SELECT h.actor_name FROM world_history_events h
+                            WHERE h.event_type='npc_grave_robbery' AND h.target_name=g.npc_name
+                            ORDER BY h.game_minute DESC LIMIT 1) AS robbed_by
+                   FROM npc_graves g LEFT JOIN characters c ON c.user_id=g.claimed_by_user_id
+                   ORDER BY g.died_game_minute DESC LIMIT 100""",
+            )
+            breakthroughs = await self._fetchall(
+                db,
+                "SELECT * FROM world_history_events WHERE event_type='npc_breakthrough' ORDER BY game_minute DESC,history_id DESC LIMIT 100",
+            )
+            return {"rows": rows, "event_types": event_types, "deaths": deaths, "lost": lost,
+                    "missing": missing, "graves": graves, "breakthroughs": breakthroughs}
 
     async def families(self) -> dict[str, Any]:
         async with self._connect() as db:
@@ -910,22 +1220,158 @@ class ReadOnlyDashboardStore:
 
     async def sects(self) -> dict[str, Any]:
         async with self._connect() as db:
+            # `sects.prestige` and `sects.treasury_stones` used to be shown on
+            # every card, and nothing in the engine or the bot has ever written
+            # either column - they read 0 for every sect for as long as the page
+            # existed (v1.6.0). A sect's real treasury is items, in
+            # `sect_treasury`, which contributions, tribute and the manor move.
             sects = await self._fetchall(
                 db,
-                """SELECT p.*,COALESCE(s.prestige,0) AS prestige,COALESCE(s.treasury_stones,0) AS treasury_stones,
+                """SELECT p.*,
                           (SELECT COUNT(*) FROM sect_membership sm WHERE sm.sect_name=p.sect_name) AS player_members,
-                          (SELECT COUNT(*) FROM npc_civilization_state nc WHERE nc.faction=p.sect_name AND nc.status='alive') AS npc_members
-                   FROM sect_politics_state p LEFT JOIN sects s ON s.sect_name=p.sect_name
+                          (SELECT COUNT(*) FROM npc_civilization_state nc WHERE nc.faction=p.sect_name AND nc.status='alive') AS npc_members,
+                          (SELECT COUNT(*) FROM sect_treasury t WHERE t.sect_name=p.sect_name AND t.quantity>0) AS treasury_items,
+                          (SELECT COALESCE(SUM(t.quantity),0) FROM sect_treasury t WHERE t.sect_name=p.sect_name) AS treasury_units
+                   FROM sect_politics_state p
                    ORDER BY p.influence DESC,p.resources DESC,p.sect_name""",
             )
             factions = await self._fetchall(db, "SELECT * FROM sect_factions ORDER BY sect_name,power DESC,faction_name")
             relations = await self._fetchall(db, "SELECT * FROM sect_relations ORDER BY ABS(relation_score) DESC,sect_a,sect_b")
             events = await self._fetchall(db, "SELECT * FROM sect_politics_events ORDER BY game_minute DESC,event_id DESC LIMIT 100")
-            memberships = await self._fetchall(
+            return {"sects": sects, "factions": factions, "relations": relations, "events": events}
+
+    # The Sects head (v1.6.0). Three reads over what a sect holds of its
+    # players: who is in it and who taught whom, how everybody tried to get in,
+    # and what the sect owns. Nothing is recomputed: a trial's TN is the one the
+    # engine stored with the attempt, because `sectTrialTuningTx` is the rule.
+
+    async def sect_members(self) -> dict[str, Any]:
+        async with self._connect() as db:
+            members = await self._fetchall(
                 db,
-                """SELECT sm.*,c.name,c.discord_name,c.realm_index,c.phase,c.life_status FROM sect_membership sm JOIN characters c ON c.user_id=sm.user_id ORDER BY sm.sect_name,sm.rank_level DESC,c.realm_index DESC""",
+                """SELECT sm.user_id,sm.sect_name,sm.rank_name,sm.rank_level,sm.joined_at,sm.contribution_points,sm.influence,
+                          c.name,c.discord_name,c.life_status,c.realm_index,c.phase,c.location
+                   FROM sect_membership sm JOIN characters c ON c.user_id=sm.user_id
+                   ORDER BY sm.sect_name,sm.rank_level DESC,c.realm_index DESC,c.name""",
             )
-            return {"sects": sects, "factions": factions, "relations": relations, "events": events, "memberships": memberships}
+            by_sect = await self._fetchall(
+                db,
+                """SELECT sect_name,COUNT(*) AS members,ROUND(AVG(rank_level),1) AS average_rank,
+                          COALESCE(SUM(contribution_points),0) AS contribution,MAX(rank_level) AS highest_rank
+                   FROM sect_membership GROUP BY sect_name ORDER BY members DESC,sect_name""",
+            )
+            lineage = await self._fetchall(
+                db,
+                """SELECT l.disciple_user_id,l.master_user_id,l.accepted_at,l.attention,
+                          d.name AS disciple_name,m.name AS master_name,sm.sect_name
+                   FROM sect_lineage l
+                   LEFT JOIN characters d ON d.user_id=l.disciple_user_id
+                   LEFT JOIN characters m ON m.user_id=l.master_user_id
+                   LEFT JOIN sect_membership sm ON sm.user_id=l.disciple_user_id
+                   ORDER BY sm.sect_name,m.name,d.name""",
+            )
+            requests = await self._fetchall_if_table(
+                db,
+                "disciple_requests",
+                """SELECT r.request_id,r.disciple_user_id,r.master_user_id,r.status,r.created_at,r.resolved_at,
+                          d.name AS disciple_name,m.name AS master_name
+                   FROM disciple_requests r
+                   LEFT JOIN characters d ON d.user_id=r.disciple_user_id
+                   LEFT JOIN characters m ON m.user_id=r.master_user_id
+                   ORDER BY (r.status='pending') DESC,r.created_at DESC LIMIT 200""",
+            )
+            return {"members": members, "by_sect": by_sect, "lineage": lineage, "requests": requests}
+
+    async def sect_recruitment(self) -> dict[str, Any]:
+        async with self._connect() as db:
+            attempts = await self._fetchall_if_table(
+                db,
+                "sect_recruitment_attempts",
+                """SELECT a.attempt_id,a.user_id,a.sect_name,a.attempt_type,a.npc_name,a.location,a.result,a.score,a.target,
+                          a.recommendation_bonus,a.details_json,a.game_minute,c.name AS player_name
+                   FROM sect_recruitment_attempts a LEFT JOIN characters c ON c.user_id=a.user_id
+                   ORDER BY a.game_minute DESC,a.attempt_id DESC LIMIT 300""",
+            )
+            recommendations = await self._fetchall_if_table(
+                db,
+                "sect_recommendations",
+                """SELECT r.recommendation_id,r.user_id,r.npc_name,r.sect_name,r.bonus,r.status,r.issued_game_minute,
+                          r.used_game_minute,c.name AS player_name
+                   FROM sect_recommendations r LEFT JOIN characters c ON c.user_id=r.user_id
+                   ORDER BY (r.status='active') DESC,r.issued_game_minute DESC LIMIT 300""",
+            )
+            # Outsider standing (v1.1.0) and a passed trial's +5 are written to
+            # `faction_reputation` under the sect's own name - a table that
+            # imposes no vocabulary, so only keys that name a sect are this page's.
+            sect_names = "SELECT sect_name FROM sect_politics_state"
+            if await self._table_exists(db, "content_sects"):
+                sect_names += " UNION SELECT name FROM content_sects"
+            standing = await self._fetchall(
+                db,
+                f"""SELECT f.user_id,f.faction_key AS sect_name,f.score,f.last_reason,f.updated_at,c.name AS player_name
+                    FROM faction_reputation f LEFT JOIN characters c ON c.user_id=f.user_id
+                    WHERE f.faction_key IN ({sect_names})
+                    ORDER BY f.faction_key,f.score DESC,c.name LIMIT 500""",
+            )
+            discoveries = await self._fetchall_if_table(
+                db,
+                "character_sect_discoveries",
+                """SELECT d.user_id,d.sect_name,d.discovery_kind,d.source_key,d.discovered_game_minute,c.name AS player_name
+                   FROM character_sect_discoveries d LEFT JOIN characters c ON c.user_id=d.user_id
+                   ORDER BY d.discovered_game_minute DESC,d.sect_name LIMIT 500""",
+            )
+            # Read directly, never through `sect.shadow`: that action's "status"
+            # mode can settle a hostile membership, and a read must not.
+            hidden = await self._fetchall_if_table(
+                db,
+                "hidden_sect_membership",
+                """SELECT h.user_id,h.sect_name,h.rank_name,h.branch_name,h.standing,h.status,h.joined_game_minute,
+                          c.name AS player_name,c.karma_score
+                   FROM hidden_sect_membership h LEFT JOIN characters c ON c.user_id=h.user_id
+                   ORDER BY h.status,h.standing DESC,c.name""",
+            )
+            return {"attempts": attempts, "recommendations": recommendations, "standing": standing,
+                    "discoveries": discoveries, "hidden": hidden}
+
+    async def sect_holdings(self) -> dict[str, Any]:
+        async with self._connect() as db:
+            manors = await self._fetchall_if_table(
+                db,
+                "sect_manors",
+                """SELECT m.*,c.name AS founder_name FROM sect_manors m LEFT JOIN characters c ON c.user_id=m.founded_by_user_id
+                   ORDER BY m.sect_name""",
+            )
+            projects = await self._fetchall_if_table(
+                db,
+                "sect_manor_projects",
+                """SELECT p.project_id,p.sect_name,p.user_id,p.project_type,p.facility_key,p.from_level,p.to_level,p.cost_json,
+                          p.game_minute,c.name AS player_name
+                   FROM sect_manor_projects p LEFT JOIN characters c ON c.user_id=p.user_id
+                   ORDER BY p.game_minute DESC,p.project_id DESC LIMIT 200""",
+            )
+            item_name = "t.item_id"
+            join = ""
+            if await self._table_exists(db, "content_items"):
+                item_name = "COALESCE(NULLIF(i.display_name,''),t.item_id)"
+                join = " LEFT JOIN content_items i ON i.name=t.item_id"
+            treasury = await self._fetchall(
+                db,
+                f"""SELECT t.sect_name,t.item_id,{item_name} AS item_name,t.quantity
+                    FROM sect_treasury t{join} WHERE t.quantity>0
+                    ORDER BY t.sect_name,t.quantity DESC,t.item_id""",
+            )
+            # The residences are registered to Crafting & Assets, which lists
+            # them by owner; this is the same table with the six facility levels
+            # that page does not show, grouped by the sect that granted them.
+            abodes = await self._fetchall_if_table(
+                db,
+                "sect_abodes",
+                """SELECT a.user_id,a.sect_name,a.name,a.base_location,a.cultivation_level,a.alchemy_level,a.forge_level,
+                          a.formation_level,a.storage_level,a.herb_garden_level,c.name AS owner_name
+                   FROM sect_abodes a LEFT JOIN characters c ON c.user_id=a.user_id
+                   ORDER BY a.sect_name,c.name""",
+            )
+            return {"manors": manors, "projects": projects, "treasury": treasury, "abodes": abodes}
 
     async def conflicts(self) -> dict[str, Any]:
         async with self._connect() as db:
@@ -1052,7 +1498,10 @@ class ReadOnlyDashboardStore:
         async with self._connect() as db:
             row = await self._fetchone(
                 db,
-                """SELECT c.*,sm.sect_name,sm.rank_name
+                # `rank_level` is what the Player Editor's sect card pre-fills;
+                # without it the card read 0 and saving it unchanged set the
+                # player's sect rank to 0 (fixed v1.6.0).
+                """SELECT c.*,sm.sect_name,sm.rank_name,sm.rank_level,sm.contribution_points,sm.influence AS sect_influence
                    FROM characters c LEFT JOIN sect_membership sm ON sm.user_id=c.user_id
                    WHERE c.user_id=?""",
                 (user_id,),
@@ -2653,10 +3102,26 @@ class DashboardServer:
             if path == "/api/npc":
                 name = _q(query, "name")
                 await self._send_json(writer, 200 if name else 400, await self.store.npc_detail(name) if name else {"error": "name_required"}); return
+            if path == "/api/npc_population":
+                await self._send_json(writer, 200, await self.store.npc_population()); return
+            if path == "/api/npc_families":
+                await self._send_json(writer, 200, await self.store.npc_families()); return
+            if path == "/api/npc_society":
+                await self._send_json(writer, 200, await self.store.npc_society()); return
+            if path == "/api/npc_deeds":
+                await self._send_json(writer, 200, await self.store.npc_deeds(
+                    limit=_qint(query, "limit", 150), q=_q(query, "q"), event_type=_q(query, "event_type"), visibility=_q(query, "visibility")
+                )); return
             if path == "/api/families":
                 await self._send_json(writer, 200, await self.store.families()); return
             if path == "/api/sects":
                 await self._send_json(writer, 200, await self.store.sects()); return
+            if path == "/api/sect_members":
+                await self._send_json(writer, 200, await self.store.sect_members()); return
+            if path == "/api/sect_recruitment":
+                await self._send_json(writer, 200, await self.store.sect_recruitment()); return
+            if path == "/api/sect_holdings":
+                await self._send_json(writer, 200, await self.store.sect_holdings()); return
             if path == "/api/conflicts":
                 await self._send_json(writer, 200, await self.store.conflicts()); return
             if path == "/api/events":

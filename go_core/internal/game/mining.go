@@ -93,6 +93,21 @@ func explorationMineAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	if strings.HasPrefix(cr.Location, "abode:") || strings.HasPrefix(cr.Location, "sect_abode:") || strings.HasPrefix(cr.Location, "personal_world:") || strings.HasPrefix(cr.Location, "birth_family:") {
 		return authoritativeMutation{}, errors.New("mining is unavailable inside a private residence or personal world")
 	}
+	// Nor under a counter or an auction floor (v1.6.0, on the owner's call):
+	// a shop and a hall are somebody's floor, not the world's ground. Asked
+	// with the engine's own place questions, so the refusal and every other
+	// rule about being inside one cannot disagree about where that is.
+	//
+	// A waystation is the exception, and all sixteen are: each location is a
+	// walled yard on the road that also carries its keeper's stall, so
+	// `shopAt` answers yes there too. The yard is road ground, and a rule
+	// about shop floors that shut every waystation would be a second rule.
+	if _, _, inside := shopAt(catalog, cr.Location); inside && catalog.Locations[cr.Location].RoadSite == "" {
+		return authoritativeMutation{}, errors.New("nobody digs through a shop's floor; step out into the street")
+	}
+	if _, _, onFloor := catalogHouseAt(catalog, cr.Location); onFloor {
+		return authoritativeMutation{}, errors.New("an auction floor is not dug; step out through its door")
+	}
 	now := float64(time.Now().UnixNano()) / 1e9
 	if active, err := activeExplorationEventForUserTx(conn, userID, now); err != nil {
 		return authoritativeMutation{}, err

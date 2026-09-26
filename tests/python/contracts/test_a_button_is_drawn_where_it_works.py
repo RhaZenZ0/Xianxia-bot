@@ -186,6 +186,42 @@ class TheRoomGetsTheRightPanel(unittest.TestCase):
                 self.assertEqual([p for p in shut if p.endswith(" status")], [])
 
 
+class TheSeamIsDugOnTheWorldsGround(unittest.TestCase):
+    """Where Mine is drawn (v1.6.0): not in a private room, on a shrine, in a
+    shop or on an auction floor - `explorationMineAction`'s own refusals - and
+    everywhere else. A waystation carries its keeper's stall and is still road
+    ground, so the engine exempts a road site and the panel must too."""
+
+    @staticmethod
+    def go_refuses_a_dig(location: str) -> bool:
+        """`explorationMineAction`'s place refusals, written from the Go."""
+        loc = LOCATIONS.get(location) or {}
+        if loc.get("road_site") == "shrine":
+            return True
+        if go_shop_at(location) and not loc.get("road_site"):
+            return True
+        return any(h.get("location") == location for h in CONTENT["auction_houses"].values())
+
+    def test_mine_is_hidden_exactly_where_the_engine_refuses_a_dig(self):
+        refused = [name for name in LOCATIONS if self.go_refuses_a_dig(name)]
+        self.assertTrue(refused, "the reader found no refused ground; the test is broken, not the tree")
+        drawn_wrong = []
+        for name in sorted(LOCATIONS):
+            if ("/mine" in hides(name)) != self.go_refuses_a_dig(name):
+                drawn_wrong.append(name)
+        self.assertEqual(drawn_wrong, [], "the panel and the engine disagree about where a seam is dug")
+
+    def test_the_rooms_a_player_stands_in(self):
+        house = CONTENT["auction_houses"]["golden_pavilion"]["location"]
+        for place in ("birth_family:3", "Jadewood Apothecary", house, "Wayside Shrine of the Quiet Pine"):
+            with self.subTest(place=place):
+                self.assertIn("/mine", hides(place))
+        self.assertIn("step out into the street", hides("Jadewood Apothecary")["/mine"])
+        for place in ("Greenriver Town", "Halfmoon Waystation"):
+            with self.subTest(place=place):
+                self.assertNotIn("/mine", hides(place), f"a dig works at {place}")
+
+
 class TheCopiesStayCopies(unittest.TestCase):
     def test_every_boss_lair_is_the_engines(self):
         """`bossTemplatesGo` and `BOSS_TEMPLATES` both say where each great

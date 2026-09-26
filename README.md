@@ -593,7 +593,10 @@ need a JSON `POST` with the `X-Xianxia-Admin: 1` header; reads go through Go-own
 never SQLite directly; every mutation runs in the engine and lands in `admin_audit_log`;
 `DASHBOARD_ADMIN_WRITES=false` makes the console read-only.
 
-Views: Overview, Timeline, NPCs, Families, Sect Politics, Conflicts, World Events, Player Activity,
+Views, in seven heads: World (Overview, Timeline, World Events, Families, Conflicts), NPCs (the
+roster with every running event's cast, Population & Whereabouts, Marriage & Family, Society, and
+Deeds & Fates, which shows a GM the hidden rows no player sees), Sects (Sect Politics, Members &
+Lineage, Recruitment with every trial's stored TN, and Holdings), Player Activity,
 Cultivation, Crafting & Assets, Exploration, Economy, Samsara Dynasties, RAG Memory, Autonomous
 Decisions, AI Routing, the Player Editor (one character at a time: realm and body ladder, caps,
 sect, perfection, root, bloodline, physique, tribulation gates, teleport, currency, karma, fate,

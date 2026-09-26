@@ -4991,6 +4991,51 @@ Three empty-picker hints say what to do when the bag, the stall or the city's bo
 **What the town's step deliberately leaves alone.** It debits no player, reads no player's price
 into any band, and skips rather than errors: a bad row costs one purchase, never the tick.
 
+### NPCs and Sects are heads of their own (v1.6.0)
+
+Asked for as more overview "like World and Players", and answered with two sidebar heads between
+World and Players rather than more sections on the pages that already existed. **NPCs**: the roster
+(with the cast of every running world event, which no view had ever read), Population &
+Whereabouts, Marriage & Family, Society, and Deeds & Fates. **Sects**: Sect Politics, Members &
+Lineage, Recruitment and Holdings. Reads only, on the owner's call: no lever moved out of the Admin
+Console, and nothing on these pages is a rule - a trial's TN is the `target` the engine stored with
+the attempt, never `sectTrialTuningTx` recomputed, and the hidden sect is read from its membership
+rows because `sect.shadow`'s "status" mode can settle a hostile membership.
+
+**Deeds & Fates has no visibility floor, and that is the design.** An unwitnessed crime and a grave
+robbed in the wilderness are written `hidden` so they never reach narrator RAG and no player is told
+(rc.24, schema 48). A GM is not a player, and a feed that dropped those rows would show a GM the
+world the players see rather than the one that happened - the reason the Graves table already read
+the hidden robbery row, and which is why that table moved here.
+
+**Three faults a read found, none of them visible from the page they were on.**
+- **The NPC filter had never worked.** `loadNPCs`' apply handler read a bare `status.value` for its
+  `<select id="status">`, and `window.status` is a real Window property that an element id never
+  shadows, so every apply sent `status="undefined"` and the server's `c.status=?` returned no cards.
+  The neighbouring `q.value`, `loc.value` and `fac.value` worked, because none of those names is a
+  Window property - which is exactly why nobody suspected the fourth. Every new page reads by
+  `getElementById`, and none uses an id that is a Window property.
+- **The Player Editor demoted on an unchanged save.** `player_detail` selected `sect_name` and
+  `rank_name` and not `rank_level`, while the sect card pre-filled `rank_level` from that row - so
+  it read 0, and saving the card as it stood set the player's sect rank to 0. A form pre-filled from
+  a field the read never selects is the rc.37 Player Editor's own promise broken one column over.
+- **The sect cards showed two numbers nothing writes.** `sects.prestige` and
+  `sects.treasury_stones` are created empty by three Go paths and written by none, so every card
+  read 0 for as long as the page existed, while the sect's real treasury - items in
+  `sect_treasury`, moved by contributions, tribute and the manor - was shown nowhere.
+
+**One owner per table still holds.** `DASHBOARD_SYSTEM_TABLES` lets a table belong to one view, so
+each new page owns the tables it is the only full reader of, and `sect_abodes` stays with Crafting &
+Assets, which registered it first; Holdings reads it without owning it.
+
+**Mining is refused in a shop and on an auction floor**, beside the private places, shrines and an
+open exploration event it already refused, on the owner's list. The refusal asks `shopAt` and
+`catalogHouseAt`, and it found its own exception on the first run: all sixteen waystations are a
+road yard that also carries the keeper's stall, so `shopAt` answers yes there, and the naive check
+shut every one of them. A road site is exempt in the engine and in the panel alike, and
+`test_a_button_is_drawn_where_it_works.py` computes the engine's rule a third time over all 477
+locations and holds the panel's Mine hide to it.
+
 ### A grade is a suffix, and one door reads it (`item_grade.go`, v1.6.0)
 
 Asked for: items graded Low / Mid / High / Superior / Transcendent, NPC shops dealing only in the

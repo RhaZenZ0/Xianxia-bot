@@ -85,9 +85,26 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(data["simulations"])
 
     async def test_dashboard_views_read_current_world_data(self):
-        self.assertIn("rows", await self.store.npcs(limit=10))
+        npcs = await self.store.npcs(limit=10)
+        self.assertIn("rows", npcs)
+        # v1.6.0: the running events' cast is on the roster; the graves moved
+        # to Deeds & Fates.
+        self.assertIn("event_casts", npcs)
+        self.assertNotIn("graves", npcs)
         self.assertIn("birth_families", await self.store.families())
-        self.assertIn("sects", await self.store.sects())
+        sects = await self.store.sects()
+        self.assertIn("sects", sects)
+        # Memberships moved to Members & Lineage; the two columns nothing ever
+        # wrote are gone from the cards.
+        self.assertNotIn("memberships", sects)
+        self.assertTrue(all("prestige" not in row and "treasury_stones" not in row for row in sects["sects"]))
+        self.assertIn("summary", await self.store.npc_population())
+        self.assertIn("couples", await self.store.npc_families())
+        self.assertIn("feuds", await self.store.npc_society())
+        self.assertIn("graves", await self.store.npc_deeds())
+        self.assertIn("members", await self.store.sect_members())
+        self.assertIn("attempts", await self.store.sect_recruitment())
+        self.assertIn("treasury", await self.store.sect_holdings())
         self.assertIn("wars", await self.store.conflicts())
         self.assertIn("world_events", await self.store.events())
         self.assertIn("players", await self.store.players())
@@ -645,7 +662,7 @@ class NavigationGroupingTests(unittest.TestCase):
 
     Twenty-three views used to be one flat row of tabs, sticky, which at laptop
     width wrapped onto three rows and ate 120px of every screen permanently.
-    They are now five groups. The gate already checks that every view has a
+    They are now seven groups (NPCs and Sects since v1.6.0). The gate already checks that every view has a
     button and a loader; this checks the thing the gate cannot see - that every
     button actually sits under a heading, in exactly one group.
     """
@@ -671,7 +688,14 @@ class NavigationGroupingTests(unittest.TestCase):
         placed = [view for views in groups.values() for view in views]
         self.assertEqual(sorted(placed), sorted(DASHBOARD_VIEW_ENDPOINTS))
         self.assertEqual(len(placed), len(set(placed)), "a view is listed in two groups")
-        self.assertEqual(len(groups), 5, f"expected five groups, got {list(groups)}")
+        self.assertEqual(len(groups), 7, f"expected seven groups, got {list(groups)}")
+        # NPCs and Sects are heads of their own (v1.6.0), between the world
+        # and the players, and neither page is left behind under World.
+        self.assertEqual(list(groups)[:4], ["World", "NPCs", "Sects", "Players"])
+        self.assertEqual(groups["NPCs"], ["npcs", "npc_population", "npc_families", "npc_society", "npc_deeds"])
+        self.assertEqual(groups["Sects"], ["sects", "sect_members", "sect_recruitment", "sect_holdings"])
+        self.assertNotIn("npcs", groups["World"])
+        self.assertNotIn("sects", groups["World"])
         # The views that can change the world are kept apart from the
         # twenty-one that only read it. Narration routing joined them: it
         # cannot touch canonical state, but it is an audited engine write and
@@ -683,6 +707,233 @@ class NavigationGroupingTests(unittest.TestCase):
     def test_the_shell_carries_the_pieces_the_page_template_needs(self):
         for required in ('id="navFilter"', 'id="crumb"', 'id="railToggle"', 'id="worldClock"', 'id="drawer"'):
             self.assertIn(required, self.html)
+
+
+class _PinnedClockPages(unittest.IsolatedAsyncioTestCase):
+    """A real bootstrap with the simulation fixture and the clock pinned, so the
+    pages' day and year arithmetic has a fixed minute to be read against."""
+
+    NOW = 200 * 24 * 60
+
+    async def asyncSetUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.path = Path(self.tmp.name) / "pages.sqlite3"
+        self.db = Database(self.path)
+        await self.db.init()
+        self.world = World(ROOT / "content" / "world.json")
+        await seed_simulation_fixture(self.db, self.world.data, 0)
+        self.store = ReadOnlyDashboardStore(self.path)
+        self.store._engine = None
+        async with self.db._connect() as db:
+            await db.execute(
+                "INSERT INTO world_state(key,value_json,updated_at) VALUES('world_clock',?,0)"
+                " ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json",
+                (json.dumps({"anchor_game_minute": self.NOW, "anchor_real_ts": time.time(), "scale": 0}),),
+            )
+            rows = await (await db.execute("SELECT npc_name,home_location FROM npc_civilization_state ORDER BY npc_name LIMIT 12")).fetchall()
+            await db.commit()
+        self.names = [r[0] for r in rows]
+        self.homes = {r[0]: r[1] for r in rows}
+
+    async def asyncTearDown(self):
+        self.tmp.cleanup()
+
+    async def _run(self, *statements):
+        async with self.db._connect() as db:
+            for sql, params in statements:
+                await db.execute(sql, params)
+            await db.commit()
+
+
+class NpcPagesTests(_PinnedClockPages):
+    """The NPCs head (v1.6.0): each page reads what the simulation wrote."""
+
+    async def test_population_counts_the_missing_the_stalled_the_away_and_the_old(self):
+        missing, stalled, away, old = self.names[:4]
+        ten_days = 10 * 24 * 60
+        year = 60 * 24 * 30 * 12
+        await self._run(
+            ("UPDATE npc_civilization_state SET status='missing',missing_since_game_minute=?,activity='Whereabouts unknown' WHERE npc_name=?",
+             (self.NOW - ten_days, missing)),
+            ("UPDATE npc_civilization_state SET activity='Stalled at the ascension gate' WHERE npc_name=?", (stalled,)),
+            ("UPDATE npc_civilization_state SET current_location='Somewhere Far Away' WHERE npc_name=?", (away,)),
+            # 70 at creation, born a year before now, lifespan 72: a year left.
+            ("INSERT INTO npc_life_state(npc_name,birth_game_minute,age_at_creation_years,natural_lifespan_years,updated_at) VALUES(?,?,70,72,0)",
+             (old, self.NOW - year)),
+        )
+        data = await self.store.npc_population()
+        self.assertEqual(data["summary"]["missing"], 1)
+        row = next(r for r in data["missing"] if r["npc_name"] == missing)
+        self.assertEqual(row["days_missing"], 10)
+        self.assertIn(stalled, [r["npc_name"] for r in data["stalled"]])
+        self.assertIn(away, [r["npc_name"] for r in data["away_from_home"]])
+        self.assertEqual([r["npc_name"] for r in data["near_end_of_lifespan"]], [old])
+        self.assertEqual(data["near_end_of_lifespan"][0]["age_years"], 71.0)
+        self.assertEqual(data["summary"]["near_end_of_lifespan"], 1)
+        # The region join is what makes "who is where" worth reading.
+        self.assertTrue(any(r["population"] for r in data["whereabouts"]), data["whereabouts"][:3])
+
+    async def test_a_married_pair_is_one_row_and_the_rest_of_the_family_is_read(self):
+        a, b, c, d, widow = self.names[:5]
+        await self._run(
+            ("INSERT INTO npc_life_state(npc_name,relationship_status,spouse_name,children_count,updated_at) VALUES(?,'married',?,1,0)", (a, b)),
+            ("INSERT INTO npc_life_state(npc_name,relationship_status,spouse_name,children_count,updated_at) VALUES(?,'married',?,1,0)", (b, a)),
+            ("INSERT INTO npc_social_relations(npc_a,npc_b,relation_type,affinity,started_game_minute,updated_at) VALUES(?,?,'marriage',80,4321,0)",
+             (min(a, b), max(a, b))),
+            ("INSERT INTO npc_social_relations(npc_a,npc_b,relation_type,affinity,updated_at) VALUES(?,?,'courtship',40,0)",
+             (min(c, d), max(c, d))),
+            ("INSERT INTO npc_life_state(npc_name,relationship_status,updated_at) VALUES(?,'widowed',0)", (widow,)),
+            ("INSERT INTO npc_descendants(child_name,parent_a,parent_b,birth_game_minute,generated_as_npc,created_at,updated_at) VALUES('Grown Child',?,?,0,1,0,0)",
+             (a, b)),
+            ("INSERT INTO world_history_events(source_key,event_type,title,summary,actor_name,game_minute,created_at,updated_at) VALUES('coa:1','npc_coming_of_age','Of age','Grown',?,777,0,0)",
+             ("Grown Child",)),
+            ("INSERT INTO birth_families(family_id,family_name,surname,archetype,location,head_name,created_at,updated_at) VALUES(901,'Test House','Test','alchemy_family','Greenriver Town','Head',0,0)", ()),
+            ("INSERT INTO birth_family_npcs(family_id,name,relation,created_at) VALUES(901,'Uncle Test','uncle',0)", ()),
+        )
+        data = await self.store.npc_families()
+        pairs = [(r["npc_a"], r["npc_b"]) for r in data["couples"]]
+        self.assertEqual(pairs, [(min(a, b), max(a, b))], "a married pair is one row, not two")
+        self.assertEqual(data["couples"][0]["married_since"], 4321)
+        self.assertEqual([(r["npc_a"], r["npc_b"]) for r in data["courtships"]], [(min(c, d), max(c, d))])
+        self.assertEqual([r["npc_name"] for r in data["widows"]], [widow])
+        child = next(r for r in data["children"] if r["child_name"] == "Grown Child")
+        self.assertEqual(child["came_of_age_game_minute"], 777)
+        self.assertEqual(next(r for r in data["relatives"] if r["name"] == "Uncle Test")["family_name"], "Test House")
+
+    async def test_society_tells_a_feud_from_a_friendship(self):
+        a, b, c, d = self.names[:4]
+        await self._run(
+            ("INSERT INTO npc_social_relations(npc_a,npc_b,relation_type,grudge,updated_at) VALUES(?,?,'grudge',45,0)", (min(a, b), max(a, b))),
+            ("INSERT INTO npc_social_relations(npc_a,npc_b,relation_type,affinity,updated_at) VALUES(?,?,'acquaintance',60,0)", (min(c, d), max(c, d))),
+            ("INSERT INTO npc_disciple_bonds(master_name,disciple_name,status,updated_at) VALUES(?,?,'active',0)", (a, c)),
+            ("INSERT INTO npc_disciple_bonds(master_name,disciple_name,status,updated_at) VALUES(?,?,'ended',0)", (b, d)),
+            ("INSERT INTO npc_registry(name,origin,created_at,updated_at) VALUES('Made By The World','descendant',0,0)", ()),
+        )
+        data = await self.store.npc_society()
+        feud_pairs = {(r["npc_a"], r["npc_b"]) for r in data["feuds"]}
+        friend_pairs = {(r["npc_a"], r["npc_b"]) for r in data["friendships"]}
+        self.assertIn((min(a, b), max(a, b)), feud_pairs)
+        self.assertNotIn((min(a, b), max(a, b)), friend_pairs)
+        self.assertIn((min(c, d), max(c, d)), friend_pairs)
+        self.assertNotIn((min(c, d), max(c, d)), feud_pairs)
+        self.assertEqual({r["status"] for r in data["disciple_bonds"]}, {"active", "ended"})
+        self.assertEqual([r["name"] for r in data["registry"]], ["Made By The World"])
+        self.assertEqual(data["registry_by_origin"], [{"origin": "descendant", "n": 1}])
+
+    async def test_the_deeds_feed_shows_a_gm_the_hidden_rows_a_player_never_sees(self):
+        dead = self.names[0]
+        await self._run(
+            ("INSERT INTO world_history_events(source_key,event_type,title,summary,visibility,actor_type,actor_name,target_name,game_minute,created_at,updated_at)"
+             " VALUES('rob:1','npc_grave_robbery','A grave emptied','Nobody saw','hidden','npc','Robber Ko',?,500,0,0)", (dead,)),
+            ("INSERT INTO world_history_events(source_key,event_type,title,summary,visibility,actor_type,actor_name,game_minute,created_at,updated_at)"
+             " VALUES('promo:1','sect_promotion','Promoted','Rose a rank','public','npc','Rising Disciple',400,0,0)", ()),
+            ("INSERT INTO world_history_events(source_key,event_type,title,summary,visibility,actor_type,actor_name,game_minute,created_at,updated_at)"
+             " VALUES('player:1','location_discovery','A player found a road','Road','public','player','Some Player',300,0,0)", ()),
+            ("INSERT INTO world_history_events(source_key,event_type,title,summary,visibility,actor_type,actor_name,game_minute,created_at,updated_at)"
+             " VALUES('bt:1','npc_breakthrough','Broke through','A realm','public','npc','Rising Disciple',200,0,0)", ()),
+            ("INSERT INTO npc_graves(npc_name,location,home_location,died_game_minute,created_at,updated_at) VALUES(?,'Wild Hills','Greenriver Town',100,0,0)", (dead,)),
+            ("INSERT INTO npc_life_state(npc_name,death_game_minute,cause_of_death,updated_at) VALUES(?,100,'lost in the hills',0)", (dead,)),
+        )
+        data = await self.store.npc_deeds()
+        keys = {r["source_key"] for r in data["rows"]}
+        self.assertIn("rob:1", keys, "a hidden deed must reach the GM")
+        self.assertIn("promo:1", keys, "an NPC-acted row counts even without the npc_ prefix")
+        self.assertNotIn("player:1", keys)
+        self.assertEqual([r["source_key"] for r in (await self.store.npc_deeds(visibility="hidden"))["rows"]], ["rob:1"])
+        self.assertEqual([r["source_key"] for r in (await self.store.npc_deeds(q="Robber"))["rows"]], ["rob:1"])
+        self.assertEqual([r["source_key"] for r in (await self.store.npc_deeds(event_type="npc_breakthrough"))["rows"]], ["bt:1"])
+        self.assertEqual(len((await self.store.npc_deeds(limit=0))["rows"]), 1)
+        self.assertEqual(data["graves"][0]["robbed_by"], "Robber Ko")
+        self.assertEqual(data["deaths"][0]["cause_of_death"], "lost in the hills")
+        self.assertEqual([r["source_key"] for r in data["breakthroughs"]], ["bt:1"])
+
+    async def test_the_roster_lists_only_a_running_events_cast_and_filters_the_missing(self):
+        missing = self.names[0]
+        await self._run(
+            ("INSERT INTO world_events(event_key,event_type,title,location,payload_json,active,starts_at,ends_at) VALUES('live','recruitment','A Delegation','Greenriver Town','{}',1,0,9e9)", ()),
+            ("INSERT INTO world_events(event_key,event_type,title,location,payload_json,active,starts_at,ends_at) VALUES('over','festival','Last Year','Greenriver Town','{}',0,0,1)", ()),
+            ("INSERT INTO world_event_npcs(event_key,npc_key,name,title,role,sect_name,can_recommend,created_at) VALUES('live','elder','Visiting Elder Wu','Elder','Decides who is taken','Azure Cloud Sect',1,0)", ()),
+            ("INSERT INTO world_event_npcs(event_key,npc_key,name,title,created_at) VALUES('over','host','Old Host','Host',0)", ()),
+            ("UPDATE npc_civilization_state SET status='missing',missing_since_game_minute=1 WHERE npc_name=?", (missing,)),
+        )
+        casts = (await self.store.npcs())["event_casts"]
+        self.assertEqual([r["name"] for r in casts], ["Visiting Elder Wu"])
+        self.assertEqual(casts[0]["sect_name"], "Azure Cloud Sect")
+        self.assertEqual(casts[0]["can_recommend"], 1)
+        self.assertEqual([r["npc_name"] for r in (await self.store.npcs(status="missing"))["rows"]], [missing])
+
+
+class SectPagesTests(_PinnedClockPages):
+    """The Sects head (v1.6.0)."""
+
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        for uid, name in ((21, "Master Lin"), (22, "Disciple Yu"), (23, "Outsider Hao")):
+            self.assertTrue(await seed_character(
+                self.db, user_id=uid, discord_name=f"u{uid}", name=name, origin="Greenriver Town",
+                path="Sword Cultivator", spiritual_root="Fire", concept="sect page", location="Greenriver Town",
+                attributes={"body": 2, "agility": 2, "spirit": 2, "insight": 2, "will": 2, "presence": 2},
+                qi_max=10, vitality_max=20,
+            ))
+
+    async def test_members_lineage_and_requests_are_read(self):
+        await self._run(
+            ("INSERT INTO sect_membership(user_id,sect_name,rank_name,rank_level,joined_at,contribution_points) VALUES(21,'Azure Cloud Sect','Elder',40,1,90)", ()),
+            ("INSERT INTO sect_membership(user_id,sect_name,rank_name,rank_level,joined_at,contribution_points) VALUES(22,'Azure Cloud Sect','Outer Disciple',10,2,5)", ()),
+            ("INSERT INTO sect_lineage(disciple_user_id,master_user_id,accepted_at,attention) VALUES(22,21,3,7)", ()),
+            ("INSERT INTO disciple_requests(disciple_user_id,master_user_id,status,created_at) VALUES(23,21,'pending',4)", ()),
+        )
+        data = await self.store.sect_members()
+        self.assertEqual([r["name"] for r in data["members"]], ["Master Lin", "Disciple Yu"])
+        self.assertEqual(data["by_sect"][0]["members"], 2)
+        self.assertEqual(data["by_sect"][0]["contribution"], 95)
+        self.assertEqual((data["lineage"][0]["master_name"], data["lineage"][0]["disciple_name"]), ("Master Lin", "Disciple Yu"))
+        self.assertEqual((data["requests"][0]["disciple_name"], data["requests"][0]["status"]), ("Outsider Hao", "pending"))
+
+    async def test_the_player_editor_reads_the_sect_rank_it_pre_fills(self):
+        """The card pre-fills `rank_level`; before v1.6.0 it was never selected,
+        so it read 0 and saving the card unchanged demoted the player."""
+        await self._run(
+            ("INSERT INTO sect_membership(user_id,sect_name,rank_name,rank_level,joined_at) VALUES(21,'Azure Cloud Sect','Elder',40,1)", ()),
+        )
+        player = (await self.store.player_detail(21))["player"]
+        self.assertEqual(player["rank_level"], 40)
+        self.assertEqual(player["rank_name"], "Elder")
+
+    async def test_recruitment_reads_the_stored_tn_and_only_sect_keyed_standing(self):
+        await self._run(
+            ("INSERT INTO sect_recruitment_attempts(user_id,sect_name,attempt_type,result,score,target,game_minute,created_at) VALUES(23,'Azure Cloud Sect','trial','failed',11,17,50,0)", ()),
+            ("INSERT INTO sect_recommendations(user_id,npc_name,sect_name,bonus,status,created_at,updated_at) VALUES(23,'Elder Wu','Azure Cloud Sect',2,'active',0,0)", ()),
+            ("INSERT INTO sect_politics_state(sect_name,updated_at) VALUES('Azure Cloud Sect',0) ON CONFLICT(sect_name) DO NOTHING", ()),
+            ("INSERT INTO faction_reputation(user_id,faction_key,score,updated_at) VALUES(23,'Azure Cloud Sect',25,0)", ()),
+            ("INSERT INTO faction_reputation(user_id,faction_key,score,updated_at) VALUES(23,'craft_hall:Alchemy',5,0)", ()),
+            ("INSERT INTO character_sect_discoveries(user_id,sect_name,discovery_kind,created_at) VALUES(23,'Azure Cloud Sect','envoy',0)", ()),
+            ("INSERT INTO hidden_sect_membership(user_id,sect_name,rank_name,status,updated_at) VALUES(22,'Heaven-Devouring Demon Sect','Shadow Initiate','active',0)", ()),
+        )
+        data = await self.store.sect_recruitment()
+        self.assertEqual((data["attempts"][0]["score"], data["attempts"][0]["target"]), (11, 17), "the TN is the one the engine stored")
+        self.assertEqual(data["recommendations"][0]["npc_name"], "Elder Wu")
+        self.assertEqual([(r["sect_name"], r["score"]) for r in data["standing"]], [("Azure Cloud Sect", 25)])
+        self.assertEqual(data["discoveries"][0]["discovery_kind"], "envoy")
+        self.assertEqual(data["hidden"][0]["player_name"], "Disciple Yu")
+
+    async def test_holdings_read_the_manor_its_projects_and_the_real_treasury(self):
+        # The holdings are foreign-keyed to `sects`, as they are in production,
+        # so the parent row is seeded first.
+        await self._run(
+            ("INSERT INTO sects(sect_name,updated_at) VALUES('Azure Cloud Sect',0) ON CONFLICT(sect_name) DO NOTHING", ()),
+            ("INSERT INTO sect_manors(sect_name,name,base_location,qi_array_level,founded_by_user_id,created_at,updated_at) VALUES('Azure Cloud Sect','Cloud Manor','Greenriver Town',2,21,0,0)", ()),
+            ("INSERT INTO sect_manor_projects(sect_name,user_id,project_type,facility_key,from_level,to_level,cost_json,created_at) VALUES('Azure Cloud Sect',21,'upgrade','qi_array',1,2,'{}',0)", ()),
+            ("INSERT INTO sect_treasury(sect_name,item_id,quantity) VALUES('Azure Cloud Sect','spirit_herb',30)", ()),
+            ("INSERT INTO sect_treasury(sect_name,item_id,quantity) VALUES('Azure Cloud Sect','spirit_iron',12)", ()),
+            ("INSERT INTO sect_politics_state(sect_name,updated_at) VALUES('Azure Cloud Sect',0) ON CONFLICT(sect_name) DO NOTHING", ()),
+        )
+        data = await self.store.sect_holdings()
+        self.assertEqual(data["manors"][0]["founder_name"], "Master Lin")
+        self.assertEqual((data["projects"][0]["from_level"], data["projects"][0]["to_level"]), (1, 2))
+        self.assertEqual([(r["item_id"], r["quantity"]) for r in data["treasury"]], [("spirit_herb", 30), ("spirit_iron", 12)])
+        card = next(r for r in (await self.store.sects())["sects"] if r["sect_name"] == "Azure Cloud Sect")
+        self.assertEqual((card["treasury_items"], card["treasury_units"]), (2, 42))
 
 
 class AttentionFeedTests(unittest.IsolatedAsyncioTestCase):
