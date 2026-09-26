@@ -16,6 +16,26 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **deferred (next release)** — *A trade's goods need that trade's certificate at a stall.* On the
+  owner's call: anyone at the realm floor may open a stall, but listing an item a recipe makes needs
+  an examination of that trade passed in this life - any rank, because a rank rises on crafting alone
+  and somebody can reach rank 2 without sitting rank 1. Raw materials stay sellable, a trade with no
+  authored examination locks nothing, and listings already standing are left alone. The engine check
+  goes in `stallListAction` beside `itemTrade`; the `/stall list` picker offers only what the engine
+  would take (rc.46). Consequence to state in the notes: a shop-bought pill is a recipe's output too,
+  so an uncertified character cannot resell one at a stall; the shop counters still buy it. Deferred
+  because the owner asked for it as its own release after v1.6.0.
+- **fixed (v1.6.0)** — *More NPC and sect overview on the GM dashboard.* Asked for as heads of their
+  own, like World and Players. NPCs carries the roster, Population & Whereabouts, Marriage & Family,
+  Society and Deeds & Fates; Sects carries Sect Politics, Members & Lineage, Recruitment and
+  Holdings. Reads only, on the owner's call. Three faults found while reading are fixed with it: the
+  roster's status filter sent "undefined", the Player Editor's sect card demoted a player on an
+  unchanged save, and the sect cards showed two columns nothing writes. Territory and wars stay on
+  Conflicts.
+- **fixed (v1.6.0)** — *Mining inside a shop or an auction hall.* Nothing refused a dig on an
+  apothecary's floor. On the owner's call a dig is refused in private places, on shrines, in a shop,
+  on an auction floor and while an exploration event is open, and nowhere else; a waystation's yard
+  carries its keeper's stall and stays open ground.
 - **fixed (v1.5.0)** — *A player can own a shop.* Asked as a question - *"What are your thoughts on
   a player owning a shop?"* - and answered with a stall in a city's street rather than a storefront in
   the private homestead (nobody could walk in) or a catalogue shop bought outright (shops are content
