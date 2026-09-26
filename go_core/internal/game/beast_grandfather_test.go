@@ -62,10 +62,10 @@ func TestAnOldBeastPaysForItsLevels(t *testing.T) {
 }
 
 func TestAnOldBeastIsLoweredToItsWorldsLimit(t *testing.T) {
-	// Rank 35, stage 16 (tamed at 19) in the Mortal World: lowered to 20,
-	// then only 19 -> 20 is owed, at 8.
-	if rank, _, left := grandfatherBeast(t, 8, 35); rank != 20 || left != 0 {
-		t.Fatalf("rank=%d cores left=%d, want 20/0", rank, left)
+	// Rank 35, stage 16 (tamed at 19) in the Mortal World: lowered to 25,
+	// then 19 -> 25 is owed: 8 + 5x16 = 88.
+	if rank, _, left := grandfatherBeast(t, 88, 35); rank != 25 || left != 0 {
+		t.Fatalf("rank=%d cores left=%d, want 25/0", rank, left)
 	}
 }
 
@@ -84,7 +84,7 @@ func TestTheOwnersRealmDecidesTheLimitBeforeWhereTheyStand(t *testing.T) {
 	if spiritual < 0 {
 		t.Fatal("the catalogue carries no Spiritual World realm; the test is broken, not the tree")
 	}
-	// Standing in the Mortal World at a Spiritual World realm: 35 is under 40,
+	// Standing in the Mortal World at a Spiritual World realm: 35 is under 50,
 	// so it keeps its rank and pays for 19..34, the sixteen levels it evolved
 	// (1x8 + 10x16 + 5x24 = 288).
 	if rank, _, left := grandfatherBeastAt(t, 288, 35, spiritual); rank != 35 || left != 0 {

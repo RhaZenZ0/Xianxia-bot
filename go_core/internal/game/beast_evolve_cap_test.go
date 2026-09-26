@@ -63,7 +63,7 @@ func TestTheEvolutionRequirementNeverNamesANumberAboveTheCap(t *testing.T) {
 
 func TestABeastCannotOutgrowTheWorldItStandsIn(t *testing.T) {
 	for world, limit := range beastRankLimits {
-		if limit != map[string]int64{"Mortal World": 20, "Spiritual World": 40, "Immortal World": 60, "Celestial World": 100}[world] {
+		if limit != map[string]int64{"Mortal World": 25, "Spiritual World": 50, "Immortal World": 75, "Celestial World": 100}[world] {
 			t.Fatalf("%s limit is %d", world, limit)
 		}
 	}
@@ -73,12 +73,12 @@ func TestABeastCannotOutgrowTheWorldItStandsIn(t *testing.T) {
 	batch4Exec(t, path, `INSERT INTO spirit_beasts(
 		user_id,name,species,rank,element,intelligence,temperament,bloodline,evolution_stage,
 		loyalty,contract_type,active,techniques_json,created_at,updated_at
-	) VALUES(42,'Cloudpaw','Wind Lynx',20,'Wind',10,'bonded','Common',5,100,'equality',1,'[]',0,0)`)
+	) VALUES(42,'Cloudpaw','Wind Lynx',25,'Wind',10,'bonded','Common',5,100,'equality',1,'[]',0,0)`)
 	_, err := evolveBeast(t, path, world, 0)
-	if err == nil || !strings.Contains(err.Error(), "rank 20") {
-		t.Fatalf("a rank-20 beast in the Mortal World evolved: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "rank 25") {
+		t.Fatalf("a rank-25 beast in the Mortal World evolved: %v", err)
 	}
-	if beastRankLimit("Spiritual World") != 40 || beastRankLimit("nowhere") != 20 {
+	if beastRankLimit("Spiritual World") != 50 || beastRankLimit("nowhere") != 25 {
 		t.Fatal("the limit is not read per world")
 	}
 }
