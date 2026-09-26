@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 65
+SCHEMA_VERSION = 66
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -204,6 +204,8 @@ OPERATIONAL_REQUIRED_TABLES = frozenset(
         "slow_query_log",
         "soul_legacy",
         "spirit_beasts",
+        "stall_card_messages",
+        "stall_channels",
         "stall_listings",
         "stall_sales",
         "startup_events",
@@ -2761,6 +2763,39 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             "CREATE INDEX IF NOT EXISTS idx_stall_sales_seller ON stall_sales(user_id, sale_id)",
         ),
     ),
+    (
+        66,
+        "a_market_channel_per_world",
+        (
+            # v1.7.0: one read-only market-stalls channel per world, the
+            # world_event_channels shape (schema 56), and one live card per
+            # open stall in it. The card row is a Discord message id and
+            # nothing else - the stall is the engine's `player_stalls` row -
+            # keyed on the stall's owner, so an erasure or a reset sweeps it
+            # with everything else of theirs; the handler deletes the message
+            # itself first, having read the id before the engine call (the
+            # v1.0.8 thread rule). The tables live in this migration alone
+            # (rc.57).
+            """CREATE TABLE IF NOT EXISTS stall_channels (
+                guild_id INTEGER NOT NULL,
+                world_name TEXT NOT NULL,
+                channel_id INTEGER NOT NULL,
+                category_id INTEGER,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL,
+                PRIMARY KEY(guild_id,world_name),
+                UNIQUE(guild_id,channel_id)
+            )""",
+            """CREATE TABLE IF NOT EXISTS stall_card_messages (
+                guild_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                channel_id INTEGER NOT NULL,
+                message_id INTEGER NOT NULL,
+                updated_at REAL NOT NULL,
+                PRIMARY KEY(guild_id,user_id)
+            )""",
+        ),
+    ),
 )
 
 
@@ -5268,6 +5303,9 @@ class Database:
             auction_rows = int(cur.rowcount or 0)
             cur = await db.execute("DELETE FROM world_event_channels WHERE guild_id=?", (int(guild_id),))
             world_event_rows = int(cur.rowcount or 0)
+            cur = await db.execute("DELETE FROM stall_channels WHERE guild_id=?", (int(guild_id),))
+            stall_channel_rows = int(cur.rowcount or 0)
+            await db.execute("DELETE FROM stall_card_messages WHERE guild_id=?", (int(guild_id),))
             await db.execute("DELETE FROM auction_lot_messages WHERE guild_id=?", (int(guild_id),))
             await db.execute("DELETE FROM playtest_items WHERE guild_id=?", (int(guild_id),))
             cur = await db.execute(
@@ -5277,7 +5315,8 @@ class Database:
             message_rows = int(cur.rowcount or 0)
             await db.commit()
         return {"server_config": config_rows, "realm_hubs": hub_rows, "auction_houses": auction_rows,
-                "world_events": world_event_rows, "channel_messages": message_rows}
+                "world_events": world_event_rows, "stall_channels": stall_channel_rows,
+                "channel_messages": message_rows}
 
     async def get_expedition_thread(self, guild_id: int, user_id: int) -> dict[str, Any] | None:
         async with self._connect() as db:
@@ -6677,6 +6716,67 @@ class Database:
             db.row_factory = aiosqlite.Row
             cur = await db.execute("SELECT * FROM world_event_channels WHERE guild_id=? ORDER BY world_name", (int(guild_id),))
             return [dict(row) for row in await cur.fetchall()]
+
+    async def set_stall_channel(self, *, guild_id: int, world_name: str, channel_id: int, category_id: int | None) -> None:
+        """One market-stalls channel per world (schema 66), the
+        `world_event_channels` shape."""
+        now = time.time()
+        async with self._connect() as db:
+            await db.execute(
+                """INSERT INTO stall_channels(guild_id,world_name,channel_id,category_id,created_at,updated_at)
+                   VALUES(?,?,?,?,?,?) ON CONFLICT(guild_id,world_name) DO UPDATE SET
+                   channel_id=excluded.channel_id,category_id=excluded.category_id,updated_at=excluded.updated_at""",
+                (int(guild_id), str(world_name), int(channel_id), int(category_id) if category_id else None, now, now),
+            )
+            await db.commit()
+
+    async def get_stall_channels(self, guild_id: int) -> list[dict[str, Any]]:
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute("SELECT * FROM stall_channels WHERE guild_id=? ORDER BY world_name", (int(guild_id),))
+            return [dict(row) for row in await cur.fetchall()]
+
+    async def remember_stall_card(self, *, guild_id: int, user_id: int, channel_id: int, message_id: int) -> None:
+        """The live card for one stall (v1.7.0): a Discord message id, nothing
+        about the stall itself - the engine's `player_stalls` row is the stall."""
+        async with self._connect() as db:
+            await db.execute(
+                """INSERT INTO stall_card_messages(guild_id,user_id,channel_id,message_id,updated_at) VALUES(?,?,?,?,?)
+                   ON CONFLICT(guild_id,user_id) DO UPDATE SET channel_id=excluded.channel_id,
+                   message_id=excluded.message_id,updated_at=excluded.updated_at""",
+                (int(guild_id), int(user_id), int(channel_id), int(message_id), time.time()),
+            )
+            await db.commit()
+
+    async def list_stall_cards(self, guild_id: int) -> list[dict[str, Any]]:
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute("SELECT * FROM stall_card_messages WHERE guild_id=? ORDER BY user_id", (int(guild_id),))
+            return [dict(row) for row in await cur.fetchall()]
+
+    async def forget_stall_card(self, guild_id: int, user_id: int) -> None:
+        async with self._connect() as db:
+            await db.execute("DELETE FROM stall_card_messages WHERE guild_id=? AND user_id=?", (int(guild_id), int(user_id)))
+            await db.commit()
+
+    async def list_player_stalls(self) -> list[dict[str, Any]]:
+        """Every open stall with its keeper's name and what is laid on it
+        (v1.7.0), for the live cards. A read: the engine owns every write."""
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                """SELECT s.user_id,s.city,s.name,s.currency_id,COALESCE(c.name,'') AS owner_name
+                   FROM player_stalls s LEFT JOIN characters c ON c.user_id=s.user_id ORDER BY s.user_id"""
+            )
+            stalls = {int(row["user_id"]): {**dict(row), "listings": []} for row in await cur.fetchall()}
+            cur = await db.execute(
+                "SELECT listing_id,user_id,item_id,quantity,unit_price,currency_id FROM stall_listings ORDER BY listing_id"
+            )
+            for row in await cur.fetchall():
+                stall = stalls.get(int(row["user_id"]))
+                if stall is not None:
+                    stall["listings"].append(dict(row))
+            return list(stalls.values())
 
     async def get_auction(self, auction_id: int) -> dict[str, Any] | None:
         async with self._connect() as db:

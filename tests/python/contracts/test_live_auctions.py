@@ -52,8 +52,8 @@ class TheFeedFollowsTheLot(unittest.TestCase):
 
     def test_settlement_follows_the_tick(self):
         worker = _body(BOT_PY, "event_expiry_worker")
-        self.assertIn("settle_lots(self.get_guild(SETTINGS.guild_id))", worker)
-        self.assertLess(worker.index("SIM.run_due("), worker.index("settle_lots("))
+        self.assertIn("sync_lots(self.get_guild(SETTINGS.guild_id))", worker)
+        self.assertLess(worker.index("SIM.run_due("), worker.index("sync_lots("))
 
     def test_the_feed_writes_only_message_ids(self):
         # No engine call, no gameplay table: the feed reads the lot and keeps
@@ -64,7 +64,7 @@ class TheFeedFollowsTheLot(unittest.TestCase):
             self.assertIn(allowed, FEED, allowed)
 
     def test_a_struck_lot_reads_sold_or_unsold(self):
-        settle = _body(FEED, "settle_lots")
+        settle = _body(FEED, "sync_lots")
         # v0.34.1: a merchant that took the lot is a sale too - the seller was paid.
         self.assertIn('(lot.get("current_bidder_user_id") or lot.get("merchant_buyer"))', settle)
         self.assertIn('"sold" if struck else "unsold"', settle)

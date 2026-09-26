@@ -127,7 +127,7 @@ def _xianxia_info_guide_text() -> str:
 
 XIANXIA_INFO_PAGES: dict[str, tuple[str, str]] = {
     "getting_started": ("🌱 Getting Started", "Run `/begin` in `#begin-here`. You are born into one of thirteen households: it teaches you a trade, hands you an heirloom, and gives you the first quest of a chain that walks you out of the door, through the town and the road, and home again. Follow it. `/menu` opens every hub from anywhere, and `/cooldowns` says what is ready and where each ready thing is done."),
-    "server_layout": ("🗺️ The Server", "Eight categories, in the order you read them. **🚪 Start Here** is `#begin-here` and this guide. **📣 Announcements** is `#world-events` for anything global and `#updates` for what changed in the last release. **🌌 Realm Capitals** holds one meeting city per world. **🌠 World Events** holds one news channel per world, and an event's scene and its thread now open in the same place. **🏮 Auction Houses** holds the live lot feeds. **🗺️ Cultivation World** holds the read-only anchors your private threads hang from. **🛠️ Feedback** is `#playtest` and `#bugs`. **🔒 Admin** is the operator's. A capital is visible only while you are standing in it; a world's news, its scenes and its auction floor are visible once you have reached that world at all."),
+    "server_layout": ("🗺️ The Server", "Nine categories, in the order you read them. **🚪 Start Here** is `#begin-here` and this guide. **📣 Announcements** is `#world-events` for anything global and `#updates` for what changed in the last release. **🌌 Realm Capitals** holds one meeting city per world. **🌠 World Events** holds one news channel per world, and an event's scene and its thread now open in the same place. **🏮 Auction Houses** holds the live lot feeds. **🧺 Market Stalls** holds one channel per world with a live card for every cultivator's stall there. **🗺️ Cultivation World** holds the read-only anchors your private threads hang from. **🛠️ Feedback** is `#playtest` and `#bugs`. **🔒 Admin** is the operator's. A capital is visible only while you are standing in it; a world's news, its scenes, its auction floor and its market stalls are visible once you have reached that world at all."),
     "character": ("🧬 Character & Cultivation", "Your household, spiritual root, physique, path, realm, resources, karma, fate and Dao heart are canonical game state. Two ladders run in parallel — qi cultivation and body tempering — and Stage 9 of either opens the optional Perfection path. The AI narrates what has already happened; it cannot change a mechanic, grant a reward, or decide an outcome."),
     "exploration": ("🧭 Exploration & Scenes", "**Where you stand** and **what scene you are in** are separate. Wilderness travel, exploration, foraging and hunting happen in your own private expedition thread under `#expeditions`. Properties and sect abodes use persistent private threads under `#player-homes`. A realm capital is a shared channel you can only see while you are in the city."),
     "world_events": ("🌠 World Events", "The world produces events on its own, and players trigger them by exploring. Each is announced in **its own world's** news channel with a link to its scene thread, and each carries a **site**: a finite number of beasts, herbs, veins, relics and tasks that deplete as people work them. Travel to the place the notice names to take part. What you are *handed* is banded by realm — a new cultivator is not offered a Dragon — but anything the world spawns on its own, you can walk into."),
@@ -185,6 +185,13 @@ CHANNEL_MESSAGE_KEYS: tuple[str, ...] = (
     # `realm_hub_channels`. A prefixed key needed no new mechanism.
     "world-events:Mortal World", "world-events:Spiritual World",
     "world-events:Immortal World", "world-events:Celestial World",
+    # v1.7.0: the per-world market-stalls channels, resolved through
+    # `stall_channels` the same way.
+    "stalls:Mortal World", "stalls:Spiritual World", "stalls:Immortal World", "stalls:Celestial World",
+    # v1.7.0: `#updates` had a default blurb since rc.59 and no slot here, so
+    # nothing ever posted it - every other reader of the default walks this
+    # tuple. A default no slot names is text nobody sees.
+    "updates",
 )
 
 
@@ -203,6 +210,11 @@ CHANNEL_MESSAGE_LABELS: dict[str, str] = {
     "world-events:Spiritual World": "#spiritual-world-events",
     "world-events:Immortal World": "#immortal-world-events",
     "world-events:Celestial World": "#celestial-world-events",
+    "stalls:Mortal World": "#mortal-world-stalls",
+    "stalls:Spiritual World": "#spiritual-world-stalls",
+    "stalls:Immortal World": "#immortal-world-stalls",
+    "stalls:Celestial World": "#celestial-world-stalls",
+    "updates": "#updates",
 }
 
 
@@ -327,6 +339,46 @@ DEFAULT_CHANNEL_MESSAGES: dict[str, str] = {
         "shift the balance of the world itself.\n"
         "You see this channel because you have reached the Celestial World."
     ),
+    "stalls:Mortal World": (
+        "\U0001f9fa **Mortal World — market stalls**\n"
+        "One card for every stall a cultivator keeps in a city of the Mortal World, kept current by the "
+        "bot: what is laid on it, at what price, and who keeps it. Buy from anywhere with "
+        "**/economy \u2192 Market Stalls \u2192 Buy** \u2014 goods from a stall farther off cost a "
+        "little more a road, and a High-grade pill or finer is sold here and on the auction floor, "
+        "never at a shop. Keep your own with **Market Stalls \u2192 Open** once you reach "
+        "Foundation Establishment.\n"
+        "Read-only: the cards are the channel."
+    ),
+    "stalls:Spiritual World": (
+        "\U0001f9fa **Spiritual World — market stalls**\n"
+        "One card for every stall a cultivator keeps in a city of the Spiritual World, kept current by the "
+        "bot: what is laid on it, at what price, and who keeps it. Buy from anywhere with "
+        "**/economy \u2192 Market Stalls \u2192 Buy** \u2014 goods from a stall farther off cost a "
+        "little more a road, and a High-grade pill or finer is sold here and on the auction floor, "
+        "never at a shop. Keep your own with **Market Stalls \u2192 Open** once you reach "
+        "Foundation Establishment.\n"
+        "Read-only: the cards are the channel."
+    ),
+    "stalls:Immortal World": (
+        "\U0001f9fa **Immortal World — market stalls**\n"
+        "One card for every stall a cultivator keeps in a city of the Immortal World, kept current by the "
+        "bot: what is laid on it, at what price, and who keeps it. Buy from anywhere with "
+        "**/economy \u2192 Market Stalls \u2192 Buy** \u2014 goods from a stall farther off cost a "
+        "little more a road, and a High-grade pill or finer is sold here and on the auction floor, "
+        "never at a shop. Keep your own with **Market Stalls \u2192 Open** once you reach "
+        "Foundation Establishment.\n"
+        "Read-only: the cards are the channel."
+    ),
+    "stalls:Celestial World": (
+        "\U0001f9fa **Celestial World — market stalls**\n"
+        "One card for every stall a cultivator keeps in a city of the Celestial World, kept current by the "
+        "bot: what is laid on it, at what price, and who keeps it. Buy from anywhere with "
+        "**/economy \u2192 Market Stalls \u2192 Buy** \u2014 goods from a stall farther off cost a "
+        "little more a road, and a High-grade pill or finer is sold here and on the auction floor, "
+        "never at a shop. Keep your own with **Market Stalls \u2192 Open** once you reach "
+        "Foundation Establishment.\n"
+        "Read-only: the cards are the channel."
+    ),
 }
 
 
@@ -381,6 +433,13 @@ async def _resolve_channel_message_target(guild: discord.Guild, channel_key: str
     if channel_key.startswith("world-events:"):
         world = channel_key.split(":", 1)[1]
         rows = {str(row["world_name"]): row for row in await DB.get_world_event_channels(guild.id)}
+        row = rows.get(world)
+        if not row:
+            return None
+        return await _resolve_text_channel(guild, row.get("channel_id"))
+    if channel_key.startswith("stalls:"):
+        world = channel_key.split(":", 1)[1]
+        rows = {str(row["world_name"]): row for row in await DB.get_stall_channels(guild.id)}
         row = rows.get(world)
         if not row:
             return None

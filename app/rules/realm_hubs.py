@@ -5,7 +5,8 @@ from typing import Any
 # The four worlds, and the one place they are enumerated. Every per-world loop
 # in the tree reads this: the access and presence roles, the capital channels,
 # which world an auction floor belongs to, and - since v1.0.0-rc.52 - the
-# per-world world-events channels. A fifth world is one entry here, not five
+# per-world world-events channels, and since v1.7.0 the per-world market-stalls
+# channels. A fifth world is one entry here, not five
 # edits in five files.
 REALM_HUBS: dict[str, dict[str, Any]] = {
     "Mortal World": {
@@ -19,6 +20,11 @@ REALM_HUBS: dict[str, dict[str, Any]] = {
             "Mortal World news — "
             "what the living world did to itself: disasters, invasions, sect wars, discoveries and the rise and fall of its powers. Visible to anyone who has reached this world."
         ),
+        "stalls_channel_name": "mortal-world-stalls",
+        "stalls_topic": (
+            "Mortal World market stalls — "
+            "one card per open stall in this world, kept current by the bot. Buy from anywhere with /economy → Market Stalls → Buy; goods from farther off cost a little more a road."
+        ),
     },
     "Spiritual World": {
         "location": "Spirit Jade Capital",
@@ -30,6 +36,11 @@ REALM_HUBS: dict[str, dict[str, Any]] = {
         "events_topic": (
             "Spiritual World news — "
             "upheavals among the ascended sects and ancient families, and every event the world opens up here. Visible to anyone who has reached this world."
+        ),
+        "stalls_channel_name": "spiritual-world-stalls",
+        "stalls_topic": (
+            "Spiritual World market stalls — "
+            "one card per open stall in this world, kept current by the bot. Buy from anywhere with /economy → Market Stalls → Buy; goods from farther off cost a little more a road."
         ),
     },
     "Immortal World": {
@@ -43,6 +54,11 @@ REALM_HUBS: dict[str, dict[str, Any]] = {
             "Immortal World news — "
             "immortal clans, law formations and the events that shake the court. Visible to anyone who has reached this world."
         ),
+        "stalls_channel_name": "immortal-world-stalls",
+        "stalls_topic": (
+            "Immortal World market stalls — "
+            "one card per open stall in this world, kept current by the bot. Buy from anywhere with /economy → Market Stalls → Buy; goods from farther off cost a little more a road."
+        ),
     },
     "Celestial World": {
         "location": "Celestial Mandate Palace",
@@ -54,6 +70,11 @@ REALM_HUBS: dict[str, dict[str, Any]] = {
         "events_topic": (
             "Celestial World news — "
             "sovereign courts, heavenly factions and the events that move them. Visible to anyone who has reached this world."
+        ),
+        "stalls_channel_name": "celestial-world-stalls",
+        "stalls_topic": (
+            "Celestial World market stalls — "
+            "one card per open stall in this world, kept current by the bot. Buy from anywhere with /economy → Market Stalls → Buy; goods from farther off cost a little more a road."
         ),
     },
 }

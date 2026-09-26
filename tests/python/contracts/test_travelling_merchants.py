@@ -107,7 +107,7 @@ class TheRoadAndTheFloor(unittest.TestCase):
         self.assertIn('lot.get("merchant_buyer")', embed)
         self.assertIn("(travelling merchant)", embed)
         self.assertIn("WORLD.merchants.get(merchant_key)", embed)
-        settle = _body(FEED, "settle_lots")
+        settle = _body(FEED, "sync_lots")
         self.assertIn('lot.get("merchant_buyer")', settle)
 
 
@@ -141,7 +141,7 @@ class MerchantsBid(unittest.TestCase):
         embed = _body(FEED, "lot_embed")
         self.assertIn('lot.get("merchant_bidder")', embed)
         self.assertIn("(travelling merchant)", embed)
-        settle = _body(FEED, "settle_lots")
+        settle = _body(FEED, "sync_lots")
         self.assertIn('str(lot.get("merchant_bidder") or "")', settle)
         self.assertIn('_edit_card(guild, record, lot, state="open")', settle)
         self.assertIn("merchant_bidder", _body(ECONOMY, "auction_browse"))

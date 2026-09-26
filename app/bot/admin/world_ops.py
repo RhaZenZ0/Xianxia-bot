@@ -32,6 +32,7 @@ from ..runtime import DB, ENGINE, SETTINGS, WORLD, _explain_engine_error, _revok
 from ..services import QUEST_FORGE, QUESTS, SIM
 from ...ai.quest_forge import store_draft
 from ...rules.quests import validate_quest_definition
+from ..stall_feed import card_record as stall_card_record, take_down_card
 from ..threads import delete_player_threads, ensure_sect_abode_record, ensure_sect_abode_thread_for
 from ..bot import bot
 from ..ui.event_scene import spawn_event_thread
@@ -921,6 +922,9 @@ async def admin_erase(
         doomed_threads = await DB.player_thread_ids(int(interaction.guild_id or 0), member.id)
     except Exception:
         log.exception("Could not read the private threads of user %s before an erasure", member.id)
+    # And their stall's card in the world's market channel (v1.7.0), by the
+    # same ordering: the sweep takes the row that names the message.
+    stall_card = await stall_card_record(interaction.guild, member.id)
     try:
         result = dict(
             await ENGINE.action(
@@ -934,6 +938,7 @@ async def admin_erase(
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     threads = await delete_player_threads(interaction.guild, doomed_threads)
+    await take_down_card(interaction.guild, stall_card)
     # And the role that said they had played (v1.0.11). This is the only place
     # it can come off: `_sync_cultivator_role` rides `require_character`, which
     # never fires again for an account with no character.

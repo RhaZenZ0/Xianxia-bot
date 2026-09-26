@@ -42,7 +42,8 @@ from ..rules.quests import (QUEST_DEFINITIONS, ascension_quest_seed_rows, beginn
                             household_errand_seed_rows, profession_exam_seed_rows, static_quest_seed_rows)
 from .services import AI_ROUTER, ALERTS, GUILD, NARRATOR, NARRATOR_CONTEXT, QUEST_FORGE, SIM
 from .threads import _private_scene_for_thread
-from .auction_feed import settle_lots
+from .auction_feed import sync_lots
+from .stall_feed import sync_stalls
 from .locations import _known_locations, current_npc_location
 from .registry import EVENT_HANDLERS, VIEW_RESTORERS
 from .typed_play import (
@@ -689,9 +690,16 @@ class XianxiaBot(commands.Bot):
                     # Go); the live cards follow it here, every cycle, so a
                     # struck lot reads as struck within a tick of the gavel.
                     try:
-                        await settle_lots(self.get_guild(SETTINGS.guild_id))
+                        await sync_lots(self.get_guild(SETTINGS.guild_id))
                     except Exception:
                         log.exception("Could not settle live auction cards")
+                    # The town buys from stalls inside the tick (npc_stalls.go)
+                    # and tells Python only a count, so the stall cards follow
+                    # the tick the same way (v1.7.0).
+                    try:
+                        await sync_stalls(self.get_guild(SETTINGS.guild_id))
+                    except Exception:
+                        log.exception("Could not refresh the stall cards")
                     for sim_run in simulation_runs:
                         log.info("World simulation %s: %s", sim_run.system, sim_run.summary)
                         for event in sim_run.events:

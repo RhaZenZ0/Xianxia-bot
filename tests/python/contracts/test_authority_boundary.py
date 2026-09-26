@@ -587,6 +587,9 @@ BOOKKEEPING_METHODS = {
     "set_channel_message", "set_server_channels", "set_info_message_id", "set_bugs_channel_id", "set_realm_hub_channel",
     "set_auction_house_channel", "remember_auction_lot_message", "forget_auction_lot_message",  # v0.33.1 live auction cards
     "set_world_event_channel",  # v1.0.0-rc.52 one world-events channel per world
+    # v1.7.0: one market-stalls channel per world and the card per open stall - Discord ids only;
+    # the stall is the player_stalls row the engine owns.
+    "set_stall_channel", "remember_stall_card", "forget_stall_card",
     # v1.0.0-rc.59: which release this guild has already been told about in #updates. A marker on
     # the same bookkeeping row as the channel ids, decided by `app/version.py` and nothing else -
     # no player and no rule can move it, which is what keeps it out of the engine.
@@ -715,7 +718,7 @@ PRESENTATION_WRITES: dict[str, set[str]] = {
     "set_info_message_id": {"server_config"},
     "set_bugs_channel_id": {"server_config"},
     "set_announced_release": {"server_config"},  # v1.0.0-rc.59 the release #updates has seen
-    "clear_discord_bindings": {"auction_house_channels", "auction_lot_messages", "channel_messages", "playtest_items", "realm_hub_channels", "server_config", "world_event_channels"},
+    "clear_discord_bindings": {"auction_house_channels", "auction_lot_messages", "channel_messages", "playtest_items", "realm_hub_channels", "server_config", "stall_card_messages", "stall_channels", "world_event_channels"},
     "set_playtest_item": {"playtest_items"},
     "clear_playtest_items": {"playtest_items"},
     "set_channel_message": {"channel_messages"},
@@ -724,6 +727,9 @@ PRESENTATION_WRITES: dict[str, set[str]] = {
     # Discord ids only; the lot itself is the auctions row the engine owns.
     "set_auction_house_channel": {"auction_house_channels"},
     "set_world_event_channel": {"world_event_channels"},
+    "set_stall_channel": {"stall_channels"},
+    "remember_stall_card": {"stall_card_messages"},
+    "forget_stall_card": {"stall_card_messages"},
     "remember_auction_lot_message": {"auction_lot_messages"},
     "forget_auction_lot_message": {"auction_lot_messages"},
     "set_expedition_thread": {"expedition_threads"},

@@ -43,6 +43,7 @@ from ..runtime import (
     respond,
     serialized_user_action,
 )
+from ..stall_feed import card_record as stall_card_record, take_down_card
 from ..threads import delete_player_threads
 from ..ui.commissions import AbandonCommissionView, abandon_warning
 from ..ui.creation import BirthFamilyView
@@ -1052,6 +1053,9 @@ async def reset(interaction: discord.Interaction) -> None:
         )
     except Exception:
         log.exception("Could not read the private threads of user %s before a reset", interaction.user.id)
+    # And their stall's card in the world's market channel (v1.7.0), by the
+    # same ordering: the sweep takes the row that names the message.
+    stall_card = await stall_card_record(interaction.guild, interaction.user.id)
     try:
         envelope = await ENGINE.authoritative_action(
             "character.reset",
@@ -1065,6 +1069,7 @@ async def reset(interaction: discord.Interaction) -> None:
     result = dict(envelope.get("result") or {})
     # The engine committed, so the rooms go with the life.
     threads = await delete_player_threads(interaction.guild, doomed_threads)
+    await take_down_card(interaction.guild, stall_card)
     remaining = int(result.get("resets_remaining", 0))
     lines = [
         f"🌱 **{result.get('name') or c['name']} is gone.** The household's record of them closes, "

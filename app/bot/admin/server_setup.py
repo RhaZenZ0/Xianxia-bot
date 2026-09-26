@@ -39,6 +39,7 @@ from ..channels import (
     configured_info_channel,
     ensure_auction_house_channels,
     ensure_cultivator_gate,
+    ensure_stall_channels,
     ensure_world_event_channels,
     ensure_realm_hub_channels,
     post_server_log,
@@ -241,6 +242,19 @@ async def clear_managed_channel_messages(guild: discord.Guild) -> dict[str, Any]
             log.exception("Could not delete world-events #%s for fresh-start wipe", channel.name)
             skipped.append(f"world-events:{world}")
 
+    # v1.7.0: the four market-stalls channels, by the same rule.
+    for row in await DB.get_stall_channels(guild.id):
+        world = str(row["world_name"])
+        channel = guild.get_channel(int(row["channel_id"]))
+        if not isinstance(channel, discord.TextChannel):
+            continue
+        try:
+            await channel.delete(reason="Xianxia RP fresh-start channel wipe")
+            cleared.append(f"stalls:{world}")
+        except (discord.Forbidden, discord.HTTPException):
+            log.exception("Could not delete market-stalls #%s for fresh-start wipe", channel.name)
+            skipped.append(f"stalls:{world}")
+
     bugs_channel_id = cfg.get("bugs_channel_id")
     bugs_channel = guild.get_channel(int(bugs_channel_id)) if bugs_channel_id else None
     if isinstance(bugs_channel, discord.ForumChannel):
@@ -347,6 +361,8 @@ async def teardown_managed_discord_layout(guild: discord.Guild) -> dict[str, Any
         targets.append((f"auction:{row['house_id']}", guild.get_channel(int(row["channel_id"]))))
     for row in await DB.get_world_event_channels(guild.id):
         targets.append((f"world-events:{row['world_name']}", guild.get_channel(int(row["channel_id"]))))
+    for row in await DB.get_stall_channels(guild.id):
+        targets.append((f"stalls:{row['world_name']}", guild.get_channel(int(row["channel_id"]))))
     bugs_channel_id = cfg.get("bugs_channel_id")
     targets.append(("bugs", guild.get_channel(int(bugs_channel_id)) if bugs_channel_id else None))
 
@@ -377,7 +393,7 @@ async def teardown_managed_discord_layout(guild: discord.Guild) -> dict[str, Any
     # All nine, including the retired SERVER_BASE_CATEGORY: a category Setup no
     # longer creates is still on every server that ran an older release, and
     # teardown is the only thing that can remove it (v1.0.0-rc.59).
-    for name in (SERVER_BASE_CATEGORY, SERVER_START_CATEGORY, SERVER_ANNOUNCE_CATEGORY, SERVER_WORLD_CATEGORY, SERVER_FEEDBACK_CATEGORY, SERVER_ADMIN_CATEGORY, SERVER_REALM_CATEGORY, SERVER_AUCTION_CATEGORY, SERVER_EVENT_CATEGORY):
+    for name in (SERVER_BASE_CATEGORY, SERVER_START_CATEGORY, SERVER_ANNOUNCE_CATEGORY, SERVER_WORLD_CATEGORY, SERVER_FEEDBACK_CATEGORY, SERVER_ADMIN_CATEGORY, SERVER_REALM_CATEGORY, SERVER_AUCTION_CATEGORY, SERVER_EVENT_CATEGORY, SERVER_STALL_CATEGORY):
         category = next((item for item in guild.categories if item.name == name), None)
         if category is None:
             continue
@@ -525,6 +541,12 @@ SERVER_AUCTION_CATEGORY = "🏮 Auction Houses"
 SERVER_EVENT_CATEGORY = "\U0001f320 World Events"
 
 
+# v1.7.0: one read-only market-stalls channel per world, where the bot keeps a
+# live card per open stall. Its own category beside the auction floors, for the
+# reason rc.51 gave that one: it is what lets teardown empty it.
+SERVER_STALL_CATEGORY = "\U0001f9fa Market Stalls"
+
+
 # The order a member reads down the channel list, and the only statement of it
 # (v1.0.0-rc.59). Categories were never positioned - no `position=`, no
 # `.edit(position=`, no `.move(` anywhere under `app/` - so their order was the
@@ -540,6 +562,7 @@ CATEGORY_ORDER = (
     SERVER_REALM_CATEGORY,
     SERVER_EVENT_CATEGORY,
     SERVER_AUCTION_CATEGORY,
+    SERVER_STALL_CATEGORY,
     SERVER_WORLD_CATEGORY,
     SERVER_FEEDBACK_CATEGORY,
     SERVER_ADMIN_CATEGORY,
@@ -716,6 +739,7 @@ async def _run_complete_server_setup(
     realm_rows = await ensure_realm_hub_channels(guild, category_name=SERVER_REALM_CATEGORY, create_missing=create_missing)
     await ensure_auction_house_channels(guild, category_name=SERVER_AUCTION_CATEGORY, create_missing=create_missing)
     await ensure_world_event_channels(guild, category_name=SERVER_EVENT_CATEGORY, create_missing=create_missing)
+    await ensure_stall_channels(guild, category_name=SERVER_STALL_CATEGORY, create_missing=create_missing)
     _bugs_channel, bugs_warning = await ensure_bugs_forum_channel(guild, category_name=SERVER_FEEDBACK_CATEGORY, create_missing=create_missing)
     await ensure_category_order(guild, create_missing=create_missing)
     # 🗺️ Cultivation World behind having played (v1.0.11). Behind
@@ -825,6 +849,31 @@ async def _dashboard_discord_snapshot(client: commands.Bot, guild: discord.Guild
             "role_name": role.name if role else None,
             "hidden": bool(visibility.get("hidden")),
             "ready": isinstance(channel, discord.TextChannel) and role is not None and bool(visibility.get("hidden")),
+        })
+
+    # v1.7.0: one read-only market-stalls channel per world. Reported, and -
+    # like the auction floors - not counted toward `setup_ready`: a missing one
+    # costs the stall cards, while the stalls themselves are on the board.
+    stall_rows = {str(row["world_name"]): row for row in await DB.get_stall_channels(guild.id)}
+    stall_markets: list[dict[str, Any]] = []
+    for world, hub in REALM_HUBS.items():
+        row = stall_rows.get(world)
+        channel = guild.get_channel(int(row["channel_id"])) if row else None
+        role = discord.utils.get(guild.roles, name=_realm_access_role_name(world))
+        is_text = isinstance(channel, discord.TextChannel)
+        visibility = realm_hub_visibility(channel, role, guild.default_role) if is_text else {"hidden": False}
+        everyone = (channel.overwrites or {}).get(guild.default_role) if is_text else None
+        member = (channel.overwrites or {}).get(role) if is_text and role is not None else None
+        read_only = is_text and getattr(everyone, "send_messages", None) is False and getattr(member, "send_messages", None) is not True
+        stall_markets.append({
+            "world": world,
+            "channel_name": channel.name if is_text else None,
+            "channel_id": channel.id if is_text else None,
+            "expected_name": str(hub.get("stalls_channel_name") or ""),
+            "role_name": role.name if role else None,
+            "hidden": bool(visibility.get("hidden")),
+            "read_only": bool(read_only),
+            "ready": is_text and role is not None and bool(visibility.get("hidden")) and bool(read_only),
         })
 
     auction_rows = {str(row["house_id"]): row for row in await DB.get_auction_house_channels(guild.id)}
@@ -953,6 +1002,7 @@ async def _dashboard_discord_snapshot(client: commands.Bot, guild: discord.Guild
         "world_events_ready": ready_feeds,
         "world_events_total": len(world_event_feeds),
         "auction_halls": auction_halls,
+        "stall_markets": stall_markets,
         "realm_ready": ready_realms,
         "realm_total": len(realm_hubs),
         "text_channels": all_channels,
@@ -1369,6 +1419,7 @@ async def admin_realm_hubs(interaction: discord.Interaction, action: app_command
         await ensure_realm_hub_channels(guild, category_name=category_name)
         await ensure_auction_house_channels(guild, category_name=SERVER_AUCTION_CATEGORY)
         await ensure_world_event_channels(guild, category_name=SERVER_EVENT_CATEGORY)
+        await ensure_stall_channels(guild, category_name=SERVER_STALL_CATEGORY)
     existing = {str(row["world_name"]): row for row in await DB.get_realm_hub_channels(guild.id)}
     lines = [
         "🏙️ **Realm-Capital Meeting Channels**",

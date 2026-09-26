@@ -17,6 +17,7 @@ from ..locations import _known_locations, _location_is_visible, _world_is_unlock
 from ...rules.progression_systems import profession_rank
 from ...rules.trade_receipt import format_trade_receipt
 from ..auction_feed import announce_lot, refresh_lot
+from ..stall_feed import refresh_stall
 from ..formatting import human_duration
 from ..pickers import auction_currency_autocomplete, usable_item_autocomplete
 from ..hubs import register_hub_option_hint
@@ -825,6 +826,8 @@ async def stall_open(interaction:discord.Interaction,name:str)->None:
         f"Lay goods on it with **/economy → Market Stalls → List**; they sell while you are away.",
         ephemeral=False,
     )
+    # The card in this world's market channel follows the stall (v1.7.0).
+    await refresh_stall(interaction.guild,interaction.user.id)
 
 
 @registered_group_command(stall_group, name="list",description="Lay carried goods on your stall at a price of your choosing")
@@ -851,6 +854,8 @@ async def stall_list(interaction:discord.Interaction,item:str,quantity:app_comma
         f"at **{int(result.get('unit_price') or price)} {coin}** each. {town}",
         ephemeral=False,
     )
+    # The card in this world's market channel follows the stall (v1.7.0).
+    await refresh_stall(interaction.guild,interaction.user.id)
 
 
 async def _my_listing_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[int]]:
@@ -882,6 +887,8 @@ async def stall_withdraw(interaction:discord.Interaction,listing:int)->None:
         f"🧺 **{WORLD.item_name(str(result.get('item_id') or ''))} ×{int(result.get('quantity') or 0)}** comes off the stall and back into your bag.",
         ephemeral=False,
     )
+    # The card in this world's market channel follows the stall (v1.7.0).
+    await refresh_stall(interaction.guild,interaction.user.id)
 
 
 @stall_withdraw.autocomplete("listing")
@@ -924,6 +931,8 @@ async def stall_buy(interaction:discord.Interaction,listing:int,quantity:app_com
         f"for **{int(result.get('total') or 0)} {_stall_coin(result)}** ({int(result.get('unit_price') or 0)} each{courier}). Balance: **{int(result.get('balance') or 0)}**.",
         ephemeral=False,
     )
+    # The seller's card, not the buyer's: a unit came off their stall.
+    await refresh_stall(interaction.guild,int(result.get("seller_user_id") or 0))
 
 
 @stall_buy.autocomplete("listing")
@@ -944,6 +953,8 @@ async def stall_close(interaction:discord.Interaction)->None:
     returned=dict(result.get("returned") or {})
     back=", ".join(f"{WORLD.item_name(k)} ×{int(v)}" for k,v in sorted(returned.items())) or "nothing was left on it"
     await interaction.followup.send(f"🧺 **{result.get('name')}** in {result.get('city')} is taken down; back into your bag: {back}.",ephemeral=False)
+    # The card in this world's market channel follows the stall (v1.7.0).
+    await refresh_stall(interaction.guild,interaction.user.id)
 
 
 register_hub_option_hint(
