@@ -42,6 +42,7 @@ from pathlib import Path
 
 import discord
 
+from ...rules.changelog import changelog_entries, pages_url, release_tag, version_key
 from ...version import INSTALLED_VERSION, RELEASE_VERSION
 from ..runtime import DB, SETTINGS, log
 
@@ -58,13 +59,10 @@ MESSAGE_LIMIT = 1900
 # reason.
 MAX_ANNOUNCED_RELEASES = 8
 
-_ENTRY = re.compile(r"^\*\*(?P<version>\d+\.\d+(?:\.\d+)?)\*\*\s*(?:\((?P<rc>rc\.\d+)\))?", re.M)
-
-
-def _release_tag(version: str) -> tuple[str, str]:
-    """`1.0.0-rc.59` -> `("1.0.0", "rc.59")`; `1.0.0` -> `("1.0.0", "")`."""
-    base, _, suffix = version.partition("-")
-    return base, suffix
+# What an entry is and how versions order live in `app/rules/changelog.py`
+# (v1.8.2), because the Pages builder reads the changelog too and the post links
+# a page that builder must have written.
+_release_tag = release_tag
 
 
 def release_notes_for(version: str, *, source: str | None = None) -> str | None:
@@ -83,16 +81,14 @@ def release_notes_for(version: str, *, source: str | None = None) -> str | None:
         log.warning("Could not read %s for release notes", VERSIONS_FILE)
         return None
 
-    base, suffix = _release_tag(version)
-    matches = list(_ENTRY.finditer(text))
-    for index, match in enumerate(matches):
-        if match.group("version") != base:
+    base, suffix = release_tag(version)
+    for label, entry in changelog_entries(text):
+        entry_base, entry_suffix = release_tag(label)
+        if entry_base != base:
             continue
-        if suffix and (match.group("rc") or "") != suffix:
+        if suffix and entry_suffix != suffix:
             continue
-        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
-        entry = text[match.start():end].strip()
-        return entry or None
+        return entry
     return None
 
 
@@ -144,24 +140,6 @@ def release_headline(entry: str) -> str:
     return body[: end.start() + 1] if end else body
 
 
-def version_key(version: str) -> tuple[int, ...]:
-    """Sortable, and `1.0.10` is newer than `1.0.9` (v1.0.11).
-
-    Versions sort as integers, never as text - the rule `playtest_checklist.py`
-    learned in v1.0.1, where `v1.0.10` sorted before `v1.0.9` and the generator
-    inherited the wrong checklist's ticks.
-
-    A release candidate sorts **below** the release it is a candidate for, so
-    `1.0.0-rc.59 < 1.0.0 < 1.0.1`. That is what the trailing sentinel is: an
-    entry with no rc suffix is the final one of its base, so it takes a number
-    no candidate can reach.
-    """
-    base, suffix = _release_tag(version)
-    parts = tuple(int(piece) for piece in re.findall(r"\d+", base))
-    rc = re.search(r"rc\.(\d+)", suffix)
-    return parts + (int(rc.group(1)) if rc else 1 << 30,)
-
-
 def releases_between(seen: str, running: str, *, source: str | None = None) -> list[tuple[str, str]]:
     """Every changelog entry after `seen` and up to `running`, oldest first.
 
@@ -182,19 +160,25 @@ def releases_between(seen: str, running: str, *, source: str | None = None) -> l
 
     low, high = version_key(seen), version_key(running)
     found: list[tuple[tuple[int, ...], str, str]] = []
-    matches = list(_ENTRY.finditer(text))
-    for index, match in enumerate(matches):
-        rc = match.group("rc") or ""
-        label = f"{match.group('version')}-{rc}" if rc else match.group("version")
+    for label, entry in changelog_entries(text):
         key = version_key(label)
-        if not (low < key <= high):
-            continue
-        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
-        entry = text[match.start():end].strip()
-        if entry:
+        if low < key <= high:
             found.append((key, label, entry))
     found.sort(key=lambda row: row[0])
     return [(label, entry) for _, label, entry in found]
+
+
+def notes_link(version: str | None = None) -> str:
+    """Where the full notes are: this release's page on the GitHub Pages site.
+
+    The post used to link `releases/tag/v<version>`, and a GitHub Release exists
+    only for a version somebody tagged - 1.7.3 to 1.7.10 and 1.8.0 have none, so
+    a server catching up across them was handed a row of 404s (v1.8.2). The site
+    is built from `VERSIONS.md` by `scripts/build_release_pages.py`, which
+    writes a page for every entry this module can announce, at the path
+    `app/rules/changelog.py` names for both. With no version, the site's index.
+    """
+    return pages_url(SETTINGS.update_repository, version)
 
 
 def release_post(version: str, entry: str) -> str:
@@ -203,10 +187,9 @@ def release_post(version: str, entry: str) -> str:
     rc.59 shipped this posting the changelog entry whole - 3,801 characters
     across three messages for rc.58 - which is written for an operator reading
     `VERSIONS.md`, not for somebody glancing at a channel. The full notes are
-    one click away in the release itself.
+    one click away in the changelog itself.
     """
-    link = f"https://github.com/{SETTINGS.update_repository}/releases/tag/v{version}"
-    return f"📣 **Xianxia RP v{version}** {release_headline(entry)}\n-# Full notes: <{link}>"
+    return f"📣 **Xianxia RP v{version}** {release_headline(entry)}\n-# Full notes: <{notes_link(version)}>"
 
 
 async def announce_release_if_new(guild: discord.Guild) -> str | None:
@@ -258,7 +241,7 @@ async def announce_release_if_new(guild: discord.Guild) -> str | None:
             await channel.send(
                 f"-# {older} earlier release{'s' if older != 1 else ''} since v{seen} "
                 f"{'are' if older != 1 else 'is'} not repeated here - full history: "
-                f"<https://github.com/{SETTINGS.update_repository}/releases>")
+                f"<{notes_link()}>")
         for version, post in posts:
             # `chunk_for_discord` still guards the send: a headline is one short
             # message in every entry written so far, but nothing structural stops

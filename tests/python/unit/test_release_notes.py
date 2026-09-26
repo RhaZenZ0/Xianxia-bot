@@ -413,8 +413,21 @@ class TheHeadlineIsDerivedNeverAuthored(unittest.TestCase):
     def test_the_post_names_the_release_and_links_the_notes(self):
         post = self.notes.release_post("1.0.0", "**1.0.0** does a thing.\n\nAt length.")
         self.assertIn("**Xianxia RP v1.0.0** does a thing.", post)
-        self.assertIn("/releases/tag/v1.0.0>", post)
+        self.assertIn(".github.io/", post)
+        self.assertIn("/v1.0.0/>", post)
         self.assertNotIn("At length", post)
+
+    def test_the_link_is_the_release_page_not_a_release_that_may_not_exist(self):
+        """A GitHub Release exists only for a tagged version (v1.8.2): 1.7.3
+        to 1.7.10 had none, so `releases/tag/v<version>` was a 404 for them.
+        The post links that version's page on the Pages site instead, which
+        `scripts/build_release_pages.py` writes for every changelog entry."""
+        post = self.notes.release_post("1.7.5", "**1.7.5** does a thing.\n\nAt length.")
+        self.assertNotIn("/releases", post)
+        self.assertIn(f"<{self.notes.notes_link('1.7.5')}>", post)
+        self.assertTrue(self.notes.notes_link("1.7.5").endswith("/v1.7.5/"))
+        # With no version it is the site's index, which every page sits under.
+        self.assertEqual(self.notes.notes_link("1.7.5"), self.notes.notes_link() + "v1.7.5/")
 
     def test_every_shipped_entry_yields_a_headline_that_fits_one_message(self):
         """Against the real changelog and the archived rcs, not a fixture."""

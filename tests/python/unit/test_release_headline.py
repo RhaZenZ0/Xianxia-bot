@@ -6,7 +6,7 @@ authored twice**: `release_headline` takes the opening sentence of the entry
 bearing in a way nothing was checking, and v1.0.1 broke both at once by
 writing its entry as three paragraphs each beginning `**1.0.1**`:
 
-1. **An entry is one header.** `_ENTRY` matches any line opening with a version
+1. **An entry is one header.** `ENTRY` (`app/rules/changelog.py`) matches any line opening with a version
    stamp, so a second `**1.0.1**` mid-entry starts a *new* entry - the notes
    silently truncate to the first paragraph and the rest of the release is
    never reported anywhere.
@@ -31,15 +31,17 @@ from tests.support import PROJECT_ROOT
 VERSIONS = (PROJECT_ROOT / "VERSIONS.md").read_text(encoding="utf-8")
 CHANGELOG = VERSIONS.split("## Changelog", 1)[-1]
 
-# The same expression `release_notes.py` uses to find an entry; read from the
-# source rather than copied, so a change there fails here instead of drifting.
+# The same expression the bot and the Pages builder use to find an entry; read
+# from the source rather than copied, so a change there fails here instead of
+# drifting. It lives in `app/rules/changelog.py` since v1.8.2.
+CHANGELOG_RULES = (PROJECT_ROOT / "app" / "rules" / "changelog.py").read_text(encoding="utf-8")
 RELEASE_NOTES = (PROJECT_ROOT / "app" / "bot" / "admin" / "release_notes.py").read_text(encoding="utf-8")
 
 
 def entry_pattern() -> re.Pattern[str]:
-    match = re.search(r'_ENTRY = re\.compile\(\s*r"(?P<pattern>[^"]+)"', RELEASE_NOTES)
+    match = re.search(r'^ENTRY = re\.compile\(\s*r"(?P<pattern>[^"]+)"', CHANGELOG_RULES, re.M)
     if not match:
-        raise AssertionError("_ENTRY is no longer a compiled literal; the reader is broken, not the tree")
+        raise AssertionError("ENTRY is no longer a compiled literal; the reader is broken, not the tree")
     return re.compile(match.group("pattern"), re.M)
 
 
