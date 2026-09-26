@@ -31,7 +31,7 @@ DASHBOARD_API_VERSION = 2
 # market-stalls channel per world and a live card per stall in it. Both are
 # Discord bindings the Server Setup card provisions, reports and tears down
 # beside the world-events feeds; neither is a gameplay table.
-DASHBOARD_REVIEWED_SCHEMA_VERSION = 66
+DASHBOARD_REVIEWED_SCHEMA_VERSION = 67
 
 DASHBOARD_GET_API_PATHS = frozenset({
     "/api/overview", "/api/capabilities", "/api/timeline", "/api/npcs", "/api/npc",

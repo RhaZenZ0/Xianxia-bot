@@ -82,9 +82,9 @@ func TestABeastCannotOutgrowTheWorldItStandsIn(t *testing.T) {
 	}
 }
 
-func TestAMilestoneRankCostsCoresAndPaysABonus(t *testing.T) {
-	if beastMilestoneCores(9) != 0 || beastMilestoneCores(10) != 3 || beastMilestoneCores(20) != 6 || beastMilestoneCores(21) != 0 {
-		t.Fatal("milestone cores are 3 per tenth at every tenth rank")
+func TestFromRankTenEveryLevelCostsCores(t *testing.T) {
+	if beastLevelCores(9) != 0 || beastLevelCores(10) != 8 || beastLevelCores(15) != 8 || beastLevelCores(20) != 16 {
+		t.Fatal("cores are 8 a level from rank 10, 16 from 20")
 	}
 	if beastMilestoneBonus(9) != 0 || beastMilestoneBonus(10) != 2 || beastMilestoneBonus(25) != 4 {
 		t.Fatal("milestone bonus is +2 per tenth rank")
@@ -95,16 +95,16 @@ func TestAMilestoneRankCostsCoresAndPaysABonus(t *testing.T) {
 	batch4Exec(t, path, `INSERT INTO spirit_beasts(
 		user_id,name,species,rank,element,intelligence,temperament,bloodline,evolution_stage,
 		loyalty,contract_type,active,techniques_json,created_at,updated_at
-	) VALUES(42,'Cloudpaw','Wind Lynx',9,'Wind',10,'bonded','Common',5,100,'equality',1,'[]',0,0)`)
-	if _, err := evolveBeast(t, path, world, 0); err == nil || !strings.Contains(err.Error(), "3 beast cores") {
-		t.Fatalf("rank 10 was reached without cores: %v", err)
+	) VALUES(42,'Cloudpaw','Wind Lynx',10,'Wind',10,'bonded','Common',5,100,'equality',1,'[]',0,0)`)
+	if _, err := evolveBeast(t, path, world, 0); err == nil || !strings.Contains(err.Error(), "8 beast cores") {
+		t.Fatalf("10 -> 11 went without cores: %v", err)
 	}
-	batch4Exec(t, path, `INSERT INTO inventory(user_id,item_id,quantity) VALUES(42,'beast_core',3)`)
+	batch4Exec(t, path, `INSERT INTO inventory(user_id,item_id,quantity) VALUES(42,'beast_core',8)`)
 	got, err := evolveBeast(t, path, world, 1)
 	if err != nil {
-		t.Fatalf("rank 10 with three cores was refused: %v", err)
+		t.Fatalf("10 -> 11 with eight cores was refused: %v", err)
 	}
-	if beast, _ := got["beast"].(map[string]any); storage.ParseInt(beast["rank"]) != 10 {
-		t.Fatalf("rank is %v, want 10", beast["rank"])
+	if beast, _ := got["beast"].(map[string]any); storage.ParseInt(beast["rank"]) != 11 {
+		t.Fatalf("rank is %v, want 11", beast["rank"])
 	}
 }

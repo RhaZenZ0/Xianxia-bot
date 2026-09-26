@@ -457,16 +457,16 @@ func beastEvolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if i64(row["loyalty"]) < need {
 		return authoritativeMutation{}, fmt.Errorf("loyalty %d is below evolution requirement %d", i64(row["loyalty"]), need)
 	}
-	// A milestone rank (10, 20, 30...) also asks for beast cores, three more at
-	// each tenth: the rank it pays for is worth a lasting combat bonus.
-	cores := beastMilestoneCores(i64(row["rank"]) + 1)
+	// From rank 10 every evolution also costs beast cores: 8 a level from
+	// rank 10, 16 from 20, and so on (v1.7.3, on the owner's call).
+	cores := beastLevelCores(i64(row["rank"]))
 	if cores > 0 {
 		short, err := consumeInventoryTx(conn, userID, map[string]int64{"beast_core": cores})
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
 		if len(short) > 0 {
-			return authoritativeMutation{}, fmt.Errorf("rank %d is a milestone and needs %d beast cores: missing %s", i64(row["rank"])+1, cores, describeMaterials(catalog, short))
+			return authoritativeMutation{}, fmt.Errorf("evolving past rank %d needs %d beast cores: missing %s", i64(row["rank"]), cores, describeMaterials(catalog, short))
 		}
 	}
 	// An evolution spends the bond (v1.7.3): it used to cost twenty loyalty,
@@ -488,7 +488,7 @@ func beastEvolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		return authoritativeMutation{}, err
 	}
 	result := map[string]any{
-		"beast": row, "profession_progress": prog, "milestone_cores": cores,
+		"beast": row, "profession_progress": prog, "cores_spent": cores,
 		"game_minute": gameMinute, "location": character.Location,
 	}
 	return authoritativeMutation{
@@ -713,13 +713,14 @@ func beastRankLimit(world string) int64 {
 	return beastRankLimits[DefaultEraWorld]
 }
 
-// beastMilestoneCores is what evolving into a rank costs in beast cores: three
-// per tenth at every tenth rank (3 at 10, 6 at 20...), nothing in between.
-func beastMilestoneCores(rank int64) int64 {
-	if rank <= 0 || rank%10 != 0 {
+// beastLevelCores is what evolving a beast out of a rank costs in beast
+// cores: nothing below rank 10, then 8 a level for every tenth the rank has
+// reached (10->11 costs 8, 20->21 costs 16).
+func beastLevelCores(rank int64) int64 {
+	if rank < 10 {
 		return 0
 	}
-	return 3 * (rank / 10)
+	return 8 * (rank / 10)
 }
 
 // beastMilestoneBonus is what a beast's milestones add to its owner's rolls,

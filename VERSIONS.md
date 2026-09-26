@@ -208,6 +208,8 @@ to reorder anything.
 - **Schema 66** adds `stall_channels` (one read-only market-stalls channel per world, the
   `world_event_channels` shape) and `stall_card_messages` (the live card per open stall) - Discord ids
   only; the stall is the `player_stalls` row the engine owns.
+- **Schema 67** adds `spirit_beasts.grandfathered`: 0 marks a beast made before the per-world rank
+  limit and the rank-10 core cost, which the engine settles once when its owner next acts.
 - **Schema 65** adds `player_stalls`, `stall_listings` and `stall_sales` - a cultivator's stall in a city's
   street, its escrowed listings and the seller's ledger; every one hangs off `characters` with foreign
   keys, so an erased seller takes the stall with them, and a buyer is anonymised on the ledger.
