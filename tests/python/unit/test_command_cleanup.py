@@ -45,7 +45,8 @@ class CommandCleanupTests(unittest.TestCase):
         # v1.7.4: the tree resolves a name through `_tree_command`, which knows
         # groups, so a group may be a slash root - but only one named here, on
         # purpose. `/stall` is the owner's call; any other group in the tuple
-        # is an internal action group leaking out.
+        # is an internal action group leaking out. `/boss` and `/party` joined
+        # in v1.7.10, asked for as "where is the boss command located?".
         self.assertIn("client.tree.add_command(_tree_command(name), guild=GUILD)", source)
         import importlib
         import os
@@ -55,7 +56,7 @@ class CommandCleanupTests(unittest.TestCase):
                                      "DATABASE_PATH": "data/test.sqlite3"}):
             surface = importlib.import_module("app.bot.surface")
         public_groups = {name for name in surface.TREE_COMMANDS if name in surface._GROUP_ACTION_ROOTS}
-        self.assertEqual(public_groups, {"stall"})
+        self.assertEqual(public_groups, {"stall", "boss", "party"})
         self.assertNotIn("bot.tree.add_command(admin_group, guild=GUILD)", source)
         self.assertIn('name="admin",', source)
         self.assertIn("async def admin_panel", source)
