@@ -31,10 +31,7 @@ from app.rules.changelog import changelog_entries, page_path, version_key  # noq
 TITLE = "Xianxia RP - Release notes"
 
 STYLE = """
-:root { --bg: #fbfaf7; --fg: #1f1d1a; --muted: #6b665e; --line: #e4e0d8; --accent: #8a4b1f; --code: #f0ece4; }
-@media (prefers-color-scheme: dark) {
-  :root { --bg: #16150f; --fg: #ebe7df; --muted: #a39d92; --line: #34312a; --accent: #e0a36a; --code: #26241d; }
-}
+:root { color-scheme: dark; --bg: #16150f; --fg: #ebe7df; --muted: #a39d92; --line: #34312a; --accent: #e0a36a; --code: #26241d; }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--fg);
   font: 17px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
