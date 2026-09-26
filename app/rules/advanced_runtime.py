@@ -222,10 +222,17 @@ def equipment_totals_line(totals: Mapping[str, int]) -> str:
     return "\n".join(lines)
 
 
+def beast_milestone_bonus(rank: Any) -> int:
+    """`beastMilestoneBonus`: +2 for every tenth rank a beast has reached."""
+    rank = int(rank or 0)
+    return 0 if rank < 10 else 2 * (rank // 10)
+
+
 def companion_bonus(rank: Any, evolution_stage: Any, loyalty: Any) -> int:
     """`combatCompanionBonus` for one beast: rank/2 + stage + loyalty/40, in
-    integer division. Only the active beast counts, and only in 1v1 combat."""
-    return int(rank or 0) // 2 + int(evolution_stage or 0) + int(loyalty or 0) // 40
+    integer division, plus its milestones. Only the active beast counts, and
+    only in 1v1 combat."""
+    return int(rank or 0) // 2 + int(evolution_stage or 0) + int(loyalty or 0) // 40 + beast_milestone_bonus(rank)
 
 
 FORMATION_POSITIONS: dict[str, dict[str, int]] = {

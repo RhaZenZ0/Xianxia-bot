@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 66
+SCHEMA_VERSION = 67
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -2794,6 +2794,19 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                 updated_at REAL NOT NULL,
                 PRIMARY KEY(guild_id,user_id)
             )""",
+        ),
+    ),
+    (
+        67,
+        "spirit_beast_grandfathering",
+        (
+            # v1.7.7: beast ranks are capped per world and every tenth rank
+            # costs beast cores. A beast that already stands past either was
+            # made before the rule, so it is settled once, by the engine, the
+            # next time its owner acts: 0 marks it for that settle, and every
+            # beast made afterwards takes the default 1, already settled.
+            "ALTER TABLE spirit_beasts ADD COLUMN grandfathered INTEGER NOT NULL DEFAULT 1",
+            "UPDATE spirit_beasts SET grandfathered=0",
         ),
     ),
 )

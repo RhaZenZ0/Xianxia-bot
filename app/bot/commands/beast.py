@@ -51,7 +51,7 @@ async def beast_status(interaction: discord.Interaction) -> None:
             f"{_companion_line(row)}"
         )
     lines.append(
-        "\n-# A beast's bonus is half its rank, plus its evolution stage, plus one for every 40 loyalty. "
+        "\n-# A beast's bonus is half its rank, plus its evolution stage, plus one for every 40 loyalty, plus two for every tenth rank. "
         "Only the ⭐ active beast fights beside you, and only in one-on-one battles, not boss raids."
     )
     await reply_long(interaction, "\n".join(lines), ephemeral=False)

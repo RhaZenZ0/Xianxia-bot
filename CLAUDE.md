@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 66; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 67; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -5332,6 +5332,13 @@ is deliberately not `outside_location`, which `cityOf` and the stalls read as *p
 directly; `TestEveryLairAndRealmEntranceCanBeReached` holds every boss lair and realm entrance to
 being on a road, beside one, a sect's gate, or in the wilds of a city the roads reach, and its
 drill - `wilds_of` deleted from the content - names both places.
+
+**Main brought the beast rules in the same release.** Another session merged per-world rank limits,
+core costs and a milestone term into `combatCompanionBonus` (`+ beastMilestoneBonus(rank)`, +2 a
+tenth rank) with no release stamp of its own, labelled "v1.7.3" - a number this branch had already
+spent on the update card. They ship in v1.7.7 and their comments say so. v1.7.5's display twin
+`companion_bonus` pinned the old expression and went stale on the merge, exactly as its gate is
+there to say; it carries `beast_milestone_bonus` now.
 
 ### Who starts a raid (v1.7.6)
 

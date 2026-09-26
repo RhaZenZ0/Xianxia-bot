@@ -29,6 +29,7 @@ from ..registry import EVENT_HANDLERS, registered_group_command, registered_root
 from ..runtime import (
     _explain_engine_error,
     DB,
+    ENGINE,
     SETTINGS,
     WORLD,
     _USER_ACTION_LOCKS,
@@ -61,6 +62,9 @@ async def _battle_reply(
         await interaction.response.send_message(content=content,embed=embed,view=view,ephemeral=False)
 
 
+MANUAL_TECHNIQUE_PREFIX="manual:"
+
+
 async def _battle_available_options(user_id:int,c:dict)->tuple[list[tuple[str,str,str]],list[tuple[str,str,str]]]:
     law_rows={str(r['law_id']):r for r in await DB.get_law_progress(user_id)}
     techniques:list[tuple[str,str,str]]=[]
@@ -70,6 +74,13 @@ async def _battle_available_options(user_id:int,c:dict)->tuple[list[tuple[str,st
         stage=WORLD.law_stage(int(row.get('comprehension',0)))
         if int(stage.get('index',0))>=int(t.get('requires_stage',99)) and int(c.get('realm_index',0))>=int(t.get('min_realm_index',999)):
             techniques.append((str(tid),str(t.get('name',tid)),str(t.get('description','Law technique'))))
+    # A manual's techniques are fought with too, so they belong on the same
+    # picker - otherwise an event battle sends a player off to /manual.
+    manuals={str(r['manual_id']):r for r in await DB.get_manuals(user_id)}
+    for tid,t in WORLD.techniques.items():
+        row=manuals.get(str(t.get('manual')))
+        if not row or int(row.get('mastery',0))<int(t.get('min_mastery',0)): continue
+        techniques.append((MANUAL_TECHNIQUE_PREFIX+str(tid),f"📖 {t.get('name',tid)}",str(t.get('description') or 'Manual technique')))
     inv=await DB.get_inventory(user_id); usable:list[tuple[str,str,str]]=[]
     for iid,qty in inv.items():
         idef=WORLD.item_definition(iid)
@@ -111,7 +122,7 @@ def _battle_embed(c:dict,b:dict,techniques:list[tuple[str,str,str]],items:list[t
         e.add_field(name="Final Decision",value="🤝 Spare — end the battle without killing\n☠️ Kill — true NPC death with persistent world consequences",inline=False)
     else:
         e.add_field(name="Core Actions",value="⚔️ Attack • 🛡️ Defend • 🏃 Flee • 🔄 Refresh",inline=False)
-        e.add_field(name="Battle Menus",value=f"🌌 Law techniques: **{len(techniques)}**\n🧪 Recovery items: **{len(items)}**",inline=False)
+        e.add_field(name="Battle Menus",value=f"🌌 Techniques: **{len(techniques)}**\n🧪 Recovery items: **{len(items)}**",inline=False)
     e.set_footer(text=f"Battle #{int(b['battle_id'])} • Owner locked • Panel updates in place")
     return e
 
@@ -121,8 +132,8 @@ class BattleTechniqueSelect(discord.ui.Select):
         self.parent_view=parent
         available=bool(techniques)
         options=[discord.SelectOption(label=name[:100],value=tid[:100],description=description[:100]) for tid,name,description in techniques]
-        if not options: options=[discord.SelectOption(label="No Law techniques available",value="__none__")]
-        super().__init__(placeholder="Use a Law technique",min_values=1,max_values=1,options=options,disabled=not available,row=1)
+        if not options: options=[discord.SelectOption(label="No techniques available",value="__none__")]
+        super().__init__(placeholder="Use a technique",min_values=1,max_values=1,options=options,disabled=not available,row=1)
     async def callback(self,interaction:discord.Interaction)->None:
         await self.parent_view._dispatch(interaction,"technique",self.values[0])
 
@@ -159,7 +170,9 @@ class BattleView(discord.ui.View):
             c=await DB.get_character(self.user_id)
             if not c:
                 await _battle_reply(interaction,content="This incarnation no longer exists.",view=None,edit_panel=True);return
-            if kind=="technique": result=await _execute_battle_law_technique(interaction,battle,value)
+            if kind=="technique" and value.startswith(MANUAL_TECHNIQUE_PREFIX):
+                result=await _execute_battle_manual_technique(interaction,battle,value[len(MANUAL_TECHNIQUE_PREFIX):])
+            elif kind=="technique": result=await _execute_battle_law_technique(interaction,battle,value)
             elif kind=="item": result=await _use_battle_recovery_item(interaction,self.battle_id,value)
             else: result="🔄 Battle panel refreshed."
             updated=await DB.get_battle(self.battle_id,user_id=self.user_id,active_only=True)
@@ -243,6 +256,43 @@ async def _use_battle_recovery_item(interaction: discord.Interaction, battle_id:
     if int(state.get("qi_restore", 0)):
         lines.append(f"Qi: **{int(state.get('qi', 0))}/{int(state.get('qi_max', 0))}**")
     return "\n".join(lines)
+
+async def _execute_battle_manual_technique(interaction: discord.Interaction, battle: dict, technique: str) -> str:
+    """One statement of a manual technique in battle, for the panel's picker
+    and for /manual technique alike. Returns the result text."""
+    t=WORLD.technique_definition(technique)
+    if not t:
+        return "Unknown manual technique."
+    if int(battle.get('npc_hp',0))<=0:
+        return "The opponent is already defeated. Choose **Spare** or **Kill**."
+    if not interaction.response.is_done(): await interaction.response.defer()
+    try:
+        envelope=await ENGINE.authoritative_action(
+            "manual.technique",interaction.user.id,
+            {"technique_id":technique},
+            action_id=f"discord:{interaction.id}:manual.technique",
+        )
+    except GameEngineError as exc:
+        return f"❌ {_explain_engine_error(exc)}"
+    resolved=dict(envelope.get("result") or {})
+    qi_cost=int(resolved.get('qi_cost',0));vit_cost=int(resolved.get('vitality_cost',0));damage=int(resolved.get('damage',0));heal=int(resolved.get('heal',0));suppress=int(resolved.get('suppress_turns',0));nhp=int(resolved.get('npc_hp',0))
+    result=[f"🌑 **{t['name']}** — {t.get('description','')}",f"Cost: **{qi_cost} Qi**"+(f" + **{vit_cost} Vitality**" if vit_cost else "")]
+    if damage: result.append(f"💥 Damage: **{damage}** • Opponent Vitality: **{nhp}**")
+    if heal: result.append(f"🩸 Forced recovery: **+{heal} Vitality**")
+    if suppress: result.append(f"⛓️ Suppression: **{suppress} turn(s)**")
+    if bool(resolved.get('forbidden')):
+        result.append(f"☯️ Karma: **{int(resolved.get('karma_score',0)):+d}**")
+        result.append("👁️ The forbidden art was **witnessed**." if bool(resolved.get('witnessed')) else "🌫️ The forbidden art was mostly **concealed**.")
+    impacts=list(resolved.get('impacts') or [])
+    if impacts: result.extend(["🌍 **World reaction:**",*[f"• {x}" for x in impacts[:6]]])
+    crime=dict(resolved.get('crime') or {})
+    if crime:
+        note=f"⚖️ Crime record **#{crime.get('crime_id')}** opened with **{crime.get('evidence',0)}% evidence**."
+        if crime.get('bounty_id') is not None: note += " A bounty was issued."
+        result.append(note)
+    if nhp<=0: result.append("🏆 **Opponent defeated.** You must still choose **Spare** or **Kill**.")
+    return "\n".join(result)
+
 
 async def _execute_battle_law_technique(interaction: discord.Interaction, battle: dict, technique: str) -> str:
     wt = await current_world_time()

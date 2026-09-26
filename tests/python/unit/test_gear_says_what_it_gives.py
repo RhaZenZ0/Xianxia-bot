@@ -72,13 +72,18 @@ class TheTwinsReadTheEnginesExpressions(unittest.TestCase):
         self.assertIn("ifcondition<0.25{condition=0.25}ifcondition>1{condition=1}", source)
         self.assertIn("attack+=int64(math.Round(float64(d[0])*condition*quality))", source)
 
-    def test_a_beast_adds_half_its_rank_its_stage_and_a_point_per_forty_loyalty(self):
+    def test_a_beast_adds_half_its_rank_its_stage_a_point_per_forty_loyalty_and_its_milestones(self):
         source = _squash(_go("combat_actions.go"))
         self.assertIn("SELECTrank,evolution_stage,loyaltyFROMspirit_beasts", source)
-        self.assertIn("bonus+=i64(r.Rows[0][0])/2+i64(r.Rows[0][1])+i64(r.Rows[0][2])/40", source)
+        self.assertIn("bonus+=i64(r.Rows[0][0])/2+i64(r.Rows[0][1])+i64(r.Rows[0][2])/40+beastMilestoneBonus(i64(r.Rows[0][0]))", source)
+        milestone = _squash(_go("beast_artifact_actions.go"))
+        self.assertIn("funcbeastMilestoneBonus(rankint64)int64{ifrank<10{return0}return2*(rank/10)}", milestone)
         self.assertEqual(companion_bonus(5, 2, 79), 2 + 2 + 1)
         self.assertEqual(companion_bonus(1, 0, 39), 0)
         self.assertEqual(companion_bonus(8, 3, 100), 4 + 3 + 2)
+        # Every tenth rank adds two (the milestones merged from main in v1.7.7).
+        self.assertEqual(companion_bonus(10, 0, 0), 5 + 2)
+        self.assertEqual(companion_bonus(25, 1, 40), 12 + 1 + 1 + 4)
 
     def test_each_point_of_agility_is_one_point_of_raid_hit_chance(self):
         source = _squash(_go("group_combat_actions.go"))
