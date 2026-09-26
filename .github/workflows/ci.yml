@@ -14,6 +14,10 @@ name: CI
 # releases were built, writes its SHA-256 sidecar, and attaches both to a
 # GitHub Release. update.sh --fetch and the bot's update-check worker read
 # nothing else. (Release channel: v0.20.4, docs/history/V020_RELEASE_NOTES.md.)
+#
+# A push to main also publishes the release-notes site (v1.8.2): the pages job
+# builds one page per VERSIONS.md entry and deploys it to GitHub Pages, which is
+# what `#updates` links to. The repository's Pages source must be GitHub Actions.
 
 on:
   push:
@@ -127,6 +131,36 @@ jobs:
           docker logs engine-smoke
           docker rm -f engine-smoke >/dev/null
           test "${ok:-}" = 1
+
+  pages:
+    # The release-notes site `#updates` links to (v1.8.2), built from the
+    # changelog on main once every check has passed on that commit. It writes
+    # to Pages only; the repository contents stay read-only here.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [python, go, containers]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Build the site from VERSIONS.md
+        run: python scripts/build_release_pages.py --out _site
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
 
   release:
     # Only a v* tag reaches this job, and only after every check above passed

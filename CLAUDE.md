@@ -5491,6 +5491,27 @@ grandfathered, against a migration that is a frozen list - so any new low-level 
 looked "taken away". `AUTHORED_AFTER_THE_LEARNING_STEP` names the recipes written after it, each
 with its reason, and asserts they were *not* grandfathered.
 
+### The link that assumed every version was tagged (v1.8.1 - v1.8.2)
+
+**The engine playtest had pinned the old beast rule (v1.8.1).** v1.7.7 made an evolution leave a
+beast at 15 loyalty, and updated the one assertion about it. The two steps after it still walked
+100, 80, 60, so one failed every run and the other passed only because 15 is also below 80. They
+hold the refusal at 15 against 70 and an evolution at exactly 70 now. **The two harnesses bind one
+fixed engine port (`127.0.0.1:18089`), so they cannot run at the same time**: run in parallel they
+share one engine, and the Discord half's maintenance lockdown fails the engine half's steps.
+
+**`#updates` linked a page that exists only for tagged versions (v1.8.2).** `release_post` linked
+`releases/tag/v<version>`, and a GitHub Release is made only when somebody pushes a `v*` tag, which
+1.7.3 to 1.7.10 and 1.8.0 never got, so a catch-up across them posted a row of 404s. The notes are a
+GitHub Pages site now: `scripts/build_release_pages.py` writes one page per `VERSIONS.md` entry and
+the `pages` job in `.github/workflows/ci.yml` publishes it on every push to main once the checks pass
+(the repository's Pages source must be "GitHub Actions"; `ci.yml` stays the one workflow file, which
+`test_release_channel.py` holds). **The link and the page are made in two places, so what they must agree on is
+stated once**, in `app/rules/changelog.py`: which lines start an entry (`ENTRY`, moved out of the
+bot), what an entry is called, and the page's path. `test_release_pages.py` builds the site from the
+real changelog and holds a page to exist at every link the bot can post. The builder escapes before
+it renders the Markdown subset, so an entry cannot put markup on the site.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

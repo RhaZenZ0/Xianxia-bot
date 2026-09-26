@@ -12,6 +12,7 @@ description: How to verify a change in this repo - the full test suite runs in G
 | `python` | `ruff check app scripts`, then `pytest -q` (all ~2,250 tests, about 7 minutes) |
 | `go` | `gofmt -l`, `go vet`, `staticcheck` and `govulncheck` at the Makefile's pins, `go test -race ./...` |
 | `containers` | builds both images, then imports every bot service and boots the engine to `/livez` |
+| `pages` | only on a push to main, after the three above: builds the release-notes site from `VERSIONS.md` and deploys it to GitHub Pages |
 | `release` | only on a `v*` tag, after the three above: manifest verify, archive, GitHub Release |
 
 **Do not run `make check` or the whole `pytest -q` locally to verify a change.** It is slow here,

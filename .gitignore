@@ -11,3 +11,4 @@ htmlcov/
 data/
 .venv/
 venv/
+_site/
