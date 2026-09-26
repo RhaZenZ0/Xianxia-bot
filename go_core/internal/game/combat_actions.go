@@ -151,7 +151,7 @@ func combatCompanionBonus(conn *storage.Conn, userID int64) (int64, error) {
 		return 0, e
 	}
 	if len(r.Rows) > 0 {
-		bonus += i64(r.Rows[0][0])/2 + i64(r.Rows[0][1]) + i64(r.Rows[0][2])/40
+		bonus += i64(r.Rows[0][0])/2 + i64(r.Rows[0][1]) + i64(r.Rows[0][2])/40 + beastMilestoneBonus(i64(r.Rows[0][0]))
 	}
 	a, e := conn.Execute(`SELECT bond_level FROM artifact_bonds WHERE user_id=? AND awakened=1`, []any{userID})
 	if e != nil {

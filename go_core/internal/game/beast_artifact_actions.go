@@ -457,6 +457,18 @@ func beastEvolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if i64(row["loyalty"]) < need {
 		return authoritativeMutation{}, fmt.Errorf("loyalty %d is below evolution requirement %d", i64(row["loyalty"]), need)
 	}
+	// A milestone rank (10, 20, 30...) also asks for beast cores, three more at
+	// each tenth: the rank it pays for is worth a lasting combat bonus.
+	cores := beastMilestoneCores(i64(row["rank"]) + 1)
+	if cores > 0 {
+		short, err := consumeInventoryTx(conn, userID, map[string]int64{"beast_core": cores})
+		if err != nil {
+			return authoritativeMutation{}, err
+		}
+		if len(short) > 0 {
+			return authoritativeMutation{}, fmt.Errorf("rank %d is a milestone and needs %d beast cores: missing %s", i64(row["rank"])+1, cores, describeMaterials(catalog, short))
+		}
+	}
 	// An evolution spends the bond (v1.7.3): it used to cost twenty loyalty,
 	// which one Train and one beast core bought back, so a beast at the capped
 	// requirement evolved every few minutes. It drops to beastEvolvedLoyalty.
@@ -476,7 +488,7 @@ func beastEvolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		return authoritativeMutation{}, err
 	}
 	result := map[string]any{
-		"beast": row, "profession_progress": prog,
+		"beast": row, "profession_progress": prog, "milestone_cores": cores,
 		"game_minute": gameMinute, "location": character.Location,
 	}
 	return authoritativeMutation{
@@ -699,4 +711,22 @@ func beastRankLimit(world string) int64 {
 		return limit
 	}
 	return beastRankLimits[DefaultEraWorld]
+}
+
+// beastMilestoneCores is what evolving into a rank costs in beast cores: three
+// per tenth at every tenth rank (3 at 10, 6 at 20...), nothing in between.
+func beastMilestoneCores(rank int64) int64 {
+	if rank <= 0 || rank%10 != 0 {
+		return 0
+	}
+	return 3 * (rank / 10)
+}
+
+// beastMilestoneBonus is what a beast's milestones add to its owner's rolls,
+// on top of the ordinary rank/stage/loyalty term: +2 for each tenth rank.
+func beastMilestoneBonus(rank int64) int64 {
+	if rank < 10 {
+		return 0
+	}
+	return 2 * (rank / 10)
 }
