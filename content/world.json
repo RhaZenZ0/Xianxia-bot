@@ -2295,6 +2295,7 @@
         "Thin formation fluctuations drift between the cliffs.",
         "Spirit-beast auras appear and vanish among the higher ridges."
       ],
+      "wilds_of": "Cloudblade City",
       "world": "Mortal World",
       "min_realm_index": 0,
       "safe_zone": false,
@@ -2314,6 +2315,7 @@
         "Water and Yin qi interfere with precise spiritual scanning.",
         "Something beneath the mud occasionally disturbs the local spiritual current."
       ],
+      "wilds_of": "Moonfen City",
       "world": "Mortal World",
       "min_realm_index": 0,
       "safe_zone": false,

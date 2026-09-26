@@ -366,6 +366,12 @@ type LocationDefinition struct {
 	Terrain        string              `json:"terrain"`
 	SettlementType string              `json:"settlement_type"`
 	Roads          []string            `json:"roads"`
+	// WildsOf (v1.7.7) names the city a road-less place lies in the wilds
+	// of: somebody who knows that city can come upon it by exploring, and
+	// the road-less jump sect gates already use takes them there. Two raid
+	// lairs, each also a secret realm's entrance, had no road and no writer
+	// of a discovery, so nothing but a GM teleport ever reached them.
+	WildsOf string `json:"wilds_of"`
 	// RoadSite (v0.39.0) marks a place by the side of a road - a
 	// "waystation", a "hunting_ground", a "ruin" or a "shrine" - and RoadLeg
 	// names the two cities whose road it lies on. A site is reached from

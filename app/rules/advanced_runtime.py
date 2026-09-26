@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from typing import Any
+import math
+from typing import Any, Mapping
+
+from app.rules.item_grades import grade_rung, split_item_grade
 
 
 # Canonical item ids already present in content/world.json. Equipment instances
@@ -102,6 +105,135 @@ EQUIPMENT_DEFINITIONS: dict[str, dict[str, Any]] = {
         ),
     },
 }
+
+# What a piece of gear gives (v1.7.5), the presentation half. The engine owns
+# every number below: `equipmentQualityMult` and `gradeEquipmentQuality` in
+# item_grade.go, the per-stat rounding in `combatEquipment` (1v1, which also
+# scales by condition) and `equipmentPowerRows` (raids, quality only), and
+# `combatCompanionBonus` for a beast. These are display twins, held to the Go
+# source by tests/python/unit/test_gear_says_what_it_gives.py. `spirit` is
+# carried by every definition and read by no rule, so nothing here shows it.
+
+
+def _go_round(value: float) -> int:
+    """Go's math.Round: half away from zero (Python's round is half-even)."""
+    return int(math.copysign(math.floor(abs(value) + 0.5), value))
+
+
+def equipment_quality_mult(quality: Any) -> float:
+    """`equipmentQualityMult`: quality 100 is x1, never below x0.5."""
+    return max(0.5, 1 + (float(quality or 0) - 100) / 200)
+
+
+def grade_equipment_quality(mult: Any) -> int:
+    """`gradeEquipmentQuality`: the quality a grade binds a piece of gear at."""
+    return _go_round(100 + 200 * (float(mult) - 1))
+
+
+def equipment_definition(item_id: Any) -> dict[str, Any]:
+    """The gear definition behind a carried id, graded or not; ``{}`` for
+    anything that is not gear. A graded id (``spirit_iron_sword@high``) is not
+    a key of EQUIPMENT_DEFINITIONS, so a bare ``.get`` answers nothing for it."""
+    base, _ = split_item_grade(str(item_id or ""))
+    return dict(EQUIPMENT_DEFINITIONS.get(base) or {})
+
+
+def equipment_effective(
+    item_id: Any,
+    *,
+    quality: Any = None,
+    durability: Any = None,
+    max_durability: Any = None,
+    ladder: Mapping[str, Any] | None = None,
+) -> dict[str, int]:
+    """Attack, defence and agility as the engine would count them.
+
+    An equipped instance passes its own ``quality`` (and its durability, for
+    the 1v1 condition scale); an item on a shelf or in a bag passes nothing,
+    and its quality is the one its grade binds at.
+    """
+    definition = equipment_definition(item_id)
+    if not definition:
+        return {}
+    if quality is None:
+        _, entry = grade_rung(ladder, split_item_grade(str(item_id))[1])
+        quality = grade_equipment_quality(entry.get("effect_mult") or 1.0)
+    scale = equipment_quality_mult(quality)
+    if durability is not None:
+        top = max(1, int(max_durability or definition.get("max_durability") or 1))
+        scale *= min(1.0, max(0.25, int(durability) / top))
+    return {stat: _go_round(int(definition.get(stat) or 0) * scale) for stat in ("attack", "defense", "agility")}
+
+
+def describe_equipment(
+    item_id: Any,
+    *,
+    quality: Any = None,
+    durability: Any = None,
+    max_durability: Any = None,
+    ladder: Mapping[str, Any] | None = None,
+) -> str:
+    """One line saying what a piece of gear gives, or ``""`` for anything else.
+
+    Agility is the only stat that is a real percentage anywhere: each point is
+    one point of boss-raid hit chance. The rest are modifiers on a 2d10 roll,
+    shown as numbers rather than invented odds.
+    """
+    definition = equipment_definition(item_id)
+    if not definition:
+        return ""
+    stats = equipment_effective(item_id, quality=quality, durability=durability, max_durability=max_durability, ladder=ladder)
+    parts: list[str] = []
+    if stats["attack"]:
+        parts.append(f"⚔️ {stats['attack']:+d} attack")
+    if stats["defense"]:
+        parts.append(f"🛡️ {stats['defense']:+d} defence")
+    if stats["agility"]:
+        parts.append(f"💨 {stats['agility']:+d} agility ({stats['agility']:+d}% raid hit)")
+    if definition.get("indestructible"):
+        parts.append("indestructible")
+    elif durability is not None:
+        parts.append(f"durability {int(durability)}/{int(max_durability or definition.get('max_durability') or 0)}")
+    else:
+        parts.append(f"durability {int(definition.get('max_durability') or 0)}")
+    if definition.get("passive_name"):
+        parts.append(f"✨ {definition['passive_name']}")
+    return " · ".join(parts)
+
+
+def equipment_totals_line(totals: Mapping[str, int]) -> str:
+    """What the summed gear does in a fight, stated once for the status card.
+
+    1v1: attack rides the attack roll and adds a third of itself to damage on
+    a hit; defence raises what an opponent's counter must beat; agility rides
+    the flee roll. A raid: attack adds to damage, half of defence comes off a
+    boss's blow, and each point of agility is one point of hit chance.
+    """
+    attack = int(totals.get("attack") or 0)
+    defense = int(totals.get("defense") or 0)
+    agility = int(totals.get("agility") or 0)
+    lines = []
+    if attack:
+        lines.append(f"⚔️ {attack:+d} to your attack roll, {max(0, attack) // 3:+d} damage on a hit")
+    if defense:
+        lines.append(f"🛡️ opponents need {defense:+d} more to hit you back · half of it comes off a boss's blow")
+    if agility:
+        lines.append(f"💨 {agility:+d} to flee · {agility:+d}% boss-raid hit chance")
+    return "\n".join(lines)
+
+
+def beast_milestone_bonus(rank: Any) -> int:
+    """`beastMilestoneBonus`: +2 for every tenth rank a beast has reached."""
+    rank = int(rank or 0)
+    return 0 if rank < 10 else 2 * (rank // 10)
+
+
+def companion_bonus(rank: Any, evolution_stage: Any, loyalty: Any) -> int:
+    """`combatCompanionBonus` for one beast: rank/2 + stage + loyalty/40, in
+    integer division, plus its milestones. Only the active beast counts, and
+    only in 1v1 combat."""
+    return int(rank or 0) // 2 + int(evolution_stage or 0) + int(loyalty or 0) // 40 + beast_milestone_bonus(rank)
+
 
 FORMATION_POSITIONS: dict[str, dict[str, int]] = {
     "vanguard": {"attack": 1, "defense": 4, "support": 0},

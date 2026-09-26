@@ -2347,6 +2347,14 @@ def update_card_state(rows: dict[str, Any] | None, release: dict[str, Any] | Non
         except (TypeError, ValueError):
             seen = None
     reachable = bool(release.get("ok")) and "newest" in release
+    # v1.7.3: how old the bot's answer is, so a GM can tell a fresh "up to
+    # date" from a stale one. An absent timestamp is unknown, never zero.
+    checked_ago: int | None = None
+    if release.get("checked_at") is not None:
+        try:
+            checked_ago = max(0, int(float(now) - float(release["checked_at"])))
+        except (TypeError, ValueError):
+            checked_ago = None
     in_progress = bool(request) and str(request.get("status") or "") not in ("", "done", "failed")
     return {
         "installed_version": INSTALLED_VERSION,
@@ -2354,6 +2362,7 @@ def update_card_state(rows: dict[str, Any] | None, release: dict[str, Any] | Non
         "newest_on_channel": (str(release.get("newest")) if release.get("newest") else None) if reachable else None,
         "update_available": bool(release.get("update_available")) if reachable else None,
         "release_error": None if reachable else str(release.get("error") or "the bot has not answered"),
+        "checked_seconds_ago": checked_ago,
         "request": request,
         "result": result,
         "watcher_seen_seconds_ago": None if seen is None else int(seen),

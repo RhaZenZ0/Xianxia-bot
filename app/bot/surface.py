@@ -1528,13 +1528,24 @@ TREE_COMMANDS: tuple[str, ...] = (
     # of its own is one step where the hub is three. `DAILY_ACTIONS` names
     # the leaf each one is, and the menu draws them as a row.
     *DAILY_ACTIONS,
+    # The market stalls (v1.7.4): a group, reached by its own name. Its leaves
+    # were only a hub page (`/economy → Market Stalls`), and a player asking
+    # for `/stall buy` found nothing - the shape `/learn` had in rc.43.
+    "stall",
 )
+
+
+def _tree_command(name: str) -> Any:
+    """A tree name as the command Discord registers: a group when the name is
+    one (v1.7.4: `/stall`), else the bound root. `ACTIONS.root` knows no
+    groups, which is why the tuple could only ever name roots."""
+    return _GROUP_ACTION_ROOTS.get(name) or ACTIONS.root(name)
 
 
 def register_command_surface(client: XianxiaBot) -> None:
     """Register only public Discord commands; gameplay actions stay internal."""
     for name in TREE_COMMANDS:
-        client.tree.add_command(ACTIONS.root(name), guild=GUILD)
+        client.tree.add_command(_tree_command(name), guild=GUILD)
     for command in _HUB_COMMANDS:
         client.tree.add_command(command, guild=GUILD)
     client.tree.error(on_app_command_error)

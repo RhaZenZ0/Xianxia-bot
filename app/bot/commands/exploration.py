@@ -16,6 +16,7 @@ from typing import Any
 import discord
 from discord import app_commands
 
+from ...rules.advanced_runtime import BOSS_TEMPLATES, boss_lair
 from ...rules.alchemy import alchemy_purge_refusal, toxicity_band
 from ...rules.birthfamily import family_profession_bonus
 from ...ops.game_engine import GameEngineError
@@ -239,6 +240,23 @@ class ExplorationEventView(discord.ui.View):
         await interaction.response.edit_message(embed=self.embed(), view=self)
 
 
+def _wilds_lines(location: str) -> str:
+    """Where a place in the wilds lies, and who keeps a lair there (v1.7.7).
+
+    No road reaches a place in the wilds of a city, so the reply says how it
+    is reached; and the two such places are raid lairs, so it names the boss
+    and the realm its raid asks for rather than leaving that to a refusal.
+    """
+    city = str((WORLD.locations.get(location) or {}).get("wilds_of") or "")
+    if not city:
+        return ""
+    lines = f"\nIt lies in the wilds of **{city}**; no road runs there, and **/travel** takes you straight to it."
+    for boss in BOSS_TEMPLATES.values():
+        if boss_lair(boss, WORLD.secret_realms)[0] == location:
+            lines += f"\n👹 **{boss['name']}** keeps its lair here - a party raid from **{WORLD.realm_name(int(boss['realm_index']))}** (**/combat → Boss Raids**)."
+    return lines
+
+
 @registered_root_command(name="explore", description="Explore your current location for events and discoveries", guild=GUILD)
 @serialized_user_action
 async def explore(interaction: discord.Interaction) -> None:
@@ -412,6 +430,7 @@ async def explore(interaction: discord.Interaction) -> None:
         discovery_text = (
             f"\n\n🧭 **New route discovered — {discovered_location}**\n"
             f"{WORLD.locations.get(discovered_location, {}).get('description', 'A newly charted route opens before you.')}"
+            f"{_wilds_lines(discovered_location)}"
         )
     if discovered_location:
         discovered_sects = _sect_recruitment_at_location(discovered_location)

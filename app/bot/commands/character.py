@@ -14,7 +14,7 @@ import discord
 from discord import app_commands
 
 from ...rules import commissions as commission_rules
-from ...rules.advanced_runtime import describe_era
+from ...rules.advanced_runtime import describe_equipment, describe_era
 from ...rules.birthfamily import family_tier_name, karma_description, karma_label
 from ...rules.fate import fate_label
 from ...ops.game_engine import GameEngineError
@@ -533,8 +533,13 @@ async def inventory(interaction: discord.Interaction) -> None:
             item = WORLD.item_definition(item_id)
             name = str(item.get("name") or item_id)
             lines.append(f"**{name}** x{qty} — {item.get('description') or ''}")
+            # A weapon, armour or accessory says what it gives (v1.7.5).
+            gear = describe_equipment(item_id, ladder=WORLD.item_grades)
+            if gear:
+                lines.append(f"  {gear}")
         text = "\n".join(lines)
-    await interaction.response.send_message(
+    await reply_long(
+        interaction,
         f"**{c['name']}'s Carried Inventory**\nLow Spirit Stones: **{c['spirit_stones']}**\n\n{text}",
         ephemeral=False,
     )
