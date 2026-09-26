@@ -244,11 +244,31 @@ func sectCraftedDonation(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	return mult, nil
 }
 
+// sectDonationCap is the most points one unit of an item may earn: its
+// cheapest shelf price in the Mortal World's own stone, at its grade (the
+// Low shelf times the grade's price multiple, the reference NPCStallCeiling
+// uses for a grade no shelf carries). Without it a point could be bought for
+// a third of a stone - the three realm keys are worth 700 to 1,200 points
+// and sell for 280 to 420 - and issued stock sold on to a keeper at a profit.
+// An item no Mortal shelf sells has no cap; its price anywhere above is a
+// hundred stones a unit or more.
+func sectDonationCap(catalog worlddata.Catalog, itemID string) (int64, bool) {
+	_, rung, ok := itemDef(catalog, itemID)
+	if !ok {
+		return 0, false
+	}
+	shelf, found := cheapestShelfPrice(catalog, itemBaseID(itemID), "low_spirit_stone")
+	if !found {
+		return 0, false
+	}
+	return shelf * max64(1, rung.PriceMult), true
+}
+
 // sectCommissionPointsTx pays a member for finishing their own sect's work,
 // in points per stone of the commission's reward.
 func sectCommissionPointsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, requiresSect string, stones int64) (map[string]any, error) {
 	ratio := catalog.SectExchange().Earning.CommissionPointsPerStone
-	if ratio <= 0 || stones <= 0 || strings.TrimSpace(requiresSect) == "" {
+	if ratio <= 0 || stones <= 0 || strings.TrimSpace(requiresSect) == "" || !tableExistsTx(conn, "sect_membership") {
 		return nil, nil
 	}
 	mem, err := sectMembershipRow(conn, userID)
@@ -276,7 +296,7 @@ func sectEventPointsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		return nil, nil
 	}
 	points := min64(limit, newTotal) - min64(limit, max64(0, newTotal-delta))
-	if points <= 0 {
+	if points <= 0 || !tableExistsTx(conn, "sect_membership") {
 		return nil, nil
 	}
 	mem, err := sectMembershipRow(conn, userID)

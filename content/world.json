@@ -31001,10 +31001,6 @@
           "min_rank_level": 10
         },
         {
-          "item_id": "paper_crane_charm",
-          "min_rank_level": 10
-        },
-        {
           "item_id": "spatial_pouch",
           "min_rank_level": 10
         },
@@ -31018,10 +31014,6 @@
         },
         {
           "item_id": "crystal_ward_talisman",
-          "min_rank_level": 20
-        },
-        {
-          "item_id": "wind_gourd",
           "min_rank_level": 20
         },
         {
@@ -31042,10 +31034,6 @@
         },
         {
           "item_id": "longevity_pill",
-          "min_rank_level": 30
-        },
-        {
-          "item_id": "azure_flying_sword",
           "min_rank_level": 30
         }
       ],

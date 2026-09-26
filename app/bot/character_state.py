@@ -13,6 +13,7 @@ from ..rules.aptitudes import aptitude_effects
 from ..rules.effects import aggregate_modifiers, normalize_effect_payload
 from ..rules.npc_memory import classify_memory, scene_memory_summary
 from ..rules.quests import next_objective_label
+from ..rules.sect import sect_points_line
 from ..rules.worldtime import from_game_minutes
 from .runtime import DB, ENGINE, WORLD, log
 from .services import QUESTS, SIM
@@ -179,6 +180,10 @@ async def announce_quest_progress(interaction: Any, changed: list[dict[str, Any]
                 # An outsider's work for a sect's gate (v1.1.0) pays standing
                 # with the sect itself - the number its entrance trial and a
                 # sponsor's roll both read. Stated from what the engine paid.
+                # A member's work for their own sect pays contribution (v1.8.0).
+                points_line = sect_points_line(commission.get("sect_points"))
+                if points_line:
+                    lines.append(points_line)
                 earned = dict(commission.get("sect_standing") or {})
                 if int(earned.get("delta") or 0) > 0:
                     lines.append(

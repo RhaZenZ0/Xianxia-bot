@@ -579,17 +579,24 @@ func sectEconomyActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID i
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
-		points := p.Quantity * unit
 		// Something the donor's certified trade makes is worth more to the
-		// sect (v1.8.0): the crafted multiplier, read off the content.
+		// sect (v1.8.0): the crafted multiplier, read off the content. And no
+		// unit earns more than it costs on a shelf, so a point is never cheaper
+		// than a stone (sectDonationCap).
 		crafted, e := sectCraftedDonation(conn, catalog, userID, p.ItemID)
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
+		perUnit := unit
 		if crafted > 1 {
-			points = int64(math.Round(float64(points) * crafted))
+			perUnit = int64(math.Round(float64(unit) * crafted))
 			out["crafted_bonus"] = crafted
 		}
+		if limit, capped := sectDonationCap(catalog, p.ItemID); capped && perUnit > limit {
+			perUnit = max64(1, limit)
+			out["capped_at_shelf"] = limit
+		}
+		points := p.Quantity * perUnit
 		promoted, e := creditSectContributionTx(conn, catalog, userID, points, max64(1, points/10))
 		if e != nil {
 			return authoritativeMutation{}, e
