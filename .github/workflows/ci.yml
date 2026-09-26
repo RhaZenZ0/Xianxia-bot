@@ -57,12 +57,17 @@ jobs:
       # rather than repeated here, so CI and `make lint` cannot drift apart.
       # vet finds none of the dead code it does: six names with no caller at
       # all had accumulated by v1.0.0 and vet passed on every one of them.
+      #
+      # setup-go v7 exports GOTOOLCHAIN=local, and the pinned tools can need a
+      # newer Go than go.mod's (staticcheck 2026.2.1 wants 1.26). `make tools`
+      # runs under Go's default GOTOOLCHAIN=auto, so the two installs say auto
+      # to build the tools the same way; vet and the tests stay on go.mod's.
       - name: Install staticcheck at the pinned version
         run: |
           version="$(sed -n 's/^STATICCHECK_VERSION ?= //p' Makefile)"
           test -n "$version" || { echo 'Makefile no longer pins STATICCHECK_VERSION' >&2; exit 1; }
           echo "staticcheck $version"
-          go install "honnef.co/go/tools/cmd/staticcheck@$version"
+          GOTOOLCHAIN=auto go install "honnef.co/go/tools/cmd/staticcheck@$version"
       - run: cd go_core && CGO_ENABLED=1 staticcheck ./...
 
       # `make audit`, which is kept out of `make lint` and `make check` because
@@ -75,7 +80,7 @@ jobs:
           version="$(sed -n 's/^GOVULNCHECK_VERSION ?= //p' Makefile)"
           test -n "$version" || { echo 'Makefile no longer pins GOVULNCHECK_VERSION' >&2; exit 1; }
           echo "govulncheck $version"
-          go install "golang.org/x/vuln/cmd/govulncheck@$version"
+          GOTOOLCHAIN=auto go install "golang.org/x/vuln/cmd/govulncheck@$version"
       - run: cd go_core && CGO_ENABLED=1 govulncheck ./...
 
       - run: cd go_core && CGO_ENABLED=1 go test -race ./...
