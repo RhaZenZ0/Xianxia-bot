@@ -706,7 +706,12 @@ async def run(url: str, token: str, db_path: str) -> Report:
     for uid in (PLAYER, BUYER):
         await step(report, f"teleport {uid} to the capital's street for the stall", gm("admin.player.teleport", {"user_id": uid, "location": capital, "reason": "playtest"}))
     await step(report, "the keeper stands at Foundation Establishment", gm("admin.player.set_realm", {"user_id": BUYER, "realm_index": 2, "phase": 1, "reason": "playtest: a stall asks for it"}))
-    await step(report, "the keeper carries four pills to sell", gm("admin.player.adjust_item", {"user_id": BUYER, "item_id": "recovery_pill", "quantity": 4, "reason": "playtest"}))
+    # A trade's goods sell at a stall only for somebody holding its
+    # certificate (v1.7.1), and no GM lever passes an examination, so the
+    # keeper carries a pill to be refused and beast cores - a raw material no
+    # recipe makes, dear enough on the shelves for the town to buy at 6 - to sell.
+    await step(report, "the keeper carries a pill", gm("admin.player.adjust_item", {"user_id": BUYER, "item_id": "recovery_pill", "quantity": 1, "reason": "playtest"}))
+    await step(report, "the keeper carries four beast cores to sell", gm("admin.player.adjust_item", {"user_id": BUYER, "item_id": "beast_core", "quantity": 4, "reason": "playtest"}))
     no_stall = await step(report, "stall.status before opening one", query("stall.status", BUYER, {}))
     report.add("PASS" if no_stall is not None and no_stall.get("available") and no_stall.get("stall") is None else "FAIL", "no stall yet, and the read says so rather than refusing", f"{(no_stall or {}).get('stall')}")
     await step(report, "a stall asks for Foundation Establishment", act("stall.open", PLAYER, {"name": "Too Early"}), expect_error="asks for")
@@ -714,24 +719,30 @@ async def run(url: str, token: str, db_path: str) -> Report:
     if opened is not None:
         report.add("PASS" if opened.get("city") == capital and opened.get("currency_id") == "low_spirit_stone" else "FAIL", "the stall stands in the capital, priced in the Mortal stone", f"{opened.get('city')} / {opened.get('currency_id')}")
         await step(report, "a second stall is refused", act("stall.open", BUYER, {"name": "Another"}), expect_error="already keep")
-        listed = await step(report, "stall.list four pills at 6", act("stall.list", BUYER, {"item_id": "recovery_pill", "quantity": 4, "unit_price": 6}))
+        await step(report, "an uncertified keeper cannot list a pill", act("stall.list", BUYER, {"item_id": "recovery_pill", "quantity": 1, "unit_price": 6}), expect_error="certificate")
+        offered = dict(await query("stall.status", BUYER, {}) or {})
+        report.add("PASS" if "beast_core" in list(offered.get("sellable_items") or []) and "recovery_pill" in list(offered.get("uncertified_items") or []) else "FAIL",
+                   "the status says what the keeper may list", f"sellable={offered.get('sellable_items')} withheld={offered.get('uncertified_items')}")
+        listed = await step(report, "stall.list four beast cores at 6", act("stall.list", BUYER, {"item_id": "beast_core", "quantity": 4, "unit_price": 6}))
         listing_id = int((listed or {}).get("listing_id") or 0)
         keeper_bag = dict(await db.get_inventory(BUYER) or {})
-        report.add("PASS" if int(keeper_bag.get("recovery_pill", 0)) == 0 else "FAIL", "the goods are in escrow, not in the bag", f"keeper carries {keeper_bag.get('recovery_pill', 0)}")
+        report.add("PASS" if int(keeper_bag.get("beast_core", 0)) == 0 and int(keeper_bag.get("recovery_pill", 0)) == 1 else "FAIL",
+                   "the goods are in escrow, and the refused pill never left the bag", f"keeper carries {keeper_bag.get('beast_core', 0)} cores, {keeper_bag.get('recovery_pill', 0)} pill")
         if listed is not None:
-            report.add("PASS" if listed.get("npc_may_buy") else "FAIL", "at 6 the town may buy (the cheapest Mortal shelf sells the pill dearer)", f"npc_ceiling={listed.get('npc_ceiling')}")
-        # A player's stall deals in any grade (v1.7.0), and the town never buys
-        # what no shelf sells, so a High pill is for cultivators only.
+            report.add("PASS" if listed.get("npc_may_buy") else "FAIL", "at 6 the town may buy (the cheapest Mortal shelf sells the core dearer)", f"npc_ceiling={listed.get('npc_ceiling')}")
+        # A player's stall deals in any grade (v1.7.0), and a grade is only a
+        # recipe's output, so the certificate (v1.7.1) covers every grade too:
+        # the uncertified keeper is refused a High pill as surely as a Low one.
+        # That the town never buys a grade no shelf sells is held in Go
+        # (TestTheTownNeverBuysAGradeNoShelfSells), where a certified seller is
+        # staged rather than rolled for.
         await step(report, "the keeper carries a High pill", gm("admin.player.adjust_item", {"user_id": BUYER, "item_id": "qi_pill@high", "quantity": 1, "reason": "playtest: a graded listing"}))
-        high = await step(report, "stall.list a High pill", act("stall.list", BUYER, {"item_id": "qi_pill@high", "quantity": 1, "unit_price": 90}))
-        if high is not None:
-            report.add("PASS" if not high.get("npc_may_buy") else "FAIL", "the town will not buy a grade no shelf sells", f"npc_ceiling={high.get('npc_ceiling')}")
-            await step(report, "stall.withdraw the High pill", act("stall.withdraw", BUYER, {"listing_id": int(high.get("listing_id") or 0)}))
+        await step(report, "an uncertified keeper cannot list a High pill either", act("stall.list", BUYER, {"item_id": "qi_pill@high", "quantity": 1, "unit_price": 90}), expect_error="certificate")
         board = await step(report, "stall.board as the player", query("stall.board", PLAYER, {}))
         seen = [s for s in list((board or {}).get("stalls") or []) if str(s.get("name")) == "Bidder's Table"]
         report.add("PASS" if seen and any(int(l.get("listing_id") or 0) == listing_id for l in list(seen[0].get("listings") or [])) else "FAIL", "the board names the stall and its listing", f"{len(list((board or {}).get('stalls') or []))} stall(s)")
         await step(report, "the keeper cannot buy from their own stall", act("stall.buy", BUYER, {"listing_id": listing_id, "quantity": 1}), expect_error="own stall")
-        bought = await step(report, "stall.buy one pill as the player", act("stall.buy", PLAYER, {"listing_id": listing_id, "quantity": 1}))
+        bought = await step(report, "stall.buy one beast core as the player", act("stall.buy", PLAYER, {"listing_id": listing_id, "quantity": 1}))
         if bought is not None:
             report.add("PASS" if int(bought.get("total") or 0) == 6 and int(bought.get("seller_paid") or 0) + int(bought.get("fee") or 0) == 6 else "FAIL", "the price is the asking price and the city's cut comes out of it", f"total={bought.get('total')} paid={bought.get('seller_paid')} fee={bought.get('fee')}")
         status = await step(report, "stall.status after the sale", query("stall.status", BUYER, {}))
@@ -763,7 +774,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         report.add("PASS" if left >= 1 else "FAIL", "the town never takes the last unit", f"{left} left")
         withdrawn = await step(report, "stall.withdraw the rest", act("stall.withdraw", BUYER, {"listing_id": listing_id}))
         keeper_bag = dict(await db.get_inventory(BUYER) or {})
-        report.add("PASS" if withdrawn is not None and int(keeper_bag.get("recovery_pill", 0)) == int(withdrawn.get("quantity") or -1) else "FAIL", "withdrawn goods come back into the bag", f"keeper carries {keeper_bag.get('recovery_pill', 0)}")
+        report.add("PASS" if withdrawn is not None and int(keeper_bag.get("beast_core", 0)) == int(withdrawn.get("quantity") or -1) else "FAIL", "withdrawn goods come back into the bag", f"keeper carries {keeper_bag.get('beast_core', 0)}")
         closed = await step(report, "stall.close", act("stall.close", BUYER, {}))
         report.add("PASS" if closed is not None and (await query("stall.status", BUYER, {})).get("stall") is None else "FAIL", "the stall is gone after close", f"{closed}")
     await step(report, "the keeper's realm is put back", gm("admin.player.set_realm", {"user_id": BUYER, "realm_index": int(keeper_before.get("realm_index") or 0), "phase": int(keeper_before.get("phase") or 1), "reason": "playtest: back to where the run had them"}))

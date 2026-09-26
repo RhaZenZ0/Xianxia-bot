@@ -1269,7 +1269,11 @@ async def run(url: str, token: str, db_path: str) -> Report:
             # command, so v1.5.0's slash calls could not reach it at all.
             was_at = str((await DB.get_character(int(player.id)) or {}).get("location") or "")
             await ENGINE.action("admin.player.teleport", int(gm.id), {"user_id": int(player.id), "location": "Greenriver Town", "reason": "playtest: a city's street for the stall"})
-            await ENGINE.action("admin.player.adjust_item", int(gm.id), {"user_id": int(player.id), "item_id": "recovery_pill", "quantity": 3, "reason": "playtest: goods for the stall"})
+            # A pill needs the Alchemy certificate to go on a stall (v1.7.1) and
+            # nothing earlier in this run sits an examination, so the pill is
+            # withheld and a raw material is what is sold.
+            await ENGINE.action("admin.player.adjust_item", int(gm.id), {"user_id": int(player.id), "item_id": "recovery_pill", "quantity": 1, "reason": "playtest: a pill the stall must refuse"})
+            await ENGINE.action("admin.player.adjust_item", int(gm.id), {"user_id": int(player.id), "item_id": "beast_core", "quantity": 3, "reason": "playtest: goods for the stall"})
             await settle_patiently(env)
             economy = await open_hub(player, channels["begin-here"], "economy", env=env)
             await economy.goto("Market Stalls", env=env)
@@ -1281,7 +1285,9 @@ async def run(url: str, token: str, db_path: str) -> Report:
 
             opened = await leaf("Open", fields={"Name": "Sim's Table"})
             expect("is set up in" in opened, f"Open did not set the stall up: {opened[:400]}")
-            listed = await leaf("List", picks={"": "Recovery Pill"}, fields={"Quantity": "3", "Price": "6"})
+            # The List picker offers only what the stall will take (v1.7.1), so
+            # the pill is not among its options and Status names it instead.
+            listed = await leaf("List", picks={"": "Beast Core"}, fields={"Quantity": "3", "Price": "6"})
             expect("Listing **#" in listed, f"List did not lay the goods out: {listed[:400]}")
             # v1.7.0: the stall's card is in its world's market channel.
             market_row = next((r for r in await DB.get_stall_channels(guild.id) if str(r["world_name"]) == "Mortal World"), None)
@@ -1289,10 +1295,11 @@ async def run(url: str, token: str, db_path: str) -> Report:
             expect(market_row is not None and card is not None and int(card["channel_id"]) == int(market_row["channel_id"]),
                    f"no card for the stall in the Mortal World's market channel: {card} / {market_row}")
             board = await leaf("Board")
-            expect("Sim's Table" in board and "Recovery Pill" in board, f"the board does not show the stall: {board[:400]}")
+            expect("Sim's Table" in board and "Beast Core" in board, f"the board does not show the stall: {board[:400]}")
             status = await leaf("Status")
             expect("On the stall" in status, f"Status does not list the goods: {status[:400]}")
-            withdrawn = await leaf("Withdraw", picks={"": "Recovery Pill"})
+            expect("Not for your stall yet" in status and "Recovery Pill" in status, f"Status does not say the pill needs a certificate: {status[:600]}")
+            withdrawn = await leaf("Withdraw", picks={"": "Beast Core"})
             expect("back into your bag" in withdrawn, f"Withdraw did not return the goods: {withdrawn[:400]}")
             closed = await leaf("Close")
             expect("is taken down" in closed, f"Close did not take the stall down: {closed[:400]}")
@@ -1301,7 +1308,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
             if was_at:
                 await ENGINE.action("admin.player.teleport", int(gm.id), {"user_id": int(player.id), "location": was_at, "reason": "playtest: back where the run had them"})
                 await settle_patiently(env)
-            return "opened, listed, on the board, withdrawn, closed"
+            return "opened, a pill refused for want of a certificate, cores listed, on the board, withdrawn, closed"
         await step(report, "/economy → Market Stalls: a stall is opened, stocked, seen on the board, emptied and taken down", stall())
 
         # ---- 8. every leaf of every hub ------------------------------------------

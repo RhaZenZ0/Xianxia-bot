@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v1.7.0
+# Xianxia RP Discord Bot v1.7.1
 
 *A cultivation RPG played entirely through Discord commands: deterministic rules in Go, an AI that
 narrates but never decides, self-hosted on your own hardware.*
@@ -520,6 +520,8 @@ Every crafted item carries a **grade** (v1.7.0) - Low, Mid, High, Superior or Tr
 how well the craft went and capped by your rank in the trade. A higher grade works harder (up to
 three times) and is worth more (double each step). Shops deal in Low, capitals in Mid as well; the
 finer grades are sold between players, at a stall or on the auction floor.
+Anybody may sell raw materials there; a trade's goods - pills, blades, talismans, array disks - go on a
+stall only for somebody who has passed an examination of that trade in this life (v1.7.1).
 
 Sects stock their own storehouses too. `sect_treasury` is what contribution points buy from, and it
 used to fill only when a player donated — so a sect nobody had joined had bare shelves forever. Its

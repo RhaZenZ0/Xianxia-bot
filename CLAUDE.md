@@ -5141,6 +5141,41 @@ afternoon into one that failed every morning. He is moved with `admin.npc.reloca
 because somebody away from home keeps no schedule (`npcWhereaboutsTx`), so the step is the same at
 every hour.
 
+### A trade's goods need its certificate at a stall (v1.7.1)
+
+On the owner's call, the stall gained a rule about **who**: an item a recipe makes is listed only by
+somebody who has passed an examination of that trade in this life; raw materials, which no recipe
+makes, are anybody's. `stallCertificateTx` in `stall_actions.go` is the one statement, and three
+decisions are in it.
+
+- **Any rank, not the first.** `advanceProfessionTx` raises a rank on XP alone and
+  `profession.exam` only ever examines the rank a candidate currently holds, so somebody who crafted
+  past rank 1 before sitting it can never sit it. A "first examination exactly" rule would lock them
+  out of selling for good; `tradeCertifiedTx` accepts a pass at any rank.
+- **Per life.** The examination's own record is kept per life (rc.45) and samsara wipes
+  `profession_progress`, so a certificate does not carry either; the life read is `soulLifeTx`, the
+  one the examination writes.
+- **A certificate nobody can earn locks nothing.** A trade that authors no examination - every
+  gathering word the nine tiers carry - is not a lock, because a door shut for ever is not a rule.
+  Listings already standing are not taken down (rc.56).
+
+The picker is rc.46's rule: `stall.status` returns `sellable_items` and `uncertified_items` off the
+same helper, and `stall_item_autocomplete` offers only the first - it never restates which items a
+recipe makes. It falls back to the whole bag when the engine does not answer, because a picker that
+empties on a hiccup reads as a player with nothing to sell, and the listing still refuses. The
+stall fixture certifies its seller in Alchemy, so the older tests still describe a pill-seller, and
+the rule is driven against the uncertified character; its drills disable the check and drop the
+life comparison, and each fails on the case it should. Both playtests now try a pill first, hold the
+refusal, and sell beast cores - raw, and dear enough on the shelves for the town to buy at 6.
+
+**It covers every grade by construction.** v1.7.0 grades only a recipe's output and `itemTrade`
+reads the base id, so `qi_pill@high` is Alchemy work like `qi_pill`. That broke v1.7.0's own harness
+step, which listed a High pill from the same uncertified keeper to show the town will not buy a
+grade no shelf sells - and no GM lever passes an examination, so no certified seller can be staged
+there without a roll. The harness holds the refusal instead, and the town's rule moved to Go
+(`TestTheTownNeverBuysAGradeNoShelfSells`), where the fixture certifies its seller: a Go-owned rule
+is proved in Go, and the harness proves the wire.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

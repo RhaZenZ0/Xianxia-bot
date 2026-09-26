@@ -32,6 +32,12 @@ package game
 //     `stall.open`; every wallet move goes through `walletDeltaTx`.
 //  6. The goods are held in escrow the way an auction lot is: `stall.list`
 //     takes them out of the bag, withdraw and close put them back.
+//
+// And one rule about who (v1.7.1, on the owner's call): a trade's goods are
+// sold at a stall by somebody who holds that trade's certificate. An item a
+// recipe makes may be listed only by a cultivator who has passed an
+// examination of that trade in this life; raw materials, which no recipe
+// makes, are anybody's to sell. `stallCertificateTx` is the one statement.
 
 import (
 	"encoding/json"
@@ -343,6 +349,12 @@ func stallListAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	}
 	if firstRowMap(dup) != nil {
 		return authoritativeMutation{}, fmt.Errorf("%s is already on your stall; withdraw that listing first", itemDisplayName(catalog, p.ItemID))
+	}
+	// Refused before the goods leave the bag, so a refusal spends nothing.
+	if refusal, err := stallCertificateTx(conn, catalog, userID, p.ItemID); err != nil {
+		return authoritativeMutation{}, err
+	} else if refusal != "" {
+		return authoritativeMutation{}, errors.New(refusal)
 	}
 	missing, err := consumeInventoryTx(conn, userID, map[string]int64{p.ItemID: p.Quantity})
 	if err != nil {
@@ -719,6 +731,60 @@ func stallBoardQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	return out, nil
 }
 
+// stallCertificateTx is the one statement of who may list an item (v1.7.1):
+// "" when the caller may, else the refusal. An item no recipe makes is
+// anybody's to sell, and so is the output of a trade that authors no
+// examination, because a certificate nobody can earn would be a door shut for
+// ever. Listings already standing are never taken down by it: a new rule does
+// not take back what a player already committed (rc.56).
+func stallCertificateTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, itemID string) (string, error) {
+	trade := itemTrade(catalog, itemID)
+	if trade == "" {
+		return "", nil
+	}
+	first, authored := firstProfessionExam(catalog, trade)
+	if !authored {
+		return "", nil
+	}
+	certified, err := tradeCertifiedTx(conn, userID, soulLifeTx(conn, userID), trade)
+	if err != nil || certified {
+		return "", err
+	}
+	hall := strings.TrimSpace(first.Hall)
+	article := "a"
+	if hall != "" && strings.ContainsRune("aeiouAEIOU", rune(hall[0])) {
+		article = "an"
+	}
+	return fmt.Sprintf("%s is %s work, and a stall sells a trade's goods only for somebody who holds its certificate: pass an examination in %s first (the %s examination is sat at %s %s)",
+		itemDisplayName(catalog, itemID), trade, trade, first.RankName, article, hall), nil
+}
+
+// stallSellableTx is what the caller carries and may list, read for the
+// picker so it never offers what `stall.list` would refuse (rc.46).
+func stallSellableTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64) ([]string, []string, error) {
+	res, err := conn.Execute(`SELECT item_id FROM inventory WHERE user_id=? AND quantity>0 ORDER BY item_id`, []any{userID})
+	if err != nil {
+		return nil, nil, err
+	}
+	sellable, withheld := []string{}, []string{}
+	for _, row := range res.Rows {
+		if len(row) == 0 {
+			continue
+		}
+		itemID := fmt.Sprint(row[0])
+		refusal, err := stallCertificateTx(conn, catalog, userID, itemID)
+		if err != nil {
+			return nil, nil, err
+		}
+		if refusal == "" {
+			sellable = append(sellable, itemID)
+		} else {
+			withheld = append(withheld, itemID)
+		}
+	}
+	return sellable, withheld, nil
+}
+
 // stallStatusQuery is the caller's own stall: its shape, its listings and the
 // last ten sales. It never refuses either; no stall is `stall: null`.
 func stallStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (map[string]any, error) {
@@ -773,5 +839,11 @@ func stallStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		sales = append(sales, sale)
 	}
 	out["recent_sales"] = sales
+	sellable, withheld, err := stallSellableTx(conn, catalog, userID)
+	if err != nil {
+		return nil, err
+	}
+	out["sellable_items"] = sellable
+	out["uncertified_items"] = withheld
 	return out, nil
 }

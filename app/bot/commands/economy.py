@@ -799,6 +799,10 @@ async def stall_status(interaction:discord.Interaction)->None:
         lines.append("\n**On the stall**" if listings else "\nNothing is laid out. Lay goods on it with **/economy → Market Stalls → List**.")
         for row in listings:
             lines.append(_stall_listing_line(row,coin))
+    withheld=[str(item) for item in (status.get("uncertified_items") or [])]
+    if withheld:
+        names=", ".join(WORLD.item_name(item) for item in withheld[:6])+(" and more" if len(withheld)>6 else "")
+        lines.append(f"\n🔒 Not for your stall yet: {names}. A trade's goods sell here only for somebody holding its certificate; pass an examination at a hall of that trade (**/craft → Profession → Profession Exam**).")
     sales=list(status.get("recent_sales") or [])
     if sales:
         lines.append("\n**Recent sales**")
@@ -830,8 +834,37 @@ async def stall_open(interaction:discord.Interaction,name:str)->None:
     await refresh_stall(interaction.guild,interaction.user.id)
 
 
+async def stall_item_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[str]]:
+    """What `stall.list` would take, and nothing else (v1.7.1).
+
+    A trade's goods go on a stall only for somebody holding that trade's
+    certificate, and the engine says which carried items those are
+    (`sellable_items` on `stall.status`) so this picker never restates the
+    rule and never offers what the listing would refuse (rc.46). An engine
+    that does not answer falls back to the whole bag: the listing still
+    refuses anything it must, and a picker that went empty on a hiccup would
+    look like a player with nothing to sell.
+    """
+    try:
+        sellable=(await _stall_status(interaction.user.id)).get("sellable_items")
+    except Exception:
+        sellable=None
+    if sellable is None:
+        return await carried_item_autocomplete(interaction,current)
+    allowed={str(item) for item in sellable}
+    inv=await DB.get_inventory(interaction.user.id)
+    needle=current.casefold().strip()
+    out=[]
+    for item_id,qty in inv.items():
+        if item_id not in allowed:continue
+        name=WORLD.item_name(item_id)
+        if not needle or needle in name.casefold() or needle in item_id.casefold():
+            out.append(app_commands.Choice(name=f"{name} x{qty}"[:100],value=item_id[:100]))
+    return out[:25]
+
+
 @registered_group_command(stall_group, name="list",description="Lay carried goods on your stall at a price of your choosing")
-@app_commands.autocomplete(item=carried_item_autocomplete)
+@app_commands.autocomplete(item=stall_item_autocomplete)
 @serialized_user_action
 async def stall_list(interaction:discord.Interaction,item:str,quantity:app_commands.Range[int,1,99]=1,price:app_commands.Range[int,1,1000000]=1)->None:
     await interaction.response.defer(ephemeral=False)
@@ -960,7 +993,7 @@ async def stall_close(interaction:discord.Interaction)->None:
 register_hub_option_hint(
     stall_list,
     "item",
-    "Your bag is empty - there is nothing to lay on the stall. Gather with **/forage** or **/mine**, hunt with **/hunt**, or craft with **/craft → General Crafting → Craft**.",
+    "Nothing in your bag can go on a stall. Raw materials are anybody's to sell - gather with **/forage** or **/mine**, or hunt with **/hunt**. A trade's goods sell only for somebody holding its certificate: pass an examination at a hall of that trade (**/craft → Profession → Profession Exam**).",
 )
 register_hub_option_hint(
     stall_withdraw,
