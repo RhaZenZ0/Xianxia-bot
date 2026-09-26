@@ -5123,6 +5123,24 @@ rc.59, and every reader of a default walks `CHANNEL_MESSAGE_KEYS`, which did not
 gate that holds every channel to having a blurb (`test_every_channel_says_what_it_is`) was green over
 text nobody could see. A default no slot names is decoration; the slot is there now.
 
+### The step that passed while recording nothing (engine playtest, v1.7.1)
+
+**The engine playtest had been red for five releases, and the first step to fail was green.** It
+ended 29 of ~930 steps failed, all from three steps written before v1.3.1 moved three bounds out of
+the bot and into the engine: `sect.discover` was sent a named list from Greenriver Town before the
+player stood at any gate, the sponsor was asked from the town, and both territory claims were made
+from the town. v1.7.0's merge already moved the player to the gate, the buyer to the foothills and
+both claimants to the hills. Two halves were still missing, and they are the ones worth keeping.
+**The discover had passed while recording nothing**, because an empty `discovered` is not an error,
+and the trial after it refused "sect has not been discovered" with twenty-five later steps failing
+far from the cause; it is held to having found the sect now. A step that can succeed at doing
+nothing is the rc.47 gate that cannot see what it forbids, one level down in a harness. **And the
+sponsor's step still hung on the hour**: Inquisitor Shen Rui keeps Greenriver Town and walks to the
+foothills only in the afternoon, so walking the buyer there turned a step that failed every
+afternoon into one that failed every morning. He is moved with `admin.npc.relocate` and put back,
+because somebody away from home keeps no schedule (`npcWhereaboutsTx`), so the step is the same at
+every hour.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —
