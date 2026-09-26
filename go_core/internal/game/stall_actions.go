@@ -185,9 +185,28 @@ func stallCityAt(catalog worlddata.Catalog, location string) (string, bool) {
 // stall: one coin under the cheapest shelf price for that item in that coin.
 // No shelf means no reference, and no reference means no mint guard, so an
 // item no shop sells is never bought by an NPC.
+//
+// A grade no shelf carries (High and finer, and Mid outside the capitals'
+// coin) is the one exception, on the owner's call (v1.7.1): its reference is
+// the Low item's cheapest shelf at the grade's worth - the multiplier `itemDef`
+// already prices every grade by - so the town buys a High pill below four Low
+// shelves, never above. That opens no loop, because no shelf and no merchant
+// sells the grade: the only way to have one to sell is to make it.
 func NPCStallCeiling(catalog worlddata.Catalog, itemID, currency string) (int64, bool) {
 	shelf, ok := cheapestShelfPrice(catalog, itemID, currency)
-	if !ok || shelf <= 1 {
+	if !ok {
+		base := itemBaseID(itemID)
+		if base == itemID {
+			return 0, false
+		}
+		_, rung, known := itemDef(catalog, itemID)
+		lowShelf, shelved := cheapestShelfPrice(catalog, base, currency)
+		if !known || !shelved {
+			return 0, false
+		}
+		shelf, ok = lowShelf*max64(1, rung.PriceMult), true
+	}
+	if shelf <= 1 {
 		return 0, false
 	}
 	return shelf - 1, true

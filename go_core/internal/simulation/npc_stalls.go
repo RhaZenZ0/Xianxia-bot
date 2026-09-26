@@ -16,7 +16,9 @@ package simulation
 //     own bound.)
 //   - **Below the shelf.** `game.NPCStallCeiling`: one coin under the
 //     cheapest content shelf price for that item in that coin, and an item no
-//     shop sells is never bought - no reference means no mint guard.
+//     shop sells is never bought - no reference means no mint guard. A grade
+//     no shelf carries is referenced to its Low shelf at the grade's worth
+//     (v1.7.1), since nothing sells the grade for it to loop through.
 //   - **Its own money.** Wealth comes off `npc_civilization_state`, finite
 //     and guarded (`AND wealth>=?`), and no player is ever debited here.
 //   - **So many a day.** `stall_system.npc_buys_per_city_per_day` per city per

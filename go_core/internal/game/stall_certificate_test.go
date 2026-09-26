@@ -107,20 +107,40 @@ func TestTheStatusSaysWhatTheSellerMayList(t *testing.T) {
 	}
 }
 
-// A player's stall deals in any grade (v1.7.0), and the town buys only what
-// some shelf sells, so a grade no shelf carries is for cultivators alone. The
-// engine playtest used to prove this with an uncertified keeper, which the
-// certificate now refuses; a certified seller is staged here instead of rolled.
-func TestTheTownNeverBuysAGradeNoShelfSells(t *testing.T) {
+// A player's stall deals in any grade (v1.7.0), and since v1.7.1 the town
+// buys a grade no shelf carries too, on the owner's call: under the Low
+// item's cheapest shelf at the grade's worth, the multiplier itemDef prices
+// every grade by. The engine playtest used to hold the opposite with an
+// uncertified keeper, which the certificate now refuses; a certified seller is
+// staged here instead of rolled.
+func TestTheTownBuysAGradeNoShelfSellsAtItsWorth(t *testing.T) {
 	path := setupStallDB(t)
-	batch4Exec(t, path, `INSERT INTO inventory(user_id,item_id,quantity) VALUES(42,'recovery_pill@high',2),(42,'recovery_pill',2)`)
-	stallMust(t, path, "stall.open", 42, map[string]any{"name": "Lin's Table"})
-	high := stallMust(t, path, "stall.list", 42, map[string]any{"item_id": "recovery_pill@high", "quantity": 1, "unit_price": 90})
-	if high["npc_may_buy"] != false || i64(high["npc_ceiling"]) != 0 {
-		t.Fatalf("the town may buy a High pill no shelf sells: %v", high)
+	catalog := mustLoadCatalog(t, batch4WorldPath(t))
+	lowShelf, ok := cheapestShelfPrice(catalog, "recovery_pill", "low_spirit_stone")
+	if !ok {
+		t.Fatal("no shelf sells the Low recovery pill; the fixture is broken, not the rule")
 	}
-	low := stallMust(t, path, "stall.list", 42, map[string]any{"item_id": "recovery_pill", "quantity": 1, "unit_price": 8})
-	if low["npc_may_buy"] != true {
-		t.Fatalf("the town will not buy a Low pill the shelves sell dearer: %v", low)
+	if _, shelved := cheapestShelfPrice(catalog, "recovery_pill@high", "low_spirit_stone"); shelved {
+		t.Fatal("a shelf sells a High recovery pill; this test needs a grade no shelf carries")
+	}
+	_, rung, known := itemDef(catalog, "recovery_pill@high")
+	if !known || rung.PriceMult < 2 {
+		t.Fatalf("the High rung is not known or not worth more than Low: %+v", rung)
+	}
+	want := lowShelf*rung.PriceMult - 1
+	batch4Exec(t, path, `INSERT INTO inventory(user_id,item_id,quantity) VALUES(42,'recovery_pill@high',4),(42,'recovery_pill',2)`)
+	stallMust(t, path, "stall.open", 42, map[string]any{"name": "Lin's Table"})
+	high := stallMust(t, path, "stall.list", 42, map[string]any{"item_id": "recovery_pill@high", "quantity": 2, "unit_price": want})
+	if high["npc_may_buy"] != true || i64(high["npc_ceiling"]) != want {
+		t.Fatalf("the town will not buy a High pill at %d (Low shelf %d x%d, less one): %v", want, lowShelf, rung.PriceMult, high)
+	}
+	stallMust(t, path, "stall.withdraw", 42, map[string]any{"listing_id": high["listing_id"]})
+	dear := stallMust(t, path, "stall.list", 42, map[string]any{"item_id": "recovery_pill@high", "quantity": 2, "unit_price": want + 1})
+	if dear["npc_may_buy"] != false {
+		t.Fatalf("the town would pay a High pill's full worth or more: %v", dear)
+	}
+	// An ungraded item no shelf sells still has no reference at all.
+	if _, ok := NPCStallCeiling(catalog, "hundred_year_peach", "low_spirit_stone"); ok {
+		t.Fatal("the town has a price for a peach no shelf sells")
 	}
 }

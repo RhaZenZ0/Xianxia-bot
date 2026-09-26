@@ -492,6 +492,48 @@ async def answer_generically(hubs: Any, actor: Any, action: Any, result: Any, *,
     return result, "+".join(how) or "ran"
 
 
+# The bot's two unconditional periodic workers, by the attribute `setup_hook`
+# stores each task under.
+PERIODIC_WORKERS = ("event_expiry_task", "operational_health_task")
+
+
+async def quiet_the_periodic_workers(bot: Any, env: Any) -> list[str]:
+    """Let the periodic workers run once at boot, then stop them for the sweep.
+
+    `event_expiry_worker` wakes every thirty real seconds and runs the
+    simulation tick - and since v1.7.0 the auction and stall card syncs after
+    it - and `operational_health_worker` probes every table the same way. A
+    tick holds the engine's write lock for seconds, so a press that landed
+    during one waited behind it and failed its five-second settle (v1.7.1):
+    "bot did not settle after INTERACTION_CREATE", naming whichever leaf the
+    wall clock picked - `/admin player unmute` in one run, `/family` in the
+    next. Nothing the harness asserts depends on either worker after boot,
+    which is why the update check, the Quest Forge and the route audit are
+    already switched off in `_configure`; these two have no switch, so they are
+    stopped here instead.
+
+    Two ways of keeping them running failed first, and both are worth knowing.
+    Declaring their engine calls `env.external_wait` still left each answer's
+    wake as an active callback, so a worker calling back to back never gave a
+    settle its quiet gap. Holding a worker's next call while the harness
+    pressed parked it between a write's execute and its commit - holding
+    SQLite's write lock (v1.2.3) - so the pressed leaf's own INSERT waited five
+    seconds behind it. A cancel is only safe where neither can happen, so it is
+    made after a settle, which returns only once both are asleep: parked in
+    their sleeps, never inside a transaction. Their first iteration - one tick,
+    both card syncs, one health probe - has run by then.
+    """
+    await settle_patiently(env)
+    stopped = []
+    for name in PERIODIC_WORKERS:
+        task = getattr(bot, name, None)
+        if task is not None and not task.done():
+            task.cancel()
+            stopped.append(name)
+    await settle_patiently(env)
+    return stopped
+
+
 async def settle_patiently(env: Any, *, attempts: int = 8) -> None:
     """Wait for the bot's outstanding work in short settles rather than one
     long one (see the note at `simcord.run`). A leaf that asks the engine for
@@ -663,6 +705,10 @@ async def run(url: str, token: str, db_path: str) -> Report:
         synced = await step(report, "the bot booted through every startup phase and synced its commands", boot())
         if synced:
             report.add("PASS", f"{len(synced)} commands are registered with the guild", ", ".join(sorted(synced)))
+        stopped = await step(report, "the periodic workers ran once and are stopped for the sweep", quiet_the_periodic_workers(bot, env))
+        if stopped is not None:
+            report.add("PASS" if sorted(stopped) == sorted(PERIODIC_WORKERS) else "FAIL",
+                       "both periodic workers were running and are stopped", ", ".join(stopped) or "none")
 
         # ---- 2. the server -----------------------------------------------------
         async def refused_admin():

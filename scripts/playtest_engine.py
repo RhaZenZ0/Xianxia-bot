@@ -733,9 +733,10 @@ async def run(url: str, token: str, db_path: str) -> Report:
         # A player's stall deals in any grade (v1.7.0), and a grade is only a
         # recipe's output, so the certificate (v1.7.1) covers every grade too:
         # the uncertified keeper is refused a High pill as surely as a Low one.
-        # That the town never buys a grade no shelf sells is held in Go
-        # (TestTheTownNeverBuysAGradeNoShelfSells), where a certified seller is
-        # staged rather than rolled for.
+        # What the town pays for a grade no shelf sells (its Low shelf at the
+        # grade's worth, v1.7.1) is held in Go
+        # (TestTheTownBuysAGradeNoShelfSellsAtItsWorth), where a certified
+        # seller is staged rather than rolled for.
         await step(report, "the keeper carries a High pill", gm("admin.player.adjust_item", {"user_id": BUYER, "item_id": "qi_pill@high", "quantity": 1, "reason": "playtest: a graded listing"}))
         await step(report, "an uncertified keeper cannot list a High pill either", act("stall.list", BUYER, {"item_id": "qi_pill@high", "quantity": 1, "unit_price": 90}), expect_error="certificate")
         board = await step(report, "stall.board as the player", query("stall.board", PLAYER, {}))

@@ -519,7 +519,8 @@ people consign.
 Every crafted item carries a **grade** (v1.7.0) - Low, Mid, High, Superior or Transcendent - set by
 how well the craft went and capped by your rank in the trade. A higher grade works harder (up to
 three times) and is worth more (double each step). Shops deal in Low, capitals in Mid as well; the
-finer grades are sold between players, at a stall or on the auction floor.
+finer grades are sold between players, at a stall or on the auction floor - and since v1.7.1 the
+town buys them from a stall too, under the Low item's shelf price at the grade's worth.
 Anybody may sell raw materials there; a trade's goods - pills, blades, talismans, array disks - go on a
 stall only for somebody who has passed an examination of that trade in this life (v1.7.1).
 
