@@ -88,6 +88,48 @@ class PresenceRuleTests(unittest.TestCase):
         self.assertNotIn("manage_messages", REALM_HUB_MEMBER_PERMISSIONS)
 
 
+class ACapitalsPartsAreTheCapital(unittest.TestCase):
+    """A gate, district, shop or auction hall of a capital is the capital (v1.7.2).
+
+    Reported as "no access to common room channel": standing at Azure Crown
+    Imperial City South Gate, and in the Azure Crown Inn whose card links the
+    capital's common room, the presence role came off, because the rule matched
+    the capital's name exactly. The engine's `cityOf` has answered this since it
+    was written; the city is computed here a third time off the raw content file
+    so two wrong halves cannot agree and pass (v1.0.9).
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        import json
+        raw = json.loads((PROJECT_ROOT / "content" / "world.json").read_text(encoding="utf-8"))
+        cls.locations = raw["locations"]
+
+    def city_of(self, name):
+        place = self.locations.get(name) or {}
+        if place.get("outside_location") and (place.get("district") or place.get("shop") or place.get("auction_house")):
+            return place["outside_location"]
+        return name
+
+    def test_the_reader_finds_the_reported_places(self):
+        for name in ("Azure Crown Imperial City South Gate", "Azure Crown Inn"):
+            self.assertEqual(self.city_of(name), "Azure Crown Imperial City", f"{name}: the reader is broken, not the tree")
+
+    def test_every_part_of_a_capital_is_that_capital(self):
+        capitals = {str(hub["location"]): world for world, hub in REALM_HUBS.items()}
+        parts = 0
+        for name in self.locations:
+            want = capitals.get(self.city_of(name))
+            self.assertEqual(presence_world_for(name, self.locations), want, name)
+            if want and name not in capitals:
+                parts += 1
+        self.assertGreater(parts, len(capitals), "no capital has a part; the walk found nothing")
+
+    def test_a_private_place_is_not_the_capital(self):
+        for name in ("birth_family:3", "abode:7", "personal_world:9", "Greenriver Town", ""):
+            self.assertIsNone(presence_world_for(name, self.locations), name)
+
+
 class GateIsAppliedTests(unittest.TestCase):
     def test_setup_path_gates_every_hub_it_resolves_with_the_presence_role(self):
         source = bot_function_source("ensure_realm_hub_channels")
@@ -117,7 +159,10 @@ class GateIsAppliedTests(unittest.TestCase):
 
     def test_presence_sync_is_exactly_one_role_and_no_call_when_unchanged(self):
         source = bot_function_source("_sync_realm_presence_roles")
-        self.assertIn("here = presence_world_for(character.get(\"location\"))", source)
+        # The sync hands over the location table, so a gate or district of the
+        # capital is the capital (v1.7.2); the rule itself is held by
+        # `ACapitalsPartsAreTheCapital` below, behaviourally.
+        self.assertIn("here = presence_world_for(character.get(\"location\"), WORLD.locations)", source)
         self.assertIn("if world == here and role.id not in current_ids", source)
         self.assertIn("if world != here and role.id in current_ids", source)
         self.assertIn("if add_roles:", source)

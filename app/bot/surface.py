@@ -1166,6 +1166,10 @@ LOCATION_GATES: dict[str, tuple[str, ...]] = {
     # in that city, and nowhere private. `stallCityAt` is the engine's question.
     "city_street": ("stall open", "stall list", "stall withdraw", "stall close"),
     "city_board": ("city accept",),
+    # The envoys receive in a realm capital's temple quarter and nowhere else
+    # (`sectRecruitmentEnvoysActionGo`, v1.7.2): anywhere else the line names
+    # the hall, which is the same direction the engine's refusal gives.
+    "envoys_hall": ("city envoys",),
     # The three v1.1.0 left out for their cost (v1.3.1, on the owner's call):
     # the ghost road's two grounds are the content twin of
     # `deathQiGroundMultiplier`, and the post and the array are one read each
@@ -1197,6 +1201,20 @@ LOCATION_GATES: dict[str, tuple[str, ...]] = {
 # `exploration_actions.go` writes these four out at every handler that refuses
 # inside one; `private_location_exit` is their Python twin.
 PRIVATE_PREFIXES = ("birth_family:", "sect_abode:", "abode:", "personal_world:")
+
+
+def envoys_hall(city: str) -> str:
+    """The temple quarter of a realm capital, where the sect envoys receive, or
+    "" when `city` is no capital: the twin of the hall
+    `sectRecruitmentEnvoysActionGo` finds - the first `temple` district among
+    the city's parts in name order (`cityPartsOf` sorts them)."""
+    if not (WORLD.locations.get(city) or {}).get("realm_hub"):
+        return ""
+    for name in sorted(WORLD.locations):
+        data = WORLD.locations[name]
+        if str(data.get("outside_location") or "") == city and str(data.get("district") or "") == "temple":
+            return name
+    return ""
 
 
 def _shop_at(location: str) -> str:
@@ -1265,6 +1283,11 @@ async def _location_hidden_actions(interaction: discord.Interaction, c: dict) ->
                              else "trades are struck at an inn's long table — find a city's inn")
     if not _city_board(city):
         shut["city_board"] = "nobody who posts work lives here — try a city's board"
+    hall = envoys_hall(city)
+    if not hall:
+        shut["envoys_hall"] = "the sect envoys receive in a realm capital's temple quarter — travel to a capital"
+    elif here != hall:
+        shut["envoys_hall"] = f"the sect envoys receive in {hall} — travel there"
     if private or not any(str(shop.get("city") or "") == city for shop in WORLD.shops.values()):
         shut["city_street"] = "a stall is kept in a city's street — travel to a city"
     if WORLD.location_safe_zone(here):

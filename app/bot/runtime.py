@@ -468,7 +468,7 @@ async def _sync_realm_presence_roles(
     available = {world: role for world, role in role_map.items() if role is not None}
     if not available:
         return
-    here = presence_world_for(character.get("location"))
+    here = presence_world_for(character.get("location"), WORLD.locations)
     current_ids = {role.id for role in member.roles}
     add_roles = [role for world, role in available.items() if world == here and role.id not in current_ids]
     remove_roles = [role for world, role in available.items() if world != here and role.id in current_ids]
