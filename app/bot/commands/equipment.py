@@ -11,7 +11,7 @@ from collections.abc import Mapping
 import discord
 from discord import app_commands
 
-from ...rules.advanced_runtime import EQUIPMENT_DEFINITIONS
+from ...rules.advanced_runtime import describe_equipment, equipment_definition, equipment_totals_line
 from ...ops.game_engine import GameEngineError
 from ..hubs import HubDynamicOption, register_hub_option_hint, register_hub_option_provider
 from ..registry import registered_group_command
@@ -34,6 +34,12 @@ equipment_group = app_commands.Group(
 )
 
 
+def _gear_name(item_id: object) -> str:
+    """A piece of gear's name at its grade ("Spirit-Iron Sword (High)")."""
+    named = str(WORLD.item_definition(str(item_id)).get("name") or "")
+    return named or str(equipment_definition(item_id).get("name") or WORLD.item_name(str(item_id)))
+
+
 @registered_group_command(equipment_group, name="status", description="Inspect your persistent equipment loadout and durability")
 async def equipment_status(interaction: discord.Interaction) -> None:
     c = await require_character(interaction)
@@ -47,29 +53,21 @@ async def equipment_status(interaction: discord.Interaction) -> None:
         )
         return
     bonus = dict(await ENGINE.action("equipment.power", interaction.user.id, {}) or {})
-    lines = [
-        f"🛡️ **Equipment — {c['name']}**",
-        f"Active bonuses: ATK **+{bonus['attack']}** • DEF **+{bonus['defense']}** • Spirit **+{bonus['spirit']}** • Agility **+{bonus['agility']}**",
-    ]
+    # The totals are the engine's own answer; the line only says what they do.
+    # Spirit is carried by every piece and read by no rule, so it is not shown.
+    totals = equipment_totals_line(bonus) or "No bonuses from what you have equipped."
+    lines = [f"🛡️ **Equipment — {c['name']}**", f"**In a fight** (equipped gear):\n{totals}"]
     for row in rows:
-        definition = EQUIPMENT_DEFINITIONS.get(str(row['item_id']), {})
-        stat_parts = []
-        for stat_key, label in (("attack", "ATK"), ("defense", "DEF"), ("spirit", "Spirit"), ("agility", "Agility")):
-            value = int(definition.get(stat_key, 0))
-            if value != 0:
-                stat_parts.append(f"{label} **{value:+d}**")
-        stats_text = " • ".join(stat_parts) if stat_parts else "No stat modifiers"
-        # Indestructible reward gear never wears (the Go engine skips it in
-        # damageEquipmentGo), so a durability fraction would be misleading.
-        condition = (
-            "**indestructible**"
-            if definition.get("indestructible")
-            else f"durability **{row['durability']}/{row['max_durability']}**"
+        description = describe_equipment(
+            row["item_id"],
+            quality=row["quality"],
+            durability=row["durability"],
+            max_durability=row["max_durability"],
+            ladder=WORLD.item_grades,
         )
-        passive = str(definition.get("passive_name") or "").strip()
-        passive_suffix = f" • passive **{passive}**" if passive else ""
         lines.append(
-            f"\n{'✅' if row['equipped'] else '▫️'} `#{row['equipment_id']}` **{definition.get('name', WORLD.item_name(row['item_id']))}** • {row['slot']} • {condition} • quality {row['quality']}% • stats {stats_text}{passive_suffix}"
+            f"\n{'✅' if row['equipped'] else '▫️'} `#{row['equipment_id']}` **{_gear_name(row['item_id'])}** • {row['slot']} • quality {row['quality']}%"
+            f"\n{description or 'No stat modifiers'}"
         )
     await reply_long(interaction, "\n".join(lines), ephemeral=False)
 
@@ -170,14 +168,19 @@ async def equipment_repair(interaction: discord.Interaction, equipment_id: int) 
 # The player-facing hub providers live here rather than in the main startup file so
 # the equipment group stays self-contained and easier to move in future refactors.
 def _equipment_option(row: Mapping[str, object]) -> HubDynamicOption:
-    definition = EQUIPMENT_DEFINITIONS.get(str(row["item_id"]), {})
-    name = str(definition.get("name") or WORLD.item_name(str(row["item_id"])))
-    durability = f"{int(row['durability'])}/{int(row['max_durability'])}"
+    name = _gear_name(row["item_id"])
     worn = int(row["max_durability"]) - int(row["durability"])
+    description = describe_equipment(
+        row["item_id"],
+        quality=row["quality"],
+        durability=row["durability"],
+        max_durability=row["max_durability"],
+        ladder=WORLD.item_grades,
+    )
     return HubDynamicOption(
         label=f"{name} • {row['slot']}"[:100],
         value=int(row["equipment_id"]),
-        description=f"#{row['equipment_id']} • durability {durability} • quality {int(row['quality'])}%"[:100],
+        description=f"#{row['equipment_id']} • {description}"[:100],
         emoji="✅" if row["equipped"] else ("🔧" if worn else "▫️"),
     )
 
@@ -220,19 +223,15 @@ async def equipment_bind_hub_options(interaction: discord.Interaction, current: 
     for item_id, quantity in sorted(dict(inventory or {}).items()):
         if int(quantity or 0) <= 0:
             continue
-        definition = EQUIPMENT_DEFINITIONS.get(str(item_id))
+        definition = equipment_definition(item_id)
         if not definition:
             continue
-        bonuses = " ".join(
-            f"{label} +{int(definition.get(key, 0))}"
-            for label, key in (("ATK", "attack"), ("DEF", "defense"), ("SPI", "spirit"), ("AGI", "agility"))
-            if int(definition.get(key, 0)) > 0
-        )
+        description = describe_equipment(item_id, ladder=WORLD.item_grades)
         options.append(
             HubDynamicOption(
-                label=f"{definition.get('name', item_id)} x{int(quantity)}"[:100],
+                label=f"{_gear_name(item_id)} x{int(quantity)}"[:100],
                 value=str(item_id),
-                description=f"{definition.get('slot', 'gear')} • {bonuses or 'no bonuses'} • durability {int(definition.get('max_durability', 0))}"[:100],
+                description=f"{definition.get('slot', 'gear')} • {description}"[:100],
                 emoji="🧷",
             )
         )
@@ -274,9 +273,7 @@ async def _equipment_label(user_id: int, equipment_id: int) -> str:
     try:
         for row in await DB.get_equipment(user_id):
             if int(row["equipment_id"]) == int(equipment_id):
-                definition = EQUIPMENT_DEFINITIONS.get(str(row["item_id"]), {})
-                name = str(definition.get("name") or WORLD.item_name(str(row["item_id"])))
-                return f"**{name}** `#{equipment_id}`"
+                return f"**{_gear_name(row['item_id'])}** `#{equipment_id}`"
     except Exception:
         log.warning("Could not resolve equipment label", exc_info=True)
     return f"item `#{equipment_id}`"

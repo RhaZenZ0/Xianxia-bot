@@ -458,7 +458,7 @@ func beastEvolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		return authoritativeMutation{}, fmt.Errorf("loyalty %d is below evolution requirement %d", i64(row["loyalty"]), need)
 	}
 	// Every evolution also costs beast cores: 1 a level below rank 10, then 8
-	// a level from 10, 16 from 20, and so on (v1.7.3, on the owner's call).
+	// a level from 10, 16 from 20, and so on (v1.7.7, on the owner's call).
 	cores := beastLevelCores(i64(row["rank"]))
 	if cores > 0 {
 		short, err := consumeInventoryTx(conn, userID, map[string]int64{"beast_core": cores})
@@ -469,7 +469,7 @@ func beastEvolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 			return authoritativeMutation{}, fmt.Errorf("evolving past rank %d needs %d beast cores: missing %s", i64(row["rank"]), cores, describeMaterials(catalog, short))
 		}
 	}
-	// An evolution spends the bond (v1.7.3): it used to cost twenty loyalty,
+	// An evolution spends the bond (v1.7.7): it used to cost twenty loyalty,
 	// which one Train and one beast core bought back, so a beast at the capped
 	// requirement evolved every few minutes. It drops to beastEvolvedLoyalty.
 	now := float64(time.Now().UnixNano()) / 1e9
@@ -694,7 +694,7 @@ func artifactAwakenAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 	}, nil
 }
 
-// beastRankLimit is how strong a beast may evolve in a world (v1.7.3, on the
+// beastRankLimit is how strong a beast may evolve in a world (v1.7.7, on the
 // owner's call): 25 in the Mortal World, 50 Spiritual, 75 Immortal, and
 // 100 in the Celestial World, which is the highest rank a beast can reach. Evolving adds
 // one rank and nothing else bounded it. A beast already above the limit keeps

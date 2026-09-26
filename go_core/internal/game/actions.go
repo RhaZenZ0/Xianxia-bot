@@ -1277,6 +1277,8 @@ func adminClearBattle(conn *storage.Conn, adminUserID int64, raw json.RawMessage
 		return nil, err
 	}
 	cleared += bossRes.RowsAffected
+	// A party made for a raid the GM just cleared goes with it (v1.7.8).
+	closeFinishedRaidOnlyPartiesTx(conn, now)
 	pvpMatchRes, err := conn.Execute(`UPDATE pvp_matches SET status='abandoned',updated_at=? WHERE status='active' AND (player1_user_id=? OR player2_user_id=?)`, []any{now, uid, uid})
 	if err != nil {
 		return nil, err

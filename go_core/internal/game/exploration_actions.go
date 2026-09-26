@@ -880,12 +880,25 @@ func roadFrontierTx(catalog worlddata.Catalog, known map[string]bool, realmIndex
 	return frontier
 }
 
-func discoverNextLocationTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, c mechanicsCharacter, gameMinute int64, now float64) (string, error) {
-	known, err := knownLocationsTx(conn, catalog, userID, c)
-	if err != nil {
-		return "", err
+// wildsCandidates is every unknown place in the wilds of a city the
+// character knows (v1.7.7): the one way to come upon a place no road reaches
+// other than a sect gate's reveal.
+func wildsCandidates(catalog worlddata.Catalog, known map[string]bool, world string, realmIndex int64) []string {
+	out := []string{}
+	for name, loc := range catalog.Locations {
+		if loc.WildsOf == "" || known[name] || !known[loc.WildsOf] || loc.World != world || loc.MinRealmIndex > realmIndex || loc.Private {
+			continue
+		}
+		out = append(out, name)
 	}
-	world := currentWorld(c, catalog)
+	sort.Strings(out)
+	return out
+}
+
+// discoveryCandidates is every place an explore could turn up for somebody
+// who knows `known`: the next ring of the road network, the sites on the
+// roads out of a known city, and the wilds of a known city (v1.7.7).
+func discoveryCandidates(catalog worlddata.Catalog, known map[string]bool, world string, realmIndex int64) []string {
 	// Candidates are restricted to the road frontier of what the character
 	// already knows, not "any unknown location anywhere in the world" - a
 	// mortal-realm character exploring around their home village should turn
@@ -895,18 +908,29 @@ func discoverNextLocationTx(conn *storage.Conn, catalog worlddata.Catalog, userI
 	// per knownLocationsTx), so this never stalls exploration - it just
 	// makes discovery follow the road network outward ring by ring instead
 	// of jumping anywhere at once.
-	frontier := roadFrontierTx(catalog, known, c.accessRealmIndex())
+	frontier := roadFrontierTx(catalog, known, realmIndex)
 	candidates := []string{}
 	for name := range frontier {
 		loc, ok := catalog.Locations[name]
-		if !ok || known[name] || loc.World != world || loc.MinRealmIndex > c.accessRealmIndex() || loc.Private || strings.HasPrefix(name, "abode:") || strings.HasPrefix(name, "personal_world:") {
+		if !ok || known[name] || loc.World != world || loc.MinRealmIndex > realmIndex || loc.Private || strings.HasPrefix(name, "abode:") || strings.HasPrefix(name, "personal_world:") {
 			continue
 		}
 		candidates = append(candidates, name)
 	}
 	// The sites on the roads out of a known city (v0.39.0) are found the
 	// same way as the next city along.
-	candidates = append(candidates, roadSiteCandidates(catalog, known, world, c.accessRealmIndex())...)
+	candidates = append(candidates, roadSiteCandidates(catalog, known, world, realmIndex)...)
+	// And the wilds of a known city (v1.7.7), which no road reaches.
+	candidates = append(candidates, wildsCandidates(catalog, known, world, realmIndex)...)
+	return candidates
+}
+
+func discoverNextLocationTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, c mechanicsCharacter, gameMinute int64, now float64) (string, error) {
+	known, err := knownLocationsTx(conn, catalog, userID, c)
+	if err != nil {
+		return "", err
+	}
+	candidates := discoveryCandidates(catalog, known, currentWorld(c, catalog), c.accessRealmIndex())
 	if len(candidates) == 0 {
 		return "", nil
 	}

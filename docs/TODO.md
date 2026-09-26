@@ -16,6 +16,29 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.7.8)** — *A solo raid.* On the owner's call `/boss start` with no party forms a party
+  of one marked `raid_only` (schema 68), closed when the raid is won, lost or cleared by a GM, and a
+  party of one fights the boss at 70% of its health (`bossSoloHPScale`). A party made by hand is
+  never closed by its raid.
+- **fixed (v1.7.6)** — *Who may start a raid.* The leader alone, on the owner's call, with every
+  member at the boss's own `RealmIndex`, which every template carried and nothing read. A party of
+  one is still a party, so a solo player raids by creating one.
+- **fixed (v1.7.7)** — *Two raid lairs no road reaches.* Moonfen Marsh (the Drowned Serpent, and the
+  Verdant Immortal Grotto's entrance) and Cloudspine Foothills (the Nine-Echo Sword Wraith, and the
+  Sword Grave's entrance) carry `wilds_of` - Moonfen City and Cloudblade City, on the owner's call -
+  and exploring from that city can turn them up; `/travel` takes the road-less jump sect gates use.
+- **fixed (v1.7.6)** — *`/boss act` Defend always failed.* Discord sent `defend` and the engine
+  accepts `guard`. The button sends `guard`, and the engine reads `defend` as a guard for an older
+  bot mid-upgrade.
+- **deferred (design)** — *The spirit stat on gear reaches no rule.* Every piece in
+  `EQUIPMENT_DEFINITIONS` carries `spirit`, the engine sums it in `combatEquipment` and
+  `equipmentPowerRows`, and nothing reads the sum. Since v1.7.5 no surface shows it, on the owner's
+  call, so the descriptions promise only what a fight does. Whether to wire it (a technique's power, a
+  sense check) or remove it is a mechanic, not a wiring.
+- **fixed (v1.7.5)** — *Say what a weapon, armour or beast gives.* Every surface that shows gear
+  names its attack, defence and agility at its grade (agility as boss-raid hit chance, the only real
+  percentage), the equipment card sums them into what they do, and a beast's card names its 1v1
+  bonus. Graded gear read "No stat modifiers" on the equipment card and is fixed with it.
 - **fixed (v1.7.1)** — *A trade's goods need that trade's certificate at a stall.* On the owner's
   call: anyone at the realm floor may open a stall, but an item a recipe makes is listed only by
   somebody who has passed an examination of that trade in this life - any rank, because a rank rises

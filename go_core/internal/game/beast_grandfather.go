@@ -8,7 +8,7 @@ import (
 	"xianxia/core/internal/worlddata"
 )
 
-// settleGrandfatheredBeastsTx brings a beast made before v1.7.3's rules under
+// settleGrandfatheredBeastsTx brings a beast made before v1.7.7's rules under
 // them, once, the next time its owner acts (schema 67 marks it grandfathered=0).
 //
 //   - A rank above its owner's limit is lowered to it: the limit of the world
