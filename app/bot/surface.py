@@ -1532,6 +1532,10 @@ TREE_COMMANDS: tuple[str, ...] = (
     # were only a hub page (`/economy → Market Stalls`), and a player asking
     # for `/stall buy` found nothing - the shape `/learn` had in rc.43.
     "stall",
+    # The raids (v1.7.10): asked "where is the boss command located?", and the
+    # answer was a hub page - `/combat → Boss Raids` - because neither group
+    # had ever been registered. The v1.7.4 shape, twice over.
+    "boss", "party",
 )
 
 

@@ -5427,6 +5427,13 @@ side of `test_seclusion_lockout`: a secluded player is refused it as the panel r
 `test_the_stalls_have_a_slash_command.py` holds both halves; putting `ACTIONS.root` back prints
 *"the tree tuple is resolved through ACTIONS.root again, which knows no groups"*.
 
+**v1.7.10 found the same fault twice more.** Asked *"where is the boss command located?"*, the answer
+was `/combat → Boss Raids`, because `boss` and `party` were in `_GROUP_ACTION_ROOTS` and never in
+`TREE_COMMANDS`. v1.7.4 fixed the one group somebody had asked for and did not look for its
+siblings - v1.0.8's picker finding again. They are tree commands now, on the acting side of the
+seclusion lockout, and `TheRaidsHaveSlashCommands` holds them; the other groups in that map are
+still reached by their hub pages alone, and which of them deserve a typed name is a decision.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —
