@@ -1698,10 +1698,36 @@ async def run(url: str, token: str, db_path: str) -> Report:
     redeemed = await step(report, "sect.redeem a herb back", act("sect.redeem", PLAYER, {"item_id": "spirit_herb", "quantity": 1}))
     if redeemed is not None:
         report.add("PASS", "the treasury sells back at its price", f"unit_cost={redeemed.get('unit_cost')} remaining={redeemed.get('remaining_points')}")
+    # The exchange (v1.8.0): the sect's own stock, priced by the engine and
+    # locked by rank. An Outer Disciple may take a talisman and not the
+    # Inner Disciple's pill; the pill waits for the rank below.
+    exchange = await step(report, "sect.exchange lists the issued stock", query("sect.exchange", PLAYER, {}))
+    if exchange is not None:
+        issued = {str(row.get("item_id")): row for row in exchange.get("issued") or []}
+        pill = issued.get("marrow_tempering_pill") or {}
+        report.add("PASS" if pill and not pill.get("eligible") else "FAIL", "the tempering pill is listed and locked to an Outer Disciple",
+                   f"eligible={pill.get('eligible')} needs={pill.get('min_rank_name')}")
+    await step(report, "an Outer Disciple is refused the Inner Disciple's pill",
+               act("sect.redeem", PLAYER, {"item_id": "marrow_tempering_pill", "quantity": 1, "source": "issued"}), expect_error="Inner Disciple")
+    talisman = await step(report, "sect.redeem an issued talisman",
+                          act("sect.redeem", PLAYER, {"item_id": "swift_wind_talisman", "quantity": 1, "source": "issued"}))
+    if talisman is not None:
+        report.add("PASS" if talisman.get("source") == "issued" and int(talisman.get("cost") or 0) > 0 else "FAIL",
+                   "issued stock costs points and never touches the treasury", f"cost={talisman.get('cost')} remaining={talisman.get('remaining_points')}")
     left = await step(report, "sect.abode.leave", act("sect.abode.leave", PLAYER, {}))
     if left is not None:
         report.add("PASS" if str(left.get("location")) == gate else "FAIL", "the residence opens onto the gate", str(left.get("location")))
     await audited("admin.player.set_sect_rank", {"user_id": PLAYER, "rank_name": "Sect Master", "rank_level": 70, "reason": "playtest"}, name="admin.player.set_sect_rank Sect Master")
+    # Now the pill is issued, and it tempers the marrow: the maximum and the
+    # current value rise together, and the allowance is counted.
+    pill = await step(report, "sect.redeem the Marrow-Tempering Pill",
+                      act("sect.redeem", PLAYER, {"item_id": "marrow_tempering_pill", "quantity": 1, "source": "issued"}))
+    if pill is not None:
+        tempered = await step(report, "item.use the Marrow-Tempering Pill", act("item.use", PLAYER, {"item_id": "marrow_tempering_pill"}))
+        if tempered is not None:
+            report.add("PASS" if int(tempered.get("vitality_max_gain") or 0) >= 2 and int(tempered.get("tempering_used") or 0) >= 1 else "FAIL",
+                       "the pill raises max vitality and counts against the body realm",
+                       f"+{tempered.get('vitality_max_gain')} -> {tempered.get('vitality_max')} ({tempered.get('tempering_used')} of {tempered.get('tempering_allowance')})")
     await step(report, "back to the town", gm("admin.player.teleport", {"user_id": PLAYER, "location": town, "reason": "playtest"}))
     manor = await step(report, "sect.manor.establish", act("sect.manor.establish", PLAYER, {"name": "Playtest Manor"}))
     if manor is not None:

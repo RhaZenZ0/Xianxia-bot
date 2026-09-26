@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 68; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 69; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -5433,6 +5433,63 @@ was `/combat → Boss Raids`, because `boss` and `party` were in `_GROUP_ACTION_
 siblings - v1.0.8's picker finding again. They are tree commands now, on the acting side of the
 seclusion lockout, and `TheRaidsHaveSlashCommands` holds them; the other groups in that map are
 still reached by their hub pages alone, and which of them deserve a typed name is a decision.
+
+### The sect exchange, earned rank, and the marrow (schema 69, v1.8.0)
+
+Asked as *"how is Vitality upgraded"*, then *"something in the sect shop that raises it"*, then
+*"more items for the sect shop"* and *"how do we earn those points"*. Each answer found the next
+missing wire, and they ship together because each needs the others.
+
+**The sect "shop" was only a treasury.** `sect.redeem` could hand back what members had donated
+and nothing else, so on a small server it was usually empty. `sect_system.exchange` is stock a sect
+*issues* - never out, not drawn from `sect_treasury` - at `points_per_sect_value` (3) times the
+item's sect value at its grade, so an item is worth the same to a sect whichever way it moves and a
+redeem followed by a donation always loses. Thirteen common lots across Outer, Inner and Core
+Disciple, and one `market_excluded` item per recruiting sect (the hidden sect has none). `sect.redeem`
+takes `source: "issued"`; an empty source is the treasury path, unchanged. `sect.exchange` is the
+read, and `/sect → Holdings → Treasury` and the redeem picker print only what it returns - the page
+used to restate the scarcity multiplier, which is `sectRedeemPressureMult` now.
+
+**Rank never moved.** Joining wrote Outer Disciple and only `admin.player.set_sect_rank` wrote
+anything after it, so rank-locked stock would have reached nobody - the finding that turned
+"unlock by rank" into a mechanic. `sect_membership.contribution_earned` (schema 69) is the lifetime
+count, backfilled from the balance as its floor; `creditSectContributionTx` is **the one door points
+come in by** - donation, a master's share, a commission, a world event - writing balance and count
+together and promoting on `exchange.promotion` (Inner at 600, Core at 3,000). Spending writes only
+the balance, so it can never cost a rank; promotion only raises and never touches a rank above the
+ladder, so a GM's Elder stays an Elder; joining a sect resets the count. Every read guards on the
+column (v1.1.0's migration-window rule): without it points are credited and nobody is promoted.
+
+**Earning.** A member's own sect's commission pays `commission_points_per_stone` of its stone reward
+(an outsider still gets v1.1.0's standing and no points). A donation of something the donor's
+certified trade makes earns `crafted_multiplier` (the v1.7.1 stall certificate, because an
+inventory row carries no provenance). A successful world-event action in the sect's own world pays
+what it added to the event contribution, capped per event off the existing
+`world_event_participation.contribution` - no new storage.
+
+**The mint the farming check found, measured before it was believed.** The three secret-realm keys
+are worth 700 to 1,200 points and sell for 280 to 420 stones, so a point cost a third of a stone -
+and with that, ten of sixteen proposed lots could be redeemed and sold to a keeper at a profit.
+`sectDonationCap` holds a donation to the cheapest Mortal shelf price per unit (times the grade's
+price multiple), so a point always costs about a stone; three flight items whose keeper price still
+beat their points (Paper Crane, Riding Gourd, Azure Flying Sword) left the stock.
+`TestNoIssuedItemTurnsPointsIntoStones` walks every lot against a Saint's keeper price; its drill
+restores the Riding Gourd and prints *"wind_gourd costs 27 points and a keeper pays a Saint 63"*.
+
+**The Marrow-Tempering Pill** (`marrow_tempering.go`) is the first thing a cultivator can make or be
+issued that raises max vitality: `vitality_max_percent` 10, never under `vitality_max_min` 2, scaled
+by grade, the maximum and the current value together. `marrowTemperingPerBodyRealm` (3) is a Go
+constant - an item cannot author its own ceiling - counted off `event_log` per `(life, body realm)`,
+the household lesson's record: samsara and a reset start fresh, and a GM lowering and restoring a
+body realm cannot refill it. It is refused before it is spent, at the cap or mid-battle, and it
+carries no instant restore so the battle panel never offers it. Taught at the Tier 2 Alchemy
+examination and sold as a slip; `market_excluded` so the regional markets do not stock it. Alchemy
+is at the `test_no_crafting_profession_is_left_far_behind` limit now: a thirteenth recipe fails it.
+
+**Migration 46's drill read today's content.** It asserts every Alchemy recipe up to level 3 is
+grandfathered, against a migration that is a frozen list - so any new low-level Alchemy recipe
+looked "taken away". `AUTHORED_AFTER_THE_LEARNING_STEP` names the recipes written after it, each
+with its reason, and asserts they were *not* grandfathered.
 
 ## Testing conventions
 
