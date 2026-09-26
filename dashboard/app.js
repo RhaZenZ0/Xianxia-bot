@@ -715,7 +715,7 @@ async function loadAdmin(){
  const updReq=upd.request||null, updRes=upd.result||null;
  const updVersions=upd.newest_on_channel===null||upd.newest_on_channel===undefined
    ?`Installed <b>v${esc(upd.installed_version||'?')}</b> · newest on the channel: <b>unknown</b> <span class="muted">(${esc(upd.release_error||'the bot has not answered')})</span>`
-   :`Installed <b>v${esc(upd.installed_version||'?')}</b> · newest on ${esc(upd.channel||'stable')}: <b>v${esc(upd.newest_on_channel)}</b> ${upd.update_available?pill('update available','warn'):pill('up to date','good')}`;
+   :`Installed <b>v${esc(upd.installed_version||'?')}</b> · newest on ${esc(upd.channel||'stable')}: <b>v${esc(upd.newest_on_channel)}</b> ${upd.update_available?pill('update available','warn'):pill('up to date','good')}${upd.checked_seconds_ago===null||upd.checked_seconds_ago===undefined?'':` <span class="muted">checked ${esc(Math.round(upd.checked_seconds_ago/60))} min ago</span>`}`;
  const updWatcher=upd.watcher_seen_seconds_ago===null||upd.watcher_seen_seconds_ago===undefined
    ?`${pill('watcher not running','bad')} <span class="muted">start <code>update_watch.sh</code> on the NAS — see docs/CONFIGURATION.md, "Updating from the dashboard"</span>`
    :(upd.watcher_running?`${pill('watcher running','good')} <span class="muted">last seen ${esc(upd.watcher_seen_seconds_ago)}s ago</span>`

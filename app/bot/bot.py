@@ -20,7 +20,7 @@ from discord.ext import commands
 from ..database import SCHEMA_VERSION
 from ..ops.health import HealthServer, HealthState
 from ..ops.http_limits import HeaderLimits
-from ..ops.release_channel import announcement, api_url, newer_than_installed, newest_for_channel, parse_releases
+from ..ops.release_channel import announcement, api_url, newer_than_installed, newest_for_channel, parse_releases, read_release_check
 from ..ai.narrator import canonical_location_reply, is_current_location_question
 from ..rules.npc_memory import classify_memory, exchange_memory_summary, public_mood_hint
 from ..version import INSTALLED_VERSION, RELEASE_VERSION
@@ -189,6 +189,9 @@ class XianxiaBot(commands.Bot):
         # in close() - it is the task running close().
         self.emergency_close_task: asyncio.Task | None = None
         self.announced_release: str | None = None
+        # v1.7.3: one release check at a time when the Server Update card
+        # finds the stored answer stale (read_release_check).
+        self.release_check_lock = asyncio.Lock()
 
     async def _dashboard_discord_control(self, action: str, payload: dict[str, Any]) -> dict[str, Any]:
         # The handler is intentionally hosted by the Discord process. The GM
@@ -217,12 +220,17 @@ class XianxiaBot(commands.Bot):
         if owns_narration_action(action):
             return await dashboard_narration_control(action, payload)
         # v1.4.0: the Server Update card asks what `check_for_release` last
-        # found, so release_channel.py stays the one comparison and GitHub is
-        # asked once per UPDATE_CHECK_HOURS rather than once per page load.
-        # A read of this process's own health entry; it changes nothing.
+        # found, so release_channel.py stays the one comparison. v1.7.3: an
+        # answer older than RELEASE_CARD_MAX_AGE_SECONDS is refreshed first -
+        # the daily worker alone left the card naming v1.7.1 for a day after
+        # v1.7.2 was published. At most one GitHub call per fifteen minutes,
+        # however often the card is loaded.
         if action == "release":
-            return {"ok": True, "action": action,
-                    "result": dict(self.health_state.checks.get("release_channel") or {})}
+            return {"ok": True, "action": action, "result": await read_release_check(
+                lambda: self.health_state.checks.get("release_channel"),
+                self.check_for_release, self.release_check_lock, time.time,
+                enabled=SETTINGS.update_check_enabled,
+            )}
         return await dashboard_discord_control(self, action, payload)
 
     async def _mark_startup_phase(self, phase: str, detail: dict | None = None) -> None:

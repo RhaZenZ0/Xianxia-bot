@@ -29,10 +29,11 @@ The parity between the two is pinned by tests/python/unit/test_release_channel.p
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any, Awaitable, Callable, Iterable
 
 DEFAULT_REPOSITORY = "RhaZenZ0/Xianxia-bot"
 CHANNELS = ("stable", "beta")
@@ -191,3 +192,56 @@ def announcement(release: Release, installed: str, channel: str) -> str:
     if summary:
         lines.insert(1, summary)
     return "\n".join(line for line in lines if line)
+
+
+# How old the bot's last answer may be before the Server Update card asks
+# GitHub again (v1.7.3). The daily UPDATE_CHECK_HOURS worker is right about
+# its own pace and wrong for a card a GM opens right after a release: v1.7.2
+# was published at 14:13 and the card went on naming v1.7.1, the answer the
+# bot had stored when it started that morning. Fifteen minutes caps GitHub at
+# four unauthenticated calls an hour however often the card is reloaded,
+# well inside the sixty the API allows.
+RELEASE_CARD_MAX_AGE_SECONDS = 15 * 60
+
+
+def release_check_is_stale(entry: Any, now: float, max_age: float = RELEASE_CARD_MAX_AGE_SECONDS) -> bool:
+    """True when there is no stored check, or the stored one is too old.
+
+    A failed check is stored with its own `checked_at` and counts as fresh,
+    so an unreachable GitHub is not asked again on every page load. An absent
+    or unreadable timestamp is stale, never "checked at 0".
+    """
+    if not isinstance(entry, dict):
+        return True
+    checked_at = entry.get("checked_at")
+    if checked_at is None:
+        return True
+    try:
+        return float(now) - float(checked_at) >= float(max_age)
+    except (TypeError, ValueError):
+        return True
+
+
+async def read_release_check(
+    read: Callable[[], Any],
+    check: Callable[[], Awaitable[Any]],
+    lock: asyncio.Lock,
+    now: Callable[[], float],
+    *,
+    enabled: bool = True,
+) -> dict[str, Any]:
+    """What the card shows: the stored check, refreshed first when it is stale.
+
+    `read` returns the stored entry and `check` runs one release check that
+    stores a new one (the bot's `check_for_release`, which never raises). The
+    lock makes any number of card loads at once cost one call to GitHub: the
+    staleness is asked again inside it, so whoever waited behind the first
+    caller reads that caller's answer. With the update check switched off
+    (`UPDATE_CHECK_ENABLED=false`) nothing is asked - the operator said not to.
+    """
+    if enabled and release_check_is_stale(read(), now()):
+        async with lock:
+            if release_check_is_stale(read(), now()):
+                await check()
+    entry = read()
+    return dict(entry) if isinstance(entry, dict) else {}

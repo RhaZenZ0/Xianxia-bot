@@ -5291,6 +5291,25 @@ so the fix turned it red - the v1.0.8 lesson once more. It asserts the call hand
 table now, and the rule is held behaviourally by `ACapitalsPartsAreTheCapital`, whose drill (drop the
 resolve) names the Azure Crown Treasure Exchange.
 
+### The card that was right about the morning (v1.7.3)
+
+Reported from the dashboard: v1.7.2 was live and the Server Update card still said v1.7.1 was the
+newest. Nothing was wrong with the release, the tag or the comparison. The card is drawn from the
+bot's `release_channel` health entry, which `check_for_release` writes once after startup and then
+every `UPDATE_CHECK_HOURS` - **24** by default - and v1.4.0 chose that on purpose, so GitHub was
+asked once a day rather than once per page load. The cache was right about its own pace; what it
+could not do is serve the one moment a GM opens that card, which is just after a release.
+
+`read_release_check` in `app/ops/release_channel.py` refreshes the stored answer before showing it
+when it is older than `RELEASE_CARD_MAX_AGE_SECONDS` (15 min), behind a lock so concurrent loads
+cost one call, and asks nothing when `UPDATE_CHECK_ENABLED=false`. A failed check carries its own
+`checked_at` and counts as fresh, so an unreachable GitHub is not hammered; an absent timestamp is
+stale, never "checked at 0". The card prints how old its answer is (`checked_seconds_ago`), because
+a cached "up to date" that does not say its age reads exactly like a live one - the `engine —`
+footer lesson (v1.0.8) in a different card. The Request button was never gated on the answer, and
+`update.sh` asks GitHub itself, so an update requested during the stale window installed v1.7.2
+anyway; only the words were wrong.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —
