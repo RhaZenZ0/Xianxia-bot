@@ -159,7 +159,7 @@ class TheAllowlistIsTheRealSurface(unittest.TestCase):
         # three that always were, and the daily five (v1.3.2), each a hub
         # leaf the panel gate already refuses on the press.
         self.assertEqual(sorted(registered - seclusion.OPEN_COMMANDS - {"admin"}),
-                         sorted(["action", "begin", "tribute", *surface.DAILY_ACTIONS]))
+                         sorted(["action", "begin", "tribute", "stall", *surface.DAILY_ACTIONS]))
 
     def test_the_way_out_is_a_leaf_every_hub_walk_can_reach(self):
         hubs, _ = self._surface()

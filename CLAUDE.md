@@ -5310,6 +5310,21 @@ footer lesson (v1.0.8) in a different card. The Request button was never gated o
 `update.sh` asks GitHub itself, so an update requested during the stale window installed v1.7.2
 anyway; only the words were wrong.
 
+### The command the answer named (v1.7.4)
+
+Asked for the stall commands, the answer was `/stall board`, `/stall buy` and the rest, and the owner
+replied *"not there"*. `stall_group` had backed `/economy → Market Stalls` since v1.5.0 and was never
+added to the command tree, so the name a player types reached nothing - rc.43's `/learn` shape,
+where the reachability gate is satisfied by a hub page and says nothing about the name people use.
+
+The tree tuple could only name bound roots, because `register_command_surface` resolved each name
+through `ACTIONS.root`, which knows no groups. `_tree_command` answers a group from
+`_GROUP_ACTION_ROOTS` - the map the hub pages are built from, so the group Discord registers is the
+very object the page's leaves belong to - and falls back to the root. `/stall` joins the acting
+side of `test_seclusion_lockout`: a secluded player is refused it as the panel refuses its leaves.
+`test_the_stalls_have_a_slash_command.py` holds both halves; putting `ACTIONS.root` back prints
+*"the tree tuple is resolved through ACTIONS.root again, which knows no groups"*.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

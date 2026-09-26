@@ -42,7 +42,20 @@ class CommandCleanupTests(unittest.TestCase):
         self.assertNotIn("tree.get_command(", source)
         self.assertNotIn("tree.remove_command(", source)
         self.assertIn("def register_command_surface", source)
-        self.assertIn("client.tree.add_command(ACTIONS.root(name), guild=GUILD)", source)
+        # v1.7.4: the tree resolves a name through `_tree_command`, which knows
+        # groups, so a group may be a slash root - but only one named here, on
+        # purpose. `/stall` is the owner's call; any other group in the tuple
+        # is an internal action group leaking out.
+        self.assertIn("client.tree.add_command(_tree_command(name), guild=GUILD)", source)
+        import importlib
+        import os
+        from unittest.mock import patch
+        with patch.dict(os.environ, {"DISCORD_TOKEN": "t", "GUILD_ID": "123456789012345678",
+                                     "ENGINE_AUTH_TOKEN": "test-engine-token-1234567890",
+                                     "DATABASE_PATH": "data/test.sqlite3"}):
+            surface = importlib.import_module("app.bot.surface")
+        public_groups = {name for name in surface.TREE_COMMANDS if name in surface._GROUP_ACTION_ROOTS}
+        self.assertEqual(public_groups, {"stall"})
         self.assertNotIn("bot.tree.add_command(admin_group, guild=GUILD)", source)
         self.assertIn('name="admin",', source)
         self.assertIn("async def admin_panel", source)
