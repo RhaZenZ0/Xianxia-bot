@@ -59,3 +59,25 @@ func TestTheEvolutionRequirementNeverNamesANumberAboveTheCap(t *testing.T) {
 		t.Fatalf("the refusal must ask for the cap and nothing above it: %v", err)
 	}
 }
+
+func TestABeastCannotOutgrowTheWorldItStandsIn(t *testing.T) {
+	for world, limit := range beastRankLimits {
+		if limit != map[string]int64{"Mortal World": 20, "Spiritual World": 40, "Immortal World": 60, "Celestial World": 80}[world] {
+			t.Fatalf("%s limit is %d", world, limit)
+		}
+	}
+	path := setupBatch4AuthorityDB(t)
+	setupStage4CompanionTables(t, path)
+	world := batch4WorldPath(t)
+	batch4Exec(t, path, `INSERT INTO spirit_beasts(
+		user_id,name,species,rank,element,intelligence,temperament,bloodline,evolution_stage,
+		loyalty,contract_type,active,techniques_json,created_at,updated_at
+	) VALUES(42,'Cloudpaw','Wind Lynx',20,'Wind',10,'bonded','Common',5,100,'equality',1,'[]',0,0)`)
+	_, err := evolveBeast(t, path, world, 0)
+	if err == nil || !strings.Contains(err.Error(), "rank 20") {
+		t.Fatalf("a rank-20 beast in the Mortal World evolved: %v", err)
+	}
+	if beastRankLimit("Spiritual World") != 40 || beastRankLimit("nowhere") != 20 {
+		t.Fatal("the limit is not read per world")
+	}
+}

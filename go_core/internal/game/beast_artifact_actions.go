@@ -451,6 +451,9 @@ func beastEvolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	// stage 5 and asked for a number no action could produce, and nothing caps
 	// the stage, so a beast there was told to do the impossible for ever.
 	need := minI64(beastLoyaltyCap, int64(60)+i64(row["evolution_stage"])*10)
+	if limit := beastRankLimit(EraWorldOf(catalog, character.Location)); i64(row["rank"]) >= limit {
+		return authoritativeMutation{}, fmt.Errorf("a beast in the %s can grow no stronger than rank %d; it is rank %d - take it to a higher world to evolve it further", EraWorldOf(catalog, character.Location), limit, i64(row["rank"]))
+	}
 	if i64(row["loyalty"]) < need {
 		return authoritativeMutation{}, fmt.Errorf("loyalty %d is below evolution requirement %d", i64(row["loyalty"]), need)
 	}
@@ -677,4 +680,23 @@ func artifactAwakenAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 			EntityID: p.ItemID, GameMinute: gameMinute, Payload: result,
 		},
 	}, nil
+}
+
+// beastRankLimit is how strong a beast may evolve in a world (v1.7.3, on the
+// owner's call): 20 in the Mortal World and 20 more a world up. Evolving adds
+// one rank and nothing else bounded it. A beast already above the limit keeps
+// its rank; it simply cannot evolve again until it stands in a higher world.
+// A world this table does not name is held to the Mortal limit.
+var beastRankLimits = map[string]int64{
+	"Mortal World":    20,
+	"Spiritual World": 40,
+	"Immortal World":  60,
+	"Celestial World": 80,
+}
+
+func beastRankLimit(world string) int64 {
+	if limit, ok := beastRankLimits[world]; ok {
+		return limit
+	}
+	return beastRankLimits[DefaultEraWorld]
 }
