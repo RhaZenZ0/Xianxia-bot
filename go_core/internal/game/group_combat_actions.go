@@ -562,12 +562,19 @@ func bossStartActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if party == nil {
 		return authoritativeMutation{}, errors.New("active party required")
 	}
+	// Only the leader starts a raid (v1.7.6). The command has said so since it
+	// was written and nothing held it, so any member could pull the whole
+	// party into a fight - and the secret floor's inheritance was checked on
+	// whoever pressed Start rather than on the leader its comment names.
+	if i64(party["leader_user_id"]) != userID {
+		return authoritativeMutation{}, errors.New("only the party leader can start a boss raid")
+	}
 	pid := i64(party["party_id"])
 	r, _ := conn.Execute(`SELECT 1 FROM boss_encounters WHERE party_id=? AND status='active'`, []any{pid})
 	if firstRowMap(r) != nil {
 		return authoritativeMutation{}, errors.New("party already has an active boss encounter")
 	}
-	r, e = conn.Execute(`SELECT pm.user_id,c.life_status,c.location,c.vitality_max FROM party_members pm JOIN characters c ON c.user_id=pm.user_id WHERE pm.party_id=?`, []any{pid})
+	r, e = conn.Execute(`SELECT pm.user_id,c.name,c.life_status,c.location,c.vitality_max,c.realm_index FROM party_members pm JOIN characters c ON c.user_id=pm.user_id WHERE pm.party_id=? ORDER BY pm.user_id`, []any{pid})
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
@@ -580,6 +587,18 @@ func bossStartActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		if fmt.Sprint(m["life_status"]) != "alive" || fmt.Sprint(m["location"]) != lair {
 			return authoritativeMutation{}, fmt.Errorf("all party members must be alive at %s", lair)
 		}
+	}
+	// A boss has a realm (v1.7.6): every member must stand at or above it.
+	// The template has carried RealmIndex since it was written and nothing
+	// read it, so a Body Tempering party could pull a Core Formation serpent.
+	var short []string
+	for _, m := range members {
+		if i64(m["realm_index"]) < t.RealmIndex {
+			short = append(short, fmt.Sprint(m["name"]))
+		}
+	}
+	if len(short) > 0 {
+		return authoritativeMutation{}, fmt.Errorf("the %s asks every member to stand at %s or above; below it: %s", t.Name, realmNameGo(catalog, t.RealmIndex), strings.Join(short, ", "))
 	}
 	if realmID != "" {
 		realm := catalog.SecretRealms[realmID]
@@ -613,6 +632,13 @@ func bossActActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 		return authoritativeMutation{}, e
 	}
 	p.Style = strings.ToLower(strings.TrimSpace(p.Style))
+	// The Discord button has always been labelled Defend and sent "defend",
+	// which this switch never knew, so every Defend was refused (v1.7.6). The
+	// bot sends "guard" now; an older bot mid-upgrade still sends "defend",
+	// so both name the one guard.
+	if p.Style == "defend" {
+		p.Style = "guard"
+	}
 	if p.Style != "attack" && p.Style != "technique" && p.Style != "guard" && p.Style != "support" {
 		return authoritativeMutation{}, errors.New("style must be attack, technique, guard, or support")
 	}

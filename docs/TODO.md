@@ -16,6 +16,16 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.7.6)** — *Who may start a raid.* The leader alone, on the owner's call, with every
+  member at the boss's own `RealmIndex`, which every template carried and nothing read. A party of
+  one is still a party, so a solo player raids by creating one.
+- **deferred (next release)** — *Two raid lairs no road reaches.* Moonfen Marsh (the Drowned Serpent)
+  and Cloudspine Foothills (the Nine-Echo Sword Wraith, and the Sword Grave's entrance) carry no
+  road and nothing discovers them, so only a GM teleport reaches either. The owner chose to make
+  them reachable; that is the release after v1.7.6.
+- **fixed (v1.7.6)** — *`/boss act` Defend always failed.* Discord sent `defend` and the engine
+  accepts `guard`. The button sends `guard`, and the engine reads `defend` as a guard for an older
+  bot mid-upgrade.
 - **deferred (design)** — *The spirit stat on gear reaches no rule.* Every piece in
   `EQUIPMENT_DEFINITIONS` carries `spirit`, the engine sums it in `combatEquipment` and
   `equipmentPowerRows`, and nothing reads the sum. Since v1.7.5 no surface shows it, on the owner's

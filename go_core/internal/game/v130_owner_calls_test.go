@@ -166,8 +166,9 @@ func TestTheNineEchoFloorOpensBeneathTheRealmOnceWalked(t *testing.T) {
 	if _, err := startWraith(t, path); err == nil || !strings.Contains(err.Error(), lair) {
 		t.Fatalf("err=%v; the refusal must name %q", err, lair)
 	}
-	// At the entrance without having walked the realm: the floor is shut.
-	batch4Exec(t, path, `UPDATE characters SET location=? WHERE user_id=42`, lair)
+	// At the entrance without having walked the realm: the floor is shut. The
+	// wraith asks for realm 7 (v1.7.6), so the leader stands there.
+	batch4Exec(t, path, `UPDATE characters SET location=?, realm_index=7 WHERE user_id=42`, lair)
 	if _, err := startWraith(t, path); err == nil || !strings.Contains(err.Error(), "walked the realm to its end") {
 		t.Fatalf("a party that never cleared the Sword Grave started the raid: err=%v", err)
 	}
@@ -231,5 +232,84 @@ func TestNoEventRollsAnAttributeNobodyHas(t *testing.T) {
 	}
 	if _, err := canonicalAttribute(conn, catalog, 42, 0, "heart"); err == nil || !strings.Contains(err.Error(), "unknown attribute") {
 		t.Fatalf("heart is still an attribute the engine accepts: err=%v", err)
+	}
+}
+
+func startBoar(t *testing.T, path string, caller int64) (map[string]any, error) {
+	t.Helper()
+	catalog := crossingCatalog(t)
+	raw, _ := json.Marshal(map[string]any{"template_key": "iron_tusk_boar_king"})
+	var out map[string]any
+	err := crossingApply(t, path, func(conn *storage.Conn) error {
+		m, err := bossStartActionGo(conn, catalog, caller, raw)
+		out, _ = m.Result.(map[string]any)
+		return err
+	})
+	return out, err
+}
+
+// A party of two at the Boar King's lair, the leader at the boar's realm.
+func setupBoarPartyDB(t *testing.T) string {
+	t.Helper()
+	path := setupNineEchoDB(t)
+	batch4Exec(t, path, `INSERT INTO party_members(party_id,user_id,role,joined_at) VALUES(1,43,'member',0)`)
+	batch4Exec(t, path, `UPDATE characters SET location='Greenriver Town', realm_index=2`)
+	return path
+}
+
+// Only the leader starts a raid (v1.7.6). The command said so and nothing held
+// it, so any member could pull the whole party into a fight.
+func TestOnlyTheLeaderStartsARaid(t *testing.T) {
+	path := setupBoarPartyDB(t)
+	if _, err := startBoar(t, path, 43); err == nil || !strings.Contains(err.Error(), "only the party leader") {
+		t.Fatalf("a member who is not the leader started the raid: err=%v", err)
+	}
+	if n := storage.ParseInt(actionScalar(t, path, `SELECT COUNT(*) FROM boss_encounters`)); n != 0 {
+		t.Fatalf("a refused start wrote %d encounter(s)", n)
+	}
+	if _, err := startBoar(t, path, 42); err != nil {
+		t.Fatalf("the leader could not start the raid: %v", err)
+	}
+}
+
+// A boss has a realm (v1.7.6): RealmIndex was carried by every template and
+// read by nothing. Every member must stand at or above it, and the refusal
+// names who does not.
+func TestEveryMemberMustStandAtTheBosssRealm(t *testing.T) {
+	path := setupBoarPartyDB(t)
+	batch4Exec(t, path, `UPDATE characters SET realm_index=1 WHERE user_id=43`)
+	_, err := startBoar(t, path, 42)
+	if err == nil || !strings.Contains(err.Error(), "Target Test") || strings.Contains(err.Error(), "Lin Test") {
+		t.Fatalf("a party with a member below the boar's realm was not refused by name: err=%v", err)
+	}
+	if n := storage.ParseInt(actionScalar(t, path, `SELECT COUNT(*) FROM boss_encounters`)); n != 0 {
+		t.Fatalf("a refused start wrote %d encounter(s)", n)
+	}
+	// Exactly at the boss's realm is enough.
+	batch4Exec(t, path, `UPDATE characters SET realm_index=2 WHERE user_id=43`)
+	if _, err := startBoar(t, path, 42); err != nil {
+		t.Fatalf("a party standing at the boar's realm was refused: %v", err)
+	}
+}
+
+// Defend is a guard (v1.7.6). The Discord button was labelled Defend and sent
+// "defend", which the engine never accepted, so every Defend was refused. An
+// older bot mid-upgrade still sends it, so the engine reads it as a guard.
+func TestDefendIsAGuard(t *testing.T) {
+	path := setupBoarPartyDB(t)
+	out, err := startBoar(t, path, 42)
+	if err != nil {
+		t.Fatalf("the raid did not start: %v", err)
+	}
+	raw, _ := json.Marshal(map[string]any{"encounter_id": out["encounter_id"], "style": "defend"})
+	err = crossingApply(t, path, func(conn *storage.Conn) error {
+		_, err := bossActActionGo(conn, crossingCatalog(t), 42, raw)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("Defend was refused: %v", err)
+	}
+	if g := storage.ParseInt(actionScalar(t, path, `SELECT guard FROM boss_participants WHERE user_id=42`)); g != 1 {
+		t.Fatalf("Defend did not guard: guard=%d", g)
 	}
 }

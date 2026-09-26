@@ -5310,6 +5310,26 @@ footer lesson (v1.0.8) in a different card. The Request button was never gated o
 `update.sh` asks GitHub itself, so an update requested during the stale window installed v1.7.2
 anyway; only the words were wrong.
 
+### Who starts a raid (v1.7.6)
+
+`boss.start` checked a party, a lair and the secret floor's inheritance, and two things more were
+written down and held by nothing: the command's description said "Party leader starts" while any
+member could, and every `bossTemplateGo` carried a `RealmIndex` no line read (the `RootGrade`
+shape, rc.55, on a boss). On the owner's call the leader alone starts, and every member must stand
+at the boss's realm; the refusal names who does not. The leader check also puts the Nine-Echo
+floor's inheritance on the person its comment always named. A party of one is still a party - the
+HP scale `0.8 + 0.2n` already priced it - so a solo player raids by creating one, and the boss list
+says so. `TestTheNineEchoFloorOpensBeneathTheRealmOnceWalked` stood its leader at realm 0 and had to
+be raised to 7, which is the rule arriving in the one test that had never been asked it.
+
+**And Defend had never worked.** `/boss act`'s choices offered Defend with the value `"defend"`, and
+`bossActActionGo` accepts `attack`, `technique`, `guard` and `support`, so every press was refused
+with the engine's own list - two halves each right about themselves and never asked about each
+other, the v1.0.3 craft-roll seam again. The button sends `guard`; the engine also reads `defend`
+as a guard, because an older bot mid-upgrade still sends it (rc.48's rolling-deploy rule).
+`test_boss_defend_is_a_guard.py` reads the choices by AST and the engine's switch out of the Go, and
+holds every offered style to being one the switch names.
+
 ### What a weapon gives, said where it is sold (v1.7.5)
 
 Asked for as "a description to each weapon or beast, or armour, how much and what chance they give".

@@ -55,7 +55,14 @@ async def boss_list(interaction: discord.Interaction) -> None:
             # A secret floor (v1.3.0): fought at the realm's entrance by a
             # party whose leader has walked the realm to its last room.
             where = f"{lair} — the floor beneath the {boss['location']}, open once you have walked that realm to its end"
-        lines.append(f"\n`{key}` — **{boss['name']}** • {where} • {len(boss['phases'])} phases • base HP {boss['max_hp']}")
+        lines.append(
+            f"\n`{key}` — **{boss['name']}** • {where} • every member at **{WORLD.realm_name(int(boss['realm_index']))}** or above"
+            f" • {len(boss['phases'])} phases • base HP {boss['max_hp']}"
+        )
+    lines.append(
+        "\n-# The party leader starts a raid with the whole party standing at the lair. "
+        "A party of one is a party: **/combat → Party → Create** and start it alone."
+    )
     await reply_long(interaction, "\n".join(lines), ephemeral=False)
 
 
@@ -98,7 +105,8 @@ async def boss_template_autocomplete(interaction: discord.Interaction, current: 
         if needle and needle not in name.casefold() and needle not in key.casefold() and needle not in location.casefold():
             continue
         marker = "here" if location == here else location
-        choices.append((0 if location == here else 1, name, app_commands.Choice(name=f"{name} — {marker}, {len(boss.get('phases', []))} phases"[:100], value=key[:100])))
+        realm = WORLD.realm_name(int(boss.get("realm_index") or 0))
+        choices.append((0 if location == here else 1, name, app_commands.Choice(name=f"{name} — {marker}, {realm}+"[:100], value=key[:100])))
     return [choice for _, _, choice in sorted(choices, key=lambda row: row[:2])][:25]
 
 
@@ -128,7 +136,7 @@ async def boss_status(interaction: discord.Interaction) -> None:
 
 
 @registered_group_command(boss_group, name="act", description="Take your once-per-round raid action; boss retaliates after the full party acts")
-@app_commands.choices(style=[app_commands.Choice(name="Attack", value="attack"), app_commands.Choice(name="Technique", value="technique"), app_commands.Choice(name="Defend", value="defend"), app_commands.Choice(name="Support", value="support")])
+@app_commands.choices(style=[app_commands.Choice(name="Attack", value="attack"), app_commands.Choice(name="Technique", value="technique"), app_commands.Choice(name="Defend", value="guard"), app_commands.Choice(name="Support", value="support")])
 @app_commands.autocomplete(technique=law_technique_autocomplete)
 @serialized_user_action
 async def boss_act(interaction: discord.Interaction, style: app_commands.Choice[str], technique: str = "") -> None:
