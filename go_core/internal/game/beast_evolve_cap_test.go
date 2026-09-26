@@ -38,7 +38,7 @@ func TestABeastAtTheLoyaltyCapCanAlwaysEvolve(t *testing.T) {
 	if storage.ParseInt(beast["evolution_stage"]) != 6 {
 		t.Fatalf("evolution_stage=%v want 6", beast["evolution_stage"])
 	}
-	// v1.7.3: an evolution spends the bond, so the next one is a long climb.
+	// v1.7.7: an evolution spends the bond, so the next one is a long climb.
 	if got := storage.ParseInt(beast["loyalty"]); got != beastEvolvedLoyalty {
 		t.Fatalf("loyalty after evolving is %d, want %d - one Train and a core must not buy the next stage back", got, beastEvolvedLoyalty)
 	}

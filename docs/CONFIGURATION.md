@@ -289,7 +289,9 @@ journey between neighbouring towns put a cultivator in transit for a real half
 hour and refused every other action until arrival; anything in between scales
 that wait. The road's length is still reported as `travel_minutes` whatever the
 setting, because the toll is priced on it. Read by the **Go engine**, and
-compose passes it in. `REINCARNATION_BASE_SAMSARA_YEARS` and
+compose passes it in. Since v1.7.9 it is the baseline rather than the last word:
+the GM dashboard's Admin Console → Travel Time card stores a pace in the engine
+(audited), and a stored pace wins until it is changed there. `REINCARNATION_BASE_SAMSARA_YEARS` and
 `REINCARNATION_MAX_WAIT_SECONDS` shape how long a dead character waits in
 samsara before rebirth.
 
@@ -505,7 +507,10 @@ container, the token read from the container's own environment - no port is open
 closes the world with the Maintenance lever, runs `./update.sh --upgrade` with all its backups and
 its rollback, reopens the world whatever happened, and reports the outcome under the request's own
 nonce. The card shows the request's progress, the last outcome, and whether the watcher has been
-heard from; the button is offered only while it has.
+heard from; the button is offered only while it has. The newest release it names is the bot's
+own release check, asked again whenever the card finds that answer more than fifteen minutes old
+(v1.7.3) and otherwise every `UPDATE_CHECK_HOURS`; the line says how long ago it was checked. With
+`UPDATE_CHECK_ENABLED=false` the card never asks GitHub and shows the newest as unknown.
 
 Start it once, on the NAS, either way:
 

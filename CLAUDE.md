@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 67; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 68; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -5290,6 +5290,142 @@ walks all forty-eight.
 so the fix turned it red - the v1.0.8 lesson once more. It asserts the call hands over the location
 table now, and the rule is held behaviourally by `ACapitalsPartsAreTheCapital`, whose drill (drop the
 resolve) names the Azure Crown Treasure Exchange.
+
+### The card that was right about the morning (v1.7.3)
+
+Reported from the dashboard: v1.7.2 was live and the Server Update card still said v1.7.1 was the
+newest. Nothing was wrong with the release, the tag or the comparison. The card is drawn from the
+bot's `release_channel` health entry, which `check_for_release` writes once after startup and then
+every `UPDATE_CHECK_HOURS` - **24** by default - and v1.4.0 chose that on purpose, so GitHub was
+asked once a day rather than once per page load. The cache was right about its own pace; what it
+could not do is serve the one moment a GM opens that card, which is just after a release.
+
+`read_release_check` in `app/ops/release_channel.py` refreshes the stored answer before showing it
+when it is older than `RELEASE_CARD_MAX_AGE_SECONDS` (15 min), behind a lock so concurrent loads
+cost one call, and asks nothing when `UPDATE_CHECK_ENABLED=false`. A failed check carries its own
+`checked_at` and counts as fresh, so an unreachable GitHub is not hammered; an absent timestamp is
+stale, never "checked at 0". The card prints how old its answer is (`checked_seconds_ago`), because
+a cached "up to date" that does not say its age reads exactly like a live one - the `engine —`
+footer lesson (v1.0.8) in a different card. The Request button was never gated on the answer, and
+`update.sh` asks GitHub itself, so an update requested during the stale window installed v1.7.2
+anyway; only the words were wrong.
+
+### A raid for one (schema 68, v1.7.8)
+
+Asked for as "and solo raid" after v1.7.6 said a party of one was already a party. It was, but a
+solo player had to make one by hand and was then left in it: `party.create` and `party.join` refuse
+anybody in an active party, so after the raid they were shut out of every other party until they
+remembered `/party leave`. On the owner's call `bossStartActionGo` makes the party itself when the
+caller has none, and a party of one fights the boss at `bossSoloHPScale` (0.7) of its health, where
+`0.8 + 0.2n` had put it at the whole base.
+
+**The mark is a column, not a name.** `parties.raid_only` (schema 68, default 0) is what tells a
+party made for a raid from one a person made; the party's name says whose raid it is and is read by
+nothing, because a name is not a reader. `closeFinishedRaidOnlyPartiesTx` is the one close, and it
+closes every raid-only party with no active encounter, so it needs no encounter id and is called
+where a raid ends: a victory or defeat in `boss.act`, and `admin.player.clear_battle`. It never
+fails the action it follows. A refused start rolls the new party back with the rest of the action,
+so a player below the boss's realm is not left in a party they never asked for.
+
+**It degrades the v1.1.0 way.** In the compose stack the engine is healthy before db-init migrates,
+so `partiesHaveRaidOnly` guards the column: in that window a lone cultivator is refused "active
+party required", exactly as before, rather than the action failing. The boss list says a boss
+fought alone is weaker without restating the number - the start reply prints the boss's real HP,
+which is the engine's own answer.
+
+### A place in the wilds of a city (v1.7.7)
+
+Asked "how can players start a raid", and the answer was that two of the three could not be: Moonfen
+Marsh and Cloudspine Foothills carried no `roads`, no city's roads named them, and no writer of
+`character_location_discoveries` ever did - so the Drowned Serpent, the Nine-Echo Sword Wraith, and
+the Verdant Immortal Grotto and Sword Grave whose entrances they are, were reached by a GM teleport
+and nothing else. Of the fifteen road-less places in the catalogue these were the only two nothing
+discovered: twelve are sect gates `revealSectRouteTx` names and three are rebirth places travel
+never needs.
+
+**A road was the wrong fix, and the content gates are why.** Every one of the 53 roads already
+carries its one road site and the gate holds it to one; a new road would move `stallDistanceHops`,
+`WhereAnNPCCanWalk` and the lexicographic site pickers several tests lean on. `wilds_of` names the
+city a road-less place lies beside - Moonfen City and Cloudblade City, on the owner's call, over the
+NPC schedules that treat both as Greenriver's outskirts - and `wildsCandidates` offers it to an
+explore by somebody who knows that city. Travel is the road-less jump sect gates already take. It
+is deliberately not `outside_location`, which `cityOf` and the stalls read as *part of* the city.
+
+`discoveryCandidates` is the explore's whole candidate list now, pulled out so a test can ask it
+directly; `TestEveryLairAndRealmEntranceCanBeReached` holds every boss lair and realm entrance to
+being on a road, beside one, a sect's gate, or in the wilds of a city the roads reach, and its
+drill - `wilds_of` deleted from the content - names both places.
+
+**Main brought the beast rules in the same release.** Another session merged per-world rank limits,
+core costs and a milestone term into `combatCompanionBonus` (`+ beastMilestoneBonus(rank)`, +2 a
+tenth rank) with no release stamp of its own, labelled "v1.7.3" - a number this branch had already
+spent on the update card. They ship in v1.7.7 and their comments say so. v1.7.5's display twin
+`companion_bonus` pinned the old expression and went stale on the merge, exactly as its gate is
+there to say; it carries `beast_milestone_bonus` now.
+
+### Who starts a raid (v1.7.6)
+
+`boss.start` checked a party, a lair and the secret floor's inheritance, and two things more were
+written down and held by nothing: the command's description said "Party leader starts" while any
+member could, and every `bossTemplateGo` carried a `RealmIndex` no line read (the `RootGrade`
+shape, rc.55, on a boss). On the owner's call the leader alone starts, and every member must stand
+at the boss's realm; the refusal names who does not. The leader check also puts the Nine-Echo
+floor's inheritance on the person its comment always named. A party of one is still a party - the
+HP scale `0.8 + 0.2n` already priced it - so a solo player raids by creating one, and the boss list
+says so. `TestTheNineEchoFloorOpensBeneathTheRealmOnceWalked` stood its leader at realm 0 and had to
+be raised to 7, which is the rule arriving in the one test that had never been asked it.
+
+**And Defend had never worked.** `/boss act`'s choices offered Defend with the value `"defend"`, and
+`bossActActionGo` accepts `attack`, `technique`, `guard` and `support`, so every press was refused
+with the engine's own list - two halves each right about themselves and never asked about each
+other, the v1.0.3 craft-roll seam again. The button sends `guard`; the engine also reads `defend`
+as a guard, because an older bot mid-upgrade still sends it (rc.48's rolling-deploy rule).
+`test_boss_defend_is_a_guard.py` reads the choices by AST and the engine's switch out of the Go, and
+holds every offered style to being one the switch names.
+
+### What a weapon gives, said where it is sold (v1.7.5)
+
+Asked for as "a description to each weapon or beast, or armour, how much and what chance they give".
+The numbers were all in the tree and none was printed where a player decides: the equipment card
+listed raw ATK/DEF/Spirit/Agility, and a shop, a merchant's pack, the market and a stall printed a
+name and a price. `describe_equipment` in `app/rules/advanced_runtime.py` is the one line, drawn at
+the item's grade on every one of those surfaces; `equipment_totals_line` says what the equipped sum
+does; `companion_bonus` is the beast's. Each is a display twin of an engine expression, and
+`test_gear_says_what_it_gives.py` reads those expressions out of the Go source.
+
+**Only one number on gear is a chance**, and the line says so: each point of agility is one point of
+boss-raid hit chance (`65 + agi*2 + equip["agility"] - ...`, clamped 15-95). Attack and defence ride
+a 2d10 roll against a TN, so they are shown as `+N` rather than as odds nobody computed.
+**Spirit is shown nowhere**: the engine sums it and no rule reads the sum, so advertising it would
+be a promise the tree does not keep. That decision is in `docs/TODO.md`.
+
+**The graded lookup is the finding.** `equipment_status` looked a carried id up with a bare
+`EQUIPMENT_DEFINITIONS.get`, and `spirit_iron_sword@high` is not a key there, so every graded weapon
+and armour read "No stat modifiers" while the engine was already counting its grade (its lookups go
+through `itemBaseID`). v1.7.0's `itemDef` door fixed that class for `catalog.Items` in Go and
+`World.item_definition` for `WORLD.items`; the equipment table was the third catalogue and had no
+door. `equipment_definition` is its door now, and the gate forbids a bare `.get` in any command.
+
+`beast_active` reads the bonus off the engine's own reply rather than the local table, because
+`test_authority_boundary` forbids that mutation handler a read of `spirit_beasts` - and the engine
+already returns the row. Two older gates pinned the spellings this replaced (`EQUIPMENT_DEFINITIONS.get(`
+in the bind picker, `definition.get("indestructible")` in the card); each holds the rule now, the
+second by describing the Bugslayer Sword.
+
+### The command the answer named (v1.7.4)
+
+Asked for the stall commands, the answer was `/stall board`, `/stall buy` and the rest, and the owner
+replied *"not there"*. `stall_group` had backed `/economy → Market Stalls` since v1.5.0 and was never
+added to the command tree, so the name a player types reached nothing - rc.43's `/learn` shape,
+where the reachability gate is satisfied by a hub page and says nothing about the name people use.
+
+The tree tuple could only name bound roots, because `register_command_surface` resolved each name
+through `ACTIONS.root`, which knows no groups. `_tree_command` answers a group from
+`_GROUP_ACTION_ROOTS` - the map the hub pages are built from, so the group Discord registers is the
+very object the page's leaves belong to - and falls back to the root. `/stall` joins the acting
+side of `test_seclusion_lockout`: a secluded player is refused it as the panel refuses its leaves.
+`test_the_stalls_have_a_slash_command.py` holds both halves; putting `ACTIONS.root` back prints
+*"the tree tuple is resolved through ACTIONS.root again, which knows no groups"*.
 
 ## Testing conventions
 

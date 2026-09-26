@@ -515,7 +515,15 @@ async def run(url: str, token: str, db_path: str) -> Report:
     await step(report, "grant the player road stones", gm("admin.player.grant_currency", {"user_id": PLAYER, "currency_id": "low_spirit_stone", "amount": 300, "reason": "playtest"}))
     await step(report, "teleport the player to Riverguard City", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Riverguard City", "reason": "playtest"}))
     capital = "Azure Crown Imperial City"
+    # v1.7.9: the GM sets the road's pace from the dashboard; the stored
+    # choice beats the .env baseline and this one journey waits half the road.
+    await step(report, "a pace above 100 is refused", gm("admin.world.set_travel_pace", {"percent": 101, "reason": "playtest"}), expect_error="between 0 and 100")
+    await audited("admin.world.set_travel_pace", {"percent": 50, "reason": "playtest"})
     journey = await step(report, "exploration.travel by road to the capital", act("exploration.travel", PLAYER, {"destination": capital, "mode": "known"}))
+    if journey is not None:
+        road, waited = present(journey.get("travel_minutes")), present(journey.get("wait_minutes"))
+        report.add("PASS" if road > 0 and waited == road * 50 // 100 else "FAIL",
+                   "the road waits the share the GM set", f"travel_minutes={road} wait_minutes={waited}")
     if journey is not None:
         gate = str(journey.get("arrived_at") or "")
         report.add("PASS" if journey.get("road_connection") and gate.endswith("Gate") and journey.get("arrival_gate") else "FAIL",
@@ -524,6 +532,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     status = await step(report, "exploration.travel_status after arrival", engine.action("exploration.travel_status", PLAYER, {}))
     if status is not None and status.get("traveling"):
         report.add("FAIL", "exploration.travel_status after arrival", f"still traveling: {status}")
+    await step(report, "the pace back to arriving at once", gm("admin.world.set_travel_pace", {"percent": 0, "reason": "playtest"}))
     parts = [part for part in list((journey or {}).get("city_parts") or []) if not part.endswith("Gate")]
     district = parts[0] if parts else capital
     await step(report, f"walk to {district}", act("exploration.travel", PLAYER, {"destination": district, "mode": "known"}))

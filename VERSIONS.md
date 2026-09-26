@@ -6,6 +6,71 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.7.9** lets the GM set how long a road journey takes from the dashboard: the Admin Console's Travel Time card sets the share of a road's length a traveller waits, from 0 (arrive at once) to 100 (the full road).
+
+It is an audited engine lever, and the stored choice wins over `TRAVEL_TIME_PERCENT` in `.env`, which is only the starting value now; journeys already under way keep their arrival time. The Player Editor also moves out of the Admin head into a Player Admin head of its own, apart from the levers that act on the whole world or server.
+
+**1.7.8** lets a cultivator raid a boss alone: `/boss start` with no party forms a party of one for the raid, closes it when the raid ends, and a boss fought alone has 70% of its health.
+
+Until now a solo player had to create a party by hand first, and was then left sitting in it after
+the raid, refused every other party until they ran `/party leave`. The party `/boss start` makes is
+closed when the boss is beaten, when the raid is lost, or when a GM clears it; a party somebody made
+themselves is left alone. A refused start - below the boss's realm, or away from its lair - leaves
+no party behind. The start reply says when a party of one was formed. Schema 68 adds the mark that
+tells the two kinds of party apart.
+
+**1.7.7** puts the Moonfen Drowned Serpent and the Nine-Echo Sword Wraith within reach: exploring from Moonfen City can turn up Moonfen Marsh, and exploring from Cloudblade City can turn up Cloudspine Foothills, and **/travel** then goes straight to either.
+
+No road ran to those two places and nothing ever marked them found, so only a GM could put a player
+there - which also shut the Verdant Immortal Grotto and the Sword Grave of Nine Echoes, whose
+entrances they are. A place in the wilds of a city is found by exploring from that city, and the
+discovery says which boss keeps its lair there and the realm its raid asks for.
+
+It also brings the spirit-beast rules settled in another session. A beast may evolve up to rank 25
+in the Mortal World, 50 in the Spiritual, 75 in the Immortal and 100 in the Celestial; each level
+costs beast cores - one a level below rank 10, then eight a level for every tenth reached (8 from
+10, 16 from 20); every tenth rank adds +2 to the owner's rolls beside it; and an evolution drops the
+beast's loyalty to 15 rather than costing twenty. A beast made before these rules is brought under
+them once, the next time its owner acts (schema 67). The battle panel's technique picker also offers
+every manual technique the player has mastered, beside the Law techniques.
+
+**1.7.6** makes a boss raid the party leader's to start, and only once every member stands at the boss's realm: Foundation Establishment for the Iron-Tusk Boar King, Nascent Soul for the Moonfen Drowned Serpent and Ascension Realm for the Nine-Echo Sword Wraith.
+
+The start command has always said the leader starts a raid, and any member could; each boss has
+always carried a realm, and nothing checked it. A refusal names whoever is below the realm. The
+boss list and the Start picker say what each boss asks, and the list says a party of one is a party,
+so a solo cultivator creates a party alone and starts the raid. And `/boss act` → Defend works: it
+sent a style the engine had never accepted, so every Defend was refused.
+
+**1.7.5** shows what every weapon, armour and beast actually gives in a fight: the equipment card, the equip and bind pickers, the inventory, every shop shelf, merchant pack, market row and market stall name each piece's attack, defence and agility at its grade, and a beast's card names the bonus it adds.
+
+Each point of agility is one point of boss-raid hit chance, and the line says so; attack and
+defence are modifiers on a roll and are shown as numbers rather than invented odds. The equipment
+card also sums the equipped gear into what it does - the attack roll, the damage on a hit, what an
+opponent needs to hit back, the flee roll and the raid hit chance. A spirit beast's card gives the
+bonus it adds to the attack, flee and defence rolls of a one-on-one battle while it is the active
+companion (half its rank, plus its evolution stage, plus a point for every 40 loyalty), and the
+taming list says what the taming roll adds against its target. A High, Superior or Transcendent
+weapon or armour used to read "No stat modifiers" on the equipment card, because the card looked it
+up by its graded name; it shows its stats at its grade now. The spirit stat on gear is left out
+everywhere: no rule reads it.
+
+**1.7.4** makes the market stalls a slash command of their own: `/stall board`, `/stall buy`, `/stall status`, `/stall open`, `/stall list`, `/stall withdraw` and `/stall close` work as typed, beside the `/economy → Market Stalls` page.
+
+The stall commands had backed that page since v1.5.0 and were never registered with Discord under
+their own name, so a player told to use `/stall buy` found nothing to type. The same rules apply
+either way: tending a stall needs Foundation Establishment and a city street, and buying works from
+anywhere.
+
+**1.7.3** makes the GM dashboard's Server Update card name a new release within fifteen minutes of its publication, instead of up to a day later.
+
+The card showed whatever the bot's release check had last found, and that check runs once a day:
+v1.7.2 was published in the afternoon and the card went on naming v1.7.1, the answer stored when
+the bot started that morning. The card now asks again whenever that answer is more than fifteen
+minutes old - at most four calls to GitHub an hour however often it is reloaded - and says how
+long ago it was checked. Requesting an update was never affected: the watcher's `update.sh`
+always asks GitHub itself, so it installed the newest release whatever the card said.
+
 **1.7.2** puts the sect envoys on the city page from the first hour, and opens the capital's common room to everybody in the capital: at its gates, in its inn and in its shops, not only on the street called by the capital's name.
 
 The Envoys hall was held back until Foundation Establishment while "The Road to a Sect", which
@@ -208,6 +273,8 @@ to reorder anything.
 - **Schema 66** adds `stall_channels` (one read-only market-stalls channel per world, the
   `world_event_channels` shape) and `stall_card_messages` (the live card per open stall) - Discord ids
   only; the stall is the `player_stalls` row the engine owns.
+- **Schema 68** adds `parties.raid_only`: 1 marks a party `/boss start` made for a player with none,
+  which the engine closes when that raid ends; every existing party keeps 0.
 - **Schema 67** adds `spirit_beasts.grandfathered`: 0 marks a beast made before the per-world rank
   limit and the rank-10 core cost, which the engine settles once when its owner next acts.
 - **Schema 65** adds `player_stalls`, `stall_listings` and `stall_sales` - a cultivator's stall in a city's
@@ -1128,9 +1195,9 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.7.2
+## Release status — v1.7.9
 
-- Current release: v1.7.2 - the sect envoys are on the city page from the first hour and drawn only in a capital's temple quarter, the Realm Capitals role follows the whole capital (its gates, districts, shops and halls), and every inn's common room hangs where its patrons can read it (see the changelog). Built on v1.7.1 - a trade's goods go on a market stall only for somebody who has passed an examination of that trade in this life, the town buys every grade from a stall, the travel picker offers only what a door opens onto, and the engine playtest's sect road holds whatever the hour (see the changelog). Built on v1.7.0 - crafted items carry a grade, Low to Transcendent, by the craft's quality capped by rank; keepers deal in Low and Mid, a player's stall in any grade, reachable from anywhere at 5% a road; each world has a read-only market-stalls channel with a live card per stall (schema 66), and every open auction lot gets its card (see the changelog). Built on v1.6.0 - the GM dashboard gains an NPCs head and a Sects head (reads only), three faults on the old pages are fixed, and a dig is refused in a shop or on an auction floor (see the changelog). Built on v1.5.0 - a cultivator at Foundation Establishment keeps a market stall in a city's street (schema 65): standing listings that sell while they are away, to cultivators and - never the last unit, never above the shelf, out of its own wealth - to the town; the homestead's merchant hall grows it (see the changelog). Built on v1.4.1 - a GM can finish or advance a player's quest from the Player Editor's new Quests card, through the same path a player's own report takes (see the changelog). Built on v1.4.0 - a GM updates the server from the dashboard: an audited request, a watcher on the NAS running `update.sh --upgrade`, and the outcome on the card (see the changelog). Built on v1.3.5 - command use is counted (schema 64) and the ten most used commands are on `/admin server observability`; nothing is reordered for it (see the changelog). Built on v1.3.4 - the punch list cleared: the Stygian Ghost Scripture is the Ghost Cultivator's high manual and its inheritance reads `preferred_paths`, a path's skill is on the sheet, two dead era keys deleted (see the changelog). Built on v1.3.3 - the eight open rule decisions settled: a Law control technique weakens its opponent (schema 63), a clan treaty that runs out ends and leaves a rivalry, the auction-door ambush is on the house's doorstep, five entries closed with reasons (see the changelog). Schema 63. Built on v1.3.2 - the daily five are one step each: `/cultivate`, `/explore`, `/hunt`, `/forage` and `/mine` are slash commands and a row of five buttons on the menu (see the changelog). Built on v1.3.1 - six rules the bot held are the engine's (a sponsor's presence, the sects a gate justifies, a city's board, a territory's ground, the forage wait, the quest chain catch-up on any action) and three more buttons are drawn only where they work (see the changelog). Built on v1.3.0 - ten of the owner's decisions: a failed craft returns half its makings, a hall teaches only what its world can make, the Nine-Echo Sword Wraith is a secret floor beneath its realm, `/reset` asks with the count, the Qi Body card shows the pool at every realm, thirty-three upper-world send-offs, no property inside a household, `heart` retired, the Starfall hall's buy line lowered (see the changelog). Built on v1.2.3 - the review's eight deferred claims settled: Vacuum refuses at once behind a half-written action, one array rule at both cultivation doors, one counter-attack TN, an undo undone again, a rank price under a merchant's wares, and a lot listed in its house's coin (see the changelog). Built on v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
+- Current release: v1.7.9 - the road's travel time is set from the GM dashboard's Travel Time card, audited, over the .env baseline, and the Player Editor has a Player Admin head of its own (see the changelog). Built on v1.7.8 - a cultivator raids alone: `/boss start` with no party forms a party of one, closed when the raid ends, against a boss at 70% of its health (schema 68, see the changelog). Schema 68. Built on v1.7.7 - Moonfen Marsh and Cloudspine Foothills, two raid lairs and two secret-realm entrances, are found by exploring from Moonfen City and Cloudblade City; spirit beasts evolve to a per-world rank limit for beast cores, with +2 a tenth rank (schema 67); manual techniques are on the battle panel (see the changelog). Schema 67. Built on v1.7.6 - only the party leader starts a boss raid, and every member must stand at the boss's realm, and `/boss act` → Defend works (see the changelog). Built on v1.7.5 - every weapon, armour and beast says what it gives in a fight, graded gear shows its stats at its grade, and the spirit stat nothing reads is left out (see the changelog). Built on v1.7.4 - the market stalls are a slash command of their own, `/stall` (see the changelog). Built on v1.7.3 - the Server Update card asks GitHub again when its answer is more than fifteen minutes old, and says how old it is (see the changelog). Built on v1.7.2 - the sect envoys are on the city page from the first hour and drawn only in a capital's temple quarter, the Realm Capitals role follows the whole capital (its gates, districts, shops and halls), and every inn's common room hangs where its patrons can read it (see the changelog). Built on v1.7.1 - a trade's goods go on a market stall only for somebody who has passed an examination of that trade in this life, the town buys every grade from a stall, the travel picker offers only what a door opens onto, and the engine playtest's sect road holds whatever the hour (see the changelog). Built on v1.7.0 - crafted items carry a grade, Low to Transcendent, by the craft's quality capped by rank; keepers deal in Low and Mid, a player's stall in any grade, reachable from anywhere at 5% a road; each world has a read-only market-stalls channel with a live card per stall (schema 66), and every open auction lot gets its card (see the changelog). Built on v1.6.0 - the GM dashboard gains an NPCs head and a Sects head (reads only), three faults on the old pages are fixed, and a dig is refused in a shop or on an auction floor (see the changelog). Built on v1.5.0 - a cultivator at Foundation Establishment keeps a market stall in a city's street (schema 65): standing listings that sell while they are away, to cultivators and - never the last unit, never above the shelf, out of its own wealth - to the town; the homestead's merchant hall grows it (see the changelog). Built on v1.4.1 - a GM can finish or advance a player's quest from the Player Editor's new Quests card, through the same path a player's own report takes (see the changelog). Built on v1.4.0 - a GM updates the server from the dashboard: an audited request, a watcher on the NAS running `update.sh --upgrade`, and the outcome on the card (see the changelog). Built on v1.3.5 - command use is counted (schema 64) and the ten most used commands are on `/admin server observability`; nothing is reordered for it (see the changelog). Built on v1.3.4 - the punch list cleared: the Stygian Ghost Scripture is the Ghost Cultivator's high manual and its inheritance reads `preferred_paths`, a path's skill is on the sheet, two dead era keys deleted (see the changelog). Built on v1.3.3 - the eight open rule decisions settled: a Law control technique weakens its opponent (schema 63), a clan treaty that runs out ends and leaves a rivalry, the auction-door ambush is on the house's doorstep, five entries closed with reasons (see the changelog). Schema 63. Built on v1.3.2 - the daily five are one step each: `/cultivate`, `/explore`, `/hunt`, `/forage` and `/mine` are slash commands and a row of five buttons on the menu (see the changelog). Built on v1.3.1 - six rules the bot held are the engine's (a sponsor's presence, the sects a gate justifies, a city's board, a territory's ground, the forage wait, the quest chain catch-up on any action) and three more buttons are drawn only where they work (see the changelog). Built on v1.3.0 - ten of the owner's decisions: a failed craft returns half its makings, a hall teaches only what its world can make, the Nine-Echo Sword Wraith is a secret floor beneath its realm, `/reset` asks with the count, the Qi Body card shows the pool at every realm, thirty-three upper-world send-offs, no property inside a household, `heart` retired, the Starfall hall's buy line lowered (see the changelog). Built on v1.2.3 - the review's eight deferred claims settled: Vacuum refuses at once behind a half-written action, one array rule at both cultivation doors, one counter-attack TN, an undo undone again, a rank price under a merchant's wares, and a lot listed in its house's coin (see the changelog). Built on v1.2.2 - the trades' ranks are the Nine-Tier ladder: Unranked, then Tier 1
   Apprentice to Tier 9 Sovereign with each trade's own word in front (Pill, Forge, Talisman, Array,
   Herb, Ore, Beast, Artifact, Treasure). No schema.
 - v1.2.1: a beast can always evolve, a homestead can be upgraded in any world, and a dozen smaller wires from a deep review (see the changelog).

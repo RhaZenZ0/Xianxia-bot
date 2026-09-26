@@ -2347,6 +2347,14 @@ def update_card_state(rows: dict[str, Any] | None, release: dict[str, Any] | Non
         except (TypeError, ValueError):
             seen = None
     reachable = bool(release.get("ok")) and "newest" in release
+    # v1.7.3: how old the bot's answer is, so a GM can tell a fresh "up to
+    # date" from a stale one. An absent timestamp is unknown, never zero.
+    checked_ago: int | None = None
+    if release.get("checked_at") is not None:
+        try:
+            checked_ago = max(0, int(float(now) - float(release["checked_at"])))
+        except (TypeError, ValueError):
+            checked_ago = None
     in_progress = bool(request) and str(request.get("status") or "") not in ("", "done", "failed")
     return {
         "installed_version": INSTALLED_VERSION,
@@ -2354,6 +2362,7 @@ def update_card_state(rows: dict[str, Any] | None, release: dict[str, Any] | Non
         "newest_on_channel": (str(release.get("newest")) if release.get("newest") else None) if reachable else None,
         "update_available": bool(release.get("update_available")) if reachable else None,
         "release_error": None if reachable else str(release.get("error") or "the bot has not answered"),
+        "checked_seconds_ago": checked_ago,
         "request": request,
         "result": result,
         "watcher_seen_seconds_ago": None if seen is None else int(seen),
@@ -2376,6 +2385,10 @@ class AdminDashboardController:
         "player.revive": "admin.player.revive",
         "player.clear_battle": "admin.player.clear_battle",
         "automation.set": "admin.automation.set",
+        # v1.7.9: how long a road journey actually waits, as a share of its
+        # length. Stored by the engine in world_state['travel_pace'] with an
+        # audit row; the .env TRAVEL_TIME_PERCENT is only the baseline.
+        "world.travel_pace": "admin.world.set_travel_pace",
         # v1.0.0-rc.41: close the world while the server is updated. The
         # engine writes the flag and the audit row; the controller pokes the
         # bot afterwards so its own door gate turns over at once.
@@ -2585,6 +2598,18 @@ class AdminDashboardController:
                     }
                 except Exception:
                     pass
+            # v1.7.9: the travel pace the GM stored, or None when the world is
+            # still on the .env baseline - which only the engine can read, so
+            # the card says "baseline" rather than guessing a number.
+            travel_pace: int | None = None
+            row = await self.store._fetchone(db, "SELECT value_json FROM world_state WHERE key='travel_pace'")
+            if row:
+                try:
+                    stored = json.loads(str(row.get("value_json") or "{}"))
+                    if stored.get("percent") is not None:
+                        travel_pace = int(stored["percent"])
+                except Exception:
+                    travel_pace = None
             clock = await self.store._world_clock(db)
             # v1.4.0: the update request, the last outcome and the watcher's
             # heartbeat, as the engine wrote them. What the card makes of them
@@ -2624,6 +2649,7 @@ class AdminDashboardController:
             "currencies": sorted(currencies),
             "simulations": simulations,
             "automation": automation,
+            "travel_pace": travel_pace,
             "maintenance_mode": maintenance_mode,
             "update_rows": update_rows,
             "audit": audit,

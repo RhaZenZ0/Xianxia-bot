@@ -83,10 +83,16 @@ class AdminGrantGuardTests(unittest.TestCase):
 
 class PlayerFacingTextTests(unittest.TestCase):
     def test_equipment_status_shows_indestructible_instead_of_a_durability_fraction(self):
+        # Since v1.7.5 the card draws each piece through describe_equipment, so
+        # the rule is held on what that line says rather than on its spelling.
+        from app.rules.advanced_runtime import describe_equipment
+
         status = bot_function_source("equipment_status")
-        self.assertIn('definition.get("indestructible")', status)
-        self.assertIn("**indestructible**", status)
-        self.assertIn('definition.get("passive_name")', status)
+        self.assertIn("describe_equipment(", status)
+        line = describe_equipment("bugslayer_sword", quality=100, durability=100, max_durability=100)
+        self.assertIn("indestructible", line)
+        self.assertNotIn("durability", line)
+        self.assertIn("Heavenly Flawfinder", line)
 
     def test_battle_narration_reports_the_passive_and_does_not_misattribute_it(self):
         main = bot_package_source()

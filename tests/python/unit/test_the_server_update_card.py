@@ -11,6 +11,7 @@ because the button that asks for an update is only offered while one is.
 from __future__ import annotations
 
 import ast
+import asyncio
 import os
 import unittest
 from unittest.mock import patch
@@ -23,6 +24,11 @@ from app.dashboard.server import (  # noqa: E402
     UPDATE_WATCHER_STALE_SECONDS,
     AdminDashboardController,
     update_card_state,
+)
+from app.ops.release_channel import (  # noqa: E402
+    RELEASE_CARD_MAX_AGE_SECONDS,
+    read_release_check,
+    release_check_is_stale,
 )
 from app.version import INSTALLED_VERSION  # noqa: E402
 
@@ -112,6 +118,19 @@ class TheBotAnswersItsReleaseCheck(unittest.TestCase):
         reads = [ast.unparse(n.args[0]) for n in ast.walk(fn) if isinstance(n, ast.Call) and ast.unparse(n.func).endswith("checks.get")]
         self.assertIn("'release_channel'", reads)
 
+    def test_the_card_read_goes_through_the_refresh(self):
+        """v1.7.3: the control action hands the bot's own check to
+        read_release_check, so a stale stored answer is refreshed rather than
+        shown - and honours UPDATE_CHECK_ENABLED."""
+        source = (PROJECT_ROOT / "app" / "bot" / "bot.py").read_text(encoding="utf-8")
+        fn = next(n for n in ast.walk(ast.parse(source)) if isinstance(n, ast.AsyncFunctionDef) and n.name == "_dashboard_discord_control")
+        calls = [n for n in ast.walk(fn) if isinstance(n, ast.Call) and ast.unparse(n.func) == "read_release_check"]
+        self.assertEqual(len(calls), 1, "the release action no longer refreshes a stale check")
+        args = [ast.unparse(a) for a in calls[0].args]
+        self.assertIn("self.check_for_release", args)
+        self.assertIn("self.release_check_lock", args)
+        self.assertEqual({k.arg: ast.unparse(k.value) for k in calls[0].keywords}.get("enabled"), "SETTINGS.update_check_enabled")
+
     def test_the_one_comparison_stays_in_release_channel(self):
         """Neither the dashboard nor the card re-derives "newer": the bot's
         check_for_release is the only caller of newer_than_installed."""
@@ -120,6 +139,73 @@ class TheBotAnswersItsReleaseCheck(unittest.TestCase):
             if "newer_than_installed(" in path.read_text(encoding="utf-8") and path.name != "release_channel.py":
                 callers.append(path.relative_to(PROJECT_ROOT).as_posix())
         self.assertEqual(callers, ["app/bot/bot.py"])
+
+
+class TheCardAsksAgainWhenItsAnswerIsOld(unittest.TestCase):
+    """Reported from the dashboard: v1.7.2 was live and the card still said
+    v1.7.1 was the newest, because it showed the bot's daily check and the
+    last one had run that morning."""
+
+    def setUp(self):
+        self.now = NOW
+        self.store: dict = {}
+        self.checks = 0
+
+    def read(self):
+        return self.store.get("release_channel")
+
+    async def check(self):
+        self.checks += 1
+        await asyncio.sleep(0)
+        self.store["release_channel"] = {"ok": True, "newest": "1.7.2", "checked_at": self.now}
+
+    def run_read(self, *, enabled=True, concurrent=1):
+        lock = asyncio.Lock()
+
+        async def go():
+            return await asyncio.gather(*(
+                read_release_check(self.read, self.check, lock, lambda: self.now, enabled=enabled)
+                for _ in range(concurrent)
+            ))
+        return asyncio.run(go())
+
+    def test_a_stale_answer_is_refreshed_before_it_is_shown(self):
+        self.store["release_channel"] = {"ok": True, "newest": "1.7.1", "checked_at": NOW - RELEASE_CARD_MAX_AGE_SECONDS - 1}
+        (result,) = self.run_read()
+        self.assertEqual(result["newest"], "1.7.2", "the card showed the morning's answer after a release was published")
+        self.assertEqual(self.checks, 1)
+
+    def test_a_fresh_answer_is_shown_without_asking(self):
+        self.store["release_channel"] = {"ok": True, "newest": "1.7.1", "checked_at": NOW - 60}
+        (result,) = self.run_read()
+        self.assertEqual(result["newest"], "1.7.1")
+        self.assertEqual(self.checks, 0)
+
+    def test_many_loads_at_once_cost_one_check(self):
+        results = self.run_read(concurrent=6)
+        self.assertEqual(self.checks, 1, "concurrent card loads each asked GitHub")
+        self.assertTrue(all(r["newest"] == "1.7.2" for r in results))
+
+    def test_a_switched_off_check_is_never_asked(self):
+        results = self.run_read(enabled=False)
+        self.assertEqual(self.checks, 0)
+        self.assertEqual(results, [{}])
+
+    def test_staleness_reads_the_timestamp_honestly(self):
+        self.assertTrue(release_check_is_stale(None, NOW))
+        self.assertTrue(release_check_is_stale({"ok": True}, NOW), "an absent timestamp is stale, not checked at 0")
+        self.assertTrue(release_check_is_stale({"checked_at": "soon"}, NOW))
+        self.assertFalse(release_check_is_stale({"ok": False, "checked_at": NOW - 5}, NOW),
+                         "a failed check is still an answer; GitHub is not asked again on every load")
+        self.assertTrue(release_check_is_stale({"checked_at": NOW - RELEASE_CARD_MAX_AGE_SECONDS}, NOW))
+
+    def test_the_card_says_how_old_its_answer_is(self):
+        state = update_card_state({}, {**RELEASE_OK, "checked_at": NOW - 125}, NOW)
+        self.assertEqual(state["checked_seconds_ago"], 125)
+        self.assertIsNone(update_card_state({}, RELEASE_OK, NOW)["checked_seconds_ago"],
+                          "an answer with no timestamp must not read as checked just now")
+        js = (PROJECT_ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("upd.checked_seconds_ago", js)
 
 
 if __name__ == "__main__":
