@@ -2306,8 +2306,16 @@ async def run(url: str, token: str, db_path: str) -> Report:
         if grown is not None:
             b = dict(grown.get("beast") or {})
             report.add("PASS" if int(b.get("evolution_stage") or 0) == 1 and int(b.get("loyalty") or 0) == 15 else "FAIL", "evolution is certain past the threshold and drops loyalty to fifteen", f"stage={b.get('evolution_stage')} loyalty={b.get('loyalty')}")
-        await step(report, "beast.evolve again at 80", act("beast.evolve", PLAYER, {"beast_id": beast_id}))
-        await step(report, "a third evolution wants 80 and finds 60", act("beast.evolve", PLAYER, {"beast_id": beast_id}), expect_error="below evolution requirement")
+        # An evolution spends the bond down to fifteen (v1.7.7) rather than
+        # costing twenty, so the old 100 -> 80 -> 60 walk no longer exists: the
+        # second evolution is refused on the spot, then made certain by raising
+        # loyalty to exactly the stage-1 requirement (60 + 10, inclusive).
+        await step(report, "a second evolution straight after wants 70 and finds 15", act("beast.evolve", PLAYER, {"beast_id": beast_id}), expect_error="loyalty 15 is below evolution requirement 70")
+        await audited("admin.player.set_beast_stats", {"user_id": PLAYER, "beast_id": beast_id, "loyalty": 70, "reason": "playtest"})
+        grown = await step(report, "beast.evolve again at exactly 70", act("beast.evolve", PLAYER, {"beast_id": beast_id}))
+        if grown is not None:
+            b = dict(grown.get("beast") or {})
+            report.add("PASS" if int(b.get("evolution_stage") or 0) == 2 and int(b.get("loyalty") or 0) == 15 else "FAIL", "the requirement is inclusive and the bond is spent again", f"stage={b.get('evolution_stage')} loyalty={b.get('loyalty')}")
     else:
         await step(report, "beast.feed with no beast", act("beast.feed", PLAYER, {"beast_id": 1, "food": "spirit_herb"}), expect_error="unknown contracted beast")
         await step(report, "beast.train with no beast", act("beast.train", PLAYER, {"beast_id": 1}), expect_error="unknown contracted beast")
