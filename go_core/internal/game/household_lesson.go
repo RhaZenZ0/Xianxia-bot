@@ -245,7 +245,7 @@ func familyLessonActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 		return authoritativeMutation{}, fmt.Errorf("a household's lesson cannot be a forbidden manual: %s", lesson.Manual)
 	}
 	if lesson.Keepsake != "" {
-		if _, known := catalog.Items[lesson.Keepsake]; !known {
+		if _, _, known := itemDef(catalog, lesson.Keepsake); !known {
 			return authoritativeMutation{}, fmt.Errorf("the household's keepsake is not in this world: %s", lesson.Keepsake)
 		}
 	}

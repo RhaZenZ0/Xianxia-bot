@@ -324,7 +324,7 @@ func caravanDispatchActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	if _, ok := catalog.Locations[p.Destination]; !ok {
 		return authoritativeMutation{}, errors.New("unknown destination")
 	}
-	item, ok := catalog.Items[p.ItemID]
+	item, _, ok := itemDef(catalog, p.ItemID)
 	if !ok {
 		return authoritativeMutation{}, errors.New("unknown item")
 	}

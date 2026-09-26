@@ -136,7 +136,7 @@ func storageUpgradeActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
 	}
-	item, ok := catalog.Items[p.ItemID]
+	item, _, ok := itemDef(catalog, p.ItemID)
 	if !ok || len(item.StorageUpgrade) == 0 {
 		return authoritativeMutation{}, errors.New("item is not a spatial-storage treasure")
 	}
@@ -653,7 +653,7 @@ func deployArrayActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
 	}
-	item, ok := catalog.Items[p.ItemID]
+	item, _, ok := itemDef(catalog, p.ItemID)
 	if !ok || item.ArrayDeploy == "" {
 		return authoritativeMutation{}, errors.New("item is not a deployable formation disk")
 	}
@@ -711,7 +711,7 @@ func spatialKeyActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
 	}
-	item, ok := catalog.Items[p.ItemID]
+	item, _, ok := itemDef(catalog, p.ItemID)
 	if !ok || len(item.SpatialKey) == 0 {
 		return authoritativeMutation{}, errors.New("item is not a spatial key/token")
 	}

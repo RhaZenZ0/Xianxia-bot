@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v1.6.0
+# Xianxia RP Discord Bot v1.7.0
 
 *A cultivation RPG played entirely through Discord commands: deterministic rules in Go, an AI that
 narrates but never decides, self-hosted on your own hardware.*
@@ -142,11 +142,11 @@ sudo ./stop.sh                                            # removes containers, 
 ### 3. Set up the Discord server
 
 Open the GM dashboard at `http://<NAS LAN address>:8090`, go to **Discord Setup** and run
-**Full Setup**. It creates or repairs eight categories in a stated order — 🚪 Start Here,
-📣 Announcements, 🌌 Realm Capitals, 🌠 World Events, 🏮 Auction Houses, 🗺️ Cultivation World,
-🛠️ Feedback, 🔒 Admin — the base channels inside them, the realm-capital channels gated behind
-presence roles, the live-auction channels, `#bugs`, `#playtest`, `#updates` and the `#xianxia-info`
-guide. It is idempotent, and since v1.0.0-rc.59 it also **moves** a channel it finds in the wrong
+**Full Setup**. It creates or repairs nine categories in a stated order — 🚪 Start Here,
+📣 Announcements, 🌌 Realm Capitals, 🌠 World Events, 🏮 Auction Houses, 🧺 Market Stalls,
+🗺️ Cultivation World, 🛠️ Feedback, 🔒 Admin — the base channels inside them, the realm-capital
+channels gated behind presence roles, the live-auction channels, one read-only market-stalls channel
+per world, `#bugs`, `#playtest`, `#updates` and the `#xianxia-info` guide. It is idempotent, and since v1.0.0-rc.59 it also **moves** a channel it finds in the wrong
 category rather than only placing a new one. See [Discord server setup](#discord-server-setup).
 
 ### Reset the world
@@ -509,6 +509,17 @@ A cultivator at Foundation Establishment can keep a **market stall** in a city's
 to other cultivators at your price and - bounded - to the town, which never takes the last unit,
 never pays more than one coin under the cheapest shop shelf, and pays out of its own wealth. The
 city takes a tenth of each sale; a homestead's merchant hall adds listing room and shrinks the cut.
+Since v1.7.0 a stall is in reach from anywhere: the board lists every stall in the world, nearest
+first, and goods from a stall farther off cost 5% more a road (another world counts as twenty),
+split between the seller, the city and the courier. Each world has a read-only market-stalls channel
+where the bot keeps one live card per open stall - what is on it, at what price, and who keeps it.
+Every open auction lot gets its card in its house's channel too, including the ones the world's own
+people consign.
+
+Every crafted item carries a **grade** (v1.7.0) - Low, Mid, High, Superior or Transcendent - set by
+how well the craft went and capped by your rank in the trade. A higher grade works harder (up to
+three times) and is worth more (double each step). Shops deal in Low, capitals in Mid as well; the
+finer grades are sold between players, at a stall or on the auction floor.
 
 Sects stock their own storehouses too. `sect_treasury` is what contribution points buy from, and it
 used to fill only when a player donated — so a sect nobody had joined had bare shelves forever. Its
@@ -660,7 +671,7 @@ report is safe to paste into an issue.
 - If narration goes flat after an image rebuild, check **/admin → Server → Ai Status** for a TLS
   banner first. If SQLite reports contention, verify only the engine opens the database.
 
-Keep the whole `data/` directory persistent across rebuilds. The current schema is **65**; every
+Keep the whole `data/` directory persistent across rebuilds. The current schema is **66**; every
 historical migration is kept so an old database upgrades in place.
 
 ## Development

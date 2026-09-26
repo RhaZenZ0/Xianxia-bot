@@ -642,6 +642,12 @@ func questProgressTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 // matchQuestEvent asks the core contract whether one reported event advances
 // the quest's objectives.
 func matchQuestEvent(userID int64, p questPayload, progress map[string]int64, objectives []map[string]any) (map[string]any, error) {
+	// A target naming a graded item counts as its base (v1.7.0): an objective
+	// to sell a Spirit-Iron Sword is met by a High one as much as a Low one.
+	if p.Target != nil {
+		base := itemBaseID(*p.Target)
+		p.Target = &base
+	}
 	payloadMap := map[string]any{"progress": progress, "objectives": objectives, "objective_type": p.ObjectiveType, "target": p.Target}
 	if p.Amount != nil {
 		payloadMap["amount"] = *p.Amount

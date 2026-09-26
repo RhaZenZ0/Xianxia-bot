@@ -156,17 +156,21 @@ func itemUseActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 		return authoritativeMutation{}, e
 	}
 	p.ItemID = strings.TrimSpace(p.ItemID)
-	item, ok := catalog.Items[p.ItemID]
+	item, _, ok := itemDef(catalog, p.ItemID)
 	if !ok {
 		return authoritativeMutation{}, errors.New("unknown item")
 	}
+	// A grade (v1.7.0) multiplies what the item does - its restores, the
+	// years it adds, its modifiers and how long they last - and nothing else:
+	// a stronger pill is not a cleaner one, so its toxicity is the base's.
+	// The base id keys the effect, so a Mid pill replaces a Low one's effect
+	// rather than stacking beside it.
+	grade := itemEffectMult(catalog, p.ItemID)
+	baseID := itemBaseID(p.ItemID)
 	if !itemHasActiveUse(item) {
 		return authoritativeMutation{}, errors.New("that item has no implemented active use yet")
 	}
-	itemName := item.Name
-	if itemName == "" {
-		itemName = p.ItemID
-	}
+	itemName := itemDisplayName(catalog, p.ItemID)
 	now := float64(time.Now().UnixNano()) / 1e9
 
 	// 0. homeward (v1.0.0-rc.32) - the Hearth-Return Talisman is refused
@@ -236,7 +240,7 @@ func itemUseActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	}
 
 	// 2. restore - clamped to the maxima; an active battle's HP bar follows.
-	qiRestore, vitRestore := maxI64(0, item.Use.Instant.QiRestore), maxI64(0, item.Use.Instant.VitalityRestore)
+	qiRestore, vitRestore := gradedAmount(item.Use.Instant.QiRestore, grade), gradedAmount(item.Use.Instant.VitalityRestore, grade)
 	// The qi body (v1.0.0-rc.7): a pill's qi is a base, scaled into the pool
 	// the drinker actually has, so it is worth the same share it always was.
 	if qiRestore > 0 {
@@ -266,7 +270,7 @@ func itemUseActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	}
 
 	// 3. life extension - permanent, reported as the running total.
-	if years := maxI64(0, item.Use.LifespanYears); years > 0 {
+	if years := gradedAmount(item.Use.LifespanYears, grade); years > 0 {
 		if _, e = conn.Execute(`UPDATE characters SET life_extension_years=life_extension_years+?,updated_at=? WHERE user_id=?`, []any{years, now, userID}); e != nil {
 			return authoritativeMutation{}, e
 		}
@@ -285,23 +289,23 @@ func itemUseActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	if len(item.Use.Effect) > 0 {
 		effectKey := strings.TrimSpace(item.Use.EffectKey)
 		if effectKey == "" {
-			effectKey = p.ItemID
+			effectKey = baseID
 		}
 		effectName := strings.TrimSpace(item.Use.Name)
 		if effectName == "" {
 			effectName = itemName
 		}
-		payload := normalizeEffectPayload(effectKey, effectName, item.Use.Effect)
+		payload := gradedEffectPayload(normalizeEffectPayload(effectKey, effectName, item.Use.Effect), grade)
 		encoded, e := json.Marshal(payload)
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
 		var ends any
-		if d := item.Use.DurationGameMinutes; d > 0 {
+		if d := gradedAmount(item.Use.DurationGameMinutes, grade); d > 0 {
 			ends = p.GameMinute + d
 		}
 		if _, e = conn.Execute(`INSERT INTO active_effects(user_id,effect_key,name,source_type,source_id,effect_json,stacks,starts_game_minute,ends_game_minute,created_at) VALUES(?,?,?,?,?,?,1,?,?,?) ON CONFLICT(user_id,effect_key,source_type,source_id) DO UPDATE SET name=excluded.name,effect_json=excluded.effect_json,stacks=excluded.stacks,starts_game_minute=excluded.starts_game_minute,ends_game_minute=excluded.ends_game_minute,created_at=excluded.created_at`,
-			[]any{userID, effectKey, effectName, "item", p.ItemID, string(encoded), p.GameMinute, ends, now}); e != nil {
+			[]any{userID, effectKey, effectName, "item", baseID, string(encoded), p.GameMinute, ends, now}); e != nil {
 			return authoritativeMutation{}, e
 		}
 		out["effect_key"], out["effect_name"] = effectKey, effectName
@@ -313,7 +317,7 @@ func itemUseActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	// 5. toxicity - settle the decay first (that is what Python's
 	// get_alchemy_state did before the add), add the residue, then settle
 	// again so the penalty effect matches the new value.
-	if gain := pillToxicityValue(p.ItemID, item); gain > 0 {
+	if gain := pillToxicityValue(baseID, item); gain > 0 {
 		if _, e = settlePillToxicityEffectTx(conn, userID, p.GameMinute); e != nil {
 			return authoritativeMutation{}, e
 		}

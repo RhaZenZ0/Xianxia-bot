@@ -181,7 +181,7 @@ func (r *Runner) robGrave(
 	// player and the right one for the fiction.
 	if item != "" {
 		if _, err := r.consignToNearestHouse(conn, robber.name, robber.location, item,
-			r.World.Items[item], robber.profession, robber.realmIndex, gm); err != nil {
+			worldItem(r.World, item), robber.profession, robber.realmIndex, gm); err != nil {
 			return true, err
 		}
 	}

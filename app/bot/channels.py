@@ -107,6 +107,24 @@ async def _ensure_cultivator_role(guild: discord.Guild) -> discord.Role | None:
         return None
 
 
+async def merge_overwrite(target: discord.abc.GuildChannel, who: Any, *, reason: str, **perms: bool) -> bool:
+    """Add these permissions to whatever the target already carries.
+
+    `set_permissions(target, **perms)` **replaces** the overwrite rather than
+    merging into it (v1.0.11), so writing a bare `view_channel=False` over a
+    read-only anchor's `send_messages=False` would leave it hidden and, to
+    everybody holding the role, writable. Returns whether anything changed; an
+    overwrite that already says all of this makes no API call.
+    """
+    existing = (target.overwrites or {}).get(who)
+    if existing is not None and all(getattr(existing, name, None) is value for name, value in perms.items()):
+        return False
+    overwrite = discord.PermissionOverwrite() if existing is None else discord.PermissionOverwrite(**dict(existing))
+    overwrite.update(**perms)
+    await target.set_permissions(who, overwrite=overwrite, reason=reason)
+    return True
+
+
 async def ensure_cultivator_gate(
     guild: discord.Guild,
     role: discord.Role | None,
@@ -148,22 +166,10 @@ async def ensure_cultivator_gate(
     changed = False
 
     async def _merge(target: discord.abc.GuildChannel, who: Any, **perms: bool) -> bool:
-        """Add these permissions to whatever the target already carries.
-
-        `set_permissions(target, **perms)` **replaces** the overwrite rather
-        than merging into it, and both channels here already carry an
-        `@everyone` overwrite of `send_messages=False` - the read-only anchor
-        rule. Replacing it with a bare `view_channel=False` would leave the
-        channels hidden and, for everybody holding the role, writable: the
-        gate would have quietly undone the thing the channels are for.
-        """
-        existing = (target.overwrites or {}).get(who)
-        if existing is not None and all(getattr(existing, name, None) is value for name, value in perms.items()):
-            return False
-        overwrite = discord.PermissionOverwrite() if existing is None else discord.PermissionOverwrite(**dict(existing))
-        overwrite.update(**perms)
-        await target.set_permissions(who, overwrite=overwrite, reason=reason)
-        return True
+        """`merge_overwrite`: both channels here already carry an `@everyone`
+        overwrite of `send_messages=False` - the read-only anchor rule - and
+        replacing it would leave them writable to everybody holding the role."""
+        return await merge_overwrite(target, who, reason=reason, **perms)
 
     try:
         for target in targets:
@@ -435,6 +441,88 @@ async def ensure_world_event_channels(
             category_id=channel.category_id if channel.category_id is not None else (category.id if category else None),
         )
     return await DB.get_world_event_channels(guild.id)
+
+
+async def ensure_stall_channels(
+    guild: discord.Guild, *, category_name: str = "\U0001f9fa Market Stalls", create_missing: bool = False,
+) -> list[dict[str, Any]]:
+    """One read-only market-stalls channel per world (v1.7.0), where the bot
+    keeps one live card per open stall (`stall_feed.py`).
+
+    The `ensure_world_event_channels` shape, rule for rule: the /admin slash
+    path only binds and the dashboard's Setup/Repair creates, a channel that
+    already exists somewhere else is re-parented rather than merely rebound
+    (rc.51), and it is gated by the realm **access** role - a world's market is
+    for everyone who has reached that world. It is also **read-only**: only the
+    bot posts, so the cards stay readable. That half is merged into whatever
+    the channel already carries rather than replacing it (v1.0.11), and the bot
+    allows itself to post before anybody is denied (rc.52).
+    """
+    existing = {str(row["world_name"]): row for row in await DB.get_stall_channels(guild.id)}
+    category = next((item for item in guild.categories if item.name == category_name), None)
+    me = guild.me
+    can_create = create_missing and bool(me) and me.guild_permissions.manage_channels
+    access_roles = await _ensure_realm_access_roles(guild) if can_create else {}
+    if can_create and category is None:
+        try:
+            category = await guild.create_category(category_name, reason="Xianxia RP market-stalls setup")
+        except discord.HTTPException:
+            log.exception("Could not create category %s", category_name)
+
+    reason = "Xianxia: a market-stalls channel is the bot's to write in"
+    for world, hub in REALM_HUBS.items():
+        name = str(hub["stalls_channel_name"])
+        row = existing.get(world)
+        channel = guild.get_channel(int(row["channel_id"])) if row else None
+        if not isinstance(channel, discord.TextChannel):
+            channel = next((item for item in guild.text_channels if item.name == name), None)
+        if channel is None and can_create:
+            try:
+                channel = await guild.create_text_channel(
+                    name, category=category, topic=str(hub.get("stalls_topic") or "")[:1024],
+                    reason="Xianxia RP market-stalls setup",
+                )
+            except discord.HTTPException:
+                log.exception("Could not create market-stalls channel #%s", name)
+        if channel is None:
+            continue
+        if can_create and category is not None and channel.category_id != category.id:
+            try:
+                await channel.edit(category=category, reason="Xianxia RP market-stalls setup")
+            except discord.HTTPException:
+                log.exception("Could not move #%s into %s", channel.name, category_name)
+        role = access_roles.get(world)
+        if can_create and role is not None:
+            # Not `ensure_realm_hub_overwrites`: that grants the role the full
+            # member set, send included, and a read-only channel would then be
+            # flipped back and forth on every Repair. Every overwrite here is
+            # merged, so a run that finds it already right makes no API call.
+            try:
+                if guild.me is not None:
+                    await merge_overwrite(channel, guild.me, reason=reason, view_channel=True, send_messages=True,
+                                          embed_links=True, read_message_history=True)
+                await merge_overwrite(channel, role, reason=reason, view_channel=True, read_message_history=True,
+                                      send_messages=False)
+                await merge_overwrite(channel, guild.default_role, reason=reason, view_channel=False, send_messages=False)
+            except (discord.Forbidden, discord.HTTPException):
+                log.exception("Could not gate #%s behind %s", channel.name, role.name)
+        await DB.set_stall_channel(
+            guild_id=guild.id, world_name=world, channel_id=channel.id,
+            category_id=channel.category_id if channel.category_id is not None else (category.id if category else None),
+        )
+    return await DB.get_stall_channels(guild.id)
+
+
+async def stall_channel(guild: discord.Guild, world: str | None) -> discord.TextChannel | None:
+    """The market-stalls channel of one world, or None when none is bound. A
+    stall with no world (it cannot happen: `stallCityAt` refuses a private
+    place) gets no card rather than a card in somebody else's market."""
+    if not world:
+        return None
+    for row in await DB.get_stall_channels(guild.id):
+        if str(row["world_name"]) == world:
+            return await _resolve_text_channel(guild, row.get("channel_id"))
+    return None
 
 
 def world_of_location(location: str | None) -> str | None:

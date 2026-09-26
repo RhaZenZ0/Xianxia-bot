@@ -287,7 +287,7 @@ func merchantResalePrice(catalog worlddata.Catalog, m worlddata.Merchant, itemID
 		markup = 150
 	}
 	price := (unitCost*markup + 99) / 100
-	if base := catalog.Items[itemID].BasePrice; price < base {
+	if base := itemBasePrice(catalog, itemID); price < base {
 		price = base
 	}
 	return max64(1, price)
@@ -490,7 +490,7 @@ func merchantValuation(catalog worlddata.Catalog, m worlddata.Merchant, itemID s
 	if ware, ok := merchantWare(m, itemID); ok {
 		return max64(1, ware.Price*60/100) * quantity
 	}
-	base := catalog.Items[itemID].SectValue
+	base := itemSectValue(catalog, itemID)
 	if base < 1 {
 		base = 5
 	}
@@ -673,7 +673,7 @@ func merchantStockRows(conn *storage.Conn, catalog worlddata.Catalog, key string
 	rows := []map[string]any{}
 	for _, row := range rowsToMaps(res) {
 		itemID := fmt.Sprint(row["item_id"])
-		name := catalog.Items[itemID].Name
+		name := itemDisplayNameOrEmpty(catalog, itemID)
 		if name == "" {
 			name = itemID
 		}
@@ -843,7 +843,7 @@ func merchantBuyAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 			return authoritativeMutation{}, err
 		}
 	}
-	name := catalog.Items[p.ItemID].Name
+	name := itemDisplayNameOrEmpty(catalog, p.ItemID)
 	if name == "" {
 		name = p.ItemID
 	}

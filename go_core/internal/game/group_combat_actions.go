@@ -217,11 +217,11 @@ func equipmentPowerRows(rows []map[string]any) map[string]int64 {
 		if i64(r["durability"]) <= 0 {
 			continue
 		}
-		d, ok := defs[fmt.Sprint(r["item_id"])]
+		d, ok := defs[itemBaseID(fmt.Sprint(r["item_id"]))]
 		if !ok {
 			continue
 		}
-		q := float64(max64(1, i64(r["quality"]))) / 100.0
+		q := equipmentQualityMult(i64(r["quality"]))
 		out["attack"] += int64(math.Round(float64(d.Attack) * q))
 		out["defense"] += int64(math.Round(float64(d.Defense) * q))
 		out["spirit"] += int64(math.Round(float64(d.Spirit) * q))
@@ -259,7 +259,7 @@ func equipmentAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 		if e := json.Unmarshal(raw, &p); e != nil {
 			return authoritativeMutation{}, e
 		}
-		d, ok := equipmentDefinitionsGo()[p.ItemID]
+		d, ok := equipmentDefinitionsGo()[itemBaseID(p.ItemID)]
 		if !ok {
 			return authoritativeMutation{}, errors.New("that item is not part of the equipment catalog")
 		}
@@ -278,7 +278,7 @@ func equipmentAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
-		c, e := conn.Execute(`INSERT INTO equipment_instances(user_id,item_id,slot,durability,max_durability,quality,equipped,bound_at,updated_at) VALUES(?,?,?,?,?,100,0,?,?)`, []any{userID, p.ItemID, d.Slot, d.MaxDurability, d.MaxDurability, now, now})
+		c, e := conn.Execute(`INSERT INTO equipment_instances(user_id,item_id,slot,durability,max_durability,quality,equipped,bound_at,updated_at) VALUES(?,?,?,?,?,?,0,?,?)`, []any{userID, p.ItemID, d.Slot, d.MaxDurability, d.MaxDurability, gradeEquipmentQuality(itemEffectMult(catalog, p.ItemID)), now, now})
 		if e != nil {
 			return authoritativeMutation{}, e
 		}

@@ -140,7 +140,7 @@ func grantBirthFamilySendoffTx(conn *storage.Conn, catalog worlddata.Catalog, us
 	if !ok || strings.TrimSpace(sendoff.Item) == "" {
 		return nil, nil
 	}
-	item, ok := catalog.Items[sendoff.Item]
+	item, _, ok := itemDef(catalog, sendoff.Item)
 	if !ok {
 		return nil, nil
 	}
@@ -162,7 +162,7 @@ func grantBirthFamilySendoffTx(conn *storage.Conn, catalog worlddata.Catalog, us
 	// And the way back (v1.0.0-rc.32): one Hearth-Return Talisman, folded
 	// at the door, inside the same once-guard as the heirloom.
 	talisman := ""
-	if _, known := catalog.Items[hearthReturnTalismanItem]; known {
+	if _, _, known := itemDef(catalog, hearthReturnTalismanItem); known {
 		if _, err = conn.Execute(
 			`INSERT INTO inventory(user_id,item_id,quantity) VALUES(?,?,1) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=quantity+1`,
 			[]any{userID, hearthReturnTalismanItem}); err != nil {

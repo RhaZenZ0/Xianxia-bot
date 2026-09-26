@@ -14,6 +14,7 @@ import json
 import re
 import unittest
 
+from app.rules.item_grades import split_item_grade
 from app.rules.progression_systems import PROFESSIONS
 from tests.support import PROJECT_ROOT
 
@@ -878,18 +879,39 @@ class CityShopContentTests(unittest.TestCase):
                 self.assertGreaterEqual(len(shop["sells"]), 2)
                 self.assertEqual(len({line["item_id"] for line in shop["sells"]}), len(shop["sells"]))
                 for line in shop["sells"]:
-                    item = items[line["item_id"]]
+                    base, grade = split_item_grade(line["item_id"])
+                    item = items[base]
                     self.assertFalse(item.get("market_excluded"), line["item_id"])
                     self.assertFalse(item.get("auction_interest"), f"{line['item_id']} is auction-grade, not shelf stock")
                     self.assertGreater(int(line["quantity"]), 0)
                     self.assertGreater(int(line["price"]), 0)
+                    self._a_keeper_deals_in_low_and_mid(shop, capital, line["item_id"], base, grade)
                 self.assertGreaterEqual(len(shop["buys"]), 2)
                 for item_id, price in shop["buys"].items():
-                    self.assertIn(item_id, items)
+                    base, grade = split_item_grade(item_id)
+                    self.assertIn(base, items)
                     self.assertGreater(int(price), 0)
+                    self._a_keeper_deals_in_low_and_mid(shop, capital, item_id, base, grade)
                 self.assertIn(shop["currency"], WORLD["currencies"])
                 self.assertEqual(WORLD["currencies"][shop["currency"]]["world"], shop["world"])
                 self.assertGreater(int(shop["restock_minutes"]), 0)
+
+    def _a_keeper_deals_in_low_and_mid(self, shop, capital, item_id, base, grade):
+        """Item grades (v1.7.0), on the owner's call: every town deals in Low,
+        a capital also in Mid, and no keeper in anything finer. A graded line is
+        a crafted item's, and sits beside its Low twin at twice its price."""
+        if not grade:
+            return
+        crafted = {out for recipe in WORLD["recipes"].values() for out in (recipe.get("output") or {})}
+        self.assertIn(base, crafted, f"{item_id}: only a recipe's output carries a grade")
+        self.assertEqual(grade, "mid", f"{item_id}: a keeper deals in Low and Mid only")
+        self.assertTrue(capital, f"{item_id}: only a capital's shop deals in Mid")
+        ladder = {g["key"]: g for g in WORLD["item_grade_system"]["grades"]}
+        low_price = next((int(line["price"]) for line in shop["sells"] if line["item_id"] == base), None)
+        mid_price = next((int(line["price"]) for line in shop["sells"] if line["item_id"] == item_id), None)
+        if mid_price is not None:
+            self.assertIsNotNone(low_price, f"{item_id} is shelved without its Low twin")
+            self.assertEqual(mid_price, low_price * int(ladder["mid"]["price_mult"]), f"{item_id} is not priced at its grade")
 
     def test_a_smithy_makes_its_own_blades(self):
         # "the products they make": a made-here line is the keeper's craft,

@@ -17,6 +17,7 @@ from ..locations import _known_locations, _location_is_visible, _world_is_unlock
 from ...rules.progression_systems import profession_rank
 from ...rules.trade_receipt import format_trade_receipt
 from ..auction_feed import announce_lot, refresh_lot
+from ..stall_feed import refresh_stall
 from ..formatting import human_duration
 from ..pickers import auction_currency_autocomplete, usable_item_autocomplete
 from ..hubs import register_hub_option_hint
@@ -58,7 +59,7 @@ async def use_item_command(interaction: discord.Interaction, item: str) -> None:
     c = await require_character(interaction)
     if not c:
         return
-    item_def = WORLD.items.get(item)
+    item_def = WORLD.item_definition(item)
     if not item_def:
         await respond(interaction, "Unknown item.", ephemeral=False)
         return
@@ -727,11 +728,21 @@ def _stall_coin(row:dict[str,Any],fallback:str="low_spirit_stone")->str:
 def _stall_listing_line(row:dict[str,Any],coin:str)->str:
     ceiling=int(row.get("npc_ceiling") or 0)
     town=f" · townsfolk pay up to {ceiling}" if ceiling and int(row.get("unit_price") or 0)<=ceiling else ""
+    unit=int(row.get("unit_price") or 0)
+    # A stall is in reach from anywhere (v1.7.0) and the engine quotes what a
+    # listing costs from where the caller stands; the board prints its quote.
+    here=row.get("price_here")
+    far=f" · **{int(here)}** from where you stand" if here is not None and int(here)!=unit else ""
     return (f"• #{int(row.get('listing_id') or 0)} **{WORLD.item_name(str(row.get('item_id') or ''))}** ×{int(row.get('quantity') or 0)}"
-            f" — {int(row.get('unit_price') or 0)} {coin} each{town}")
+            f" — {unit} {coin} each{far}{town}")
 
 
-@registered_group_command(stall_group, name="board",description="The stalls of the city you stand in, and what is laid on them")
+def _stall_roads(hops:Any)->str:
+    n=int(hops or 0)
+    return "here" if n<=0 else ("1 road off" if n==1 else f"{n} roads off")
+
+
+@registered_group_command(stall_group, name="board",description="Every stall in the world, nearest first, and what it costs from where you stand")
 async def stall_board(interaction:discord.Interaction)->None:
     c=await require_character(interaction)
     if not c:return
@@ -741,24 +752,22 @@ async def stall_board(interaction:discord.Interaction)->None:
         await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
     if not board.get("available"):
         await interaction.response.send_message("The stalls are not open in this world yet.",ephemeral=False);return
-    if not board.get("is_city"):
-        await interaction.response.send_message("Stalls are kept in a city's street. Travel to a city and look again.",ephemeral=False);return
-    city=str(board.get("city") or "")
-    coin=_stall_coin(board)
     stalls=list(board.get("stalls") or [])
     if not stalls:
         await interaction.response.send_message(
-            f"Nobody keeps a stall in **{city}** yet. Open one with **/economy → Market Stalls → Open** and lay your goods on it.",ephemeral=False);return
-    lines=[f"🧺 **Market stalls in {city}**"]
+            "Nobody keeps a stall anywhere yet. Open one in a city's street with **/economy → Market Stalls → Open** and lay your goods on it.",ephemeral=False);return
+    pct=int(board.get("distance_percent_per_hop") or 0)
+    lines=["🧺 **Market stalls**, nearest first"]
     for stall in stalls:
         mine=" (yours)" if stall.get("mine") else ""
-        lines.append(f"\n**{stall.get('name')}**{mine} — kept by {stall.get('owner_name') or 'a cultivator'}")
+        lines.append(f"\n**{stall.get('name')}**{mine} in {stall.get('city')} ({_stall_roads(stall.get('hops'))}) — kept by {stall.get('owner_name') or 'a cultivator'}")
         listings=list(stall.get("listings") or [])
         if not listings:
             lines.append("• nothing laid out right now")
         for row in listings:
-            lines.append(_stall_listing_line(row,coin))
-    lines.append("\nBuy with **/economy → Market Stalls → Buy**; the number is the listing.")
+            lines.append(_stall_listing_line(row,_stall_coin(row)))
+    far=f" Goods sent from a stall on another road cost {pct}% more a road, for the courier." if pct else ""
+    lines.append(f"\nBuy with **/economy → Market Stalls → Buy**; the number is the listing.{far}")
     await reply_long(interaction,"\n".join(lines))
 
 
@@ -817,6 +826,8 @@ async def stall_open(interaction:discord.Interaction,name:str)->None:
         f"Lay goods on it with **/economy → Market Stalls → List**; they sell while you are away.",
         ephemeral=False,
     )
+    # The card in this world's market channel follows the stall (v1.7.0).
+    await refresh_stall(interaction.guild,interaction.user.id)
 
 
 @registered_group_command(stall_group, name="list",description="Lay carried goods on your stall at a price of your choosing")
@@ -843,6 +854,8 @@ async def stall_list(interaction:discord.Interaction,item:str,quantity:app_comma
         f"at **{int(result.get('unit_price') or price)} {coin}** each. {town}",
         ephemeral=False,
     )
+    # The card in this world's market channel follows the stall (v1.7.0).
+    await refresh_stall(interaction.guild,interaction.user.id)
 
 
 async def _my_listing_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[int]]:
@@ -874,6 +887,8 @@ async def stall_withdraw(interaction:discord.Interaction,listing:int)->None:
         f"🧺 **{WORLD.item_name(str(result.get('item_id') or ''))} ×{int(result.get('quantity') or 0)}** comes off the stall and back into your bag.",
         ephemeral=False,
     )
+    # The card in this world's market channel follows the stall (v1.7.0).
+    await refresh_stall(interaction.guild,interaction.user.id)
 
 
 @stall_withdraw.autocomplete("listing")
@@ -887,18 +902,18 @@ async def _board_listing_autocomplete(interaction:discord.Interaction,current:st
     except Exception:
         return []
     needle=current.lower().strip()
-    coin=_stall_coin(board)
     choices=[]
     for stall in list(board.get("stalls") or []):
         if stall.get("mine"):continue
         for row in list(stall.get("listings") or []):
             name=WORLD.item_name(str(row.get("item_id") or ""))
             if needle and needle not in name.lower() and needle not in str(stall.get("name") or "").lower():continue
-            choices.append(app_commands.Choice(name=f"#{int(row.get('listing_id') or 0)} {name} ×{int(row.get('quantity') or 0)} — {int(row.get('unit_price') or 0)} {coin} · {stall.get('name')}"[:100],value=int(row.get("listing_id") or 0)))
+            price=int(row.get("price_here") if row.get("price_here") is not None else row.get("unit_price") or 0)
+            choices.append(app_commands.Choice(name=f"#{int(row.get('listing_id') or 0)} {name} ×{int(row.get('quantity') or 0)} — {price} {_stall_coin(row)} · {stall.get('name')}, {_stall_roads(stall.get('hops'))}"[:100],value=int(row.get("listing_id") or 0)))
     return choices[:25]
 
 
-@registered_group_command(stall_group, name="buy",description="Buy from a stall in the city you stand in")
+@registered_group_command(stall_group, name="buy",description="Buy from any stall; goods from another road cost a little more a road")
 @serialized_user_action
 async def stall_buy(interaction:discord.Interaction,listing:int,quantity:app_commands.Range[int,1,99]=1)->None:
     await interaction.response.defer(ephemeral=False)
@@ -909,11 +924,15 @@ async def stall_buy(interaction:discord.Interaction,listing:int,quantity:app_com
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await _report_trade(interaction,str(result.get("item_id") or ""))
+    surcharge=int(result.get("surcharge") or 0)
+    courier=f", {surcharge} of it the courier's for {_stall_roads(result.get('hops'))}" if surcharge else ""
     await interaction.followup.send(
         f"🧺 **{result.get('stall_name') or 'The stall'}** sells you **{WORLD.item_name(str(result.get('item_id') or ''))} ×{int(result.get('quantity') or quantity)}** "
-        f"for **{int(result.get('total') or 0)} {_stall_coin(result)}** ({int(result.get('unit_price') or 0)} each). Balance: **{int(result.get('balance') or 0)}**.",
+        f"for **{int(result.get('total') or 0)} {_stall_coin(result)}** ({int(result.get('unit_price') or 0)} each{courier}). Balance: **{int(result.get('balance') or 0)}**.",
         ephemeral=False,
     )
+    # The seller's card, not the buyer's: a unit came off their stall.
+    await refresh_stall(interaction.guild,int(result.get("seller_user_id") or 0))
 
 
 @stall_buy.autocomplete("listing")
@@ -934,6 +953,8 @@ async def stall_close(interaction:discord.Interaction)->None:
     returned=dict(result.get("returned") or {})
     back=", ".join(f"{WORLD.item_name(k)} ×{int(v)}" for k,v in sorted(returned.items())) or "nothing was left on it"
     await interaction.followup.send(f"🧺 **{result.get('name')}** in {result.get('city')} is taken down; back into your bag: {back}.",ephemeral=False)
+    # The card in this world's market channel follows the stall (v1.7.0).
+    await refresh_stall(interaction.guild,interaction.user.id)
 
 
 register_hub_option_hint(
@@ -949,7 +970,7 @@ register_hub_option_hint(
 register_hub_option_hint(
     stall_buy,
     "listing",
-    "No other cultivator has anything on a stall in this city. See the board with **/economy → Market Stalls → Board**, or set up your own with **Open**.",
+    "No other cultivator has anything on a stall anywhere. See the board with **/economy → Market Stalls → Board**, or set up your own with **Open**.",
 )
 
 

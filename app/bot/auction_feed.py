@@ -4,7 +4,14 @@ channel, kept current while the lot is open and struck when it settles.
 Presentation only. The lot is the `auctions` row the engine owns; this module
 reads it and keeps a Discord message in step with it - listed on
 `auction.sell`, refreshed on `auction.bid`, closed after the simulation tick
-that settles it (finalizeAuctions in Go). The only thing written here is the
+that settles it (finalizeAuctions in Go).
+
+Since v1.7.0 the tick also posts the card for any open lot that has none.
+Until then a card was posted in exactly one place, a player's own
+`/auction sell`, so every lot the world listed itself - an NPC's find
+consigned to the nearest house (`npc_finds.go`), a grave-robber's keepsake -
+sat on the floor with no card, and on a small server that is most of the
+floor. The only thing written here is the
 message id (`auction_lot_messages`), so a lost or deleted message is a card
 that is not there, never a lot that is not.
 """
@@ -50,7 +57,9 @@ async def lot_embed(house_id: str, lot: dict[str, Any], *, state: str = "open") 
         # took the lot at its starting bid; the seller is paid all the same.
         merchant = dict(WORLD.merchants.get(merchant_key) or {})
         bidder = f"{merchant.get('name') or merchant_key} (travelling merchant)"
-    seller = await _name(lot.get("seller_user_id"))
+    # A lot the world listed carries its NPC seller's name and no seller id;
+    # without this the card read "Seller: None".
+    seller = str(lot.get("seller_npc_name") or "") or await _name(lot.get("seller_user_id"))
     minimum = max(int(lot.get("starting_bid") or 0), bid + 1)
     ends_at = int(float(lot.get("ends_at") or time.time()))
     if state == "sold":
@@ -131,11 +140,22 @@ async def refresh_lot(guild: discord.Guild | None, auction_id: int) -> None:
     await _edit_card(guild, record, lot, state="open" if int(lot.get("active") or 0) else "sold")
 
 
-async def settle_lots(guild: discord.Guild | None) -> int:
-    """Strike every card whose lot the engine has settled. Called after each
-    simulation tick; returns how many cards were closed."""
+async def sync_lots(guild: discord.Guild | None) -> int:
+    """Keep the floor's cards in step with the lots. Called after each
+    simulation tick: first post a card for every open lot that has none (the
+    world's own consignments, and a player lot whose first post failed), then
+    strike every card whose lot the engine has settled. Returns how many cards
+    were closed."""
     if guild is None:
         return 0
+    carded = {int(row["auction_id"]) for row in await DB.list_auction_lot_messages(guild.id)}
+    # A house with no channel here has nowhere to post; skipping it keeps an
+    # unbound server from costing two reads per lot on every tick.
+    bound = {str(row["house_id"]) for row in await DB.get_auction_house_channels(guild.id)}
+    for lot in await DB.list_active_auctions():
+        auction_id = int(lot.get("auction_id") or 0)
+        if auction_id and auction_id not in carded and str(lot.get("house_id") or "") in bound:
+            await announce_lot(guild, str(lot.get("house_id") or ""), auction_id)
     closed = 0
     for record in await DB.list_auction_lot_messages(guild.id):
         lot = await DB.get_auction(int(record["auction_id"]))

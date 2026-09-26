@@ -84,7 +84,7 @@ func cleanTradeItems(catalog worlddata.Catalog, raw map[string]int64) (map[strin
 		if id == "" || qty <= 0 {
 			continue
 		}
-		if _, ok := catalog.Items[id]; !ok {
+		if _, _, ok := itemDef(catalog, id); !ok {
 			return nil, fmt.Errorf("unknown item %s", id)
 		}
 		out[id] += qty
@@ -144,7 +144,7 @@ func tradeItemsView(catalog worlddata.Catalog, items map[string]int64) []map[str
 	out := make([]map[string]any, 0, len(ids))
 	for _, id := range ids {
 		name := id
-		if it, ok := catalog.Items[id]; ok && it.Name != "" {
+		if it, _, ok := itemDef(catalog, id); ok && it.Name != "" {
 			name = it.Name
 		}
 		out = append(out, map[string]any{"item_id": id, "name": name, "quantity": items[id]})

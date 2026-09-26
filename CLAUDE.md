@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 65; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 66; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -5035,6 +5035,93 @@ road yard that also carries the keeper's stall, so `shopAt` answers yes there, a
 shut every one of them. A road site is exempt in the engine and in the panel alike, and
 `test_a_button_is_drawn_where_it_works.py` computes the engine's rule a third time over all 477
 locations and holds the panel's Mine hide to it.
+
+### A grade is a suffix, and one door reads it (`item_grade.go`, v1.7.0)
+
+Asked for: items graded Low / Mid / High / Superior / Transcendent, NPC shops dealing only in the
+lowest, player stalls in any. The owner's calls: crafted items only (the recipe outputs), grade by
+the craft's margin capped by trade rank, stronger *and* pricier, towns sell Low and capitals Mid,
+the price doubling a step (x1/2/4/8/16), keepers buying Low and Mid only.
+
+**The quality ladder graded nothing.** `alchemyQualityGo` and `craftQuality` have named a craft's
+quality since before the trades had ranks, and spent it on one thing: a larger Alchemy batch.
+Nothing read quality when an item was used, and `equipment_instances.quality` was read by two
+formulas - `1+(q-100)/200` solo, `q/100` in group combat - that agreed only at 100, the one value
+anything had ever written. `equipmentQualityMult` is the one formula now, and a grade binds at
+its inverse (`gradeEquipmentQuality`), so a High sword really is x1.5.
+
+**A suffix, not a column, and the reason is the tables.** An item id is free text in the bag,
+storage, a stall, the auction floor, a trade offer and a sect's treasury, with no foreign key to
+content, so `<base>@<grade>` rides through all of them with no schema change - and the bare id is
+Low, so every existing row is already correct. A column would have been a migration on six tables
+and a new key on each. The separator is a code constant on both sides, not content: changing it
+would orphan every graded row.
+
+**The cost of a suffix is that `catalog.Items[id]` answers "unknown" for every graded item**, and
+production Go had ~38 of those. `itemDef` is the one door - base, rung, and whether the id names
+anything (only a recipe output has a grade; the first rung is written bare, so `qi_pill@low` is
+refused rather than becoming a second name for Low) - and `TestTheCatalogueIsReadByOneDoor` holds
+production Go to it by AST, the `TestThePurseHasOneDoor` shape. The bot has the same problem with
+`WORLD.items` and the same answer: `World.item_definition`, held by
+`test_item_grades.py`. **What a grade is worth is priced inside `itemDef`**, so every reader of
+`BasePrice`/`SectValue` - sect contribution, appraisal, a merchant's valuation, a keeper's counter -
+gets the grade's worth without knowing grades exist. **What it does is scaled where it is used**:
+restores, lifespan, a modifier (an additive value multiplied, a multiplier's distance from 1), and
+duration. Toxicity is deliberately not, because a stronger pill is not a cleaner one.
+
+**The mint rule holds per grade for free**: `cheapestShelfPrice` and `highestKeeperBuy` key on the
+full graded id, so a Mid counter is held under the Mid shelf. A keeper refuses `keeperGradeCeiling`
+(High) and above before asking whether the shop wants the item. And a stall's town buyers already
+buy only what some shelf sells (v1.5.0), so High and finer sell to players only - exactly the split
+asked for, with no new rule.
+
+**A stall is in reach from anywhere, priced by the road** (asked in the same session: "the player
+shop are always in reach the only thing the price increases per distance"). `stallDistanceHops` is
+a shortest walk over `canonicalRoadNeighbors` plus each road site's `road_leg`, walked to exhaustion
+and capped at `cross_world_hops` - stopped early, a far city would have answered as the off-road
+half and been cheaper than the middle of its world. Another world or a private place is
+`cross_world_hops` (20); the same world but no road (a marsh, a sect gate) is half; a household is
+measured from its town. The surcharge is split a third to the seller, a third to the city's cut
+(which like the fee goes into no purse) and the rest a courier sink; `StallSaleTx`, the town's
+door, passes zero because the town stands in the stall's city.
+
+### Every open lot gets a card, and every stall a card of its own (schema 66, v1.7.0)
+
+Reported as *"I have got no updates on auction channel"*. `announce_lot` posted a lot's card in
+**exactly one place**, a player's own `/auction sell`, and the tick's `settle_lots` only ever edited
+cards that already existed. Every lot the world listed itself - `npc_finds.go` consigning an NPC's
+find or a grave-robber's keepsake to the nearest house - sat on the floor with no card, and on a
+small server that is most of the floor: the same missing wire as `/learn` (rc.43) and the peach
+(rc.50), a finished mechanism nothing pointed at. `sync_lots` posts a card for every open lot that
+has none, skipping houses with no bound channel so an unbound server costs nothing a tick, and the
+card names `seller_npc_name` - it would have read *"Seller: None"*, the `engine —` footer lesson
+(v1.0.8) in a card. The card still needs the house's channel: a server that never ran Full Setup or
+Repair has no auction channels to post in, and nothing here changes that.
+
+**The stall channels are `world_event_channels` again, with one rule it does not have.** One per
+world (`stalls_channel_name` on `REALM_HUBS`, so a fifth world is one entry), in a new **🧺 Market
+Stalls** category after the auction floors, gated by the access role, created only behind
+`create_missing`, re-parented when found elsewhere. The new rule is **read-only**, and it
+deliberately does not go through `ensure_realm_hub_overwrites`: that grants the role the full member
+set, send included, so a read-only overwrite written after it would be flipped back on every Repair
+and written again - churn a "Repair creates nothing new" check cannot see. Every overwrite is
+`merge_overwrite`, lifted out of the cultivator gate (v1.0.11) so there is one statement of *merge,
+never replace*, and the bot allows itself first (rc.52). `test_stall_channels.py` reads the calls in
+source order, because `ast.walk` is breadth-first and "which call comes first" was the assertion.
+
+**One card per stall, kept by three doors.** Each stall command refreshes its keeper's card after
+the engine agreed (a buy refreshes the *seller's*); `sync_stalls` refreshes every card after the
+tick, which is when the town buys (`npc_stalls.go` tells Python only a count) and which also takes
+down the card of a stall that went some way no command saw; and a reset or an erasure reads the card
+before the engine sweeps the row that names it and deletes the message after - v1.0.8's thread rule,
+because `stall_card_messages` is keyed on `user_id` and the sweep takes it. **The tick would otherwise
+edit every card every tick**, so `_LAST_SAID` remembers what each card last said in this process and
+leaves an unchanged one alone; a command refresh forces the edit, and a restart edits each card once.
+
+**`#updates`' blurb had never been posted.** `DEFAULT_CHANNEL_MESSAGES["updates"]` has existed since
+rc.59, and every reader of a default walks `CHANNEL_MESSAGE_KEYS`, which did not name it - so the
+gate that holds every channel to having a blurb (`test_every_channel_says_what_it_is`) was green over
+text nobody could see. A default no slot names is decoration; the slot is there now.
 
 ## Testing conventions
 

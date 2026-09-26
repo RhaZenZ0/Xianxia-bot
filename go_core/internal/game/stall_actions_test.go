@@ -270,30 +270,67 @@ func TestABuyerPaysAndTheSellerIsPaidInTheStallsWorldCurrency(t *testing.T) {
 	if got := stallCount(t, path, `SELECT COUNT(*) FROM currency_wallets WHERE user_id=42 AND currency_id<>'low_spirit_stone'`); got != 0 {
 		t.Fatal("the sale was paid in the seller's current world's money rather than the stall's")
 	}
-	// A buyer in another city is not at the counter.
+	// A stall is in reach from anywhere (v1.7.0), and distance is priced, not
+	// refused. The marsh is in Greenriver's world and on no road, so it counts
+	// as half the cross-world distance: 10 roads, +50%. On a 20-stone pill
+	// that is 10 more: a third to the seller, a third to the city's cut, and
+	// the rest is the courier's, which goes into nobody's purse.
 	batch4Exec(t, path, `UPDATE characters SET location='Moonfen Marsh' WHERE user_id=43`)
-	if _, err := stallAct(t, path, "stall.buy", 43, map[string]any{"listing_id": listing, "quantity": 1}); err == nil || !strings.Contains(err.Error(), "stands in Greenriver Town") {
-		t.Fatalf("a buyer bought from the marsh: %v", err)
+	far := stallMust(t, path, "stall.buy", 43, map[string]any{"listing_id": listing, "quantity": 1})
+	if storage.ParseInt(far["hops"]) != 10 || storage.ParseInt(far["surcharge"]) != 10 || storage.ParseInt(far["total"]) != 30 {
+		t.Fatalf("a pill bought from the marsh cost %v (%v roads, %v surcharge); want 30 = 20 + 10 over 10 roads", far["total"], far["hops"], far["surcharge"])
+	}
+	if storage.ParseInt(far["fee"]) != 2+10/3 || storage.ParseInt(far["seller_paid"]) != 18+10/3 {
+		t.Fatalf("the far sale split the courier's fee wrongly: %v", far)
+	}
+	if got := stallCount(t, path, `SELECT balance FROM currency_wallets WHERE user_id=43 AND currency_id='low_spirit_stone'`); got != 100-20-20-30 {
+		t.Fatalf("the far buyer holds %d, want %d", got, 100-20-20-30)
+	}
+	if got := stallCount(t, path, `SELECT balance FROM currency_wallets WHERE user_id=42 AND currency_id='low_spirit_stone'`); got != 36+18+10/3 {
+		t.Fatalf("the seller holds %d after the far sale, want %d: their price less the cut, and a third of the courier's fee", got, 36+18+10/3)
 	}
 }
 
-func TestTheBoardShowsTheCitysStallsAndNobodyElses(t *testing.T) {
+func TestTheBoardShowsEveryStallPricedFromWhereYouStand(t *testing.T) {
 	path := setupStallDB(t)
 	batch4Exec(t, path, `INSERT INTO inventory(user_id,item_id,quantity) VALUES(42,'recovery_pill',4)`)
 	stallMust(t, path, "stall.open", 42, map[string]any{"name": "Lin's Table"})
 	stallMust(t, path, "stall.list", 42, map[string]any{"item_id": "recovery_pill", "quantity": 4, "unit_price": 6})
 	board := stallQuery(t, path, "stall.board", 43)
 	stalls, _ := board["stalls"].([]map[string]any)
-	if board["city"] != "Greenriver Town" || len(stalls) != 1 || stalls[0]["owner_name"] != "Lin Test" {
+	if board["city"] != "Greenriver Town" || len(stalls) != 1 || stalls[0]["owner_name"] != "Lin Test" || storage.ParseInt(stalls[0]["hops"]) != 0 {
 		t.Fatalf("board %v", board)
+	}
+	if price := storage.ParseInt(stalls[0]["listings"].([]map[string]any)[0]["price_here"]); price != 6 {
+		t.Fatalf("in the stall's own city a 6-stone pill is quoted %d", price)
 	}
 	batch4Exec(t, path, `UPDATE characters SET location='Moonfen Marsh' WHERE user_id=43`)
 	board = stallQuery(t, path, "stall.board", 43)
-	if board["is_city"] != false {
-		t.Fatalf("the marsh is a city: %v", board)
+	stalls, _ = board["stalls"].([]map[string]any)
+	if len(stalls) != 1 || storage.ParseInt(stalls[0]["hops"]) != 10 {
+		t.Fatalf("the marsh's board must still list Greenriver's stall, 10 roads off: %v", board)
 	}
-	if stalls, _ := board["stalls"].([]map[string]any); len(stalls) != 0 {
-		t.Fatalf("the marsh's board lists Greenriver's stall: %v", board)
+	if price := storage.ParseInt(stalls[0]["listings"].([]map[string]any)[0]["price_here"]); price != 9 {
+		t.Fatalf("from the marsh the pill is quoted %d, want 9", price)
+	}
+}
+
+func TestDistanceIsCountedInRoads(t *testing.T) {
+	catalog := shopCatalog(t)
+	cases := []struct {
+		from, to string
+		want     int64
+	}{
+		{"Greenriver Town", "Greenriver Town", 0},
+		{"Riverguard City", "Greenriver Town", 1},
+		{"Moonfen Marsh", "Greenriver Town", 10},
+		{"Spirit Jade Capital", "Greenriver Town", 20},
+		{"Dust Road Waystation", "Immortal River City", 1},
+	}
+	for _, c := range cases {
+		if got := stallDistanceHops(catalog, c.from, c.to); got != c.want {
+			t.Errorf("%s to %s is %d roads, want %d", c.from, c.to, got, c.want)
+		}
 	}
 }
 

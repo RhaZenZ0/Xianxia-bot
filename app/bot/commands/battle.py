@@ -72,7 +72,7 @@ async def _battle_available_options(user_id:int,c:dict)->tuple[list[tuple[str,st
             techniques.append((str(tid),str(t.get('name',tid)),str(t.get('description','Law technique'))))
     inv=await DB.get_inventory(user_id); usable:list[tuple[str,str,str]]=[]
     for iid,qty in inv.items():
-        idef=WORLD.items.get(iid,{})
+        idef=WORLD.item_definition(iid)
         if qty>0 and idef.get('use',{}).get('instant'):
             instant=idef.get('use',{}).get('instant',{})
             recovery=[]

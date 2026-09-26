@@ -544,7 +544,7 @@ func artifactBondAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	if p.ItemID == "" {
 		return authoritativeMutation{}, errors.New("item_id is required")
 	}
-	if _, ok := catalog.Items[p.ItemID]; !ok {
+	if _, _, ok := itemDef(catalog, p.ItemID); !ok {
 		return authoritativeMutation{}, errors.New("unknown canonical item")
 	}
 	character, err := loadLivingCompanionActor(conn, userID)

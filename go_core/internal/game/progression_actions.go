@@ -138,7 +138,7 @@ func conditionTreatAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 	// cultivator at zero; `jade_life_herb`, `heart_calming_pill` and
 	// `purging_phoenix_pill` carry none and are untouched by construction.
 	restored := map[string]any{}
-	if def, ok := catalog.Items[item]; ok {
+	if def, _, ok := itemDef(catalog, item); ok {
 		vit, qi := def.Use.Instant.VitalityRestore, def.Use.Instant.QiRestore
 		if vit > 0 || qi > 0 {
 			if _, err = conn.Execute(

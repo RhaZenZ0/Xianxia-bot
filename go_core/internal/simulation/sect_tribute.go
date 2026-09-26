@@ -25,6 +25,7 @@ package simulation
 import (
 	"fmt"
 	"strings"
+	"xianxia/core/internal/game"
 
 	"xianxia/core/internal/storage"
 	"xianxia/core/internal/worlddata"
@@ -62,7 +63,7 @@ func sectTributeItems(catalog worlddata.Catalog, tribute worlddata.SectTribute, 
 		if itemID == "" || seen[itemID] {
 			continue
 		}
-		if _, ok := catalog.Items[itemID]; !ok {
+		if _, _, ok := game.ItemDef(catalog, itemID); !ok {
 			continue
 		}
 		seen[itemID] = true

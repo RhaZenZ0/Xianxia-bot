@@ -29,7 +29,7 @@ async def _market_item_matches(current:str)->list[app_commands.Choice[str]]:
     # (market.catalog, v0.30.0); WORLD supplies only the display names.
     q=current.lower().strip(); out=[]
     for iid in await SIM.market_item_ids():
-        item=WORLD.items.get(iid) or {}
+        item=WORLD.item_definition(iid)
         name=str(item.get('name',iid))
         if q and q not in name.lower() and q not in iid.lower(): continue
         out.append(app_commands.Choice(name=name[:100],value=iid[:100]))
@@ -48,7 +48,7 @@ async def usable_item_autocomplete(
     needle = current.casefold().strip()
     choices=[]
     for item_id in inv:
-        item=WORLD.items.get(item_id,{})
+        item=WORLD.item_definition(item_id)
         if not item.get("use") and not item.get("storage_upgrade") and not item.get("array_deploy"):
             continue
         label=str(item.get("name",item_id))

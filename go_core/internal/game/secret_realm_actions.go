@@ -269,7 +269,7 @@ func rollRareRoomItems(catalog worlddata.Catalog, room worlddata.SecretRealmRoom
 	sort.Strings(ids)
 	for _, id := range ids {
 		spec := room.RareItems[id]
-		if _, ok := catalog.Items[id]; !ok {
+		if _, _, ok := itemDef(catalog, id); !ok {
 			continue
 		}
 		if spec.Chance <= 0 || spec.Max <= 0 {

@@ -178,7 +178,7 @@ func shopStockRows(conn *storage.Conn, catalog worlddata.Catalog, key string) ([
 	rows := []map[string]any{}
 	for _, row := range rowsToMaps(res) {
 		itemID := fmt.Sprint(row["item_id"])
-		name := catalog.Items[itemID].Name
+		name := itemDisplayNameOrEmpty(catalog, itemID)
 		if name == "" {
 			name = itemID
 		}
@@ -198,7 +198,7 @@ func shopBuysRows(conn *storage.Conn, catalog worlddata.Catalog, userID int64, s
 	sort.Strings(ids)
 	rows := []map[string]any{}
 	for _, id := range ids {
-		name := catalog.Items[id].Name
+		name := itemDisplayNameOrEmpty(catalog, id)
 		if name == "" {
 			name = id
 		}
@@ -337,7 +337,7 @@ func shopTradeSetup(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 }
 
 func itemDisplayName(catalog worlddata.Catalog, itemID string) string {
-	if name := catalog.Items[itemID].Name; name != "" {
+	if name := itemDisplayNameOrEmpty(catalog, itemID); name != "" {
 		return name
 	}
 	return itemID
@@ -397,6 +397,11 @@ func shopSellAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 	p, key, shop, err := shopTradeSetup(conn, catalog, userID, raw)
 	if err != nil {
 		return authoritativeMutation{}, err
+	}
+	// A keeper deals in the two grades a shelf carries (v1.7.0). Anything
+	// finer is priced by players, at a stall or on the auction floor.
+	if itemGradeIndex(catalog, p.ItemID) >= keeperGradeCeiling {
+		return authoritativeMutation{}, fmt.Errorf("a keeper will not price %s; sell it at a market stall or on the auction floor", itemDisplayName(catalog, p.ItemID))
 	}
 	if _, wanted := shop.Buys[p.ItemID]; !wanted {
 		return authoritativeMutation{}, fmt.Errorf("%s does not buy %s", shop.Name, itemDisplayName(catalog, p.ItemID))

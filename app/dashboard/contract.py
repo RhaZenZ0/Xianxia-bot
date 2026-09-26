@@ -27,7 +27,11 @@ DASHBOARD_API_VERSION = 2
 # over them and carries no lever: a GM's erasure and reset already take a
 # stall with the character, and an `admin.stall.close` lever is deferred until
 # a GM asks for one (docs/TODO.md).
-DASHBOARD_REVIEWED_SCHEMA_VERSION = 65
+# Schema 66 (v1.7.0) adds `stall_channels` and `stall_card_messages`: one
+# market-stalls channel per world and a live card per stall in it. Both are
+# Discord bindings the Server Setup card provisions, reports and tears down
+# beside the world-events feeds; neither is a gameplay table.
+DASHBOARD_REVIEWED_SCHEMA_VERSION = 66
 
 DASHBOARD_GET_API_PATHS = frozenset({
     "/api/overview", "/api/capabilities", "/api/timeline", "/api/npcs", "/api/npc",

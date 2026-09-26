@@ -109,7 +109,14 @@ class TheGateAllowsBeforeItDenies(unittest.TestCase):
         # `assertIn` prints its haystack, and the haystack is the whole
         # function; a gate whose message has to be scrolled past is one nobody
         # reads (v1.0.8's shell gate).
-        self.assertTrue("PermissionOverwrite" in self.code and "overwrite=overwrite" in self.code, (
+        #
+        # v1.7.0 lifted the merge into `merge_overwrite` so the market-stalls
+        # channels share one statement of it; the gate must still go through
+        # it, and it must still merge.
+        merge = _code(_function("app/bot/channels.py", "merge_overwrite"))
+        self.assertTrue("merge_overwrite(" in self.code, (
+            "the gate no longer goes through merge_overwrite, so nothing says its overwrites merge"))
+        self.assertTrue("PermissionOverwrite" in merge and "overwrite=overwrite" in merge, (
             "set_permissions(target, **perms) replaces the overwrite. Both anchors carry an "
             "@everyone overwrite of send_messages=False, so a bare view_channel=False would "
             "leave them hidden and writable to everybody holding the role"))

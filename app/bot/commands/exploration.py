@@ -878,9 +878,16 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
     if quality_label:
         prefix = "⚗️ Batch quality" if profession == "Alchemy" else "✨ Craft quality"
         quality_line = f"\n{prefix}: **{quality_label}**"
-        mult = int(resolved.get("output_multiplier", 1))
-        if profession == "Alchemy" and success and mult > 1:
-            quality_line += f" • output ×{mult}"
+        # The grade (v1.7.0): what the quality made, and when the crafter's
+        # rank held it back, what the roll had reached and the rank that makes it.
+        grade = str(resolved.get("grade") or "")
+        reached = str(resolved.get("grade_reached") or "")
+        if success and grade:
+            quality_line += f" • grade **{grade}**"
+            if reached and reached != grade:
+                needed = resolved.get("grade_reached_rank")
+                quality_line += (f"\n-# The roll reached **{reached}**; your rank caps it at {grade}."
+                                 + (f" {reached} needs **{profession_rank(int(needed), profession)}**." if needed is not None else ""))
 
     # Built outside the f-string: a backslash inside an f-string expression is
     # only legal from Python 3.12 (PEP 701), and `python -m compileall app` is
@@ -946,7 +953,7 @@ async def method_slip_autocomplete(interaction: discord.Interaction, current: st
     for item_id, quantity in sorted(held.items()):
         if int(quantity) <= 0:
             continue
-        definition = WORLD.items.get(item_id) or {}
+        definition = WORLD.item_definition(item_id)
         if not definition.get("teaches_recipe"):
             continue
         label = str(definition.get("name") or item_id)

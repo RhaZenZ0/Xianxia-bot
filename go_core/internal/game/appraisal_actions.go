@@ -107,7 +107,7 @@ func appraisalSubject(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	if itemID == "" {
 		return "", worlddata.Item{}, errors.New("name an item or a lot to read")
 	}
-	item, ok := catalog.Items[itemID]
+	item, _, ok := itemDef(catalog, itemID)
 	if !ok {
 		return "", worlddata.Item{}, errors.New("unknown item")
 	}

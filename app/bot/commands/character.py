@@ -43,6 +43,7 @@ from ..runtime import (
     respond,
     serialized_user_action,
 )
+from ..stall_feed import card_record as stall_card_record, take_down_card
 from ..threads import delete_player_threads
 from ..ui.commissions import AbandonCommissionView, abandon_warning
 from ..ui.creation import BirthFamilyView
@@ -529,7 +530,7 @@ async def inventory(interaction: discord.Interaction) -> None:
             # The fallback only covers an id missing from the catalogue; an
             # entry present but short a field must not take the listing down
             # with it, so every read has its own default.
-            item = WORLD.items.get(item_id) or {}
+            item = WORLD.item_definition(item_id)
             name = str(item.get("name") or item_id)
             lines.append(f"**{name}** x{qty} — {item.get('description') or ''}")
         text = "\n".join(lines)
@@ -1052,6 +1053,9 @@ async def reset(interaction: discord.Interaction) -> None:
         )
     except Exception:
         log.exception("Could not read the private threads of user %s before a reset", interaction.user.id)
+    # And their stall's card in the world's market channel (v1.7.0), by the
+    # same ordering: the sweep takes the row that names the message.
+    stall_card = await stall_card_record(interaction.guild, interaction.user.id)
     try:
         envelope = await ENGINE.authoritative_action(
             "character.reset",
@@ -1065,6 +1069,7 @@ async def reset(interaction: discord.Interaction) -> None:
     result = dict(envelope.get("result") or {})
     # The engine committed, so the rooms go with the life.
     threads = await delete_player_threads(interaction.guild, doomed_threads)
+    await take_down_card(interaction.guild, stall_card)
     remaining = int(result.get("resets_remaining", 0))
     lines = [
         f"🌱 **{result.get('name') or c['name']} is gone.** The household's record of them closes, "
