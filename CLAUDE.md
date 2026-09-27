@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 69; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 70; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -5554,6 +5554,26 @@ replies and stay as they are.
 built only when discord.py lacks Components V2, which the pinned 2.7.1 never does. It walks scopes
 by AST, holds that every allowed fallback is still there, and asserts it can find one before it
 trusts an empty answer.
+
+### A flame is what opens the top grade (`flames.go`, schema 70, v1.10.0)
+
+On the owner's calls: Alchemy and Forging only, permanent, and a flame is what unlocks
+Transcendent. The rung asks `min_rank` 7 and a trade stops rising at rank 6
+(`crafting_actions.go`), so nobody could ever make it - `craftGradeIndex` now takes whether the
+bound flame opens the top grade, and `gradeRankAllows` lets a rung carrying `flame_min_rank` (6) be
+made from that rank with one. The margin it asks is still the roll's to reach; the flame's own
+bonus is what helps it get there. `flame_system` in `world.json` is the roster: four flames, one per
+world, captured at that world's Forge Terraces (`flameAt`, and `LOCATION_GATES["flame_source"]`
+the panel twin), each with a realm floor, a capture TN and qi, a bonus from `base_bonus` to
+`max_bonus` over `max_refinement` steps, refine items per step and whether it opens the top grade.
+
+A capture is the purge scorch's shape - `fire_resistance`/5 on the roll and `meridian_damage` on a
+miss - plus `flame_affinity`, the one new modifier stat, which the Heavenly Flame Root carries. A
+refinement is certain: it is the price, not a gamble. `character_flames` is read through
+`heldFlamesTx`, which answers "no flames" rather than erroring when the table is not there yet, for
+v1.1.0's migration-window reason - a craft reads it, and a craft must never refuse over a flame.
+`admin.player.grant_flame` is audited and is how the engine playtest reaches refine and bind
+without winning a roll.
 
 ### A raid is fought at its own pace (v1.9.1)
 

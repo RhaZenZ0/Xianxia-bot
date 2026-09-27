@@ -597,3 +597,152 @@ async def crime_atone(interaction: discord.Interaction, crime_id: int) -> None:
         f"⚖️ Crime **#{crime_id}** is marked **atoned** and any bounty sourced only from it is resolved. "
         f"Paid **{fine} {WORLD.currency_name(currency)}** • remaining balance **{balance}**.",ephemeral=False
     )
+
+
+# ---------------------------------------------------------------------------
+# Flames (v1.10.0)
+# ---------------------------------------------------------------------------
+# A flame is captured at its world's forge terraces, refined with beast cores
+# and ore, and bound to steady an Alchemy or Forging roll; a fully refined
+# heavenly flame is what opens the Transcendent grade. Everything below is the
+# engine's answer (flames.go): nothing here decides a cost, a bonus or a roll.
+flame_group = app_commands.Group(name="flame", description="Capture, refine and bind the flames that steady alchemy and forging")
+
+
+async def _flame_status(user_id: int) -> dict:
+    return dict(await ENGINE.action("flame.status", int(user_id), {}) or {})
+
+
+def _refinement_bar(level: int, maximum: int) -> str:
+    maximum = max(1, int(maximum))
+    level = max(0, min(maximum, int(level)))
+    return f"{'🔥' * level}{'▫️' * (maximum - level)} **{level}/{maximum}**"
+
+
+def _flame_card(c: dict, status: dict) -> Card:
+    trades = " and ".join(str(t) for t in status.get("trades") or []) or "crafting"
+    card = Card(title=f"🔥 Flames — {c['name']}", colour=0xE74C3C,
+                description=(f"A bound flame steadies every **{trades}** roll. A fully refined heavenly flame "
+                             "lets a crafter at the sixth rank make **Transcendent** work."))
+    maximum = int(status.get("max_refinement") or 9)
+    for flame in status.get("flames") or []:
+        name = str(flame.get("name") or flame.get("flame_id"))
+        if flame.get("held"):
+            head = f"{'✅ ' if flame.get('bound') else ''}{name}{' — bound' if flame.get('bound') else ''}"
+            lines = [_refinement_bar(int(flame.get("refinement") or 0), maximum),
+                     f"Adds **+{int(flame.get('bonus') or 0)}** to a craft roll"
+                     + (" • opens **Transcendent**" if flame.get("opens_now") else
+                        (" • opens Transcendent when fully refined" if flame.get("opens_top_grade") else ""))]
+            if flame.get("next_refine_items") is not None:
+                cost = WORLD.item_names({str(k): int(v) for k, v in dict(flame["next_refine_items"]).items()})
+                lines.append(f"Next refinement: {cost} + {int(flame.get('next_refine_qi') or 0)} qi (base)")
+        else:
+            head = f"▫️ {name}"
+            lines = [f"Captured at **{flame.get('location')}** ({flame.get('world')}) from "
+                     f"{WORLD.realm_name(int(flame.get('min_realm_index') or 0))}",
+                     f"+{int(flame.get('base_bonus') or 0)} to +{int(flame.get('max_bonus') or 0)} to a craft roll"
+                     + (" • opens Transcendent when fully refined" if flame.get("opens_top_grade") else "")]
+        if flame.get("description"):
+            lines.append(f"*{flame['description']}*")
+        card.add_field(name=head, value="\n".join(lines), inline=False)
+    card.set_footer(text="Capture with /flame capture at a forge terrace • refine and bind with /flame refine and /flame bind")
+    return card
+
+
+async def held_flame_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    """The flames this cultivator holds - the only ones refine and bind accept."""
+    try:
+        status = await _flame_status(interaction.user.id)
+    except Exception:
+        log.warning("Could not load flames for a picker", exc_info=True)
+        return []
+    needle = current.casefold().strip()
+    out = []
+    for flame in status.get("flames") or []:
+        if not flame.get("held"):
+            continue
+        name = str(flame.get("name") or flame.get("flame_id"))
+        if needle and needle not in name.casefold():
+            continue
+        out.append(app_commands.Choice(name=f"{name} • refinement {int(flame.get('refinement') or 0)}"[:100],
+                                       value=str(flame.get("flame_id"))[:100]))
+    return out[:25]
+
+
+@registered_group_command(flame_group, name="status", description="See the flames you hold, what they give, and where the rest are captured")
+async def flame_status(interaction: discord.Interaction) -> None:
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        status = await _flame_status(interaction.user.id)
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    await interaction.response.send_message(view=card_view(_flame_card(c, status)))
+
+
+@registered_group_command(flame_group, name="capture", description="Try to capture the flame that burns at this forge terrace")
+@serialized_user_action
+async def flame_capture(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction):
+        return
+    try:
+        envelope = await ENGINE.authoritative_action("flame.capture", interaction.user.id, {},
+                                                     action_id=f"discord:{interaction.id}:flame.capture")
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    name = str(result.get("name") or "the flame")
+    lines = [f"🔥 **Capturing the {name}** — {int(result.get('qi_cost') or 0)} qi spent",
+             roll_line(SimpleNamespace(**dict(result.get("roll") or {})))]
+    if result.get("success"):
+        lines.append(f"✅ The {name} is yours, for good. It adds **+{int(result.get('bonus') or 0)}** to Alchemy and Forging rolls"
+                     + (" and is bound." if result.get("bound") else "; bind it with **/craft → Flames → Bind**."))
+    else:
+        scorched = dict(result.get("scorched") or {})
+        lines.append(f"🩸 The flame gets away and burns your meridians — **{scorched.get('name', 'Meridian Damage')}** "
+                     f"(severity {int(scorched.get('severity', 1))}). `/condition treat` with a **Jade Life Herb** mends it.")
+    await interaction.followup.send("\n".join(lines), ephemeral=False)
+
+
+@registered_group_command(flame_group, name="refine", description="Refine a flame you hold with beast cores, ore and qi")
+@app_commands.autocomplete(flame=held_flame_autocomplete)
+@serialized_user_action
+async def flame_refine(interaction: discord.Interaction, flame: str) -> None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction):
+        return
+    try:
+        envelope = await ENGINE.authoritative_action("flame.refine", interaction.user.id, {"flame_id": str(flame)},
+                                                     action_id=f"discord:{interaction.id}:flame.refine")
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    spent = WORLD.item_names({str(k): int(v) for k, v in dict(result.get("spent_items") or {}).items()})
+    lines = [f"🔥 **{result.get('name')}** refined — {_refinement_bar(int(result.get('refinement') or 0), int(result.get('max_refinement') or 9))}",
+             f"Spent {spent} and {int(result.get('qi_cost') or 0)} qi. It now adds **+{int(result.get('bonus') or 0)}** to a craft roll."]
+    if result.get("opens_top_grade"):
+        lines.append("✨ Fully refined: while it is bound, a crafter at the sixth rank can make **Transcendent** work.")
+    await interaction.followup.send("\n".join(lines), ephemeral=False)
+
+
+@registered_group_command(flame_group, name="bind", description="Bind one of your flames as the one your crafting reads")
+@app_commands.autocomplete(flame=held_flame_autocomplete)
+@serialized_user_action
+async def flame_bind(interaction: discord.Interaction, flame: str) -> None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction):
+        return
+    try:
+        envelope = await ENGINE.authoritative_action("flame.bind", interaction.user.id, {"flame_id": str(flame)},
+                                                     action_id=f"discord:{interaction.id}:flame.bind")
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    await interaction.followup.send(f"✅ **{result.get('name')}** is bound: it adds **+{int(result.get('bonus') or 0)}** "
+                                    "to your Alchemy and Forging rolls.", ephemeral=False)

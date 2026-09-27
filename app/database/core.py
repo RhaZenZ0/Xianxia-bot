@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 69
+SCHEMA_VERSION = 70
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -90,6 +90,7 @@ OPERATIONAL_REQUIRED_TABLES = frozenset(
         "character_fate",
         "character_item_appraisals",
         "character_location_discoveries",
+        "character_flames",
         "character_manuals",
         "character_physiques",
         "character_qi_body",
@@ -2834,6 +2835,27 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             # that is the floor they start from.
             "ALTER TABLE sect_membership ADD COLUMN contribution_earned INTEGER NOT NULL DEFAULT 0",
             "UPDATE sect_membership SET contribution_earned=MAX(0,contribution_points)",
+        ),
+    ),
+    (
+        70,
+        "flames",
+        (
+            # v1.10.0: the flames a cultivator captures at a world's forge
+            # terraces. One row per flame held; `refinement` is the only thing
+            # that ever changes, because a flame is never used up, and `bound`
+            # marks the one a craft reads. Keyed on the character, so an
+            # erasure or a reset takes it with them.
+            """CREATE TABLE IF NOT EXISTS character_flames (
+                user_id INTEGER NOT NULL,
+                flame_id TEXT NOT NULL,
+                refinement INTEGER NOT NULL DEFAULT 0,
+                bound INTEGER NOT NULL DEFAULT 0,
+                captured_game_minute INTEGER NOT NULL DEFAULT 0,
+                updated_at REAL NOT NULL,
+                PRIMARY KEY(user_id,flame_id),
+                FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE
+            )""",
         ),
     ),
 )

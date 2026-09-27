@@ -843,13 +843,14 @@ SURFACE = {
         },
     },
     "commands/law.py": {
-        "groups": ('law_group', 'manual_group', 'condition_group', 'profession_group', 'crime_group'),
+        "groups": ('law_group', 'manual_group', 'condition_group', 'profession_group', 'crime_group', 'flame_group'),
         "roots": (),
         "leaves": {
             "law_group": ('status', 'comprehend', 'technique'),
             "manual_group": ('list', 'study', 'practise', 'technique'),
             "condition_group": ('status', 'treat'),
             "profession_group": ('status', 'exam'),
+            "flame_group": ('status', 'capture', 'refine', 'bind'),
             "crime_group": ('status', 'atone'),
         },
     },

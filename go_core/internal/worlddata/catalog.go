@@ -1032,6 +1032,9 @@ type Catalog struct {
 	// multiplies and the trade rank that can make it. Which items are graded is
 	// not listed here: it is every recipe's output, read off Recipes.
 	ItemGrades ItemGradeSystem `json:"item_grade_system"`
+	// FlameSystem (v1.10.0): the flames a cultivator captures at a world's
+	// forge terraces, refines, and binds to steady an Alchemy or Forging roll.
+	FlameSystem FlameSystem `json:"flame_system"`
 }
 
 // ItemGradeSystem is the grade ladder a crafted item climbs (v1.7.0). A graded
@@ -1051,6 +1054,36 @@ type ItemGrade struct {
 	MinRank    int64    `json:"min_rank"`
 	Qualities  []string `json:"qualities"`
 	MinMargin  *int64   `json:"min_margin"`
+	// FlameMinRank (v1.10.0), when set, is the rank at which a crafter whose
+	// bound flame opens the top grade may make this rung below its MinRank.
+	FlameMinRank *int64 `json:"flame_min_rank"`
+}
+
+// FlameSystem is the flame roster (v1.10.0). Every field is read by one rule
+// in the game package (flames.go).
+type FlameSystem struct {
+	Description               string                     `json:"description"`
+	Trades                    []string                   `json:"trades"`
+	MaxRefinement             int64                      `json:"max_refinement"`
+	CaptureScorchSevereMargin int64                      `json:"capture_scorch_severe_margin"`
+	Flames                    map[string]FlameDefinition `json:"flames"`
+}
+
+// FlameDefinition is one flame: where it is captured, how hard, what binding
+// it adds to a craft at each refinement, and what refining it costs.
+type FlameDefinition struct {
+	Name          string           `json:"name"`
+	Description   string           `json:"description"`
+	World         string           `json:"world"`
+	Location      string           `json:"location"`
+	MinRealmIndex int64            `json:"min_realm_index"`
+	CaptureTN     int64            `json:"capture_tn"`
+	CaptureQi     int64            `json:"capture_qi"`
+	BaseBonus     int64            `json:"base_bonus"`
+	MaxBonus      int64            `json:"max_bonus"`
+	RefineItems   map[string]int64 `json:"refine_items"`
+	RefineQi      int64            `json:"refine_qi"`
+	OpensTopGrade bool             `json:"opens_top_grade"`
 }
 
 // StallSystem is that roster. Every field is read by one rule in the game

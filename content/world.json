@@ -768,6 +768,11 @@
             "stat": "combat_bonus",
             "operation": "add",
             "value": 1
+          },
+          {
+            "stat": "flame_affinity",
+            "operation": "add",
+            "value": 2
           }
         ]
       },
@@ -71213,6 +71218,9 @@
       "family legacy": 5,
       "family quest": 5,
       "fate history": 4,
+      "flame bind": 2,
+      "flame capture": 2,
+      "flame refine": 2,
       "formation activate": 2,
       "formation assign": 2,
       "formation create": 2,
@@ -71298,6 +71306,7 @@
       "combat / Formations": 2,
       "combat / Party": 2,
       "craft / Alchemy": 2,
+      "craft / Flames": 2,
       "craft / Profession": 2,
       "cultivation / Arts": 2,
       "cultivation / Ghost": 2,
@@ -71400,8 +71409,88 @@
         "price_mult": 16,
         "min_rank": 7,
         "qualities": [],
-        "min_margin": 12
+        "min_margin": 12,
+        "flame_min_rank": 6
       }
     ]
+  },
+  "flame_system": {
+    "description": "Flames a cultivator captures at a world's forge terraces and refines over time (v1.10.0). A bound flame steadies an Alchemy or Forging roll, and a fully refined heavenly flame is what lets a crafter reach the Transcendent grade. A flame is never used up.",
+    "trades": [
+      "Alchemy",
+      "Forging"
+    ],
+    "max_refinement": 9,
+    "capture_scorch_severe_margin": -5,
+    "flames": {
+      "earth_heart_fire": {
+        "name": "Earth-Heart Fire",
+        "description": "The slow red fire that lives under a forge city's oldest furnaces. It is patient, forgiving and hard to put out.",
+        "world": "Mortal World",
+        "location": "Emberforge Forge Terraces",
+        "min_realm_index": 2,
+        "capture_tn": 12,
+        "capture_qi": 20,
+        "base_bonus": 1,
+        "max_bonus": 2,
+        "refine_items": {
+          "beast_core": 1,
+          "spirit_iron": 1
+        },
+        "refine_qi": 10,
+        "opens_top_grade": false
+      },
+      "crimson_lotus_flame": {
+        "name": "Crimson Lotus Flame",
+        "description": "A flame that opens like a lotus when fed spirit crystal, and closes like a fist when it is not.",
+        "world": "Spiritual World",
+        "location": "Vermilion Furnace Forge Terraces",
+        "min_realm_index": 8,
+        "capture_tn": 15,
+        "capture_qi": 40,
+        "base_bonus": 1,
+        "max_bonus": 3,
+        "refine_items": {
+          "beast_core": 2,
+          "spirit_crystal_ore": 1
+        },
+        "refine_qi": 20,
+        "opens_top_grade": false
+      },
+      "nine_heavens_sun_flame": {
+        "name": "Nine-Heavens Sun Flame",
+        "description": "A shard of the sun the Solar Furnace was built to hold. Fully refined, it burns clean enough to make a thing without a single flaw.",
+        "world": "Immortal World",
+        "location": "Solar Furnace Forge Terraces",
+        "min_realm_index": 16,
+        "capture_tn": 18,
+        "capture_qi": 80,
+        "base_bonus": 2,
+        "max_bonus": 4,
+        "refine_items": {
+          "beast_core": 3,
+          "immortal_gold_ore": 1
+        },
+        "refine_qi": 40,
+        "opens_top_grade": true
+      },
+      "primordial_chaos_flame": {
+        "name": "Primordial Chaos Flame",
+        "description": "The fire that was burning before the heavens were divided. The Solar Crucible does not contain it so much as persuade it to stay.",
+        "world": "Celestial World",
+        "location": "Solar Crucible Forge Terraces",
+        "min_realm_index": 24,
+        "capture_tn": 21,
+        "capture_qi": 120,
+        "base_bonus": 3,
+        "max_bonus": 5,
+        "refine_items": {
+          "beast_core": 4,
+          "starsteel_ore": 1
+        },
+        "refine_qi": 60,
+        "opens_top_grade": true
+      }
+    }
   }
 }

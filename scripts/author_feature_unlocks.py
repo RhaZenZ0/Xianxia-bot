@@ -106,6 +106,9 @@ PAGES: dict[str, int] = {
     "economy / Caravans": 3,
     "craft / Alchemy": 2,
     "craft / Profession": 2,
+    # Flames (v1.10.0): a system past the first hour, like the rest of the
+    # trades beyond the basics. The Mortal flame is held from the same realm.
+    "craft / Flames": 2,
     "sect / Sect": 2,
     # `sect / Recruitment` stays at 0 (v1.1.0): Recommendation and Trial take
     # an argument, so a hub press is the only way to reach them, and

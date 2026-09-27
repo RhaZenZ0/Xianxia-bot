@@ -1729,6 +1729,12 @@ class ReadOnlyDashboardStore:
                 """SELECT a.*,c.name AS player_name FROM artifact_bonds a JOIN characters c ON c.user_id=a.user_id
                    ORDER BY a.awakened DESC,a.bond_level DESC,a.resonance DESC,c.name LIMIT 200""",
             )
+            # The flames a cultivator has captured (v1.10.0, schema 70): read only.
+            flames = await self._fetchall_if_table(
+                db, "character_flames",
+                """SELECT f.*,c.name AS player_name FROM character_flames f JOIN characters c ON c.user_id=f.user_id
+                   ORDER BY f.refinement DESC,c.name,f.flame_id LIMIT 200""",
+            )
             abodes = await self._fetchall_if_table(
                 db, "cave_abodes",
                 """SELECT a.*,c.name AS owner_name FROM cave_abodes a JOIN characters c ON c.user_id=a.user_id
@@ -1764,7 +1770,7 @@ class ReadOnlyDashboardStore:
                     "deployed_arrays": len(arrays),
                 },
                 "professions": professions, "alchemy": alchemy, "alchemy_batches": batches,
-                "spirit_beasts": beasts, "artifact_bonds": artifacts, "cave_abodes": abodes,
+                "spirit_beasts": beasts, "artifact_bonds": artifacts, "flames": flames, "cave_abodes": abodes,
                 "sect_abodes": sect_abodes, "personal_worlds": personal_worlds,
                 "deployed_arrays": arrays, "equipment": equipment,
             }

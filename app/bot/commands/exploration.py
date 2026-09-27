@@ -926,6 +926,8 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
             (f"Birth-family {resolved.get('family_trade') or 'trade'} tradition", inherited_family_bonus),
             (f"Past-life {profession} memory ({resolved.get('craft_echo_life') or 'a life before'})", craft_echo),
             ("Profession mastery bonus", profession_bonus),
+            # The bound flame (v1.10.0): the engine's own figure and name.
+            (f"🔥 {resolved.get('flame_name') or 'Bound flame'}", int(resolved.get("flame_bonus", 0))),
         )
         if value
     ]

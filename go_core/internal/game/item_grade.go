@@ -167,8 +167,9 @@ func itemSectValue(catalog worlddata.Catalog, itemID string) int64 {
 // craftGradeIndex is the rung a craft reaches: the highest rung whose quality
 // or margin the roll met, then capped by the crafter's rank in the trade. The
 // second value is the rung before the cap, so a reply can say what a higher
-// rank would have made.
-func craftGradeIndex(catalog worlddata.Catalog, quality string, margin, rank int64) (int, int) {
+// rank would have made. A bound flame that opens the top grade (v1.10.0) lets
+// a rung carrying `flame_min_rank` be made from that rank instead.
+func craftGradeIndex(catalog worlddata.Catalog, quality string, margin, rank int64, flameOpens bool) (int, int) {
 	reached := 0
 	for i, g := range catalog.ItemGrades.Grades {
 		hit := false
@@ -185,10 +186,19 @@ func craftGradeIndex(catalog worlddata.Catalog, quality string, margin, rank int
 		}
 	}
 	capped := reached
-	for capped > 0 && catalog.ItemGrades.Grades[capped].MinRank > rank {
+	for capped > 0 && !gradeRankAllows(catalog.ItemGrades.Grades[capped], rank, flameOpens) {
 		capped--
 	}
 	return capped, reached
+}
+
+// gradeRankAllows is whether a crafter at this rank may make this rung: at its
+// MinRank, or at its FlameMinRank with a flame that opens it.
+func gradeRankAllows(g worlddata.ItemGrade, rank int64, flameOpens bool) bool {
+	if g.MinRank <= rank {
+		return true
+	}
+	return flameOpens && g.FlameMinRank != nil && rank >= *g.FlameMinRank
 }
 
 // itemDisplayNameOrEmpty is an item's name at its grade ("Qi Pill (High)"), or

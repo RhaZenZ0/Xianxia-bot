@@ -2512,6 +2512,38 @@ async def run(url: str, token: str, db_path: str) -> Report:
     await step(report, "the realm the earlier sections left", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": realm_before[0], "phase": realm_before[1], "reason": "playtest"}))
     await step(report, "home to the town", gm("admin.player.teleport", {"user_id": PLAYER, "location": town, "reason": "playtest"}))
 
+    # ---- 20z. flames (v1.10.0) -------------------------------------------------
+    # A flame is captured at its world's forge terraces on a real roll, so the
+    # capture is driven and its outcome reported, never asserted. What follows
+    # must not hang on that roll, so the GM's grant lever gives the flame -
+    # which is also the audited lever being proved - and refine, bind and the
+    # status read are then certain. The heavenly flame, granted fully refined,
+    # is what the status must say opens Transcendent.
+    await step(report, "stand at Foundation Establishment for a flame", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 2, "phase": 1, "reason": "playtest: a flame asks for it"}))
+    await step(report, "to the Emberforge forge terraces", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Emberforge Forge Terraces", "reason": "playtest"}))
+    captured = await step(report, "flame.capture at the terraces (a roll: taken or burned)", act_free("flame.capture", PLAYER, {}))
+    if captured is not None:
+        report.add("PASS", "the capture, for the record",
+                   f"{captured.get('name')}: {'taken' if captured.get('success') else 'got away and burned the meridians'}")
+    await audited("admin.player.grant_flame", {"user_id": PLAYER, "flame_id": "earth_heart_fire", "refinement": 0, "reason": "playtest"})
+    await step(report, "grant the refinement's makings", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": "beast_core", "quantity": 5, "reason": "playtest"}))
+    await step(report, "grant the refinement's ore", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": "spirit_iron", "quantity": 5, "reason": "playtest"}))
+    refined = await step(report, "flame.refine the Earth-Heart Fire", act("flame.refine", PLAYER, {"flame_id": "earth_heart_fire"}))
+    if refined is not None:
+        report.add("PASS" if int(refined.get("refinement") or 0) == 1 else "FAIL", "refining raised it to 1", str(refined.get("refinement")))
+    await audited("admin.player.grant_flame", {"user_id": PLAYER, "flame_id": "nine_heavens_sun_flame", "refinement": 9, "reason": "playtest"})
+    bound = await step(report, "flame.bind the Nine-Heavens Sun Flame", act("flame.bind", PLAYER, {"flame_id": "nine_heavens_sun_flame"}))
+    if bound is not None:
+        report.add("PASS" if bound.get("flame_id") == "nine_heavens_sun_flame" else "FAIL", "the heavenly flame is the bound one", str(bound))
+    flames = await step(report, "flame.status", query("flame.status", PLAYER, {}))
+    if flames is not None:
+        sun = next((f for f in flames.get("flames") or [] if f.get("flame_id") == "nine_heavens_sun_flame"), {})
+        report.add("PASS" if sun.get("bound") and sun.get("opens_now") else "FAIL",
+                   "the fully refined heavenly flame is bound and opens Transcendent", str(sun))
+    await step(report, "back to the town", gm("admin.player.teleport", {"user_id": PLAYER, "location": town, "reason": "playtest"}))
+    await step(report, "flame.capture from the town is refused", act_free("flame.capture", PLAYER, {}), expect_error="no flame burns here")
+    await step(report, "the realm the earlier sections left, again", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": realm_before[0], "phase": realm_before[1], "reason": "playtest"}))
+
     # ---- 21. samsara, and what the hands remember (v1.0.0-rc.32) -------------
     # Last, because it ends the character. The trades this life practised go
     # into its record before the wipe, and a fresh rebirth remembers nothing
