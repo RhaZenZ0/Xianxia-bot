@@ -2542,6 +2542,26 @@ async def run(url: str, token: str, db_path: str) -> Report:
                    "the fully refined heavenly flame is bound and opens Transcendent", str(sun))
     await step(report, "back to the town", gm("admin.player.teleport", {"user_id": PLAYER, "location": town, "reason": "playtest"}))
     await step(report, "flame.capture from the town is refused", act_free("flame.capture", PLAYER, {}), expect_error="no flame burns here")
+    # The spirit sense (v1.10.0): built by practice, never captured. A
+    # meditation must build it; a full stage is staged with the GM's lever
+    # (audited) and settled, and a fully built sense must say it opens
+    # Transcendent for Formation and Inscription.
+    sense_before = await step(report, "spirit_sense.status before", query("spirit_sense.status", PLAYER, {}))
+    meditated = await step(report, "a meditation builds the spirit sense", act_free("cultivation.train", PLAYER, {}))
+    if meditated is not None:
+        gained = dict(meditated.get("spirit_sense_gain") or {})
+        report.add("PASS" if int(gained.get("gain") or 0) > 0 or int((sense_before or {}).get("stage") or 0) >= 9 else "FAIL",
+                   "the meditation reported spirit-sense progress", str(gained))
+    await audited("admin.player.set_spirit_sense", {"user_id": PLAYER, "stage": 0, "progress": 40, "reason": "playtest: a full first stage"})
+    settled = await step(report, "spirit_sense.settle a full stage", act("spirit_sense.settle", PLAYER, {}))
+    if settled is not None:
+        report.add("PASS" if int(settled.get("stage") or 0) == 1 else "FAIL", "settling raised the sense to stage 1", str(settled))
+    await step(report, "spirit_sense.settle an empty stage is refused", act("spirit_sense.settle", PLAYER, {}), expect_error="toward its next stage")
+    await audited("admin.player.set_spirit_sense", {"user_id": PLAYER, "stage": 9, "progress": 0, "reason": "playtest: fully built"})
+    sense = await step(report, "spirit_sense.status fully built", query("spirit_sense.status", PLAYER, {}))
+    if sense is not None:
+        report.add("PASS" if sense.get("opens_now") and int(sense.get("bonus") or 0) == 5 else "FAIL",
+                   "a fully built sense gives +5 and opens Transcendent", str(sense))
     await step(report, "the realm the earlier sections left, again", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": realm_before[0], "phase": realm_before[1], "reason": "playtest"}))
 
     # ---- 21. samsara, and what the hands remember (v1.0.0-rc.32) -------------

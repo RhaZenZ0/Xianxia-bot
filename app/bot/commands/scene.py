@@ -17,7 +17,7 @@ from discord import app_commands
 from ...ops.game_engine import GameEngineError
 from ...ai.narrator import roll_npc_memory
 from ...rules import commissions as commission_rules
-from ...rules.advanced_runtime import deed_karma_line
+from ...rules.advanced_runtime import deed_karma_line, spirit_gain_line
 from ...rules.npc_memory import classify_memory, exchange_memory_summary, public_mood_hint
 from .. import scene_layout
 from ..cards import Card, card_view
@@ -407,6 +407,9 @@ async def _resolve_scene_action(
         karma_line = deed_karma_line(mechanics.get("deed_karma"))
         if karma_line:
             fixed += f"\n{karma_line}"
+        sense_line = spirit_gain_line(mechanics.get("spirit_sense_gain"))
+        if sense_line:
+            fixed += f"\n{sense_line}"
     action_text = f"{profile['label']} — target: {target}. {detail}"
     channel_id = interaction.channel_id or 0
     await DB.add_history(channel_id, user_id=interaction.user.id, speaker=c["name"], content=action_text)

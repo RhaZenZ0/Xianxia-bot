@@ -15,6 +15,7 @@ from discord import app_commands
 
 from ...ops.game_engine import GameEngineError
 from ...rules.progression_systems import ascension_gate
+from ...rules.advanced_runtime import spirit_gain_line
 from ..character_state import record_quest_progress, announce_quest_progress, current_effect_modifiers
 from ..formatting import roll_line
 from ..status_cards import _ELEMENT_MARKS
@@ -105,6 +106,8 @@ async def cultivate(interaction: discord.Interaction) -> None:
         extra += f"\n🧭 **{result.get('stance_label') or stance.title()}** stance: **x{float(result.get('stance_mult', 1)):.2f}** gain."
     if int(result.get("insight_xp_gain", 0)):
         extra += f"\n💡 Refining banks **+{int(result['insight_xp_gain'])} Insight XP** toward the realm gate."
+    if spirit_gain_line(result.get("spirit_sense_gain")):
+        extra += "\n" + spirit_gain_line(result.get("spirit_sense_gain"))
     deviation = dict(result.get("deviation") or {})
     if deviation:
         extra += f"\n⚠️ The forced qi ran wild: **{deviation.get('name') or 'Qi Deviation'}** (severity {int(deviation.get('severity', 1))}). Treat it under **/character → Afflictions**, or it drags every session down."

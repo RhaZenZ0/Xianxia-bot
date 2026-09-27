@@ -72,7 +72,7 @@ from .commands.equipment import equipment_group
 from .commands.exploration import alchemy_group, city_group, realmhub_group, travel_group
 from .commands.family import family_group
 from .commands.formation import formation_group, formation_status
-from .commands.law import condition_group, crime_group, flame_group, law_group, manual_group, profession_group
+from .commands.law import condition_group, crime_group, flame_group, law_group, manual_group, profession_group, spirit_group
 from .commands.scene import scene_group, scene_status, talk
 from .commands.secretrealm import secret_group, secret_status
 from .commands.sect import sect_group
@@ -140,6 +140,7 @@ _GROUP_ACTION_ROOTS = {
     "tribulation": tribulation_group,
     "profession": profession_group,
     "flame": flame_group,
+    "spirit": spirit_group,
     "crime": crime_group,
     "beast": beast_group,
     "artifact": artifact_group,
@@ -179,7 +180,7 @@ _MIGRATED_ROOTS = {
     "dantian", "daoheart", "duel", "effects", "equipment", "era", "explore", "family",
     "formation", "ghost", "grudges", "hunt", "hunter", "inheritances", "fate", "mine",
     "innerworld", "inventory", "karma", "law", "learn", "lifespan", "manual", "market", "merchant", "shop", "trade", "blackmarket",
-    "meridian", "npcinfo", "party", "perfect", "profession", "provenance", "reincarnate", "flame",
+    "meridian", "npcinfo", "party", "perfect", "profession", "provenance", "reincarnate", "flame", "spirit",
     "reputation", "reset", "rulers", "scene", "seclusion", "secretrealm", "sect", "sense",
     "sheet", "soul", "spatialkey", "specialeffects", "stall", "stance", "insight", "storage", "talk", "territory",
     "time", "travel", "realmhub", "tribulation", "use", "wallet", "war", "world",
@@ -379,6 +380,7 @@ _HUB_DEFINITIONS = (
             _hub_page("craft", "General Crafting", "Practice alchemy, forging, formation or talisman inscription from known recipes."),
             _hub_page("profession", "Profession", "Your crafting and support-profession mastery: what rank you hold, the hall examination that certifies it, and reading a method slip into a method you keep.", "learn"),
             _hub_page("flame", "Flames", "Capture a flame at a world's forge terraces, refine it and bind it: it steadies every alchemy and forging roll, and a fully refined heavenly flame opens the Transcendent grade."),
+            _hub_page("spirit", "Spirit Sense", "Build your spirit sense through formation and inscription, meditation and scene actions, and settle each stage with qi: it steadies those two trades, and fully built it opens the Transcendent grade."),
         ),
     ),
     HubDefinition(
@@ -1553,6 +1555,8 @@ TREE_COMMANDS: tuple[str, ...] = (
     "profession",
     # Flames (v1.10.0): capture, refine and bind, as a command of its own too.
     "flame",
+    # And its Formation/Inscription twin, built rather than captured.
+    "spirit",
 )
 
 

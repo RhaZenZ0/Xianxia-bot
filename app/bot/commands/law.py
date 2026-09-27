@@ -746,3 +746,76 @@ async def flame_bind(interaction: discord.Interaction, flame: str) -> None:
     result = dict(envelope.get("result") or {})
     await interaction.followup.send(f"✅ **{result.get('name')}** is bound: it adds **+{int(result.get('bonus') or 0)}** "
                                     "to your Alchemy and Forging rolls.", ephemeral=False)
+
+
+# ---------------------------------------------------------------------------
+# The spirit sense (v1.10.0)
+# ---------------------------------------------------------------------------
+# Built, never captured: Formation and Inscription crafts, meditation and
+# scene actions fill it, qi settles each stage, and it steadies Formation and
+# Inscription rolls. Fully built, it opens the Transcendent grade for those
+# two trades. Every number here is the engine's (spirit_sense.go).
+spirit_group = app_commands.Group(name="spirit", description="Build the spirit sense that steadies formation and inscription")
+
+
+def _spirit_card(c: dict, status: dict) -> Card:
+    trades = " and ".join(str(t) for t in status.get("trades") or []) or "those trades"
+    stage = int(status.get("stage") or 0)
+    maximum = int(status.get("max_stage") or 9)
+    card = Card(title=f"🌀 Spirit Sense — {c['name']}", colour=0x8E44AD,
+                description=(f"Built, not found: practice fills it and qi settles each stage. It steadies every "
+                             f"**{trades}** roll, and fully built it lets a crafter at the sixth rank make **Transcendent** work."))
+    card.add_field(name=f"Stage {stage}/{maximum}",
+                   value=(f"{'🌀' * stage}{'▫️' * (maximum - stage)}\nAdds **+{int(status.get('bonus') or 0)}** to a {trades} roll"
+                          + (" • opens **Transcendent**" if status.get("opens_now") else "")), inline=False)
+    if status.get("need") is not None:
+        progress, need = int(status.get("progress") or 0), int(status.get("need") or 1)
+        filled = min(10, round(progress * 10 / max(1, need)))
+        ready = progress >= need
+        card.add_field(name="Toward the next stage",
+                       value=(f"{'🟪' * filled}{'⬛' * (10 - filled)} **{progress}/{need}**\n"
+                              + (f"✅ Ready: **/spirit settle** for {int(status.get('settle_qi') or 0)} qi (base) → +{int(status.get('next_bonus') or 0)}"
+                                 if ready else f"Next stage adds +{int(status.get('next_bonus') or 0)}; settling it costs {int(status.get('settle_qi') or 0)} qi (base)")),
+                       inline=False)
+    gains = dict(status.get("gains") or {})
+    card.add_field(name="What builds it",
+                   value=(f"🛠️ a {trades} craft **+{int(gains.get('craft') or 0)}** (half on a miss)\n"
+                          f"🧘 a meditation **+{int(gains.get('meditation') or 0)}**\n"
+                          f"🎭 a successful scene action **+{int(gains.get('scene') or 0)}**, {int(status.get('scene_gains_per_day') or 0)} a world day\n"
+                          f"Each gains a little more for your Spirit (+1 per {int(status.get('spirit_divisor') or 4)} Spirit)."),
+                   inline=False)
+    card.set_footer(text="Settle a full stage with /spirit settle")
+    return card
+
+
+@registered_group_command(spirit_group, name="status", description="See your spirit sense, its stage and what builds it")
+async def spirit_status(interaction: discord.Interaction) -> None:
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        status = dict(await ENGINE.action("spirit_sense.status", interaction.user.id, {}) or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    await interaction.response.send_message(view=card_view(_spirit_card(c, status)))
+
+
+@registered_group_command(spirit_group, name="settle", description="Settle a full stage of your spirit sense into the next, for qi")
+@serialized_user_action
+async def spirit_settle(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction):
+        return
+    try:
+        envelope = await ENGINE.authoritative_action("spirit_sense.settle", interaction.user.id, {},
+                                                     action_id=f"discord:{interaction.id}:spirit_sense.settle")
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    lines = [f"🌀 **Spirit sense settled — stage {int(result.get('stage') or 0)}/{int(result.get('max_stage') or 9)}** "
+             f"for {int(result.get('qi_cost') or 0)} qi. It now adds **+{int(result.get('bonus') or 0)}** to Formation and Inscription rolls."]
+    if result.get("opens_top_grade"):
+        lines.append("✨ Fully built: a crafter at the sixth rank can make **Transcendent** Formation and Inscription work.")
+    await interaction.followup.send("\n".join(lines), ephemeral=False)

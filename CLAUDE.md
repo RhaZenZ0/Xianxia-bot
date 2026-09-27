@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 70; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 71; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -5574,6 +5574,17 @@ refinement is certain: it is the price, not a gamble. `character_flames` is read
 v1.1.0's migration-window reason - a craft reads it, and a craft must never refuse over a flame.
 `admin.player.grant_flame` is audited and is how the engine playtest reaches refine and bind
 without winning a roll.
+
+**The spirit sense is the flame's twin and deliberately its opposite** (`spirit_sense.go`, schema
+71): on the owner's call, "no spirit capture, you build your spirit". Nothing is found or rolled.
+`spiritSenseGainTx` is the one door progress comes in by, called from `craftResolveAction` (a
+Formation or Inscription craft, half on a miss), `cultivationTrain` (a qi meditation) and
+`resolveSceneAction` (a success, capped per world day off `event_log` like good-deed karma), and
+`TestEveryPracticeBuildsTheSenseWhereItHappens` reads the three calls by AST. Progress stops at the
+stage's need until `spirit_sense.settle` spends qi to take the next stage, so practice cannot run
+past a stage nobody chose to settle. A fully built sense opens the top rung for its two trades
+through the same `opened_min_rank` the flame uses - one rung field, two things that can open it -
+which is why it is not called `flame_min_rank`. `admin.player.set_spirit_sense` is audited.
 
 ### A raid is fought at its own pace (v1.9.1)
 

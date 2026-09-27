@@ -487,3 +487,14 @@ def deed_karma_line(deed: Mapping[str, Any] | None) -> str:
         return ""
     why = _DEED_WORDS.get(str(deed.get("deed") or ""), "for a good deed")
     return f"☯️ Karma **{delta:+d}** {why} → **{int(deed.get('karma_score') or 0):+d}**"
+
+
+def spirit_gain_line(gained: Any) -> str:
+    """The line a reply prints for spirit-sense progress the engine wrote
+    (v1.10.0): a Formation or Inscription craft, a meditation, a scene action."""
+    gained = dict(gained) if isinstance(gained, Mapping) else {}
+    gain = int(gained.get("gain") or 0)
+    if not gain:
+        return ""
+    line = f"🌀 Spirit sense **+{gain}** → {int(gained.get('progress') or 0)}/{int(gained.get('need') or 0)}"
+    return line + (" • ready to settle (**/spirit settle**)" if gained.get("ready") else "")

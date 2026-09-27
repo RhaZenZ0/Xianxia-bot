@@ -39,7 +39,9 @@ DASHBOARD_API_VERSION = 2
 # Schema 70 (v1.10.0) adds `character_flames`, the flames a cultivator has
 # captured: shown read-only on Crafting & Assets beside the artifact bonds,
 # with no lever - a flame is taken, refined and bound by the player.
-DASHBOARD_REVIEWED_SCHEMA_VERSION = 70
+# Schema 71 (v1.10.0) adds `character_spirit_sense`, the sense a cultivator
+# builds for Formation and Inscription: read-only on Crafting & Assets too.
+DASHBOARD_REVIEWED_SCHEMA_VERSION = 71
 
 DASHBOARD_GET_API_PATHS = frozenset({
     "/api/overview", "/api/capabilities", "/api/timeline", "/api/npcs", "/api/npc",
@@ -147,7 +149,7 @@ DASHBOARD_SYSTEM_TABLES = {
     ),
     "crafting": (
         "profession_progress", "alchemy_state", "alchemy_batches", "spirit_beasts", "artifact_bonds",
-        "character_flames", "cave_abodes", "sect_abodes", "personal_worlds", "deployed_location_arrays", "equipment_instances",
+        "character_flames", "character_spirit_sense", "cave_abodes", "sect_abodes", "personal_worlds", "deployed_location_arrays", "equipment_instances",
     ),
     "exploration": (
         "exploration_events", "exploration_event_participants", "secret_realm_runs",

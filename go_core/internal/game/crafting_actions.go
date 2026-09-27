@@ -421,7 +421,9 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	}
 	// And the bound flame (v1.10.0), for the two trades that work with fire.
 	flameBonus, flameOpens, flameName := craftFlameTx(conn, catalog, userID, profession)
-	contextBonus := effectBonus + facilityBonus + manorFacilityBonus + familyBonus + craftEcho + flameBonus
+	// And the spirit sense, for the two trades drawn with spirit rather than fire.
+	senseBonus, senseOpens := craftSpiritSenseTx(conn, catalog, userID, profession)
+	contextBonus := effectBonus + facilityBonus + manorFacilityBonus + familyBonus + craftEcho + flameBonus + senseBonus
 	mod := base + level + contextBonus
 
 	roll, err := roll2d10(mod, recipe.TN)
@@ -453,7 +455,7 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	// The grade (v1.7.0). Quality used to multiply an alchemy batch and do
 	// nothing for the other three trades; it is spent on the grade of what is
 	// made now, capped by the crafter's rank in this trade.
-	gradeIndex, gradeReached := craftGradeIndex(catalog, qkey, margin, level, flameOpens)
+	gradeIndex, gradeReached := craftGradeIndex(catalog, qkey, margin, level, flameOpens || senseOpens)
 	output := map[string]int64{}
 	for k, v := range recipe.Output {
 		output[gradedID(catalog, k, gradeIndex)] = v
@@ -618,6 +620,9 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		"flame_bonus":          flameBonus,
 		"flame_name":           flameName,
 		"flame_opens_top":      flameOpens,
+		"spirit_sense_bonus":   senseBonus,
+		"spirit_sense_opens":   senseOpens,
+		"spirit_sense_gain":    spiritSenseGainTx(conn, catalog, userID, "craft", !success, gameMinute, float64(time.Now().UnixNano())/1e9),
 	}
 	evp, _ := json.Marshal(result)
 	return authoritativeMutation{

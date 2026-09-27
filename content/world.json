@@ -71278,6 +71278,7 @@
       "soul": 5,
       "spatialkey": 2,
       "specialeffects": 2,
+      "spirit settle": 2,
       "stall close": 2,
       "stall list": 2,
       "stall open": 2,
@@ -71308,6 +71309,7 @@
       "craft / Alchemy": 2,
       "craft / Flames": 2,
       "craft / Profession": 2,
+      "craft / Spirit Sense": 2,
       "cultivation / Arts": 2,
       "cultivation / Ghost": 2,
       "cultivation / Path": 2,
@@ -71410,7 +71412,7 @@
         "min_rank": 7,
         "qualities": [],
         "min_margin": 12,
-        "flame_min_rank": 6
+        "opened_min_rank": 6
       }
     ]
   },
@@ -71492,5 +71494,24 @@
         "opens_top_grade": true
       }
     }
+  },
+  "spirit_sense_system": {
+    "description": "A spirit sense a cultivator builds rather than finds (v1.10.0): practice in Formation and Inscription, meditation and scene actions fill it, qi settles each stage, and it steadies every Formation and Inscription roll. Fully built, it lets a crafter reach the Transcendent grade in those two trades.",
+    "trades": [
+      "Formation",
+      "Inscription"
+    ],
+    "max_stage": 9,
+    "stage_progress": 40,
+    "settle_qi": 15,
+    "gains": {
+      "craft": 12,
+      "meditation": 4,
+      "scene": 3
+    },
+    "scene_gains_per_day": 5,
+    "spirit_divisor": 4,
+    "min_bonus": 1,
+    "max_bonus": 5
   }
 }

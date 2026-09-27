@@ -303,6 +303,13 @@ func resolveSceneAction(conn *storage.Conn, catalog worlddata.Catalog, actorID i
 		}
 		// Standing firm against something outside yourself is a good deed
 		// (v1.9.1); a Resolve against "Self" always succeeds, so it pays none.
+		// Any successful scene action builds the spirit sense (v1.10.0), a
+		// few a world day; a "Self" action always succeeds, so it builds none.
+		if rolled["success"] == true {
+			if gained := spiritSenseGainTx(conn, catalog, actorID, "scene", false, p.GameMinute, float64(time.Now().UnixNano())/1e9); gained != nil {
+				result["spirit_sense_gain"] = gained
+			}
+		}
 		if p.ActionKey == "resolve" && rolled["success"] == true {
 			now := float64(time.Now().UnixNano()) / 1e9
 			paid, karma := grantDeedKarmaTx(conn, actorID, "scene_resolve", sceneResolveDeedKey(p.GameMinute), sceneResolveDeedKarma, 1, now)

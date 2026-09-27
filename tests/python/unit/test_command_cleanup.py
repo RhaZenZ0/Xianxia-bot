@@ -56,7 +56,7 @@ class CommandCleanupTests(unittest.TestCase):
                                      "DATABASE_PATH": "data/test.sqlite3"}):
             surface = importlib.import_module("app.bot.surface")
         public_groups = {name for name in surface.TREE_COMMANDS if name in surface._GROUP_ACTION_ROOTS}
-        self.assertEqual(public_groups, {"stall", "boss", "party", "body", "profession", "flame"})
+        self.assertEqual(public_groups, {"stall", "boss", "party", "body", "profession", "flame", "spirit"})
         self.assertNotIn("bot.tree.add_command(admin_group, guild=GUILD)", source)
         self.assertIn('name="admin",', source)
         self.assertIn("async def admin_panel", source)
@@ -76,8 +76,9 @@ class CommandCleanupTests(unittest.TestCase):
         # 84 since v1.2.0: `/mine` joined, the seam beside the hills.
         # 85 since v1.5.0: `/stall` joined, a cultivator's own counter in a
         # city's street.
-        # 86 since v1.10.0: `/flame` joined, the craft hub's Flames page.
-        self.assertEqual(len(ast.literal_eval(migrated_node.value)), 86)
+        # 87 since v1.10.0: `/flame` and `/spirit` joined, the craft hub's
+        # Flames and Spirit Sense pages.
+        self.assertEqual(len(ast.literal_eval(migrated_node.value)), 87)
         self.assertNotIn("tree.remove_command", source)
         self.assertIn('"alchemy": alchemy_group', source)
         self.assertIn('_hub_page("alchemy", "Alchemy"', source)

@@ -1735,6 +1735,11 @@ class ReadOnlyDashboardStore:
                 """SELECT f.*,c.name AS player_name FROM character_flames f JOIN characters c ON c.user_id=f.user_id
                    ORDER BY f.refinement DESC,c.name,f.flame_id LIMIT 200""",
             )
+            senses = await self._fetchall_if_table(
+                db, "character_spirit_sense",
+                """SELECT s.*,c.name AS player_name FROM character_spirit_sense s JOIN characters c ON c.user_id=s.user_id
+                   ORDER BY s.stage DESC,s.progress DESC,c.name LIMIT 200""",
+            )
             abodes = await self._fetchall_if_table(
                 db, "cave_abodes",
                 """SELECT a.*,c.name AS owner_name FROM cave_abodes a JOIN characters c ON c.user_id=a.user_id
@@ -1770,7 +1775,7 @@ class ReadOnlyDashboardStore:
                     "deployed_arrays": len(arrays),
                 },
                 "professions": professions, "alchemy": alchemy, "alchemy_batches": batches,
-                "spirit_beasts": beasts, "artifact_bonds": artifacts, "flames": flames, "cave_abodes": abodes,
+                "spirit_beasts": beasts, "artifact_bonds": artifacts, "flames": flames, "spirit_senses": senses, "cave_abodes": abodes,
                 "sect_abodes": sect_abodes, "personal_worlds": personal_worlds,
                 "deployed_arrays": arrays, "equipment": equipment,
             }

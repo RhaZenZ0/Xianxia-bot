@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 70
+SCHEMA_VERSION = 71
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -92,6 +92,7 @@ OPERATIONAL_REQUIRED_TABLES = frozenset(
         "character_location_discoveries",
         "character_flames",
         "character_manuals",
+        "character_spirit_sense",
         "character_physiques",
         "character_qi_body",
         "character_quests",
@@ -2854,6 +2855,23 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                 captured_game_minute INTEGER NOT NULL DEFAULT 0,
                 updated_at REAL NOT NULL,
                 PRIMARY KEY(user_id,flame_id),
+                FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE
+            )""",
+        ),
+    ),
+    (
+        71,
+        "spirit_sense",
+        (
+            # v1.10.0: the spirit sense a cultivator builds for Formation and
+            # Inscription - one row per character, its stage and the progress
+            # toward the next. Practice writes progress; qi settles a stage.
+            # Keyed on the character, so an erasure or a reset takes it.
+            """CREATE TABLE IF NOT EXISTS character_spirit_sense (
+                user_id INTEGER PRIMARY KEY,
+                stage INTEGER NOT NULL DEFAULT 0,
+                progress INTEGER NOT NULL DEFAULT 0,
+                updated_at REAL NOT NULL,
                 FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE
             )""",
         ),

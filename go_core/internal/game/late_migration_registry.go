@@ -148,6 +148,8 @@ func applyLateMigrationAction(conn *storage.Conn, catalog worlddata.Catalog, use
 		return flameRefineAction(conn, catalog, userID, raw)
 	case "flame.bind":
 		return flameBindAction(conn, catalog, userID, raw)
+	case "spirit_sense.settle":
+		return spiritSenseSettleAction(conn, catalog, userID, raw)
 	default:
 		return authoritativeMutation{}, fmt.Errorf("unsupported late migration operation: %s", op)
 	}

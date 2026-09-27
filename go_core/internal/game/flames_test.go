@@ -166,7 +166,7 @@ func TestAFlameNeverBreaksACraftBeforeTheTableExists(t *testing.T) {
 func TestAFlameIsWhatOpensTranscendent(t *testing.T) {
 	catalog := crossingCatalog(t)
 	top := len(catalog.ItemGrades.Grades) - 1
-	if catalog.ItemGrades.Grades[top].FlameMinRank == nil {
+	if catalog.ItemGrades.Grades[top].OpenedMinRank == nil {
 		t.Fatalf("the top rung carries no flame_min_rank; the content is broken, not the rule")
 	}
 	without, reached := craftGradeIndex(catalog, "flawless", 12, 6, false)
