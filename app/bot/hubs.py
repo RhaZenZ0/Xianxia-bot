@@ -1139,17 +1139,24 @@ async def _layout_result_send(
     if not source.response.is_done():
         await source.response.defer()
     followup_kwargs = dict(kwargs)
-    card = followup_kwargs.get("view")
+    own_view = followup_kwargs.get("view")
     for key in ("ephemeral", "silent", "view", "content"):
         followup_kwargs.pop(key, None)
-    # A card (v1.9.0) is its own Components V2 view, so it is sent with the
-    # view rather than dropped as the panel's duplicate would be; text sent
-    # beside it goes into it, because a V2 message carries no content.
-    if is_layout(card) and not getattr(card, "is_layout_hub", False):
-        if fold_content(card, content):
-            return await source.followup.send(ephemeral=False, view=card, **followup_kwargs)
-        await source.followup.send(content, ephemeral=False)
-        return await source.followup.send(ephemeral=False, view=card, **followup_kwargs)
+    # A result that brings buttons of its own keeps them (v1.8.5). This
+    # used to drop every view, so a card pressed from a panel - the raid
+    # card, a Narrate it - arrived beside it with nothing to press. What is
+    # still dropped is the panel's own view, which `_safe_edit_kwargs` hands
+    # along as a fallback: a second copy of the panel is not a result.
+    if own_view is not None and own_view is not hub_view and not getattr(own_view, "is_layout_hub", False):
+        if LAYOUT_COMPONENTS_AVAILABLE and isinstance(own_view, discord.ui.LayoutView):
+            # A Components V2 message carries no content or embeds. Text sent
+            # with a card goes into the card (v1.9.0); text sent with any
+            # other layout is sent first, on its own, rather than lost.
+            wait = {"wait": followup_kwargs["wait"]} if "wait" in followup_kwargs else {}
+            if not fold_content(own_view, content):
+                await source.followup.send(content, ephemeral=False)
+            return await source.followup.send(view=own_view, ephemeral=False, **wait)
+        followup_kwargs["view"] = own_view
     if content is None and not any(key in followup_kwargs for key in ("embed", "embeds")):
         content = "✅ Done."
     return await source.followup.send(content, ephemeral=False, **followup_kwargs)

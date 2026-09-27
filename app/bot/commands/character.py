@@ -25,6 +25,7 @@ from ..channels import configured_begin_channel
 from ..character_state import current_effect_modifiers
 from ..formatting import human_duration, player_property_emoji, player_property_facility_lines
 from ..hubs import register_confirm_note
+from ..locations import objective_line_suffix
 from ..registry import registered_group_command, registered_root_command
 from ..runtime import (
     carried_item_autocomplete,
@@ -346,7 +347,8 @@ async def _player_dashboard_card(user_id: int, *, guild_id: int | None, page: st
                 # As in the journal: the accepted terms, not today's definition.
                 for obj in list(dict(row.get("terms") or {}).get("objectives") or definition.get("objectives") or []):
                     cur = int(progress.get(str(obj["id"]), 0)); req = max(1, int(obj.get("count",1)))
-                    parts.append(f"{'✅' if cur >= req else '▫️'} {obj.get('label',obj['id'])} **{cur}/{req}**")
+                    where = await objective_line_suffix(int(user_id), c, obj, cur >= req)
+                    parts.append(f"{'✅' if cur >= req else '▫️'} {obj.get('label',obj['id'])} **{cur}/{req}**{where}")
                 embed.add_field(name=f"📜 {definition.get('title', row['quest_key'])}", value="\n".join(parts) or "In progress", inline=False)
         else:
             embed.add_field(name="Active Quests", value="None", inline=False)
@@ -481,7 +483,11 @@ async def quests_command(interaction: discord.Interaction) -> None:
             pinned = dict(row.get("terms") or {})
             for obj in list(pinned.get("objectives") or definition.get("objectives") or []):
                 cur=int(progress.get(str(obj["id"]),0)); req=max(1,int(obj.get("count",1)))
-                objectives.append(f"{'✅' if cur >= req else '▫️'} {obj.get('label',obj['id'])} {cur}/{req}")
+                # Somebody to speak with says where they are now (v1.8.3):
+                # the tick walks townsfolk about, and the pickers only offer
+                # who is in the room.
+                where = await objective_line_suffix(interaction.user.id, c, obj, cur >= req)
+                objectives.append(f"{'✅' if cur >= req else '▫️'} {obj.get('label',obj['id'])} {cur}/{req}{where}")
             title = definition.get("title", row["quest_key"])
             # A commission is marked, and carries its clock: a deadline you
             # cannot see is a deadline you will miss.

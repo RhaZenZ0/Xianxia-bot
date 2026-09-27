@@ -5529,12 +5529,12 @@ edit that turns an old embed message into a card clears both (`content=None, emb
 auction and stall feeds edit cards posted before this release, and if Discord ever refuses the
 conversion they post the card again and take the old one down, so a lot or a stall keeps one card.
 
-**The hub was dropping every view it was handed.** `_layout_result_send` popped `view` from what
-it sent beside the panel, on the reasoning that it could only be the panel's duplicate - so a
-battle panel opened from a hub arrived with no buttons, and a card, being a view, would have
-arrived as "✅ Done.". It keeps a V2 view that is not the hub's own now. Mentions ping inside a
-text display where they never did inside an embed, so the raid card is sent with
-`AllowedMentions.none()`.
+**Text sent beside a card goes into it.** v1.8.5 made the hub keep a result's own view instead of
+dropping it as the panel's duplicate, and sent a layout without its content, because a V2 message
+may carry none - which lost whatever text came with it. `_layout_result_send` hands that text to
+`fold_content` now, and sends it on its own first only when the layout is not a card. Mentions
+ping inside a text display where they never did inside an embed, so the raid card, which names
+every raider, is sent with `AllowedMentions.none()`.
 
 `test_every_card_is_a_layout.py` forbids a `discord.Embed` or an `embed=` send anywhere in
 `app/bot` except the two classic fallbacks - the classic hub and the classic Scene Action panel,

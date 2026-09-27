@@ -459,6 +459,13 @@ class ResultsInThePanelTests(unittest.TestCase):
         self.assertEqual(len(calls["followup"]), 3)
         self.assertEqual(calls["edit_original"], [])
         self.assertEqual(hub_view.last_result, "")
+        # The result's own buttons go with it (v1.8.5); they used to be dropped.
+        self.assertIn("view", calls["followup"][1][1], "a result's own buttons were dropped beside the panel")
+
+    def test_the_panels_own_view_is_never_sent_again_beside_it(self):
+        hubs, source, hub_view, calls = self._fixtures(source_is_panel=True)
+        self._run(hubs._layout_result_send(source, None, {"embed": object(), "view": hub_view}, hub_view))
+        self.assertNotIn("view", calls["followup"][0][1])
 
     def test_a_card_goes_beside_the_panel_with_its_own_view(self):
         """v1.9.0: a card is a Components V2 view. This path used to drop every

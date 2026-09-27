@@ -101,6 +101,22 @@ class NoCardIsAnEmbed(unittest.TestCase):
         self.assertEqual(sorted(CLASSIC_FALLBACKS - scopes), [])
 
 
+class ACardThatNamesPeopleDoesNotPingThem(unittest.TestCase):
+    def test_the_raid_card_is_sent_without_pings(self):
+        """The raid card names every raider by mention. An embed never pinged
+        one; a text display does, so without this every /boss status called
+        the whole party."""
+        tree = ast.parse((BOT / "commands" / "boss.py").read_text(encoding="utf-8"))
+        send = next(node for node in ast.walk(tree)
+                    if isinstance(node, ast.AsyncFunctionDef) and node.name == "_send_raid_card")
+        calls = [call for call in ast.walk(send) if isinstance(call, ast.Call)
+                 and getattr(call.func, "attr", "") == "send"]
+        self.assertTrue(calls, "the reader found no send in _send_raid_card; the gate is broken, not the tree")
+        for call in calls:
+            quiet = {kw.arg: ast.unparse(kw.value) for kw in call.keywords}.get("allowed_mentions", "")
+            self.assertIn("AllowedMentions.none()", quiet, ast.unparse(call))
+
+
 class ACardIsDrawnAsAContainer(unittest.TestCase):
     def setUp(self):
         self.cards = _cards()

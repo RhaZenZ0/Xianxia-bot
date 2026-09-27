@@ -55,6 +55,11 @@ NOT_AN_INTERACTION_ENTRYPOINT = {
     # calling it, on the one branch that reaches it, and that branch is checked
     # here independently.
     "_claim_grave_if_here",
+    # The raid card's two engine doors (v1.8.5) take a bare user id: the
+    # card's buttons, a technique picker and `/boss act` / `/boss claim` all
+    # reach them, and each of those defers before calling in.
+    "_raid_act",
+    "_raid_claim",
 }
 
 # `if not interaction.response.is_done(): await interaction.response.defer(...)`
