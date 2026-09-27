@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v1.10.0
+# Xianxia RP Discord Bot v1.11.1
 
 *A cultivation RPG played entirely through Discord commands: deterministic rules in Go, an AI that
 narrates but never decides, self-hosted on your own hardware.*
@@ -384,7 +384,7 @@ the next one climbable; the cultivate cooldown sets the calendar. Crossing a rea
 attributes, one point of will and one of your path's own. Two things you raise yourself multiply
 every session: the spirit-gathering array in your own property, six percent a level through
 **/abode → Upgrade**, and the manual you practise, by its grade from Mortal to Dao and by your
-mastery of it, chosen with **/cultivation → Arts → Practise**. Qi itself now has a body to live in
+mastery of it, chosen with **/cultivation → Arts → Cultivate By**. Qi itself now has a body to live in
 (v1.0.0-rc.7): a lower dantian whose size is the realm you stand in, the channels you have opened
 and the method you practise - hundreds of qi at Qi Condensation, tens of thousands at Nascent Soul -
 refilling over four game hours; a middle dantian whose purity prices every technique you use, raised
@@ -410,7 +410,7 @@ goes in. The five phases do the deciding - a **resonant** root gathers a quarter
 less with an eight-in-a-hundred chance each session that the qi turns going in. Void and Chaos stand
 outside the cycle and answer to nobody; a root of several elements is answered by the kindest of them;
 and a better, purer root absorbs more of whatever it touches. The sheet, the session and
-**/cultivation → Arts → Practise** all name the kind a method draws and what your root makes of it.
+**/cultivation → Arts → Cultivate By** all name the kind a method draws and what your root makes of it.
 A sect is joined through an entrance trial before its examiner, sat at the sect's gate and open
 from the first realm. No road reaches a gate, so the ways to one are the envoys' hall of a capital,
 which puts every public gate of its world on your travel list, and a sect's recruitment delegation at

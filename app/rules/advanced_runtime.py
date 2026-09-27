@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from app.rules.item_grades import grade_rung, split_item_grade
 
@@ -501,3 +501,21 @@ def spirit_gain_line(gained: Any) -> str:
         return ""
     line = f"🌀 Spirit sense **+{gain}** → {int(gained.get('progress') or 0)}/{int(gained.get('need') or 0)}"
     return line + (" • ready to settle (**/spirit settle**)" if gained.get("ready") else "")
+
+
+def manual_practice_line(practised: Any, mastery_levels: Sequence[str] = ()) -> str:
+    """The line `/cultivate` prints for the practice a session put into the
+    manual it was cultivated by (v1.11.0). Only a session that gathered
+    something practises, so an absent block prints nothing."""
+    practised = dict(practised) if isinstance(practised, Mapping) else {}
+    gain = int(practised.get("gain") or 0)
+    if not gain:
+        return ""
+    name = str(practised.get("manual_name") or practised.get("manual_id") or "your method")
+    line = f"📖 Practice in **{name}** +{gain} → {int(practised.get('practice') or 0)}"
+    if practised.get("mastery_rose"):
+        mastery = int(practised.get("mastery") or 0)
+        levels = list(mastery_levels)
+        label = levels[max(0, min(len(levels) - 1, mastery))] if levels else f"mastery {mastery}"
+        line += f" • it reaches **{label}**"
+    return line

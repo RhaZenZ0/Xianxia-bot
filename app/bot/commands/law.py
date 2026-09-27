@@ -233,12 +233,15 @@ async def manual_study(interaction:discord.Interaction,manual:str)->None:
     await interaction.response.send_message(f"📖 **{m['name']}**\n{m.get('description','')}\nMastery: **{_mastery_name(int(state.get('mastery',0)))}** • Practice {state.get('practice',0)}\nUnlocked: **{', '.join(unlocked) if unlocked else 'none yet'}**{karma_note}",ephemeral=False)
 
 
-@registered_group_command(manual_group, name="practise",description="Choose the manual you cultivate by; its grade speeds every session")
+@registered_group_command(manual_group, name="cultivate_by",description="Choose the manual you cultivate by; each session speeds and practises it")
 @app_commands.autocomplete(manual=learned_manual_autocomplete)
 @serialized_user_action
-async def manual_practise(interaction:discord.Interaction,manual:str)->None:
-    """The art you practise (v1.0.0-rc.6). The engine keeps the choice and
-    applies its grade and your mastery to every gathering session."""
+async def manual_cultivate_by(interaction:discord.Interaction,manual:str)->None:
+    """The art you cultivate by (v1.0.0-rc.6). The engine keeps the choice and
+    applies its grade and your mastery to every gathering session. It was
+    called Practise until v1.11.0 and practised nothing; every session that
+    gathers now adds a point of practice to this manual, so the name says
+    what the choice is rather than what it used not to do."""
     await interaction.response.defer(ephemeral=False)
     c=await require_character(interaction)
     if not c:return
@@ -267,7 +270,7 @@ async def manual_practise(interaction:discord.Interaction,manual:str)->None:
     await interaction.followup.send(
         f"📖 **{c['name']} circulates the {result.get('manual_name') or manual}.**\n"
         f"Grade **{result.get('manual_grade') or 'Unknown'}** • mastery **{_mastery_name(int(result.get('mastery',0)))}** — "
-        f"every session gathers **x{float(result.get('manual_mult',1)):.2f}**.{affinity}{note}",
+        f"every session gathers **x{float(result.get('manual_mult',1)):.2f}** and practises it.{affinity}{note}",
         ephemeral=False,
     )
 

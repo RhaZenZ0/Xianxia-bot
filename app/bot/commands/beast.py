@@ -9,6 +9,7 @@ import discord
 from discord import app_commands
 
 from ..formatting import roll_line
+from ..hubs import HubDynamicOption, register_hub_option_hint, register_hub_option_provider
 from ..registry import registered_group_command
 from ..runtime import (
     DB,
@@ -16,6 +17,7 @@ from ..runtime import (
     WORLD,
     character_location_display,
     current_world_time,
+    log,
     require_character,
     reply_long,
     serialized_user_action,
@@ -247,3 +249,117 @@ async def beast_active(interaction: discord.Interaction, beast_id: int) -> None:
         bonus = companion_bonus(row.get("rank"), row.get("evolution_stage"), row.get("loyalty"))
         chosen = f" **{row.get('name') or 'Your beast'}** now adds **{bonus:+d}** to your attack, flee and defence rolls in one-on-one battles."
     await interaction.followup.send(f"🐉 Active companion changed.{chosen}", ephemeral=False)
+
+
+# Every beast leaf asked for a number (v1.11.0): `/beast tame` wanted an
+# encounter id and feed, train, evolve and active a beast id, each read off
+# another page and typed by hand. Reported as "Tame ask for id when taming and
+# each time you feed them". Each id is a picker now - on the panel through the
+# hub option providers, and on the slash command through autocomplete over the
+# same rows - so the number is still what the engine is sent and a player never
+# has to know it.
+
+
+def _beast_option(row: Any) -> HubDynamicOption:
+    bonus = companion_bonus(row.get("rank"), row.get("evolution_stage"), row.get("loyalty"))
+    return HubDynamicOption(
+        label=f"{row['name']} ({row['species']})"[:100],
+        value=int(row["beast_id"]),
+        description=(f"Rank {row['rank']} • loyalty {row['loyalty']} • evolution {row['evolution_stage']} "
+                     f"• {bonus:+d} in battle{' • active' if row.get('active') else ''}")[:100],
+        emoji="⭐" if row.get("active") else "🐉",
+    )
+
+
+async def _beast_rows(interaction: discord.Interaction) -> list[Any]:
+    try:
+        return list(await DB.get_spirit_beasts(interaction.user.id))
+    except Exception:
+        log.warning("Could not load spirit beasts for a picker", exc_info=True)
+        return []
+
+
+async def beast_hub_options(interaction: discord.Interaction, current: str) -> list[HubDynamicOption]:
+    """Every contracted beast, the active one first."""
+    rows = sorted(await _beast_rows(interaction), key=lambda row: (not row.get("active"), int(row["beast_id"])))
+    return [_beast_option(row) for row in rows[:25]]
+
+
+async def beast_inactive_hub_options(interaction: discord.Interaction, current: str) -> list[HubDynamicOption]:
+    """Only a beast that is not already the active companion."""
+    rows = [row for row in await _beast_rows(interaction) if not row.get("active")]
+    return [_beast_option(row) for row in rows[:25]]
+
+
+async def encounter_hub_options(interaction: discord.Interaction, current: str) -> list[HubDynamicOption]:
+    """The subdued wild beasts waiting where the player stands."""
+    try:
+        c = await DB.get_character(interaction.user.id)
+        if not c:
+            return []
+        wt = await current_world_time()
+        rows = list(await DB.get_wild_beast_encounters(
+            interaction.user.id, game_minute=wt.total_minutes, location=str(c.get("location", ""))))
+    except Exception:
+        log.warning("Could not load taming opportunities for a picker", exc_info=True)
+        return []
+    return [
+        HubDynamicOption(
+            label=f"{row['species']} • Rank {row['rank']}"[:100],
+            value=int(row["encounter_id"]),
+            description=(f"{row['element']} • {row['temperament']} • taming TN {row['taming_tn']} "
+                         f"• leaves in {max(0, int(row['expires_game_minute']) - wt.total_minutes)} game min")[:100],
+            emoji="🪢",
+        )
+        for row in rows[:25]
+    ]
+
+
+def _choices(options: list[HubDynamicOption], current: str) -> list[app_commands.Choice[int]]:
+    needle = current.casefold().strip()
+    return [
+        app_commands.Choice(name=option.label[:100], value=int(option.value))
+        for option in options
+        if not needle or needle in option.label.casefold() or needle == str(option.value)
+    ][:25]
+
+
+async def beast_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[int]]:
+    return _choices(await beast_hub_options(interaction, current), current)
+
+
+async def beast_inactive_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[int]]:
+    return _choices(await beast_inactive_hub_options(interaction, current), current)
+
+
+async def encounter_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[int]]:
+    return _choices(await encounter_hub_options(interaction, current), current)
+
+
+beast_tame.autocomplete("encounter_id")(encounter_autocomplete)
+for _command in (beast_feed, beast_train, beast_evolve):
+    _command.autocomplete("beast_id")(beast_autocomplete)
+beast_active.autocomplete("beast_id")(beast_inactive_autocomplete)
+
+register_hub_option_provider(beast_tame, "encounter_id", encounter_hub_options)
+for _command in (beast_feed, beast_train, beast_evolve):
+    register_hub_option_provider(_command, "beast_id", beast_hub_options)
+register_hub_option_provider(beast_active, "beast_id", beast_inactive_hub_options)
+
+register_hub_option_hint(
+    beast_tame,
+    "encounter_id",
+    "No subdued wild beast is waiting where you stand. An overwhelming **/hunt** victory can leave one to tame, "
+    "and it waits only a while.",
+)
+for _command in (beast_feed, beast_train, beast_evolve):
+    register_hub_option_hint(
+        _command,
+        "beast_id",
+        "You have no contracted spirit beast yet. Tame one with **/beast → Companions → Tame** after a strong **/hunt**.",
+    )
+register_hub_option_hint(
+    beast_active,
+    "beast_id",
+    "There is no other beast to make active: your only companion is already fighting beside you, or you have none yet.",
+)

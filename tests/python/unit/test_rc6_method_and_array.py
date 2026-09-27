@@ -74,7 +74,7 @@ class TheMethodYouPractise(unittest.TestCase):
         self.assertIn("manualMult", GO_ACTIONS)
 
     def test_the_player_chooses_it_from_what_they_have_learned(self):
-        self.assertIn('@registered_group_command(manual_group, name="practise"', LAW_SOURCE)
+        self.assertIn('@registered_group_command(manual_group, name="cultivate_by"', LAW_SOURCE)
         self.assertIn("@app_commands.autocomplete(manual=learned_manual_autocomplete)", LAW_SOURCE)
         self.assertIn('"cultivation.manual",interaction.user.id', LAW_SOURCE)
         self.assertIn("manual_grade", CULTIVATION_SOURCE)

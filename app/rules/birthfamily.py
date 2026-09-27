@@ -321,6 +321,20 @@ def family_tutoring_line(sendoff: dict[str, Any]) -> str:
     return f"\n🛠️ {tutor.capitalize()}: {start}, and the household's **+{FAMILY_TRADE_BONUS} {trade} tradition** goes with you."
 
 
+def family_connections_line(sendoff: dict[str, Any]) -> str:
+    """The standing a household's connections gave the child (v1.11.1): the
+    engine's `reputation` block, faction -> the score it now stands at. Only a
+    raised floor is reported, so a second life that already had it says nothing."""
+    raised = dict(sendoff.get("reputation") or {})
+    if not raised:
+        return ""
+    parts = [f"**{faction} {int(score):+d}**" for faction, score in sorted(raised.items())]
+    line = f"\n🌑 The house's connections go with you: {', '.join(parts)}."
+    if any(str(faction).casefold() == "underworld contacts" for faction in raised):
+        line += " The underworld's brokers will deal with you — **/economy → Black Market → Rumors** says where they meet."
+    return line
+
+
 def karma_label(score: int) -> str:
     score = int(score)
     if score >= 500:

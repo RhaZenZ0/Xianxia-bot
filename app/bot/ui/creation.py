@@ -12,7 +12,7 @@ from typing import Any
 
 import discord
 
-from ...rules.birthfamily import family_tier_name, family_tutoring_line
+from ...rules.birthfamily import family_connections_line, family_tier_name, family_tutoring_line
 from ...rules.creation_ui import (
     cultivation_style_profile,
     family_emoji,
@@ -159,6 +159,7 @@ class CharacterModal(discord.ui.Modal):
                     f"{str(sendoff.get('line') or '').strip()}\n"
                     "It carries you — the road runs at a third of its walking hours while you have it."
                     + family_tutoring_line(sendoff)
+                    + family_connections_line(sendoff)
                 ),
                 inline=False,
             )

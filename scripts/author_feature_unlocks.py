@@ -80,7 +80,11 @@ PAGES: dict[str, int] = {
     "character / Dao Partnership": 4,
     "character / Fate": 4,
     "character / Samsara": 5,
-    "ascend / Perfection": 5,
+    # Open from realm 0 (v1.11.1): the engine lets a Perfection begin at stage 9
+    # of any realm, and a banked insight or a Perfection is what opens the
+    # first gates. `_progression_hidden_actions` draws Start at stage 9 and the
+    # rest while a path is under way, so the page is never a wall of refusals.
+    "ascend / Perfection": 0,
     "cultivation / Qi Body": 8,
     "cultivation / Ghost": 2,
     "cultivation / Path": 2,
@@ -190,7 +194,6 @@ LEAVES: dict[str, int] = {
     # recruitment page it sits on opens at 0 since v1.1.0, and this does not.
     "sect shadow": 2,
     "boss list": 2,
-    "perfect info": 3,
 }
 
 # `is_status_read` is the rule rather than a list, because the list is what

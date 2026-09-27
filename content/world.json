@@ -69741,7 +69741,10 @@
     "hidden_weapon_family": {
       "item": "moonfen_shadow_fan",
       "line": "Handed over without ceremony, in the dark, by someone who was not there a moment before.",
-      "trade": "Inscription"
+      "trade": "Inscription",
+      "reputation": {
+        "Underworld Contacts": 15
+      }
     },
     "weaponsmith_martial_family": {
       "item": "forge_proof_sword",
@@ -69751,7 +69754,10 @@
     "nether_market_house": {
       "item": "nether_market_lantern",
       "line": "Lit off the house lamp so the trade knows the flame. Owe nobody on the road, your mother says.",
-      "trade": "Inscription"
+      "trade": "Inscription",
+      "reputation": {
+        "Underworld Contacts": 15
+      }
     },
     "escort_martial_family": {
       "item": "escort_cargo_skiff",
@@ -69801,7 +69807,10 @@
     "spirit_hidden_house": {
       "item": "moonveil_covert_needle",
       "line": "Left on your pillow by someone who was not there. The house does not say goodbye; it says be careful.",
-      "trade": "Inscription"
+      "trade": "Inscription",
+      "reputation": {
+        "Underworld Contacts": 15
+      }
     },
     "spirit_frontier_house": {
       "item": "northwind_signal_horn",
@@ -69856,7 +69865,10 @@
     "immortal_hidden_house": {
       "item": "lunar_veil_mask",
       "line": "Left folded on your bed with no note. The house was never here; neither, from now on, were you.",
-      "trade": "Inscription"
+      "trade": "Inscription",
+      "reputation": {
+        "Underworld Contacts": 15
+      }
     },
     "immortal_frontier_house": {
       "item": "polar_gate_beacon",
@@ -69911,7 +69923,10 @@
     "celestial_hidden_house": {
       "item": "lunar_shadow_veil",
       "line": "Left on your pillow by nobody. The house does not say farewell; it says be unseen.",
-      "trade": "Inscription"
+      "trade": "Inscription",
+      "reputation": {
+        "Underworld Contacts": 15
+      }
     },
     "celestial_frontier_house": {
       "item": "froststar_watch_lantern",
@@ -71235,7 +71250,7 @@
       "innerworld leave": 5,
       "innerworld setrule": 5,
       "karma": 2,
-      "manual practise": 2,
+      "manual cultivate_by": 2,
       "manual study": 2,
       "manual technique": 2,
       "market buy": 2,
@@ -71247,12 +71262,6 @@
       "party create": 2,
       "party join": 2,
       "party leave": 2,
-      "perfect abandon": 5,
-      "perfect clues": 5,
-      "perfect info": 3,
-      "perfect quest": 5,
-      "perfect start": 5,
-      "perfect trial": 5,
       "realmhub go": 2,
       "reincarnate": 5,
       "reputation": 2,
@@ -71294,7 +71303,6 @@
     "pages": {
       "abode / Access": 3,
       "abode / Property": 3,
-      "ascend / Perfection": 5,
       "character / Afflictions": 2,
       "character / Consequences": 3,
       "character / Dao Partnership": 4,

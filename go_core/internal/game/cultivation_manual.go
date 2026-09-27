@@ -112,6 +112,35 @@ func practisedManual(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	return best, bestMastery, false, nil
 }
 
+// cultivationPracticeGain is what one session adds to the practice of the
+// manual it was cultivated by (v1.11.0). Until then a method's mastery rose
+// only by studying it again (every 45 minutes) or by fighting with its
+// techniques, so a cultivator who sat with one manual for weeks never grew any
+// better at it. One point a session reaches the top mastery (28 practice) in
+// twenty-eight sessions.
+const cultivationPracticeGain = int64(1)
+
+// practiseCultivatedManualTx adds a session's practice to the manual the
+// cultivator gathers by - the chosen one, else the best learned - and answers
+// nil when they have learned none. It reports the mastery before and after so
+// the reply can say when a level was reached.
+func practiseCultivatedManualTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, now float64) (map[string]any, error) {
+	id, before, _, err := practisedManual(conn, catalog, userID)
+	if err != nil || id == "" {
+		return nil, err
+	}
+	row, err := practiceManualTx(conn, userID, id, cultivationPracticeGain, now)
+	if err != nil {
+		return nil, err
+	}
+	after := i64(row["mastery"])
+	return map[string]any{
+		"manual_id": id, "manual_name": catalog.TechniqueSystem.Manuals[id].Name,
+		"gain": cultivationPracticeGain, "practice": i64(row["practice"]),
+		"mastery": after, "mastery_before": before, "mastery_rose": after > before,
+	}, nil
+}
+
 // manualCultivationMultiplier is what the practised method is worth to a
 // session: its grade, deepened by mastery. No method is 1.0 and no penalty.
 // The element (v1.0.0-rc.9) comes back with it: the kind of qi the method

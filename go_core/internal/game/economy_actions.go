@@ -352,6 +352,10 @@ func auctionBidAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "economy", EventType: "auction.bid", EntityType: "auction", EntityID: fmt.Sprint(p.AuctionID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 
+// blackMarketTrustReputation is the Underworld Contacts standing at which a
+// broker sells to a cultivator (the Python twin is BLACK_MARKET_ACCESS_REPUTATION).
+const blackMarketTrustReputation = int64(15)
+
 func blackMarketAuthorized(conn *storage.Conn, catalog worlddata.Catalog, userID int64, c map[string]any) (string, int64, error) {
 	karma := i64(c["karma_score"])
 	rep := int64(0)
@@ -365,7 +369,7 @@ func blackMarketAuthorized(conn *storage.Conn, catalog worlddata.Catalog, userID
 	if karma <= -40 {
 		return "dark karma", rep, nil
 	}
-	if rep >= 15 {
+	if rep >= blackMarketTrustReputation {
 		return "underworld contacts", rep, nil
 	}
 	m, err := conn.Execute(`SELECT sect_name FROM sect_membership WHERE user_id=?`, []any{userID})
@@ -401,8 +405,16 @@ func blackMarketTradeAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
+	// A broker buys from a stranger (v1.11.1). Underworld Contacts had one
+	// source, a trade at a post, and a trade needed the trust it was meant
+	// to earn - so the door by reputation could never open. A cultivator the
+	// brokers do not know may fence the goods a post trades, and each sale is
+	// the +1 below; selling to them is still for the trusted alone.
+	if reason == "" && p.Buy {
+		return authoritativeMutation{}, fmt.Errorf("underworld brokers do not recognize this character; they will buy from a stranger, but sell only to Underworld Contacts %d+, dark karma or a demonic sect", blackMarketTrustReputation)
+	}
 	if reason == "" {
-		return authoritativeMutation{}, errors.New("underworld brokers do not recognize this character")
+		reason = "fencing as a stranger"
 	}
 	postRes, err := conn.Execute(`SELECT * FROM black_market_posts WHERE location=? AND active=1 AND opens_game_minute<=? AND closes_game_minute>?`, []any{p.Location, p.GameMinute, p.GameMinute})
 	if err != nil {
@@ -497,7 +509,7 @@ func blackMarketTradeAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 			}
 		}
 	}
-	out := map[string]any{"buy": p.Buy, "item_id": p.ItemID, "quantity": p.Quantity, "currency_id": currency, "unit_price": unit, "total": total, "balance": balance, "heat": i64(post["heat"]), "access": reason, "underworld_reputation": rep, "detected": detected, "crime": crime}
+	out := map[string]any{"buy": p.Buy, "item_id": p.ItemID, "quantity": p.Quantity, "currency_id": currency, "unit_price": unit, "total": total, "balance": balance, "heat": i64(post["heat"]), "access": reason, "underworld_reputation": rep, "trust_reputation": blackMarketTrustReputation, "detected": detected, "crime": crime}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "economy", EventType: "black_market.trade", EntityType: "black_market", EntityID: fmt.Sprint(post["world_name"]), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 

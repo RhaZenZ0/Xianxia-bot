@@ -5617,6 +5617,52 @@ passive does (`describe_equipment_in_full`, `equipment_passive_line`), professio
 card with a section per trade (`_profession_card`), and `/body` and `/profession` are tree
 commands, the v1.7.4 `/stall` fault found twice more.
 
+### A method is practised by being cultivated by, and an id is picked (v1.11.0)
+
+Asked as *"How can we practice a manual"*, and the answer had two faults. The leaf called
+**Practise** chose which manual a cultivator gathers by and added no practice; and gathering by a
+manual never raised its mastery, so weeks of sessions left a method as mastered as the day it was
+read. `practiseCultivatedManualTx` (`cultivation_manual.go`) adds `cultivationPracticeGain` (1) to
+the manual `practisedManual` answers for - the chosen one, else the best learned - on every session
+that gathered, through `practiceManualTx`, the one door practice comes in by. **A session that
+gathered nothing practises nothing**, for the insight rule's reason: a full stage must not be a
+mastery farm, and `TestCultivatingByAMethodPractisesIt` holds both halves. The leaf is
+`cultivate_by` now (label **Cultivate By**), because a button called Practise that practises
+nothing is the `sync_world_catalog` lie in a panel; `test_cultivating_practises_the_method.py`
+holds that the old name does not come back.
+
+Reported from play in the same session: *"Tame ask for id when taming and each time you feed
+them"*. Every beast leaf took a bare `int`, read off `/beast status` or `/beast encounters` and
+typed into another page. Each is a hub option provider and a slash autocomplete over the same rows
+(`beast.py`), the equipment shape. `test_an_id_is_picked_not_typed.py` reads every registered
+command's `*_id: int` parameter by AST and holds it to having a provider or being named in
+`STILL_TYPED`, which is **not empty**: nineteen other parameters (a boss claim, a pursuit, a crime,
+a formation, a discipleship request, family history rows, a war, a caravan, an auction, a duel, a
+bond) still ask for a number, and the list can only shrink. Its first run found two a grep had
+missed, `birth_family_claim` and `birth_family_conflict`.
+
+### A door by reputation that could never open (v1.11.1)
+
+Asked *"Are the black market discoverable?"*. `blackMarketAuthorized` opens the brokers on dark
+karma, a demonic sect, or Underworld Contacts 15 - and the one writer of that reputation in the
+tree was `blackMarketTradeAction` itself, *after* the authorization. A reputation earned only by
+the action it gates is the rc.48 shape turned inward: a door that looks open and is decoration.
+The Hidden-Weapon family's boon promised "discreet underworld contacts" and `faction_reputation`
+held nothing. A broker buys from a stranger now - a sell is let through unauthorized with
+`access` = "fencing as a stranger", and the existing +1 is the path to trust - and
+`birth_family_sendoff.<archetype>.reputation` grants five underworld households the threshold,
+through `householdReputationTx`, **as a floor, never added**, because the send-off is reached by
+creation, samsara and a household's backfill. `blackMarketTrustReputation` is the one number;
+`test_the_underworld_and_perfection_can_be_reached.py` holds the Python twin to it. Both Go
+drills are recorded in `underworld_contacts_test.go`'s shape: the first version of the floor drill
+only broke the build, which proves nothing, and was redone as a disabled term.
+
+*"And where is the perfect stage"* - the engine lets a Perfection begin at stage 9 of any realm and
+the curriculum held the page to Soul Formation, while a banked insight or a Perfection is what opens
+the first gates. The page is at 0; `perfection` now opens on either ladder's stage 9, and a new
+`perfection_path` gate draws Quest, Clues, Trial and Abandon only while a path is under way, so
+opening the page did not put four refusals in front of a Body Tempering cultivator at stage 3.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

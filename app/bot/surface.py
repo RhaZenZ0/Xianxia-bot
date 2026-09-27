@@ -1053,6 +1053,10 @@ PROGRESSION_GATES: dict[str, tuple[str, ...]] = {
     # shut until one has actually been survived.
     "ascension_gate": ("tribulation gate",),
     "perfection": ("perfect start",),
+    # The rest of the path is drawn only while one is under way (v1.11.1): the
+    # page opens from realm 0 now, so without this a Body Tempering cultivator
+    # at stage 3 would see four buttons that could only refuse.
+    "perfection_path": ("perfect quest", "perfect clues", "perfect trial", "perfect abandon"),
     "sect_member": ("sect roster", "sect politics", "sect address", "sect family", "sect shadow",
                     "sect manor establish", "sect manor upgrade", "sect abode", "sect treasury", "sect contribute", "sect redeem",
                     "sect discipleship request", "sect discipleship accept", "sect discipleship reject", "sect discipleship leave"),
@@ -1097,8 +1101,18 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
         shut["ascension_gate"] = (
             f"no tribulation out of {standing_in or 'this world'} has been survived here yet"
             if departing else "no world-crossing tribulation leads out of this world")
-    if phase != 9:
-        shut["perfection"] = "Perfection begins at stage 9"
+    # Either ladder at stage 9 opens the door (v1.11.1): `/perfect start`
+    # takes a path, and the body path's stage is its own column.
+    body_realm = int(c.get("body_realm_index") or 0)
+    body_phase = int(c.get("body_phase") or 1)
+    if phase != 9 and body_phase != 9:
+        shut["perfection"] = "Perfection begins at stage 9 of the realm or the body"
+    under_way = False
+    for row in (await DB.get_perfection(uid, realm), await DB.get_body_perfection(uid, body_realm)):
+        if row and int(row.get("active") or 0) and not int(row.get("completed") or 0):
+            under_way = True
+    if not under_way:
+        shut["perfection_path"] = "no Perfection path is under way — Start one at stage 9"
     if not await DB.get_sect_membership(uid):
         shut["sect_member"] = "you are in no sect — see Recruitment"
     else:
