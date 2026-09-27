@@ -7807,6 +7807,23 @@ class Database:
             out = dict(row)
             cur = await db.execute("SELECT * FROM boss_participants WHERE encounter_id=? ORDER BY user_id", (int(out["encounter_id"]),))
             out["participants"] = [dict(r) for r in await cur.fetchall()]
+            # What the raid card draws beside the fight (v1.8.5): who leads
+            # the party and whether it was made for this raid alone, the
+            # formation it fights in, and which raiders have claimed.
+            cur = await db.execute("SELECT * FROM parties WHERE party_id=?", (int(out["party_id"]),))
+            party = await cur.fetchone()
+            out["party"] = dict(party) if party else {}
+            cur = await db.execute(
+                "SELECT name,stance,cohesion FROM party_formations WHERE party_id=? AND active=1 LIMIT 1",
+                (int(out["party_id"]),),
+            )
+            formation = await cur.fetchone()
+            out["formation"] = dict(formation) if formation else {}
+            cur = await db.execute(
+                "SELECT user_id,claimed FROM boss_reward_claims WHERE encounter_id=? ORDER BY user_id",
+                (int(out["encounter_id"]),),
+            )
+            out["claims"] = [dict(r) for r in await cur.fetchall()]
             # The phase's name and numbers come from the boss template at
             # the presenter (boss_encounter_phase, v0.30.0); the row keeps
             # the engine's phase_index.

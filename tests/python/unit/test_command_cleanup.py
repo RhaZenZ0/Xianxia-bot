@@ -182,6 +182,15 @@ class CommandCleanupTests(unittest.TestCase):
             "_step_reply",
             "HubLayoutMenuButton",
             "ExpiredPanelView",
+            # v1.8.5: the raid card is one message the whole party presses.
+            # A press by somebody outside the raid, a refusal of one raider's
+            # action, and the technique picker listing one raider's own Law
+            # techniques are each for that raider alone - broadcasting them
+            # would be LayoutHubView's mis-click leak on a card built to be
+            # pressed by several people. What the raid did is always public:
+            # it is the card itself, redrawn in the channel.
+            "RaidView",
+            "RaidTechniqueSelect",
         }
         violations = []
 

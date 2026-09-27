@@ -287,6 +287,49 @@ async def _location_is_visible(user_id: int, character: dict[str, Any], location
     return str(location) in await _known_locations(user_id, character)
 
 
+async def talk_target_whereabouts(user_id: int, character: dict[str, Any], npc_name: str) -> str:
+    """Where somebody a quest asks you to speak with is now (v1.8.3).
+
+    The civilization tick walks ordinary townsfolk off to the next district
+    and home again, so a commission's fishmonger is often not on the dock the
+    commission was written about - and the `/talk` and `/npcinfo` pickers only
+    offer who is in the room, so nothing told a player where to look. This is
+    `/npcinfo`'s own answer, under `/npcinfo`'s own rule: a place the player
+    has not discovered is not named. A missing person is never placed, because
+    finding them is the point of looking. It never raises, because it is drawn
+    beside every line of the journal.
+    """
+    name = str(npc_name or "").strip()
+    if not name:
+        return ""
+    try:
+        state = await SIM.npc_status(name) or {}
+        status = str(state.get("status") or "")
+        if status == "missing":
+            return "is missing; nobody knows where"
+        where = await current_npc_location(name)
+        if where == DEAD or (state and status not in ("", "alive")):
+            return "has died"
+        if not where:
+            return ""
+        if str(where) == str(character.get("location") or ""):
+            return "is here with you"
+        if await _location_is_visible(int(user_id), character, str(where)):
+            return f"is now at **{where}**"
+        return "is somewhere you have not been"
+    except Exception:
+        log.exception("Could not resolve where %s is for the journal", name)
+        return ""
+
+
+async def objective_line_suffix(user_id: int, character: dict[str, Any] | None, objective: dict[str, Any], done: bool) -> str:
+    """The whereabouts note for an unfinished `talk` objective, else nothing."""
+    if done or not character or str(objective.get("type") or "") != "talk":
+        return ""
+    where = await talk_target_whereabouts(user_id, character, str(objective.get("target") or ""))
+    return f" · *{str(objective.get('target'))} {where}*" if where else ""
+
+
 async def location_autocomplete(
     interaction: discord.Interaction, current: str
 ) -> list[app_commands.Choice[str]]:
