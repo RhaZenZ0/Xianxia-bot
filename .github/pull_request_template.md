@@ -81,8 +81,10 @@ the restore, or make the outcome certain by the scenario instead.
 
 ## Checks
 
-<!-- What you ran, not what CI will run. Real numbers, please. -->
+<!-- What you ran locally, not what CI will run. The full suite runs in GitHub
+on this PR (ci.yml); locally, run the targeted checks for what the branch
+touches, and the two playtests before a release. Real numbers, please. -->
 
-`make check` (ruff, gofmt, go vet, staticcheck, pytest, go test) -
-_N_ Python tests, Go suite green. Dashboard gate PASS.
-Release manifest verified at _N_ files. **No schema change.**
+Targeted: _the test files and Go packages run, with counts_. Playtests: _engine N/N,
+Discord N/N, or not run and why_. Release manifest rewritten. **No schema change.**
+The full suite runs in GitHub on this PR.

@@ -26,7 +26,17 @@ bindings (`libsqlite3-dev` on Debian/Ubuntu). `.env.example` is keys, defaults a
 separators only — a contract test holds it to that — and `docs/CONFIGURATION.md` is where every
 key is explained; a new key gets its line in both.
 
-Full local check suite (mirrors CI):
+**The full suite runs on GitHub, not here.** `.github/workflows/ci.yml` runs all of it on every
+pull request and every push to main, so to verify a change, run only the targeted checks for what
+it touches (the tests that name the changed file, module or content key; `gofmt`, `go vet` and
+`go test` for the touched Go package; `scripts/release_manifest.py --write`), push, and read CI.
+Do not run `make check` or a whole `pytest -q` to verify a change: it takes about eight minutes
+here and still proves nothing about the Go race detector, the pinned tools or the containers. A
+branch with no pull request runs no CI, so a change is checked once its PR is open. The one
+exception is the two playtests below, which never run in GitHub and are run here before a release.
+The `github-ci` skill (`.claude/skills/github-ci/SKILL.md`) has the details.
+
+`make check` is still the whole suite in one command, for a person on a machine that has time:
 
 ```bash
 make check          # lint + format-check + test-python + test-go
@@ -5695,6 +5705,37 @@ a war lets it start over - and `TestASectWithNoRoadLeftDoesNotLeapAcrossTheMap` 
 review asked for the history insert's error to fail the claim, and that was declined: one system's
 error ends the whole tick (rc.28), and `recordWarDeclared` already treats its history row the same
 way - a lost rumour is not worth every batch ordered after `sect_politics`.
+
+### A district is entered from the city page (v1.12.1)
+
+Asked as *"Enter the District can we do that?"*: City → Look listed the gates and districts and
+sent the player to find them in `/travel`'s list. On the owner's call there are two doors,
+`city enter` (a picker) and a button per place under City → Look, and both call
+`ACTIONS.handler_for(travel)` - the `/forage` shape, so neither can drift from the travel it is.
+`_places_to_enter` offers the streets, the districts and the gates, minus where you stand, and
+only what `door_allows` says the engine opens, so a shop offers its street alone.
+`test_a_district_can_be_entered.py` sweeps every location in the catalogue; its drill (the door
+check dropped) fails from a shop.
+
+### A card pages, and a restart-safe panel keeps the cut (v1.12.1)
+
+Asked as *"if the discord layout is too long can we do page 2?"*. Hub panels already paged
+(actions behind "More actions", a plain result up to five pages), but a **card** past Discord's
+4,000 characters was cut with an ellipsis, so the end of a long sheet was lost. `Card._pages`
+splits it - title and footer on every page, the lead, description and fields in order, broken
+between paragraphs, then lines, then words, at most `MAX_PAGES` - and `CardView._page_row` puts
+◀ Page n/N ▶ under it. Two things are decisions. **A view with controls of its own and no timeout
+keeps the cut**: such a view may be re-registered at boot with `bot.add_view`, which needs every
+control to carry a fixed `custom_id`, and page buttons carry none, so paging one would stop it
+being re-registrable. **A pure card gets a timeout when it pages**, `register_page_timeout(panel_timeout)`
+from the surface, because a view that waits for ever holds memory for ever. The first run of
+`test_a_long_card_pages.py` found the button turning the page number without redrawing the card;
+its drill (the page row switched off) fails three of its tests.
+
+The same release moved `go.mod` to `go 1.26.0` with `toolchain go1.26.8`. The pair is deliberate:
+the engine image is `golang:1.26` pinned by digest, and the official images set `GOTOOLCHAIN=local`,
+so a `go` line naming a patch newer than the image's would fail the build; the `toolchain` line is
+what CI (setup-go reads it) and govulncheck run on, and a local build under `GOTOOLCHAIN=auto`.
 
 ## Testing conventions
 
