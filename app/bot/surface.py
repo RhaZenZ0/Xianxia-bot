@@ -1175,7 +1175,7 @@ LOCATION_GATES: dict[str, tuple[str, ...]] = {
     # The four prefixes every one of these handlers refuses inside, and the
     # places whose markets, posts, arrays and territory rows are all keyed on
     # a catalogue location a private room never is.
-    "private_room": ("explore", "hunt", "mine", "travel go", "realmhub go", "market buy", "market sell",
+    "private_room": ("explore", "hunt", "mine", "travel go", "city enter", "realmhub go", "market buy", "market sell",
                      "blackmarket buy", "blackmarket sell", "array use", "territory claim"),
     "shop_counter": ("shop browse", "shop buy", "shop sell"),
     "auction_floor": ("auction leave", "auction bid", "auction sell", "auction browse"),

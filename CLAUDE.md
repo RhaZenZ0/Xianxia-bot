@@ -5706,6 +5706,17 @@ review asked for the history insert's error to fail the claim, and that was decl
 error ends the whole tick (rc.28), and `recordWarDeclared` already treats its history row the same
 way - a lost rumour is not worth every batch ordered after `sect_politics`.
 
+### A district is entered from the city page (v1.12.1)
+
+Asked as *"Enter the District can we do that?"*: City → Look listed the gates and districts and
+sent the player to find them in `/travel`'s list. On the owner's call there are two doors,
+`city enter` (a picker) and a button per place under City → Look, and both call
+`ACTIONS.handler_for(travel)` - the `/forage` shape, so neither can drift from the travel it is.
+`_places_to_enter` offers the streets, the districts and the gates, minus where you stand, and
+only what `door_allows` says the engine opens, so a shop offers its street alone.
+`test_a_district_can_be_entered.py` sweeps every location in the catalogue; its drill (the door
+check dropped) fails from a shop.
+
 ### A card pages, and a restart-safe panel keeps the cut (v1.12.1)
 
 Asked as *"if the discord layout is too long can we do page 2?"*. Hub panels already paged

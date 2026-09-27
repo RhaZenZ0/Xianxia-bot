@@ -33,8 +33,8 @@ from ..discovery import (
     travel_first_discovers_location,
 )
 from ..formatting import human_duration, roll_line
-from ..hubs import register_hub_option_hint, HubDynamicOption, register_hub_option_provider
-from ..locations import _known_locations, access_realm_index, destination_groups, npcs_present
+from ..hubs import register_hub_option_hint, HubDynamicOption, panel_timeout, register_hub_option_provider
+from ..locations import _known_locations, access_realm_index, destination_groups, door_allows, npcs_present
 from ..registry import ACTIONS, VIEW_RESTORERS, registered_group_command, registered_root_command
 from ..runtime import (
     DB,
@@ -1373,6 +1373,49 @@ def _city_parts(city: str) -> list[str]:
     return sorted(name for name, data in WORLD.locations.items() if data.get("district") and str(data.get("outside_location")) == city)
 
 
+def _places_to_enter(here: str) -> list[tuple[str, str, str]]:
+    """Where "Enter" can take you from ``here`` (v1.12.1): the city's streets,
+    then its districts, then its gates, as (name, emoji, what it is).
+
+    Asked for from play as *"Enter the District can we do that?"* - a district
+    was reached only by finding it in `/travel`'s list. These are the same
+    places, walked by the same engine action, so nothing is decided here: a
+    place is offered only where `door_allows` says the engine will open it
+    (from inside a shop that is the street alone), never the place you are
+    standing in, and a road site or a city with no walls offers nothing."""
+    here_data = WORLD.locations.get(here) or {}
+    if here_data.get("road_site") or here_data.get("private"):
+        return []
+    city = _city_of(here)
+    if city not in WORLD.locations:
+        return []
+    parts = _city_parts(city)
+    rows: list[tuple[str, str, str]] = [(city, "🏙️", "the streets of the city")]
+    rows += [(p, "🏘️", "a district") for p in parts if not WORLD.locations[p].get("gate")]
+    rows += [(p, "🏯", "a gate") for p in parts if WORLD.locations[p].get("gate")]
+    return [row for row in rows if row[0] != here and door_allows(here, row[0])]
+
+
+class CityEnterButton(discord.ui.Button):
+    """One place under City → Look: pressing it walks there through `/travel`."""
+
+    def __init__(self, place: str, emoji: str) -> None:
+        super().__init__(style=discord.ButtonStyle.secondary, label=place[:80], emoji=emoji)
+        self.place = place
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        await ACTIONS.handler_for(travel)(interaction, self.place)
+
+
+class CityLookView(CardView):
+    """City → Look with a button for every place Enter would offer."""
+
+    def __init__(self, card: Card, places: list[tuple[str, str, str]]) -> None:
+        super().__init__(card=card, timeout=panel_timeout())
+        for name, emoji, _what in places[:20]:
+            self.add_item(CityEnterButton(name, emoji))
+
+
 def _city_inn(city: str) -> str:
     return next((name for name in _city_parts(city) if WORLD.locations[name].get("district") == "inn"), "")
 
@@ -1437,8 +1480,50 @@ async def city_look(interaction: discord.Interaction) -> None:
     if mood:
         lines.append(mood)
     lines.append(f"{WORLD.locations.get(here, {}).get('description', '')}")
-    lines.append("Walk to any gate or district with **/travel**; walk the streets with **/world → Act → Explore** to find the shops. **/world → City → Board** for work, **Inn** for company, **Rumours** for news.")
-    await interaction.response.send_message("\n".join(lines), ephemeral=False)
+    places = _places_to_enter(here)
+    walk = ("Press a place below to walk there, or **/world → City → Enter**" if places
+            else "Walk to any gate or district with **/travel**")
+    lines.append(f"{walk}; walk the streets with **/world → Act → Explore** to find the shops. **/world → City → Board** for work, **Inn** for company, **Rumours** for news.")
+    if not places:
+        await interaction.response.send_message("\n".join(lines), ephemeral=False)
+        return
+    await interaction.response.send_message(view=CityLookView(Card(description="\n".join(lines)), places), ephemeral=False)
+
+
+async def city_enter_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    c = await DB.get_character(interaction.user.id)
+    if not c:
+        return []
+    needle = str(current or "").casefold().strip()
+    return [app_commands.Choice(name=f"{name} — {what}"[:100], value=name[:100])
+            for name, _emoji, what in _places_to_enter(str(c.get("location") or ""))
+            if not needle or needle in name.casefold()][:25]
+
+
+async def city_enter_hub_options(interaction: discord.Interaction, current: str) -> list[HubDynamicOption]:
+    c = await DB.get_character(interaction.user.id)
+    if not c:
+        return []
+    needle = str(current or "").casefold().strip()
+    return [HubDynamicOption(label=name[:100], value=name[:100], description=what[:100], emoji=emoji)
+            for name, emoji, what in _places_to_enter(str(c.get("location") or ""))
+            if not needle or needle in name.casefold()][:25]
+
+
+@registered_group_command(city_group, name="enter", description="Walk into a district or gate of this city, or back to its streets")
+@app_commands.autocomplete(place=city_enter_autocomplete)
+async def city_enter(interaction: discord.Interaction, place: str) -> None:
+    """`/world → City → Enter` (v1.12.1): the same walk `/travel` makes, over
+    the places `_places_to_enter` offers, through the registry's binding of
+    `/travel go` so the two doors cannot drift - nothing is decided here."""
+    await ACTIONS.handler_for(travel)(interaction, place)
+
+
+register_hub_option_provider(city_enter, "place", city_enter_hub_options)
+register_hub_option_hint(
+    city_enter, "place",
+    "There is nowhere to walk to from here: this place has no districts or gates, or you are on a road "
+    "or in a private room. Step out, or use **/travel** to go further.")
 
 
 @registered_group_command(city_group, name="board", description="The city's commission board: a quest pavilion in a capital, the gate notice elsewhere")

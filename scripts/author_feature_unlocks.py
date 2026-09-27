@@ -168,6 +168,7 @@ LEAVES: dict[str, int] = {
     # The city's page waits, but its reads and its board are the first
     # hour's: the owner's list says Quest, and the board is where they are.
     "city look": 0,
+    "city enter": 0,
     "city inn": 0,
     "city rumours": 0,
     "city board": 0,
