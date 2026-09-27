@@ -5641,6 +5641,28 @@ a formation, a discipleship request, family history rows, a war, a caravan, an a
 bond) still ask for a number, and the list can only shrink. Its first run found two a grep had
 missed, `birth_family_claim` and `birth_family_conflict`.
 
+### A door by reputation that could never open (v1.11.1)
+
+Asked *"Are the black market discoverable?"*. `blackMarketAuthorized` opens the brokers on dark
+karma, a demonic sect, or Underworld Contacts 15 - and the one writer of that reputation in the
+tree was `blackMarketTradeAction` itself, *after* the authorization. A reputation earned only by
+the action it gates is the rc.48 shape turned inward: a door that looks open and is decoration.
+The Hidden-Weapon family's boon promised "discreet underworld contacts" and `faction_reputation`
+held nothing. A broker buys from a stranger now - a sell is let through unauthorized with
+`access` = "fencing as a stranger", and the existing +1 is the path to trust - and
+`birth_family_sendoff.<archetype>.reputation` grants five underworld households the threshold,
+through `householdReputationTx`, **as a floor, never added**, because the send-off is reached by
+creation, samsara and a household's backfill. `blackMarketTrustReputation` is the one number;
+`test_the_underworld_and_perfection_can_be_reached.py` holds the Python twin to it. Both Go
+drills are recorded in `underworld_contacts_test.go`'s shape: the first version of the floor drill
+only broke the build, which proves nothing, and was redone as a disabled term.
+
+*"And where is the perfect stage"* - the engine lets a Perfection begin at stage 9 of any realm and
+the curriculum held the page to Soul Formation, while a banked insight or a Perfection is what opens
+the first gates. The page is at 0; `perfection` now opens on either ladder's stage 9, and a new
+`perfection_path` gate draws Quest, Clues, Trial and Abandon only while a path is under way, so
+opening the page did not put four refusals in front of a Body Tempering cultivator at stage 3.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

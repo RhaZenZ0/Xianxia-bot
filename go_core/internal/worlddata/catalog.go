@@ -651,6 +651,12 @@ type BirthFamilySendoff struct {
 	// already is - a weapon-smith's family forges, a tomb-watch clan inscribes -
 	// and kept in content so it is tunable without an engine change.
 	Trade string `json:"trade"`
+	// Reputation is the standing a household's connections give a child
+	// (v1.11.1): the Hidden-Weapon family's "discreet underworld contacts" were
+	// a boon in the prose and a zero in `faction_reputation`. Granted as a
+	// floor, never added, so a second life in the same kind of house cannot
+	// stack it.
+	Reputation map[string]int64 `json:"reputation"`
 }
 
 type Inheritance struct {

@@ -17,3 +17,17 @@ def access_reason(*, karma: int, underworld_reputation: int, sect_alignment: str
     return None
 
 
+
+
+def underworld_trust_line(result: dict) -> str:
+    """What a fence said about the brokers' trust (v1.11.1), read off the
+    engine's reply: the standing it left and the standing at which a broker
+    sells. Nothing when the seller was already trusted for another reason."""
+    result = dict(result or {})
+    if str(result.get("access") or "") != "fencing as a stranger":
+        return ""
+    rep = int(result.get("underworld_reputation") or 0)
+    trust = int(result.get("trust_reputation") or BLACK_MARKET_ACCESS_REPUTATION)
+    if rep >= trust:
+        return f"\n🌑 Underworld Contacts **{rep:+d}** — the brokers know you now and will sell to you."
+    return f"\n🌑 Underworld Contacts **{rep:+d}** of **{trust}** — {trust - rep} more before a broker sells to you."

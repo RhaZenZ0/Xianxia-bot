@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -137,7 +138,16 @@ func grantBirthFamilySendoffTx(conn *storage.Conn, catalog worlddata.Catalog, us
 		return nil, err
 	}
 	sendoff, ok := catalog.BirthFamilySendoff[archetype]
-	if !ok || strings.TrimSpace(sendoff.Item) == "" {
+	if !ok {
+		return nil, nil
+	}
+	// The household's connections (v1.11.1), ahead of the heirloom's guard
+	// for the schooling's reason: they are the family's, not the object's.
+	standing, err := householdReputationTx(conn, userID, sendoff.Reputation, now)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(sendoff.Item) == "" {
 		return nil, nil
 	}
 	item, _, ok := itemDef(catalog, sendoff.Item)
@@ -178,7 +188,42 @@ func grantBirthFamilySendoffTx(conn *storage.Conn, catalog worlddata.Catalog, us
 	if tutoring != nil {
 		out["tutoring"] = tutoring
 	}
+	if len(standing) > 0 {
+		out["reputation"] = standing
+	}
 	return out, nil
+}
+
+// householdReputationTx raises each faction the send-off names to at least
+// its value, and answers what it raised. A floor rather than a grant: the
+// send-off is reached from creation, samsara and a household's backfill, and
+// none of them may stack a household's contacts on top of standing already
+// earned. Factions are walked in sorted order so the ledger reads one way.
+func householdReputationTx(conn *storage.Conn, userID int64, want map[string]int64, now float64) (map[string]int64, error) {
+	factions := make([]string, 0, len(want))
+	for faction := range want {
+		factions = append(factions, faction)
+	}
+	sort.Strings(factions)
+	raised := map[string]int64{}
+	for _, faction := range factions {
+		res, err := conn.Execute(`SELECT score FROM faction_reputation WHERE user_id=? AND LOWER(faction_key)=LOWER(?)`, []any{userID, faction})
+		if err != nil {
+			return nil, err
+		}
+		have := int64(0)
+		if len(res.Rows) > 0 {
+			have = storage.ParseInt(res.Rows[0][0])
+		}
+		if delta := want[faction] - have; delta > 0 {
+			score, err := adjustReputationTx(conn, userID, faction, delta, "household connections", now)
+			if err != nil {
+				return nil, err
+			}
+			raised[faction] = score
+		}
+	}
+	return raised, nil
 }
 
 type birthFamilyHomelandProfile struct {

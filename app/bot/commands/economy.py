@@ -11,6 +11,7 @@ from typing import Any
 import discord
 from discord import app_commands
 
+from ...rules.black_market import BLACK_MARKET_ACCESS_REPUTATION, underworld_trust_line
 from ...rules.black_market import access_reason as black_market_access_reason
 from ...ops.game_engine import GameEngineError
 from ..locations import _known_locations, _location_is_visible, _world_is_unlocked, location_autocomplete
@@ -1276,13 +1277,11 @@ async def blackmarket_rumors(interaction: discord.Interaction) -> None:
     c = await require_character(interaction)
     if not c:
         return
+    # Where the brokers meet is a rumour anybody can hear (v1.11.1); what they
+    # will do with you is trust. A stranger may fence the goods a post trades,
+    # and each sale raises Underworld Contacts toward the standing at which a
+    # broker sells to them.
     reason, rep, _ = await _black_market_access(interaction.user.id, c)
-    if not reason:
-        await interaction.response.send_message(
-            f"🌑 The underworld does not trust you yet. Access requires dark Karma, a demonic-sect introduction, "
-            f"or **Underworld Contacts {15}+** (yours: **{rep:+d}**).", ephemeral=False
-        )
-        return
     wt = await current_world_time()
     known = await _known_locations(interaction.user.id, c)
     posts = [
@@ -1291,7 +1290,10 @@ async def blackmarket_rumors(interaction: discord.Interaction) -> None:
     ]
     if not posts:
         await interaction.response.send_message("The underworld routes are quiet right now.", ephemeral=False); return
-    lines=[f"🌑 **Black-Market Rumors** — Access: {reason}."]
+    lines=[f"🌑 **Black-Market Rumors** — Access: {reason}." if reason else
+           f"🌑 **Black-Market Rumors** — the brokers do not know you. They will buy what their post trades "
+           f"(**/economy → Black Market → Sell**) and each sale raises Underworld Contacts; at **{BLACK_MARKET_ACCESS_REPUTATION}** "
+           f"(yours: **{rep:+d}**) they sell to you too."]
     for post in posts:
         lines.append(
             f"• **{post['world_name']}** — **{post['location']}** "
@@ -1305,28 +1307,34 @@ async def blackmarket_status(interaction: discord.Interaction) -> None:
     c=await require_character(interaction)
     if not c:return
     reason,rep,_=await _black_market_access(interaction.user.id,c)
-    if not reason:
-        await interaction.response.send_message(f"🌑 No broker will deal with you yet. Underworld Contacts: **{rep:+d}**.",ephemeral=False);return
     wt=await current_world_time(); post=await DB.get_active_black_market(str(c.get('location','')),wt.total_minutes)
     if not post:
         await interaction.response.send_message("No active underworld post is hidden at your current location. Use **Economy → Black Market → Rumors**.",ephemeral=False);return
     lines=[f"🌑 **Hidden Trading Post — {post['location']}**",f"Heat: **{post['heat']}/100** • closes in **{max(0,int(post['closes_game_minute'])-wt.total_minutes)} game min**"]
+    if not reason:
+        lines.append(f"The broker will buy these from you but sell to you only at Underworld Contacts **{BLACK_MARKET_ACCESS_REPUTATION}** (yours: **{rep:+d}**).")
     for row in post.get('stock',[]): lines.append(f"• **{WORLD.item_name(str(row['item_id']))}** x{row['quantity']} — **{row['unit_price']:,} {WORLD.currency_name(str(row['currency_id']))}** • {row['legal_status']}")
     await reply_long(interaction,"\n".join(lines),ephemeral=False)
 
 
-async def _black_market_item_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[str]]:
+async def _black_market_item_autocomplete(interaction:discord.Interaction,current:str,*,selling:bool=False)->list[app_commands.Choice[str]]:
+    """What a post trades. Buying needs the brokers' trust; selling - fencing -
+    does not (v1.11.1), so the sell picker is the post's goods the player carries."""
     c=await DB.get_character(interaction.user.id)
     if not c:return []
-    reason,_,_=await _black_market_access(interaction.user.id,c)
-    if not reason:return []
+    if not selling:
+        reason,_,_=await _black_market_access(interaction.user.id,c)
+        if not reason:return []
     wt=await current_world_time(); post=await DB.get_active_black_market(str(c.get('location','')),wt.total_minutes)
     if not post:return []
+    carried=await DB.get_inventory(interaction.user.id) if selling else {}
     q=current.casefold().strip(); out=[]
     for row in post.get('stock',[]):
         iid=str(row['item_id']); name=WORLD.item_name(iid)
+        if selling and int(carried.get(iid,0) or 0)<=0:continue
         if q and q not in iid.casefold() and q not in name.casefold():continue
-        out.append(app_commands.Choice(name=f"{name} ({row['quantity']} left)"[:100],value=iid[:100]))
+        note=f"{int(carried[iid])} carried" if selling else f"{row['quantity']} left"
+        out.append(app_commands.Choice(name=f"{name} ({note})"[:100],value=iid[:100]))
     return out[:25]
 
 
@@ -1362,12 +1370,13 @@ async def blackmarket_sell(interaction:discord.Interaction,item:str,quantity:app
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
-    await interaction.followup.send(format_trade_receipt(icon="🌑",verb="Sold",item_label=WORLD.item_name(item),quantity=int(quantity),result=result,currency_name=WORLD.currency_name),ephemeral=False)
+    receipt=format_trade_receipt(icon="🌑",verb="Sold",item_label=WORLD.item_name(item),quantity=int(quantity),result=result,currency_name=WORLD.currency_name)
+    await interaction.followup.send(receipt+underworld_trust_line(result),ephemeral=False)
 
 
 @blackmarket_sell.autocomplete("item")
 async def blackmarket_sell_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[str]]:
-    return await _black_market_item_autocomplete(interaction,current)
+    return await _black_market_item_autocomplete(interaction,current,selling=True)
 
 
 @registered_group_command(market_group, name="prices",description="View dynamic local prices, supply and demand")
