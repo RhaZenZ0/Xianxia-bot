@@ -5555,6 +5555,37 @@ built only when discord.py lacks Components V2, which the pinned 2.7.1 never doe
 by AST, holds that every allowed fallback is still there, and asserts it can find one before it
 trusts an empty answer.
 
+### A raid is fought at its own pace (v1.9.1)
+
+Four reports from one solo raid, and three are one shape: a rule written for one surface that
+reached another it was never meant for. **The action meter paced the fight.** Every raid press
+spent a token from the per-player bucket (`TYPED_PLAY_BURST` 4, then one every ten seconds),
+which v0.31.0 built to guard the AI narration allowance - and a raid press calls no model, while
+the engine already holds a raider to one action a round. Solo, every press is a round, so the
+meter was the whole pace. `serialized_user_action(metered=False)` keeps the lock and spends no
+token; `/boss act`, `/boss claim` and the raid card use it, and `test_bot_package`'s decorator gate
+now reads a decorator that is a call. **A miss read as damage.** `boss.act` reported a miss as
+"Attack deals 0 damage", and a hit always deals at least 1, so the zero was only ever a miss
+nobody was told about; `bossStrikeLine` says it missed and the chance it had. **The Technique
+button offered Laws only**, so a cultivator whose art was a manual had nothing to press.
+`manualTechniqueFor` and `spendManualTechniqueTx` are the one statement of whether a manual
+technique may be used and what it costs, shared by the battle and the raid; in a raid its damage
+plus mastery replaces an attack's +1 on the same hit roll.
+
+**Good deeds pay karma** (`karma_deeds.go`), each capped because karma gates the hidden sect and a
+sect's trial preference: a world-event Aid/Support/Stabilize/Evacuate/Defend (+1, three per
+event), a Resolve scene action against anything but oneself (+1 a world day - a Resolve on "Self"
+always succeeds), a personal event helped to its end (+1), the last unit of a site (+3). The count
+is `event_log` rows of type `karma_deed` keyed on the deed, and a missing table pays nothing
+rather than refusing the action. `TestEveryGoodDeedIsPaidWhereItHappens` reads the four doors by
+AST, because the helper's own tests pass against a tree nothing calls it from.
+
+A technique picker prints what a manual technique does (`describe_manual_technique`, the display
+twin of `manualTechniqueAction` and the raid's bonus), gear prints its description and what its
+passive does (`describe_equipment_in_full`, `equipment_passive_line`), profession status is a
+card with a section per trade (`_profession_card`), and `/body` and `/profession` are tree
+commands, the v1.7.4 `/stall` fault found twice more.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

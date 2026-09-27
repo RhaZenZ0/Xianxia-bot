@@ -11,7 +11,12 @@ from collections.abc import Mapping
 import discord
 from discord import app_commands
 
-from ...rules.advanced_runtime import describe_equipment, equipment_definition, equipment_totals_line
+from ...rules.advanced_runtime import (
+    describe_equipment,
+    describe_equipment_in_full,
+    equipment_definition,
+    equipment_totals_line,
+)
 from ...ops.game_engine import GameEngineError
 from ..hubs import HubDynamicOption, register_hub_option_hint, register_hub_option_provider
 from ..registry import registered_group_command
@@ -58,8 +63,11 @@ async def equipment_status(interaction: discord.Interaction) -> None:
     totals = equipment_totals_line(bonus) or "No bonuses from what you have equipped."
     lines = [f"🛡️ **Equipment — {c['name']}**", f"**In a fight** (equipped gear):\n{totals}"]
     for row in rows:
-        description = describe_equipment(
+        # Every piece says what it is and what its passive does (v1.9.1), not
+        # only its numbers.
+        description = describe_equipment_in_full(
             row["item_id"],
+            description=str(WORLD.item_definition(str(row["item_id"])).get("description") or ""),
             quality=row["quality"],
             durability=row["durability"],
             max_durability=row["max_durability"],
@@ -67,7 +75,7 @@ async def equipment_status(interaction: discord.Interaction) -> None:
         )
         lines.append(
             f"\n{'✅' if row['equipped'] else '▫️'} `#{row['equipment_id']}` **{_gear_name(row['item_id'])}** • {row['slot']} • quality {row['quality']}%"
-            f"\n{description or 'No stat modifiers'}"
+            f"\n{description}"
         )
     await reply_long(interaction, "\n".join(lines), ephemeral=False)
 

@@ -16,7 +16,7 @@ from typing import Any
 import discord
 from discord import app_commands
 
-from ...rules.advanced_runtime import BOSS_TEMPLATES, boss_lair
+from ...rules.advanced_runtime import BOSS_TEMPLATES, boss_lair, deed_karma_line
 from ...rules.alchemy import alchemy_purge_refusal, toxicity_band
 from ...rules.birthfamily import family_profession_bonus
 from ...ops.game_engine import GameEngineError
@@ -172,6 +172,8 @@ class ExplorationEventView(CardView):
             lines.append(f"Effect: {dict(outcome['effect']).get('name','Special effect')}")
         if outcome.get("karma_delta"):
             lines.append(f"Karma {int(outcome['karma_delta']):+d} → {int(outcome.get('karma_score',0)):+d}")
+        if deed_karma_line(outcome.get("deed_karma")):
+            lines.append(deed_karma_line(outcome.get("deed_karma")))
         if outcome.get("fate_delta"):
             lines.append(f"Fate {int(outcome['fate_delta']):+d} → {int(outcome.get('fate',0))}/9")
         return lines

@@ -187,6 +187,13 @@ func worldEventActAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 		}
 	}
 
+	if success && worldEventGoodDeeds[actionKey] {
+		paid, karma := grantDeedKarmaTx(conn, userID, "world_event_good_deed", "world_event:"+eventKey, worldEventDeedKarma, worldEventDeedKarmaCap, now)
+		if deed := deedKarmaResult("world_event_good_deed", paid, karma); deed != nil {
+			out["deed_karma"] = deed
+		}
+	}
+
 	if success {
 		claim, e := conn.Execute(`INSERT OR IGNORE INTO event_claims(user_id,event_key,claimed_at) VALUES(?,?,?)`, []any{userID, eventKey, now})
 		if e != nil {

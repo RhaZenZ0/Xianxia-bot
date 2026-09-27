@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	"xianxia/core/internal/eventledger"
 	"xianxia/core/internal/gamerng"
@@ -299,6 +300,15 @@ func resolveSceneAction(conn *storage.Conn, catalog worlddata.Catalog, actorID i
 		}
 		for k, v := range rolled {
 			result[k] = v
+		}
+		// Standing firm against something outside yourself is a good deed
+		// (v1.9.1); a Resolve against "Self" always succeeds, so it pays none.
+		if p.ActionKey == "resolve" && rolled["success"] == true {
+			now := float64(time.Now().UnixNano()) / 1e9
+			paid, karma := grantDeedKarmaTx(conn, actorID, "scene_resolve", sceneResolveDeedKey(p.GameMinute), sceneResolveDeedKarma, 1, now)
+			if deed := deedKarmaResult("scene_resolve", paid, karma); deed != nil {
+				result["deed_karma"] = deed
+			}
 		}
 	}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "scene", EventType: "scene_action_resolved", EntityType: "character", EntityID: fmt.Sprint(actorID), GameMinute: p.GameMinute, Payload: map[string]any{"result": result, "detail": detail}}}, nil

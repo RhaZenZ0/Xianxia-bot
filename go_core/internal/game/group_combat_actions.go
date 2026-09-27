@@ -187,8 +187,10 @@ type bossActPayload struct {
 	EncounterID int64  `json:"encounter_id"`
 	Style       string `json:"style"`
 	Technique   string `json:"technique"`
-	GameMinute  int64  `json:"game_minute"`
-	Version     *int64 `json:"version,omitempty"`
+	// ManualTechnique is a manual's technique rather than a Law's (v1.9.1).
+	ManualTechnique string `json:"manual_technique"`
+	GameMinute      int64  `json:"game_minute"`
+	Version         *int64 `json:"version,omitempty"`
 }
 
 func activePartyRow(conn *storage.Conn, userID int64) (map[string]any, error) {
@@ -756,6 +758,8 @@ func bossActActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	base := max64(body, spirit) + i64(cr["realm_index"]) + equip["attack"] + form["attack"]
 	events := []string{}
 	damage := int64(0)
+	hit := false
+	hitChance := int64(0)
 	if p.Style == "guard" {
 		_, e = conn.Execute(`UPDATE boss_participants SET guard=1,acted_round=?,updated_at=? WHERE encounter_id=? AND user_id=?`, []any{round, now, p.EncounterID, userID})
 		events = append(events, "You brace within the formation and prepare to absorb the boss counterattack.")
@@ -772,7 +776,31 @@ func bossActActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 		}
 	} else {
 		bonus := int64(1)
-		if p.Style == "technique" {
+		var manualUse *manualTechniqueUse
+		manualName, manualHeal, manualVitality := "", int64(0), int64(0)
+		if p.Style == "technique" && strings.TrimSpace(p.ManualTechnique) != "" {
+			// A manual's technique in a raid (v1.9.1). The raid's Technique
+			// button offered Law techniques only, so a cultivator whose art
+			// was a manual - most of the first realms - had nothing to press.
+			// It costs what it costs in a battle, through the same door, and
+			// what it deals rides the strike: its damage plus mastery in place
+			// of an attack's 1, on the same hit roll. A heal mends the user's
+			// own raid vitality; a raid has no suppression to hold.
+			techID := strings.TrimSpace(p.ManualTechnique)
+			mt, mm, mastery, err := manualTechniqueFor(conn, catalog, userID, techID)
+			if err != nil {
+				return authoritativeMutation{}, err
+			}
+			use, err := spendManualTechniqueTx(conn, catalog, userID, techID, mt, mm, p.GameMinute, fmt.Sprint(enc["location"]))
+			if err != nil {
+				return authoritativeMutation{}, err
+			}
+			manualUse = &use
+			manualName = mt.Name
+			bonus = max64(1, mt.Damage+mastery)
+			manualHeal = max64(0, mt.Heal+mastery)
+			manualVitality = mt.VitalityCost
+		} else if p.Style == "technique" {
 			// Bring this in line with the real combat.technique system:
 			// using a technique requires actually having unlocked it (Law
 			// stage + realm), and its bonus scales with how deeply that Law
@@ -798,8 +826,10 @@ func bossActActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 		}
 		roll := stablePercentGo(p.EncounterID, round, userID, p.Style, i64(enc["version"]))
 		accuracy := 65 + agi*2 + equip["agility"] - phase.Defense*2
+		hitChance = clamp(accuracy, 15, 95)
 		bugslayerGuard := int64(0)
-		if roll < clamp(accuracy, 15, 95) {
+		if roll < hitChance {
+			hit = true
 			damage = max64(1, base+bonus+(100-roll)/20-phase.Defense)
 			if p.Style == "attack" {
 				hasBugslayer, bsErr := hasEquippedItemGo(conn, userID, bugslayerSwordItemID)
@@ -828,7 +858,25 @@ func bossActActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 			)
 		}
 		_ = damageEquipmentGo(conn, userID, 1)
-		events = append(events, fmt.Sprintf("%s deals %d damage.", titleWords(p.Style), damage))
+		if manualUse != nil {
+			cost := fmt.Sprintf("%s costs %d Qi", manualName, manualUse.QiCost)
+			if manualVitality > 0 {
+				cost += fmt.Sprintf(" and %d Vitality", manualVitality)
+			}
+			events = append(events, cost+".")
+		}
+		events = append(events, bossStrikeLine(p.Style, hit, damage, hitChance))
+		if manualHeal > 0 && e == nil {
+			_, e = conn.Execute(`UPDATE boss_participants SET vitality=MIN(vitality_max,vitality+?),updated_at=? WHERE encounter_id=? AND user_id=?`, []any{manualHeal, now, p.EncounterID, userID})
+			events = append(events, fmt.Sprintf("%s restores %d raid vitality.", manualName, manualHeal))
+		}
+		if manualUse != nil && manualUse.Forbidden {
+			if manualUse.Witnessed {
+				events = append(events, "The forbidden art was witnessed.")
+			} else {
+				events = append(events, "The forbidden art was mostly concealed.")
+			}
+		}
 	}
 	if e != nil {
 		return authoritativeMutation{}, e
@@ -923,12 +971,29 @@ func bossActActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	out := firstRowMap(rr)
 	out["events"] = events
 	out["action_damage"] = damage
+	if p.Style == "attack" || p.Style == "technique" {
+		out["action_hit"] = hit
+		out["hit_chance"] = hitChance
+	}
 	out["status"] = status
 	if status == "active" {
 		out["status"] = fmt.Sprint(firstRowMap(rr)["status"])
 	}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "boss", EventType: "boss.act", EntityType: "boss_encounter", EntityID: fmt.Sprint(p.EncounterID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
+
+// bossStrikeLine is what an attack or a technique says happened (v1.9.1). A
+// miss used to read "Attack deals 0 damage.", which a player cannot tell from
+// a hit that did nothing - a hit always deals at least 1 - so it was reported
+// from play as damage going missing. A miss says it missed, and the chance it
+// had, because agility is the one thing that moves that chance.
+func bossStrikeLine(style string, hit bool, damage, hitChance int64) string {
+	if !hit {
+		return fmt.Sprintf("%s misses - a %d%% chance to hit.", titleWords(style), hitChance)
+	}
+	return fmt.Sprintf("%s deals %d damage.", titleWords(style), damage)
+}
+
 func bossClaimActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p idPayload
 	if e := json.Unmarshal(raw, &p); e != nil {

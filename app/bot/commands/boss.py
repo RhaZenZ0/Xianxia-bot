@@ -9,10 +9,11 @@ from typing import Any
 import discord
 from discord import app_commands
 
-from ...rules.advanced_runtime import BOSS_TEMPLATES, boss_encounter_phase, boss_lair
+from ...rules.advanced_runtime import BOSS_TEMPLATES, boss_encounter_phase, boss_lair, describe_manual_technique, law_raid_strike_bonus
 from ...rules.battle import vitality_bar
 from ...ops.game_engine import GameEngineError
 from ..channels import _report_game_ui_error
+from .battle import MANUAL_TECHNIQUE_PREFIX
 from ..hubs import panel_timeout, register_hub_option_hint
 from ..registry import registered_group_command
 from ..runtime import (
@@ -21,7 +22,6 @@ from ..runtime import (
     ENGINE,
     WORLD,
     _user_action_lock,
-    budget_refusal_line,
     current_world_time,
     require_character,
     reply_long,
@@ -208,8 +208,52 @@ def _unlocked_law_techniques(character: dict[str, Any], law_rows: list[dict[str,
             continue
         stage = int(WORLD.law_stage(comprehension[law]).get("index", 0))
         if stage >= int(definition.get("requires_stage", 99)) and realm >= int(definition.get("min_realm_index", 999)):
-            out.append((str(tid), str(definition.get("name", tid)), str(definition.get("description") or "Law technique")))
+            out.append((str(tid), str(definition.get("name", tid)),
+                        f"🌌 +{law_raid_strike_bonus(comprehension[law])} to the strike · no cost"))
     return out
+
+
+def _raid_manual_techniques(manual_rows: list[dict[str, Any]]) -> list[tuple[str, str, str]]:
+    """The manual techniques this cultivator may use in a raid (v1.9.1).
+
+    The engine's own test (manualTechniqueFor): the manual studied to the
+    technique's `min_mastery`. The Technique button offered Law techniques
+    only, so a cultivator whose art was a manual had nothing to press. Each
+    option says what it does in a raid rather than its flavour text.
+    """
+    mastery = {str(row.get("manual_id")): int(row.get("mastery") or 0) for row in manual_rows}
+    out: list[tuple[str, str, str]] = []
+    for tid, definition in sorted(WORLD.techniques.items()):
+        manual = str(definition.get("manual") or "")
+        if manual not in mastery or mastery[manual] < int(definition.get("min_mastery", 0)):
+            continue
+        what = describe_manual_technique(definition, mastery=mastery[manual],
+                                         manual=WORLD.manual_definition(manual), raid=True)
+        out.append((MANUAL_TECHNIQUE_PREFIX + str(tid), f"📖 {definition.get('name', tid)}", what))
+    return out
+
+
+async def _raid_techniques(user_id: int, character: dict[str, Any] | None) -> list[tuple[str, str, str]]:
+    """Every technique a raider may press: their Laws', then their manuals'."""
+    if not character:
+        return []
+    return [*_unlocked_law_techniques(character, await DB.get_law_progress(user_id)),
+            *_raid_manual_techniques(await DB.get_manuals(user_id))]
+
+
+def _technique_name(technique: str) -> str:
+    if technique.startswith(MANUAL_TECHNIQUE_PREFIX):
+        tid = technique[len(MANUAL_TECHNIQUE_PREFIX):]
+        return f"📖 {(WORLD.technique_definition(tid) or {}).get('name', tid)}"
+    return f"🌌 {WORLD.law_system.get('techniques', {}).get(technique, {}).get('name', technique)}"
+
+
+def _technique_payload(technique: str) -> dict[str, str]:
+    """A Law technique rides `technique`, a manual's `manual_technique` (v1.9.1)."""
+    technique = technique.strip()
+    if technique.startswith(MANUAL_TECHNIQUE_PREFIX):
+        return {"technique": "", "manual_technique": technique[len(MANUAL_TECHNIQUE_PREFIX):]}
+    return {"technique": technique}
 
 
 async def _raid_act(
@@ -224,7 +268,7 @@ async def _raid_act(
             {
                 "encounter_id": int(encounter["encounter_id"]),
                 "style": style,
-                "technique": technique.strip(),
+                **_technique_payload(technique),
                 "version": int(encounter["version"]),
             },
             action_id=action_id,
@@ -258,13 +302,13 @@ async def _raid_claim(user_id: int, action_id: str, encounter_id: int) -> tuple[
 
 
 class RaidTechniqueSelect(discord.ui.Select):
-    """The presser's own unlocked Law techniques, in a message only they see."""
+    """The presser's own techniques, Law and manual, in a message only they see."""
 
     def __init__(self, parent: "RaidView", card_message: discord.Message | None, techniques: list[tuple[str, str, str]]) -> None:
         self.parent_view = parent
         self.card_message = card_message
         super().__init__(
-            placeholder="Choose a Law technique",
+            placeholder="Choose a technique",
             min_values=1, max_values=1,
             options=[discord.SelectOption(label=name[:100], value=tid[:100], description=text[:100]) for tid, name, text in techniques[:25]],
         )
@@ -376,10 +420,12 @@ class RaidView(discord.ui.LayoutView):
         # A technique is chosen in a message only its raider sees, so its
         # answer stays there and the shared card is edited by reference.
         private = card_message is not None
-        refusal = budget_refusal_line(uid, "raid_card") if raid_style != "refresh" else None
-        if refusal:
-            await interaction.response.send_message(refusal, ephemeral=True)
-            return
+        # A raid press spends nothing from the per-player action meter
+        # (v1.9.1). The meter guards the AI narration allowance and a flood of
+        # actions; a raid press calls no model, and the engine already holds a
+        # raider to one action a round. Solo, every press is a round, so the
+        # meter was the whole pace of the fight - four presses, then one every
+        # ten seconds - which a player reported as a cooldown on the buttons.
         if not interaction.response.is_done():
             if private:
                 await interaction.response.defer(ephemeral=True)
@@ -404,12 +450,11 @@ class RaidView(discord.ui.LayoutView):
                 await self._redraw(interaction, fresh, card_message=card_message)
                 return
             if raid_style == "technique" and not technique:
-                c = await DB.get_character(uid)
-                techniques = _unlocked_law_techniques(c, await DB.get_law_progress(uid)) if c else []
+                techniques = await _raid_techniques(uid, await DB.get_character(uid))
                 if not techniques:
                     await interaction.followup.send(
-                        "You have no Law technique unlocked for a raid yet: a Law's stage and your realm open them "
-                        "(**/cultivation → Laws**).", ephemeral=True)
+                        "You have no technique for a raid yet: study a manual (**/cultivation → Arts → Study**) or comprehend a Law "
+                        "to its technique's stage (**/cultivation → Laws**).", ephemeral=True)
                     return
                 picker = discord.ui.View(timeout=panel_timeout())
                 picker.add_item(RaidTechniqueSelect(self, interaction.message, techniques))
@@ -421,7 +466,7 @@ class RaidView(discord.ui.LayoutView):
                 return
             label = _RAID_STYLE_LABELS.get(raid_style, raid_style.title())
             if raid_style == "technique":
-                label = f"🌌 {WORLD.law_system.get('techniques', {}).get(technique, {}).get('name', technique)}"
+                label = _technique_name(technique)
             await self._redraw(interaction, card, events=[f"<@{uid}> — {label}", *events], card_message=card_message)
             if private:
                 await interaction.followup.send(f"{label}: the raid card is updated.", ephemeral=True)
@@ -447,13 +492,10 @@ async def _send_raid_card(interaction: discord.Interaction, encounter: dict[str,
 
 
 async def law_technique_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
-    """The techniques this raider has unlocked, not every one in the world."""
-    c = await DB.get_character(interaction.user.id)
-    if not c:
-        return []
+    """The techniques this raider may use, Law and manual, not every one in the world."""
     needle = current.casefold().strip()
     out: list[app_commands.Choice[str]] = []
-    for tid, name, _ in _unlocked_law_techniques(c, await DB.get_law_progress(interaction.user.id)):
+    for tid, name, _ in await _raid_techniques(interaction.user.id, await DB.get_character(interaction.user.id)):
         if not needle or needle in name.casefold() or needle in tid.casefold():
             out.append(app_commands.Choice(name=name[:100], value=tid[:100]))
     return out[:25]
@@ -556,7 +598,7 @@ async def boss_status(interaction: discord.Interaction) -> None:
 @registered_group_command(boss_group, name="act", description="Take your once-per-round raid action; boss retaliates after the full party acts")
 @app_commands.choices(style=[app_commands.Choice(name="Attack", value="attack"), app_commands.Choice(name="Technique", value="technique"), app_commands.Choice(name="Defend", value="guard"), app_commands.Choice(name="Support", value="support")])
 @app_commands.autocomplete(technique=law_technique_autocomplete)
-@serialized_user_action
+@serialized_user_action(metered=False)
 async def boss_act(interaction: discord.Interaction, style: app_commands.Choice[str], technique: str = "") -> None:
     if not await require_character(interaction):
         return
@@ -565,7 +607,7 @@ async def boss_act(interaction: discord.Interaction, style: app_commands.Choice[
         await interaction.response.send_message("Your party has no active boss encounter.", ephemeral=False)
         return
     if style.value == "technique" and not technique.strip():
-        await interaction.response.send_message("Choose which unlocked Law technique to use.", ephemeral=False)
+        await interaction.response.send_message("Choose which technique to use.", ephemeral=False)
         return
     # Acknowledged before the engine is asked, so an expired token can never
     # leave a committed action unreported (test_ack_before_mutation).
@@ -580,7 +622,7 @@ async def boss_act(interaction: discord.Interaction, style: app_commands.Choice[
 
 
 @registered_group_command(boss_group, name="claim", description="Claim your reward from a completed boss encounter")
-@serialized_user_action
+@serialized_user_action(metered=False)
 async def boss_claim(interaction: discord.Interaction, encounter_id: int) -> None:
     await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction):

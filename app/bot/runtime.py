@@ -280,7 +280,7 @@ def _user_action_lock(user_id: int) -> asyncio.Lock:
     return _USER_ACTION_LOCKS.setdefault(int(user_id), asyncio.Lock())
 
 
-def serialized_user_action(func):
+def serialized_user_action(func=None, *, metered: bool = True):
     """Serialize state-changing commands per Discord user in this bot process.
 
     Cooldown checks and game-state writes often span more than one SQLite call.
@@ -290,10 +290,19 @@ def serialized_user_action(func):
     Since v0.31.0 the wrapper is also a door of the per-player budget: every
     state-changing command spends a token from the same bucket typed play
     spends, and a refused one is answered rather than queued.
+
+    `@serialized_user_action(metered=False)` keeps the lock and spends no
+    token (v1.9.1). It is for an action that calls no model and that the
+    engine already paces, and a raid is the one: the engine holds a raider to
+    one action a round, and a solo raid's every press is a round, so the meter
+    was the pace of the whole fight.
     """
+    if func is None:
+        return lambda inner: serialized_user_action(inner, metered=metered)
+
     @wraps(func)
     async def wrapper(interaction: discord.Interaction, *args, **kwargs):
-        refusal = budget_refusal_line(interaction.user.id, "slash")
+        refusal = budget_refusal_line(interaction.user.id, "slash") if metered else None
         if refusal:
             if interaction.response.is_done():
                 await interaction.followup.send(refusal, ephemeral=False)

@@ -201,6 +201,35 @@ def describe_equipment(
     return " · ".join(parts)
 
 
+def equipment_passive_line(item_id: Any) -> str:
+    """What a piece of gear's passive does, or ``""`` (v1.9.1).
+
+    `describe_equipment` named the passive and never said what it did, so a
+    player holding the Bugslayer Sword asked how to see what Heavenly
+    Flawfinder is. The words are the definition's own `passive_description`.
+    """
+    definition = equipment_definition(item_id)
+    name = str(definition.get("passive_name") or "")
+    if not name:
+        return ""
+    what = str(definition.get("passive_description") or "").strip()
+    return f"✨ **{name}** — {what}" if what else f"✨ **{name}**"
+
+
+def describe_equipment_in_full(item_id: Any, *, description: str = "", **stats: Any) -> str:
+    """Every line a player needs about one piece of gear (v1.9.1): what it
+    gives, the item's own description, and its passive. `description` is the
+    catalogue's text, handed in because the item table lives in the bot's
+    world, not in this module."""
+    lines = [describe_equipment(item_id, **stats) or "No stat modifiers"]
+    if description.strip():
+        lines.append(f"*{description.strip()}*")
+    passive = equipment_passive_line(item_id)
+    if passive:
+        lines.append(passive)
+    return "\n".join(lines)
+
+
 def equipment_totals_line(totals: Mapping[str, int]) -> str:
     """What the summed gear does in a fight, stated once for the status card.
 
@@ -370,3 +399,91 @@ def describe_era(
     return out
 
 
+
+
+# The engine's techniqueForbidden (manual_forbidden_actions.go): a karma cost,
+# one of these tags on the technique, or a Demonic manual or one tagged with
+# the first three.
+_FORBIDDEN_TECHNIQUE_TAGS = frozenset({"forbidden", "demonic", "evil", "sacrificial", "soul_devouring"})
+_FORBIDDEN_MANUAL_TAGS = frozenset({"forbidden", "demonic", "evil"})
+
+
+def manual_technique_forbidden(technique: Mapping[str, Any], manual: Mapping[str, Any] | None = None) -> bool:
+    """Display twin of the engine's techniqueForbidden."""
+    tags = {str(tag).casefold() for tag in technique.get("tags") or []}
+    if int(technique.get("karma_cost") or 0) > 0 or tags & _FORBIDDEN_TECHNIQUE_TAGS:
+        return True
+    manual = manual or {}
+    manual_tags = {str(tag).casefold() for tag in manual.get("tags") or []}
+    return str(manual.get("alignment") or "").casefold() == "demonic" or bool(manual_tags & _FORBIDDEN_MANUAL_TAGS)
+
+
+def describe_manual_technique(
+    technique: Mapping[str, Any],
+    *,
+    mastery: int = 0,
+    manual: Mapping[str, Any] | None = None,
+    raid: bool = False,
+) -> str:
+    """One line saying what a manual's technique does (v1.9.1).
+
+    The picker used to print the technique's authored description, which for
+    the generated catalogue reads "A mortal-tier sword cultivator technique
+    preserved in ..." and says nothing about the fight. The numbers are the
+    engine's: in a battle, damage and heal are the technique's own plus the
+    manual's mastery (manualTechniqueAction); in a raid, damage plus mastery
+    replaces an attack's +1 on the strike, never under 1, and a raid holds no
+    suppression (bossActActionGo). The qi is the content's base cost - the
+    engine scales it into the cultivator's own qi body.
+    """
+    damage = max(0, int(technique.get("damage") or 0) + int(mastery))
+    heal = max(0, int(technique.get("heal") or 0) + int(mastery))
+    parts: list[str] = []
+    if raid:
+        parts.append(f"💥 +{max(1, damage)} to the strike")
+        if heal:
+            parts.append(f"🩸 +{heal} raid vitality")
+    else:
+        if damage:
+            parts.append(f"💥 {damage} damage")
+        if heal:
+            parts.append(f"🩸 +{heal} vitality")
+        suppress = int(technique.get("suppress_turns") or 0)
+        if suppress > 0:
+            parts.append(f"⛓️ holds {suppress} turn{'s' if suppress != 1 else ''}")
+    cost = f"⚡ {int(technique.get('qi_cost') or 0)} Qi"
+    vitality_cost = int(technique.get("vitality_cost") or 0)
+    if vitality_cost > 0:
+        cost += f" + {vitality_cost} Vit"
+    parts.append(cost)
+    if manual_technique_forbidden(technique, manual):
+        karma = int(technique.get("karma_cost") or 0)
+        parts.append(f"☯️ forbidden{f', -{karma} karma' if karma else ''}")
+    return " · ".join(parts)
+
+
+def law_raid_strike_bonus(comprehension: int) -> int:
+    """What a Law technique adds to a raid strike: bossActActionGo's 2 + comprehension/20."""
+    return 2 + max(0, int(comprehension)) // 20
+
+
+_DEED_WORDS = {
+    "world_event_good_deed": "for helping in the event",
+    "scene_resolve": "for standing firm",
+    "personal_event_helped": "for seeing their trouble through",
+    "event_site_cleared": "for clearing the last of the site",
+}
+
+
+def deed_karma_line(deed: Mapping[str, Any] | None) -> str:
+    """The line a reply prints for karma a good deed paid (v1.9.1).
+
+    Everything comes from the engine's `deed_karma` block; a deed that paid
+    nothing - its cap reached - is absent and prints nothing.
+    """
+    deed = dict(deed or {})
+    delta = int(deed.get("karma_delta") or 0)
+    if not delta:
+        return ""
+    why = _DEED_WORDS.get(str(deed.get("deed") or ""), "for a good deed")
+    return f"☯️ Karma **{delta:+d}** {why} → **{int(deed.get('karma_score') or 0):+d}**"

@@ -19,6 +19,7 @@ from typing import Any
 import discord
 from discord import app_commands
 
+from ...rules.advanced_runtime import deed_karma_line, describe_manual_technique
 from ...rules.sect import sect_points_line
 from ...rules.battle import matchup_label, opponent_debuff_label, suppression_label, vitality_band, vitality_bar
 from ...ops.game_engine import GameEngineError
@@ -90,7 +91,11 @@ async def _battle_available_options(user_id:int,c:dict)->tuple[list[tuple[str,st
     for tid,t in WORLD.techniques.items():
         row=manuals.get(str(t.get('manual')))
         if not row or int(row.get('mastery',0))<int(t.get('min_mastery',0)): continue
-        techniques.append((MANUAL_TECHNIQUE_PREFIX+str(tid),f"📖 {t.get('name',tid)}",str(t.get('description') or 'Manual technique')))
+        # What it does, not its flavour text (v1.9.1): the generated manuals'
+        # descriptions read "A mortal-tier sword cultivator technique
+        # preserved in ..." and a player asked what each one actually does.
+        what=describe_manual_technique(t,mastery=int(row.get('mastery',0)),manual=WORLD.manual_definition(str(t.get('manual'))))
+        techniques.append((MANUAL_TECHNIQUE_PREFIX+str(tid),f"📖 {t.get('name',tid)}",what))
     inv=await DB.get_inventory(user_id); usable:list[tuple[str,str,str]]=[]
     for iid,qty in inv.items():
         idef=WORLD.item_definition(iid)
@@ -415,7 +420,7 @@ async def _finish_battle(interaction:discord.Interaction,outcome:str,*,expected_
             log.exception("Quest progress update failed after a battle")
     if result.get("event_manifestation"):
         verb="disperse" if outcome=="kill" else "drive off"
-        points_line=sect_points_line(result.get("sect_points"))
+        points_line="\n".join(x for x in (sect_points_line(result.get("sect_points")),deed_karma_line(result.get("deed_karma"))) if x)
         await _battle_reply(
             interaction,
             content=(f"⚔️ **You {verb} the hostile manifestation.** It was part of the live event, not a persistent NPC life. "

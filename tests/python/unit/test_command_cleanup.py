@@ -56,7 +56,7 @@ class CommandCleanupTests(unittest.TestCase):
                                      "DATABASE_PATH": "data/test.sqlite3"}):
             surface = importlib.import_module("app.bot.surface")
         public_groups = {name for name in surface.TREE_COMMANDS if name in surface._GROUP_ACTION_ROOTS}
-        self.assertEqual(public_groups, {"stall", "boss", "party"})
+        self.assertEqual(public_groups, {"stall", "boss", "party", "body", "profession"})
         self.assertNotIn("bot.tree.add_command(admin_group, guild=GUILD)", source)
         self.assertIn('name="admin",', source)
         self.assertIn("async def admin_panel", source)

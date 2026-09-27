@@ -444,6 +444,11 @@ func worldEventEngageAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 	}
 	out["remaining"] = remaining
 	out["total"] = node.Total
+	if took {
+		if deed := eventSiteClearedKarmaTx(conn, userID, eventKey, now); deed != nil {
+			out["deed_karma"] = deed
+		}
+	}
 
 	verb := map[string]string{"beast": "drove off", "herb": "harvested", "ore": "cut loose", "relic": "recovered", "task": "carried out"}[node.NodeType]
 	if verb == "" {

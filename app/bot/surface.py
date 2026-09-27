@@ -1536,6 +1536,13 @@ TREE_COMMANDS: tuple[str, ...] = (
     # answer was a hub page - `/combat → Boss Raids` - because neither group
     # had ever been registered. The v1.7.4 shape, twice over.
     "boss", "party",
+    # Body cultivation (v1.9.1): asked for "a player facing command for body
+    # cultivation", and its leaves - temper, the sheet, the breakthrough -
+    # were only `/cultivation → Body`, three steps from the tree.
+    "body",
+    # And the trades (v1.9.1): "a panel to check the status of your
+    # profession" - `/profession status` draws it, `/profession exam` sits one.
+    "profession",
 )
 
 

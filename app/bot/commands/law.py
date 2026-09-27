@@ -15,6 +15,7 @@ from discord import app_commands
 from ...rules.effects import normalize_effect_payload
 from ...ops.game_engine import GameEngineError
 from ...rules.progression_systems import condition_definition, profession_rank, profession_xp_needed
+from ..cards import Card, card_view
 from ..character_state import record_quest_progress, announce_quest_progress, current_effect_modifiers
 from ..formatting import roll_line
 from ..registry import registered_group_command
@@ -419,7 +420,6 @@ async def profession_status(interaction: discord.Interaction) -> None:
             f" • TN {int(definition.get('tn') or 0)}{tail}"
         )
 
-    lines = [f"🛠️ **Profession Mastery — {c['name']}**"]
     if not rows and not known:
         # The page used to stop here whatever else was true, which meant a
         # cultivator who had bought a slip and read it was told they had no
@@ -430,34 +430,52 @@ async def profession_status(interaction: discord.Interaction) -> None:
             "with **/craft → Profession → Learn**.", ephemeral=False,
         )
         return
+    await interaction.response.send_message(view=card_view(_profession_card(c, rows, by_trade, bool(known))))
+
+
+def _xp_bar(xp: int, needed: int, *, width: int = 10) -> str:
+    """How far a trade is toward its next rank, as a bar a glance can read."""
+    cap = max(1, int(needed))
+    value = max(0, min(cap, int(xp)))
+    filled = min(width, round(value * width / cap))
+    return f"{'🟧' * filled}{'⬛' * (width - filled)} **{value}/{cap} XP**"
+
+
+def _profession_card(c: dict, rows: list, by_trade: dict[str, list[str]], knows_methods: bool) -> Card:
+    """The profession panel (v1.9.1): one section per trade - its rank, a bar
+    toward the next, the record, and every method known in it with what it
+    needs against what is carried. Asked for in play as "a panel to check the
+    status of your profession"; it had been a wall of text."""
+    card = Card(title=f"🛠️ Profession Mastery — {c['name']}", colour=0xE67E22)
     if not rows:
-        lines.append("_No craft attempt has been recorded yet — the methods below are what you know._")
+        card.description = "_No craft attempt has been recorded yet — the methods below are what you know._"
     for row in rows:
         level = int(row.get("level", 0)); xp = int(row.get("xp", 0))
         trade = str(row["profession"])
-        lines.append(
-            f"\n**{trade} — {profession_rank(level, trade)}** (Level {level})\n"
-            f"XP **{xp}/{profession_xp_needed(level)}** • Successes {row.get('successes',0)} • Failures {row.get('failures',0)} • Quality {row.get('quality_points',0)}"
-        )
-        for line in by_trade.pop(trade, []):
-            lines.append(line)
+        methods = by_trade.pop(trade, [])
+        value = [
+            _xp_bar(xp, profession_xp_needed(level)),
+            f"✔️ {row.get('successes', 0)} successes • ✖️ {row.get('failures', 0)} failures • ✨ {row.get('quality_points', 0)} quality",
+            *(methods or ["  _no method known in this trade yet_"]),
+        ]
+        card.add_field(name=f"{trade} — {profession_rank(level, trade)} (Level {level})", value="\n".join(value), inline=False)
     # A method in a trade with no progress row yet is still one you know, and
     # leaving it out is how the old page managed to show nothing at all.
     for trade, entries in sorted(by_trade.items()):
-        lines.append(f"\n**{trade} — {profession_rank(0, trade)}** (Level 0)")
-        lines.extend(entries)
-    if known:
-        lines.append(
-            "\n✅ you can make it now • ❌ short of materials • 🔴 your rank is too low"
-            "\nBuy materials at a hall of the trade (**/economy → City Shops → Here**) or gather "
-            "them (**/craft → Alchemy → Forage**). New methods come from slips: **/craft → Profession → Learn**."
+        card.add_field(name=f"{trade} — {profession_rank(0, trade)} (Level 0)", value="\n".join(entries), inline=False)
+    if knows_methods:
+        card.add_field(
+            name="Reading this",
+            value=("✅ you can make it now • ❌ short of materials • 🔴 your rank is too low\n"
+                   "Buy materials at a hall of the trade (**/economy → City Shops → Here**) or gather "
+                   "them (**/craft → Alchemy → Forage**). New methods come from slips: **/craft → Profession → Learn**."),
+            inline=False,
         )
     else:
-        lines.append(
-            "\nYou know no methods yet. Slips are sold in most halls of a trade — buy one and read "
-            "it with **/craft → Profession → Learn**."
-        )
-    await reply_long(interaction, "\n".join(lines), ephemeral=False)
+        card.add_field(name="Methods", value=("You know no methods yet. Slips are sold in most halls of a trade — buy one and read "
+                                             "it with **/craft → Profession → Learn**."), inline=False)
+    card.set_footer(text="Craft with /craft • sit a hall's examination with /profession exam")
+    return card
 
 
 PROFESSION_EXAM_CHOICES = [
