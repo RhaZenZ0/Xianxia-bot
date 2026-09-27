@@ -438,7 +438,12 @@ async def _send_raid_card(interaction: discord.Interaction, encounter: dict[str,
     # response pressed from a hub panel would hand back the panel's.
     if not interaction.response.is_done():
         await interaction.response.defer()
-    view.message = await interaction.followup.send(view=view, ephemeral=False, wait=True)
+    # The card names each raider by mention. Inside an embed a mention never
+    # pinged; inside a text display it does, so the card says who without
+    # calling the whole party on every /boss status (v1.9.0).
+    view.message = await interaction.followup.send(
+        view=view, ephemeral=False, wait=True, allowed_mentions=discord.AllowedMentions.none()
+    )
 
 
 async def law_technique_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:

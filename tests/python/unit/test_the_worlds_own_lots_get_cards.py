@@ -31,12 +31,14 @@ def _feed():
 
 
 class FakeMessage:
+    # Since v1.9.0 a card is a Components V2 view; the fake keeps the card the
+    # view carries, which is what these tests read.
     def __init__(self, message_id: int, embed):
         self.id = message_id
         self.embed = embed
 
-    async def edit(self, *, embed):
-        self.embed = embed
+    async def edit(self, *, view, content=None, embed=None):
+        self.embed = view.card
 
 
 class FakeChannel:
@@ -44,8 +46,8 @@ class FakeChannel:
         self.id = channel_id
         self.messages: dict[int, FakeMessage] = {}
 
-    async def send(self, *, embed):
-        message = FakeMessage(1000 + len(self.messages), embed)
+    async def send(self, *, view):
+        message = FakeMessage(1000 + len(self.messages), view.card)
         self.messages[message.id] = message
         return message
 
@@ -112,7 +114,7 @@ class TheTickCardsWhatTheWorldListed(unittest.IsolatedAsyncioTestCase):
         await self._sync(db)
         self.assertIn(7, db.cards, "an open lot the world listed got no card - the tick only edited cards that existed")
         card = self.channel.messages[db.cards[7]["message_id"]].embed
-        seller = next(field.value for field in card.fields if field.name == "Seller")
+        seller = next(value for name, value, _inline in card.fields if name == "Seller")
         self.assertEqual(seller, "Digger Wu", "an NPC lot's card must name its NPC seller, not 'None'")
 
     async def test_a_second_tick_posts_nothing_new(self):

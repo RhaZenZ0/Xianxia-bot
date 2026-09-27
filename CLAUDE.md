@@ -5512,6 +5512,49 @@ bot), what an entry is called, and the page's path. `test_release_pages.py` buil
 real changelog and holds a page to exist at every link the bot can post. The builder escapes before
 it renders the Markdown subset, so an entry cannot put markup on the site.
 
+### Every card is a layout (`app/bot/cards.py`, v1.9.0)
+
+The hubs moved to Components V2 in v0.19.5 and every card stayed a classic embed, so the bot drew
+two looks side by side. A card is written as an embed was - `Card` keeps `discord.Embed`'s
+constructor, `add_field`, `set_footer`, `set_thumbnail`, `set_image` - and draws itself as a
+`Container`: the title and description, the fields under bold headings, the footer small, the
+buttons in rows beneath. `CardView` is a `LayoutView` that takes a view written the classic way
+(`@discord.ui.button`, `add_item` with `row=`, `clear_items`), so each view moved by changing its
+base class; its buttons are `view.controls`, because `view.children` is the layout discord.py
+itself walks, and the persistent event and exploration panels stamp their ids over `controls`.
+
+**A V2 message carries no content and no embeds**, which is the rule every site had to meet.
+Text that used to ride beside a card goes into it (`fold_content`, drawn above the title), and an
+edit that turns an old embed message into a card clears both (`content=None, embed=None`). The
+auction and stall feeds edit cards posted before this release, and if Discord ever refuses the
+conversion they post the card again and take the old one down, so a lot or a stall keeps one card.
+
+**Text sent beside a card goes into it.** v1.8.5 made the hub keep a result's own view instead of
+dropping it as the panel's duplicate, and sent a layout without its content, because a V2 message
+may carry none - which lost whatever text came with it. `_layout_result_send` hands that text to
+`fold_content` now, and sends it on its own first only when the layout is not a card. Mentions
+ping inside a text display where they never did inside an embed, so the raid card, which names
+every raider, is sent with `AllowedMentions.none()`.
+
+**A plain-text reply is a notice card, decided in one place.** About three hundred replies are a
+bare string through `interaction.response` or `interaction.followup`, and none was edited.
+`ConnectionState.parse_interaction_create` builds every interaction by the name `Interaction` in
+`discord.state`; `install_notices()` (called by `XianxiaBot.__init__`) points that name at
+`NoticeInteraction`, whose `response`, `followup` and `edit_original_response` turn a reply that is
+text and nothing else (`is_plain`: no view, embed or file) into a card coloured by how it opens.
+A reply that brings its own view is the handler's decision and is left as written. A text-only
+*edit* is converted only when the message it lands on is already a layout - a notice, a slash
+command's "thinking" placeholder (`_NOTICED`, keyed by interaction id because `Interaction` has
+`__slots__`), or a V2 message - because a V2 message refuses content and a classic one would lose
+its buttons. Typed play has its own sender and applies the same two helpers. Channel posts are not
+replies and stay as they are.
+
+`test_every_card_is_a_layout.py` forbids a `discord.Embed` or an `embed=` send anywhere in
+`app/bot` except the two classic fallbacks - the classic hub and the classic Scene Action panel,
+built only when discord.py lacks Components V2, which the pinned 2.7.1 never does. It walks scopes
+by AST, holds that every allowed fallback is still there, and asserts it can find one before it
+trusts an empty answer.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

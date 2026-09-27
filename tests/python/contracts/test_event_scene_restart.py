@@ -64,23 +64,23 @@ class ThePanelIsPersistent(unittest.TestCase):
         _, view = self._view()
         self.assertTrue(view.is_persistent(), "add_view would reject this panel")
         self.assertIsNone(view.timeout)
-        for item in view.children:
+        for item in view.controls:
             self.assertTrue(getattr(item, "custom_id", None), f"{item!r} has no custom_id")
 
     def test_ids_are_stable_across_processes_and_unique_per_event(self):
         scene, first = self._view()
         _, again = self._view()
-        self.assertEqual([i.custom_id for i in first.children], [i.custom_id for i in again.children])
+        self.assertEqual([i.custom_id for i in first.controls], [i.custom_id for i in again.controls])
         _, other = self._view("secret_realm_rotation:other_vault:1")
         self.assertFalse(
-            set(i.custom_id for i in first.children) & set(i.custom_id for i in other.children),
+            set(i.custom_id for i in first.controls) & set(i.custom_id for i in other.controls),
             "two live events would fight over the same controls",
         )
         # Discord's ceiling, whatever the event key grows into.
         long_key = "world_event:" + "x" * 400
         for item in scene.EventSceneView(
             title="t", event_type="random_event", expires_at=2_000_000_000.0, event_key=long_key,
-        ).children:
+        ).controls:
             self.assertLessEqual(len(item.custom_id), 100)
 
     def test_the_site_select_keeps_its_id_when_its_options_change(self):
@@ -89,9 +89,9 @@ class ThePanelIsPersistent(unittest.TestCase):
         scene, view = self._view()
         nodes = [{"node_key": "beast:1", "name": "Ashen Wolf", "node_type": "beast", "remaining": 2, "total": 3}]
         view._refresh_site_select(nodes)
-        first = next(i for i in view.children if isinstance(i, scene.EventSiteSelect)).custom_id
+        first = next(i for i in view.controls if isinstance(i, scene.EventSiteSelect)).custom_id
         view._refresh_site_select([{**nodes[0], "remaining": 1}])
-        second = next(i for i in view.children if isinstance(i, scene.EventSiteSelect)).custom_id
+        second = next(i for i in view.controls if isinstance(i, scene.EventSiteSelect)).custom_id
         self.assertEqual(first, second)
         self.assertTrue(view.is_persistent())
 
@@ -173,13 +173,13 @@ class TheExplorationPanelIsPersistentToo(unittest.TestCase):
     def test_two_players_in_one_encounter_do_not_share_controls(self):
         _, mine = self._view(owner=1)
         _, theirs = self._view(owner=2)
-        self.assertFalse(set(i.custom_id for i in mine.children) & set(i.custom_id for i in theirs.children))
+        self.assertFalse(set(i.custom_id for i in mine.controls) & set(i.custom_id for i in theirs.controls))
 
     def test_the_buttons_still_know_which_action_they_are(self):
         # _sync_buttons reads the action out of the id; namespacing the id
         # must not stop it disabling what the engine no longer offers.
         _, view = self._view()
-        labels = {str(i.label): i.disabled for i in view.children}
+        labels = {str(i.label): i.disabled for i in view.controls}
         self.assertFalse(labels["Observe"], "an available action must stay enabled")
         self.assertFalse(labels["Refresh"], "refresh is always available")
         self.assertTrue(labels["Approach"], "an action the engine did not offer must be disabled")

@@ -103,7 +103,7 @@ class TheRoadAndTheFloor(unittest.TestCase):
         self.assertIn("{road}{merchants}{safe}{meeting}", EXPLORATION)
 
     def test_the_card_calls_a_merchant_purchase_a_sale(self):
-        embed = _body(FEED, "lot_embed")
+        embed = _body(FEED, "lot_card")
         self.assertIn('lot.get("merchant_buyer")', embed)
         self.assertIn("(travelling merchant)", embed)
         self.assertIn("WORLD.merchants.get(merchant_key)", embed)
@@ -138,7 +138,7 @@ class MerchantsBid(unittest.TestCase):
         self.assertIn("ALTER TABLE auctions ADD COLUMN merchant_bidder", migration)
 
     def test_the_card_and_the_board_name_a_merchant_high_bidder(self):
-        embed = _body(FEED, "lot_embed")
+        embed = _body(FEED, "lot_card")
         self.assertIn('lot.get("merchant_bidder")', embed)
         self.assertIn("(travelling merchant)", embed)
         settle = _body(FEED, "sync_lots")

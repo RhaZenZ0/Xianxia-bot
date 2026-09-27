@@ -28,6 +28,7 @@ from typing import Any, Awaitable, Callable
 import discord
 
 from . import maintenance, seclusion, usage
+from .cards import as_notice, is_plain
 from .registry import ACTIONS, EVENT_HANDLERS
 from .runtime import DB, SETTINGS, TYPED_PLAY_BUDGET, log
 from .typed_play_router import Candidate, CommandParameter, CommandSpec, Route, VerbTable
@@ -157,10 +158,16 @@ class MessageInteraction:
         self.response = _MessageResponse(self)
         self.followup = _MessageFollowup(self)
         self.sent: list[discord.Message] = []
+        self._first_is_notice = False
         self.typed_play = True
 
     async def _send(self, content: Any = None, **kwargs: Any) -> discord.Message | None:
         clean = {k: v for k, v in kwargs.items() if k in _SEND_KWARGS and v is not None}
+        # A plain-text reply is drawn as a notice card (v1.9.0), exactly as
+        # NoticeInteraction draws one for a slash command.
+        notice = is_plain(content, clean)
+        if notice:
+            clean, content = as_notice(content, clean), None
         try:
             if not self.sent:
                 msg = await self.source_message.reply(content, mention_author=False, **clean)
@@ -169,12 +176,18 @@ class MessageInteraction:
         except discord.HTTPException:
             log.exception("Typed play could not deliver a reply")
             return None
+        if not self.sent:
+            self._first_is_notice = notice
         self.sent.append(msg)
         return msg
 
     async def edit_original_response(self, **kwargs: Any) -> discord.Message | None:
         if self.sent:
             clean = {k: v for k, v in kwargs.items() if k in _SEND_KWARGS | {"content"}}
+            content = clean.get("content")
+            if self._first_is_notice and is_plain(content, clean):
+                # The reply is a notice card, which a text-only edit cannot land on.
+                clean = {"content": None, "embed": None, **as_notice(content, clean)}
             try:
                 return await self.sent[0].edit(**clean)
             except discord.HTTPException:

@@ -221,8 +221,7 @@ class TheDelegationIsReachable(unittest.TestCase):
         for key, value in {"expires_at": 9e12, "category": "Sect Recruitment", "severity": 3,
                            "location": "Greenriver Town", "title": "Major Sect Recruitment"}.items():
             setattr(view, key, value)
-        embed = view.embed(cast=cast, site=site)
-        text = embed.description + "\n".join(f"{f.name}\n{f.value}" for f in embed.fields)
+        text = view.scene_card(cast=cast, site=site).text()
         self.assertIn("This delegation speaks for the **Azure Cloud Sect**", text)
         self.assertIn("**/sect → Recruitment → Recommendation**", text)
         self.assertIn("clearing it shows you the Azure Cloud Sect's gate", text)

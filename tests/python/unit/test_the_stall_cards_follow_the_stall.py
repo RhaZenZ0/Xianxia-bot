@@ -32,8 +32,9 @@ class FakeMessage:
     def __init__(self, channel, message_id, embed):
         self.channel, self.id, self.embed, self.edits = channel, message_id, embed, 0
 
-    async def edit(self, *, embed):
-        self.embed = embed
+    async def edit(self, *, view, content=None, embed=None):
+        # A card is a Components V2 view since v1.9.0; the fake keeps its card.
+        self.embed = view.card
         self.edits += 1
 
     async def delete(self):
@@ -46,7 +47,8 @@ class FakeChannel:
         self.messages: dict[int, FakeMessage] = {}
         self._next = channel_id * 100
 
-    async def send(self, *, embed):
+    async def send(self, *, view):
+        embed = view.card
         self._next += 1
         message = FakeMessage(self, self._next, embed)
         self.messages[message.id] = message
@@ -109,7 +111,7 @@ class StallCards(unittest.IsolatedAsyncioTestCase):
 
     def _text(self, message) -> str:
         embed = message.embed
-        return "\n".join([embed.title or "", embed.description or ""] + [f.value for f in embed.fields])
+        return "\n".join([embed.title or "", embed.description or ""] + [value for _name, value, _inline in embed.fields])
 
     async def test_a_card_is_posted_in_the_stalls_world_and_names_the_grade(self):
         self._open(listings=[{"listing_id": 12, "item_id": "qi_pill@high", "quantity": 2, "unit_price": 90}])

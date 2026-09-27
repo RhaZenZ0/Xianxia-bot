@@ -1368,6 +1368,58 @@ async def run(url: str, token: str, db_path: str) -> Report:
             return "opened, a pill refused for want of a certificate, cores listed, on the board, withdrawn, closed"
         await step(report, "/economy → Market Stalls: a stall is opened, stocked, seen on the board, emptied and taken down", stall())
 
+        # ---- 7c. a raid at its lair (v1.9.0) --------------------------------------
+        # A raid is started only standing in its lair, and the lair worth
+        # driving is one no road reaches: the GM's teleport is what puts the
+        # player there, the way a GM would stage it on a live server. The
+        # template is read off the content, never written down here - the
+        # deepest one the player's realm allows that is not a secret realm's
+        # floor (that one also wants the realm walked to its end).
+        async def raid_at_its_lair():
+            from app.rules.advanced_runtime import BOSS_TEMPLATES, boss_lair
+            character = await DB.get_character(int(player.id)) or {}
+            was_at = str(character.get("location") or "")
+            realm = int(character.get("realm_index") or 0)
+            fightable = sorted(
+                (int(t.get("realm_index") or 0), key) for key, t in BOSS_TEMPLATES.items()
+                if not boss_lair(t, WORLD.secret_realms)[1] and int(t.get("realm_index") or 0) <= realm
+            )
+            expect(fightable, f"no raid a realm-{realm} cultivator can start outside a secret realm")
+            key = fightable[-1][1]
+            template = BOSS_TEMPLATES[key]
+            lair = boss_lair(template, WORLD.secret_realms)[0]
+            await ENGINE.action("admin.player.teleport", int(gm.id), {"user_id": int(player.id), "location": lair, "reason": "playtest: to the raid's lair"})
+            await settle_patiently(env)
+            standing = str((await DB.get_character(int(player.id)) or {}).get("location") or "")
+            # The messages name the place read back off the character, never
+            # the lair value itself: CodeQL's sensitive-data heuristic reads the
+            # `secret_realms` argument above as a secret and flags anything
+            # derived from it that reaches a printed line.
+            expect(standing == lair, f"the GM teleport left the player at {standing!r}, not at {key}'s lair")
+            started = await player.slash(channels["begin-here"], "boss start", boss=key)
+            await settle_patiently(env)
+            reply = result_text(started)
+            for failure in WIRING_FAILURE_TEXTS:
+                expect(failure not in reply, f"/boss start raised: {reply[:400]}")
+            expect(str(template.get("name") or key) in reply, f"/boss start at {standing} drew no card for {key}: {reply[:600]}")
+            card_message = next((m for m in list(started.followups or []) if "Attack" in button_labels(m.components)), None)
+            expect(card_message is not None, f"the raid card carries no Attack button: {reply[:600]}")
+            card = Panel(player, channels["begin-here"], card_message)
+            await card.press("Attack")
+            await settle_patiently(env)
+            after = card.text()
+            for failure in WIRING_FAILURE_TEXTS:
+                expect(failure not in after, f"pressing Attack on the raid card raised: {after[:400]}")
+            expect("Round" in after, f"the raid card did not redraw after Attack: {after[:600]}")
+            await ENGINE.action("admin.player.clear_battle", int(gm.id), {"user_id": int(player.id), "reason": "playtest: end the staged raid"})
+            if was_at:
+                await ENGINE.action("admin.player.teleport", int(gm.id), {"user_id": int(player.id), "location": was_at, "reason": "playtest: back where the run had them"})
+            await settle_patiently(env)
+            return f"{template.get('name', key)} at {standing}: teleported there by the GM, started, Attack pressed on its card, cleared"
+        raided = await step(report, "a GM teleport to a raid's lair, /boss start there and Attack on the card", raid_at_its_lair())
+        if raided:
+            report.add("PASS", "the raid, for the record", raided)
+
         # ---- 8. every leaf of every hub ------------------------------------------
         # Everything above is scripted: a loop whose outcome matters, asserted
         # on. This is generic: every leaf the hubs register, pressed once by a

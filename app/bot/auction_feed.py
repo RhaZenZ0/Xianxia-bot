@@ -22,6 +22,7 @@ from typing import Any
 
 import discord
 
+from .cards import Card, card_view
 from .channels import _resolve_text_channel
 from .runtime import DB, WORLD, log
 
@@ -37,7 +38,7 @@ async def _name(user_id: Any) -> str:
     return str(character["name"]) if character else "Unknown"
 
 
-async def lot_embed(house_id: str, lot: dict[str, Any], *, state: str = "open") -> discord.Embed:
+async def lot_card(house_id: str, lot: dict[str, Any], *, state: str = "open") -> Card:
     """The card. ``state`` is open, sold or unsold."""
     house = dict(WORLD.auction_houses.get(house_id) or {})
     item = WORLD.item_name(str(lot.get("item_id") or ""))
@@ -71,7 +72,7 @@ async def lot_embed(house_id: str, lot: dict[str, Any], *, state: str = "open") 
     else:
         title = f"🏮 Lot #{lot.get('auction_id')} — {item} ×{quantity}"
         colour = 0xA5863B
-    embed = discord.Embed(title=title, colour=colour, description=str(house.get("name") or house_id))
+    embed = Card(title=title, colour=colour, description=str(house.get("name") or house_id))
     embed.add_field(name="Seller", value=seller, inline=True)
     if state == "sold":
         embed.add_field(name="Struck to", value=bidder, inline=True)
@@ -106,7 +107,7 @@ async def announce_lot(guild: discord.Guild | None, house_id: str, auction_id: i
     if channel is None or lot is None:
         return None
     try:
-        message = await channel.send(embed=await lot_embed(house_id, lot))
+        message = await channel.send(view=card_view(await lot_card(house_id, lot)))
     except discord.HTTPException:
         log.exception("Could not post the live card for lot %s", auction_id)
         return None
@@ -120,12 +121,33 @@ async def _edit_card(guild: discord.Guild, record: dict[str, Any], lot: dict[str
     channel = await _resolve_text_channel(guild, record.get("channel_id"))
     if channel is None:
         return False
+    view = card_view(await lot_card(str(record["house_id"]), lot, state=state))
     try:
         message = await channel.fetch_message(int(record["message_id"]))
-        await message.edit(embed=await lot_embed(str(record["house_id"]), lot, state=state))
-        return True
     except discord.HTTPException:
         return False
+    try:
+        # content and embed cleared: a card posted before v1.9.0 was an embed,
+        # and a Components V2 message may carry neither.
+        await message.edit(content=None, embed=None, view=view)
+        return True
+    except discord.HTTPException:
+        pass
+    # An old embed card Discord would not turn into a layout: post the card
+    # again and take the old one down, so the lot keeps one live card.
+    try:
+        replacement = await channel.send(view=card_view(await lot_card(str(record["house_id"]), lot, state=state)))
+    except discord.HTTPException:
+        return False
+    try:
+        await message.delete()
+    except discord.HTTPException:
+        pass
+    await DB.remember_auction_lot_message(
+        auction_id=int(record["auction_id"]), guild_id=guild.id, house_id=str(record["house_id"]),
+        channel_id=channel.id, message_id=replacement.id,
+    )
+    return True
 
 
 async def refresh_lot(guild: discord.Guild | None, auction_id: int) -> None:

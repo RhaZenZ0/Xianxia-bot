@@ -19,6 +19,7 @@ import discord
 
 from ...ops.game_engine import GameEngineError
 from ...rules.sect import sect_points_line
+from ..cards import Card, CardView, fold_content
 from ..character_state import announce_quest_progress, record_quest_progress
 from ..channels import _event_archive_minutes, _report_game_ui_error, _resolve_text_channel, event_scene_parent, world_event_channel
 from ..registry import EVENT_HANDLERS, VIEW_RESTORERS
@@ -198,7 +199,7 @@ class EventSystemsView(discord.ui.View):
         self.add_item(EventSystemsSelect(systems))
 
 
-class EventSceneView(discord.ui.View):
+class EventSceneView(CardView):
     """Persistent, event-specific play surface backed by canonical game state."""
 
     def __init__(
@@ -224,16 +225,16 @@ class EventSceneView(discord.ui.View):
         # The decorator gives each button a random custom_id, which is exactly
         # what a persistent view cannot have. Stamped by label here, so the
         # view rebuilt at startup answers the clicks of the one it replaces.
-        for item in self.children:
+        for item in self.controls:
             if isinstance(item, discord.ui.Button):
                 item.custom_id=_event_custom_id(self.event_key, str(item.label or "button").casefold().replace(" ", "_"))
         self.add_item(EventActionSelect(self))
 
-    def embed(
+    def scene_card(
         self, *, description: str = "", objective: str = "", site: list[dict[str, Any]] | None = None,
         progress: dict[str, Any] | None = None, participants: list[dict[str, Any]] | None = None,
         cast: list[dict[str, Any]] | None = None,
-    ) -> discord.Embed:
+    ) -> Card:
         """The scene panel.
 
         This used to be four fields of text explaining what its own buttons
@@ -255,7 +256,7 @@ class EventSceneView(discord.ui.View):
             # tell whom the elder spoke for, and nothing on the panel said
             # which door the scene actually was.
             header += f"\n\n🏯 This delegation speaks for the **{delegation}**."
-        embed=discord.Embed(title=f"🌌 {self.title}", description=header[:4000], color=colour)
+        embed=Card(title=f"🌌 {self.title}", description=header[:4000], color=colour)
 
         site=list(site or []); progress=dict(progress or {})
         if progress.get("total"):
@@ -362,18 +363,20 @@ class EventSceneView(discord.ui.View):
             log.exception("Could not load the event site for %s", self.event_key)
         return description, objective, site, progress, participants, cast
 
-    async def render(self) -> discord.Embed:
+    async def render(self) -> Card:
         """Build the panel against live state, refreshing the site select with
-        whatever is still workable."""
+        whatever is still workable. The view carries the card it returns."""
         description, objective, site, progress, participants, cast = await self._site_state()
         self._refresh_site_select(site)
-        return self.embed(
+        card = self.scene_card(
             description=description, objective=objective, site=site,
             progress=progress, participants=participants, cast=cast,
         )
+        self.set_card(card)
+        return card
 
     def _refresh_site_select(self, site: list[dict[str, Any]]) -> None:
-        for item in list(self.children):
+        for item in self.controls:
             if isinstance(item, EventSiteSelect):
                 self.remove_item(item)
         workable=[n for n in site if int(n.get("remaining") or 0)>0]
@@ -649,8 +652,9 @@ class EventSceneView(discord.ui.View):
         except GameEngineError as exc:
             await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
         result=dict(envelope.get("result") or {}); bid=int(result.get("battle_id") or 0)
-        battle=await DB.get_active_battle(interaction.user.id); embed,view=await EVENT_HANDLERS.invoke("battle_panel", interaction.user.id,c,battle or result)
-        await interaction.response.send_message(content=f"⚔️ **Event confrontation #{bid} — {npc_name}.**\n{tail}",embed=embed,view=view)
+        battle=await DB.get_active_battle(interaction.user.id); _card,view=await EVENT_HANDLERS.invoke("battle_panel", interaction.user.id,c,battle or result)
+        fold_content(view,f"⚔️ **Event confrontation #{bid} — {npc_name}.**\n{tail}")
+        await interaction.response.send_message(view=view)
 
     @discord.ui.button(label="Scene Action",emoji="🎭",style=discord.ButtonStyle.success,row=2)
     async def scene_action(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
@@ -658,14 +662,16 @@ class EventSceneView(discord.ui.View):
 
     @discord.ui.button(label="Refresh",emoji="🔄",style=discord.ButtonStyle.secondary,row=2)
     async def refresh(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        embed=await self.render()
-        await interaction.response.edit_message(embed=embed,view=self)
+        await self.render()
+        # content and embed cleared: a scene posted before v1.9.0 was an embed,
+        # and the card it becomes is a Components V2 message, which carries neither.
+        await interaction.response.edit_message(content=None,embed=None,view=self)
 
     async def on_error(self, interaction: discord.Interaction, error: Exception, item: discord.ui.Item[Any]) -> None:
         await _report_game_ui_error(interaction,error,where=f"event-scene:{type(item).__name__}")
 
     async def on_timeout(self) -> None:
-        for item in self.children:item.disabled=True
+        self.disable_controls()
 
 
 def _delegation_sect(cast: list[dict[str, Any]], site: list[dict[str, Any]]) -> str:
@@ -809,11 +815,9 @@ async def spawn_event_thread(
             title=title, event_type=event_type, expires_at=expires_at, location=event_location,
             event_key=event_key, category=event_category, severity=event_severity,
         )
-        await thread.send(
-            content=f"{interaction.user.mention} opened this live event scene.",
-            embed=await event_view.render(),
-            view=event_view,
-        )
+        await event_view.render()
+        fold_content(event_view, f"{interaction.user.mention} opened this live event scene.")
+        await thread.send(view=event_view)
     except (discord.Forbidden, discord.HTTPException):
         log.exception("Could not send the event-thread starter panel for %s", title)
 
@@ -862,11 +866,9 @@ async def spawn_system_event_thread(
             title=title, event_type=event_type, expires_at=expires_at, location=event_location,
             event_key=event_key, category=event_category, severity=event_severity,
         )
-        await thread.send(
-            content="**The world moves on its own.** Travel to the event location to participate.",
-            embed=await event_view.render(),
-            view=event_view,
-        )
+        await event_view.render()
+        fold_content(event_view, "**The world moves on its own.** Travel to the event location to participate.")
+        await thread.send(view=event_view)
     except (discord.Forbidden,discord.HTTPException):
         log.exception("Could not send autonomous event starter panel for %s", title)
     return thread

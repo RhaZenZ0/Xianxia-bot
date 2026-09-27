@@ -19,7 +19,7 @@ class WorldAccessAndSceneActionTests(unittest.TestCase):
         self.assertIn('name="🧠 Attribute"', source)
         self.assertIn('name="🎯 Target"', source)
         self.assertIn('name="📝 Attempt"', source)
-        self.assertIn("await interaction.followup.send(embed=embed, ephemeral=False)", source)
+        self.assertIn("await interaction.followup.send(view=card_view(embed), ephemeral=False)", source)
         self.assertIn('\"scene.action\"', source)
         self.assertIn('self_action = bool(mechanics.get(\"automatic\", False))', source)
         self.assertIn("Outcome: Automatic success — self-directed action.", source)

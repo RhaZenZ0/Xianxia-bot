@@ -72,7 +72,7 @@ class TheFeedFollowsTheLot(unittest.TestCase):
         self.assertIn("forget_auction_lot_message", settle)
 
     def test_an_anonymous_bidder_stays_anonymous_on_the_card(self):
-        embed = _body(FEED, "lot_embed")
+        embed = _body(FEED, "lot_card")
         self.assertIn('"Anonymous" if anonymous and bidder_id', embed)
 
 

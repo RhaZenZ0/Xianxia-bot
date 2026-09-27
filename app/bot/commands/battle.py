@@ -23,6 +23,7 @@ from ...rules.sect import sect_points_line
 from ...rules.battle import matchup_label, opponent_debuff_label, suppression_label, vitality_band, vitality_bar
 from ...ops.game_engine import GameEngineError
 from ...rules.worldtime import MINUTES_PER_YEAR
+from ..cards import Card, CardView, card_view, fold_content, is_layout
 from ..channels import _report_game_ui_error
 from ..character_state import record_quest_progress, announce_quest_progress
 from ..formatting import human_duration, roll_line
@@ -48,19 +49,27 @@ battle_group = app_commands.Group(name="battle",description="Resolve active dang
 BATTLE_STYLE_CHOICES=[app_commands.Choice(name="Attack",value="attack"),app_commands.Choice(name="Defend",value="defend"),app_commands.Choice(name="Flee",value="flee")]
 
 async def _battle_reply(
-    interaction:discord.Interaction, *, content:str|None=None, embed:discord.Embed|None=None,
-    view:discord.ui.View|None=None, edit_panel:bool=False, ephemeral:bool=False,
+    interaction:discord.Interaction, *, content:str|None=None,
+    view:discord.ui.BaseView|None=None, edit_panel:bool=False, ephemeral:bool=False,
 )->None:
+    # The battle panel is a card (v1.9.0), a Components V2 message, which may
+    # carry no content: text for the panel goes into the card, and a panel
+    # replaced by text alone becomes a card holding only that text.
+    if view is None and edit_panel and content:
+        view=card_view(Card(description=content)); content=None
+    if is_layout(view) and fold_content(view,content):
+        content=None
     if edit_panel:
         if interaction.response.is_done():
-            await interaction.edit_original_response(content=content,embed=embed,view=view)
+            await interaction.edit_original_response(content=content,embed=None,view=view)
         else:
-            await interaction.response.edit_message(content=content,embed=embed,view=view)
+            await interaction.response.edit_message(content=content,embed=None,view=view)
         return
+    extra={} if view is None else {"view":view}
     if interaction.response.is_done():
-        await interaction.followup.send(content=content,embed=embed,view=view,ephemeral=False)
+        await interaction.followup.send(content=content,ephemeral=False,**extra)
     else:
-        await interaction.response.send_message(content=content,embed=embed,view=view,ephemeral=False)
+        await interaction.response.send_message(content=content,ephemeral=False,**extra)
 
 
 MANUAL_TECHNIQUE_PREFIX="manual:"
@@ -93,13 +102,13 @@ async def _battle_available_options(user_id:int,c:dict)->tuple[list[tuple[str,st
             usable.append((str(iid),f"{idef.get('name',iid)} x{qty}"," • ".join(recovery) or "Instant recovery"))
     return techniques[:25],usable[:25]
 
-def _battle_embed(c:dict,b:dict,techniques:list[tuple[str,str,str]],items:list[tuple[str,str,str]], *, result_text:str|None=None)->discord.Embed:
+def _battle_card(c:dict,b:dict,techniques:list[tuple[str,str,str]],items:list[tuple[str,str,str]], *, result_text:str|None=None)->Card:
     defeated=int(b.get("npc_hp",0))<=0
     description=result_text or ("Your opponent is defeated. Decide their fate." if defeated else "Choose your next action.")
     player_max=max(1,int(b.get('player_hp_max',0)),int(c.get('vitality_max',0)),int(b.get('player_hp',0)))
     npc_max=max(1,int(b.get('npc_hp_max',0)),int(b.get('npc_hp',0)))
     _,embed_color=vitality_band(int(b.get('player_hp',0)),player_max)
-    e=discord.Embed(title=f"⚔️ Battle #{b['battle_id']} — {b['npc_name']}",description=description,color=embed_color)
+    e=Card(title=f"⚔️ Battle #{b['battle_id']} — {b['npc_name']}",description=description,color=embed_color)
     e.add_field(name="Your Vitality",value=vitality_bar(int(b['player_hp']),player_max),inline=False)
     e.add_field(name="Opponent Vitality",value=vitality_bar(int(b['npc_hp']),npc_max),inline=False)
     e.add_field(
@@ -150,7 +159,7 @@ class BattleRecoverySelect(discord.ui.Select):
         await self.parent_view._dispatch(interaction,"item",self.values[0])
 
 
-class BattleView(discord.ui.View):
+class BattleView(CardView):
     def __init__(self,user_id:int,battle_id:int,techniques:list[tuple[str,str,str]],items:list[tuple[str,str,str]]):
         super().__init__(timeout=300); self.user_id=int(user_id); self.battle_id=int(battle_id)
         self.add_item(BattleTechniqueSelect(self,techniques)); self.add_item(BattleRecoverySelect(self,items))
@@ -181,7 +190,7 @@ class BattleView(discord.ui.View):
                 await _battle_reply(interaction,content="⌛ This battle has already ended.",view=None,edit_panel=True);return
             c=await DB.get_character(self.user_id) or c
             embed,view=await _battle_panel(self.user_id,c,updated,result_text=result)
-            await _battle_reply(interaction,embed=embed,view=view,edit_panel=True)
+            await _battle_reply(interaction,view=view,edit_panel=True)
     async def on_error(self, interaction: discord.Interaction, error: Exception, item: discord.ui.Item[Any]) -> None:
         await _report_game_ui_error(interaction, error, where=f"battle:{self.battle_id}:{type(item).__name__}")
     @discord.ui.button(label="Attack",style=discord.ButtonStyle.danger,emoji="⚔️",row=0)
@@ -193,7 +202,7 @@ class BattleView(discord.ui.View):
     @discord.ui.button(label="Refresh",style=discord.ButtonStyle.secondary,emoji="🔄",row=0)
     async def refresh(self,interaction:discord.Interaction,button:discord.ui.Button): await self._dispatch(interaction,"refresh")
 
-class BattleFinishView(discord.ui.View):
+class BattleFinishView(CardView):
     def __init__(self,user_id:int,battle_id:int):
         super().__init__(timeout=300); self.user_id=int(user_id); self.battle_id=int(battle_id)
     async def interaction_check(self,interaction:discord.Interaction)->bool:
@@ -212,7 +221,7 @@ class BattleFinishView(discord.ui.View):
             if not b or not c or int(b.get('npc_hp',1))>0:
                 await _battle_reply(interaction,content="⌛ This final-decision panel is stale.",view=None,edit_panel=True);return
             embed,view=await _battle_panel(self.user_id,c,b,result_text="🔄 Final decision refreshed. Choose the opponent's fate.")
-            await _battle_reply(interaction,embed=embed,view=view,edit_panel=True)
+            await _battle_reply(interaction,view=view,edit_panel=True)
     async def on_error(self, interaction: discord.Interaction, error: Exception, item: discord.ui.Item[Any]) -> None:
         await _report_game_ui_error(interaction, error, where=f"battle-finish:{self.battle_id}:{type(item).__name__}")
     @discord.ui.button(label="Spare",style=discord.ButtonStyle.success,emoji="🤝",row=0)
@@ -223,9 +232,10 @@ class BattleFinishView(discord.ui.View):
     async def refresh(self,interaction:discord.Interaction,button:discord.ui.Button): await self._refresh(interaction)
 
 
-async def _battle_panel(user_id:int,c:dict,b:dict,*,result_text:str|None=None)->tuple[discord.Embed,discord.ui.View]:
+async def _battle_panel(user_id:int,c:dict,b:dict,*,result_text:str|None=None)->tuple[Card,CardView]:
+    """The battle card and its controls; the view already carries the card."""
     techniques,items=await _battle_available_options(user_id,c)
-    embed=_battle_embed(c,b,techniques,items,result_text=result_text)
+    embed=_battle_card(c,b,techniques,items,result_text=result_text)
     beasts=await DB.get_spirit_beasts(user_id)
     active_beast=next((x for x in beasts if int(x.get('active',0))==1),None)
     bonds=await DB.get_artifact_bonds(user_id)
@@ -234,8 +244,8 @@ async def _battle_panel(user_id:int,c:dict,b:dict,*,result_text:str|None=None)->
     awakened=[x for x in bonds if int(x.get('awakened',0))==1]
     if awakened:
         embed.add_field(name="Artifact Resonance",value=" • ".join(f"{WORLD.item_name(x['item_id'])} ({x['resonance']}%)" for x in awakened[:3]),inline=False)
-    if int(b.get('npc_hp',0))<=0: return embed,BattleFinishView(user_id,int(b['battle_id']))
-    return embed,BattleView(user_id,int(b['battle_id']),techniques,items)
+    if int(b.get('npc_hp',0))<=0: return embed,BattleFinishView(user_id,int(b['battle_id'])).set_card(embed)
+    return embed,BattleView(user_id,int(b['battle_id']),techniques,items).set_card(embed)
 
 
 async def _use_battle_recovery_item(interaction: discord.Interaction, battle_id: int, item_id: str) -> str:
@@ -448,7 +458,7 @@ async def _resolve_battle_turn(interaction:discord.Interaction,style:str,action:
         await _battle_reply(interaction,content="You are not in an active battle.",ephemeral=False,edit_panel=edit_panel); return
     if int(b.get("npc_hp",0))<=0:
         embed,view=await _battle_panel(interaction.user.id,c,b)
-        await _battle_reply(interaction,embed=embed,view=view,ephemeral=False,edit_panel=edit_panel);return
+        await _battle_reply(interaction,view=view,ephemeral=False,edit_panel=edit_panel);return
     wt=await current_world_time()
     try:
         envelope=await COMBAT.turn(
@@ -491,7 +501,7 @@ async def _resolve_battle_turn(interaction:discord.Interaction,style:str,action:
         c=await DB.get_character(interaction.user.id) or c
         lines.append("🏆 **Opponent defeated.** Decide whether to **Spare** or **Kill** them. Killing named NPCs can permanently change families, sects, regions, alliances and the economy.")
         embed,view=await _battle_panel(interaction.user.id,c,updated,result_text="\n".join(lines))
-        await _battle_reply(interaction,embed=embed,view=view,edit_panel=edit_panel);return
+        await _battle_reply(interaction,view=view,edit_panel=edit_panel);return
     if str(result.get("status"))=="lost":
         injury=dict(result.get("injury") or {})
         if result.get("fate_rescue"):
@@ -520,7 +530,7 @@ async def _resolve_battle_turn(interaction:discord.Interaction,style:str,action:
     updated=await DB.get_active_battle(interaction.user.id) or {**b,'player_hp':int(result.get('player_hp',b.get('player_hp',1))),'npc_hp':int(result.get('npc_hp',b.get('npc_hp',1)))}
     c=await DB.get_character(interaction.user.id) or c
     embed,view=await _battle_panel(interaction.user.id,c,updated,result_text="\n".join(lines))
-    await _battle_reply(interaction,embed=embed,view=view,edit_panel=edit_panel)
+    await _battle_reply(interaction,view=view,edit_panel=edit_panel)
 
 @registered_group_command(battle_group, name="status",description="View your active battle and all currently available options")
 async def battle_status(interaction:discord.Interaction)->None:
@@ -528,8 +538,8 @@ async def battle_status(interaction:discord.Interaction)->None:
     if not c:return
     b=await DB.get_active_battle(interaction.user.id)
     if not b: await interaction.response.send_message("You are not in an active battle.",ephemeral=False); return
-    embed,view=await _battle_panel(interaction.user.id,c,b)
-    await interaction.response.send_message(embed=embed,view=view,ephemeral=False)
+    _card,view=await _battle_panel(interaction.user.id,c,b)
+    await interaction.response.send_message(view=view,ephemeral=False)
 
 @registered_group_command(battle_group, name="finish",description="Spare or kill an opponent you have already defeated")
 @app_commands.choices(outcome=[app_commands.Choice(name="Spare",value="spare"),app_commands.Choice(name="Kill",value="kill")])
@@ -561,11 +571,9 @@ async def battle_challenge(interaction:discord.Interaction,target:str)->None:
         await interaction.response.send_message(f"⚔️ {exc}. Wait for that confrontation to end.",ephemeral=False);return
     result=dict(envelope.get("result") or {}); bid=int(result.get("battle_id") or 0)
     battle=await DB.get_active_battle(interaction.user.id)
-    embed,view=await _battle_panel(interaction.user.id,c,battle or result)
-    await interaction.response.send_message(
-        content=f"⚔️ **Challenge accepted.** Battle `#{bid}` begins. If you win, you will explicitly choose whether the defeated NPC lives or dies.",
-        embed=embed,view=view,
-    )
+    _card,view=await _battle_panel(interaction.user.id,c,battle or result)
+    fold_content(view,f"⚔️ **Challenge accepted.** Battle `#{bid}` begins. If you win, you will explicitly choose whether the defeated NPC lives or dies.")
+    await interaction.response.send_message(view=view)
 
 
 @battle_challenge.autocomplete("target")

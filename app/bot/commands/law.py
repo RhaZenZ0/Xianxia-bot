@@ -117,8 +117,8 @@ async def law_technique_command(interaction:discord.Interaction,technique:str)->
         if not updated:
             await respond(interaction, "⌛ This battle has already ended.",ephemeral=False);return
         c=await DB.get_character(interaction.user.id) or c
-        embed,view=await _battle_panel(interaction.user.id,c,updated,result_text=result)
-        await respond(interaction, embed=embed,view=view);return
+        _card,view=await _battle_panel(interaction.user.id,c,updated,result_text=result)
+        await respond(interaction, view=view);return
     # Out of battle the technique is an engine action too, as of v0.23.0: the
     # requirement checks above and the effect write below used to sit on the
     # same side of the boundary, so nothing but this file decided whether a
@@ -289,9 +289,9 @@ async def manual_technique(interaction:discord.Interaction,technique:str)->None:
     text=await _execute_battle_manual_technique(interaction,battle,technique)
     updated=await DB.get_battle(int(battle['battle_id']),user_id=interaction.user.id,active_only=True) or battle
     c=await DB.get_character(interaction.user.id) or c
-    embed,view=await _battle_panel(interaction.user.id,c,updated,result_text=text)
-    if interaction.response.is_done(): await interaction.followup.send(embed=embed,view=view)
-    else: await interaction.response.send_message(embed=embed,view=view)
+    _card,view=await _battle_panel(interaction.user.id,c,updated,result_text=text)
+    if interaction.response.is_done(): await interaction.followup.send(view=view)
+    else: await interaction.response.send_message(view=view)
 
 
 # ---------- Persistent injuries / deviations ----------

@@ -24,6 +24,7 @@ from ...rules.progression_systems import profession_rank, profession_xp_needed
 from ...rules.realm_hubs import REALM_HUBS, realm_hub, realm_hub_by_location
 from ...rules.sect_manor import manor_craft_bonus
 from ...rules.sect_recruitment import recruitment_definition
+from ..cards import Card, CardView, fold_content
 from ..channels import event_scene_parent, send_long_to_thread, world_of_location
 from ..character_state import record_quest_progress, announce_quest_progress
 from ..discovery import (
@@ -74,7 +75,7 @@ def _exploration_event_token(event_id: str, owner_user_id: int) -> str:
     return hashlib.blake2s(f"{event_id}:{int(owner_user_id)}".encode("utf-8"), digest_size=8).hexdigest()
 
 
-class ExplorationEventView(discord.ui.View):
+class ExplorationEventView(CardView):
     """Personal exploration-event controls backed entirely by Go authority."""
 
     def __init__(self, owner_user_id: int, event: dict[str, Any]) -> None:
@@ -93,10 +94,11 @@ class ExplorationEventView(discord.ui.View):
         # restored panel answers its own clicks and nobody else's.
         self._stamp_custom_ids()
         self._sync_buttons()
+        self.show()
 
     def _stamp_custom_ids(self) -> None:
         token = _exploration_event_token(str(self.event.get("event_id") or ""), self.owner_user_id)
-        for item in self.children:
+        for item in self.controls:
             if not isinstance(item, discord.ui.Button):
                 continue
             action = str(item.custom_id or "").split(":")[-1] or "button"
@@ -112,7 +114,7 @@ class ExplorationEventView(discord.ui.View):
     def _sync_buttons(self) -> None:
         available = self._available_keys()
         active = bool(self.event.get("active"))
-        for item in self.children:
+        for item in self.controls:
             if not isinstance(item, discord.ui.Button):
                 continue
             custom_id = "exploration_event:" + str(item.custom_id or "").split(":")[-1]
@@ -122,13 +124,17 @@ class ExplorationEventView(discord.ui.View):
             key = custom_id.rsplit(":", 1)[-1]
             item.disabled = (not active) or key not in available
 
-    def embed(self) -> discord.Embed:
+    def show(self) -> "ExplorationEventView":
+        """Draw the card for the event as it now stands; returns the view."""
+        return self.set_card(self.event_card())
+
+    def event_card(self) -> Card:
         active = bool(self.event.get("active"))
         title = str(self.event.get("title") or "Unexpected Event")
         description = str(self.event.get("description") or "Something unexpected interrupts your exploration.")
         location = str(self.event.get("location") or "Unknown")
         expires_at = int(float(self.event.get("expires_at") or time.time()))
-        embed = discord.Embed(
+        embed = Card(
             title=f"🌌 {title}",
             description=(
                 f"**{self.event.get('category','Fate Encounter')}** • {'🟢 Active' if active else '⚫ Resolved'}\n"
@@ -189,7 +195,9 @@ class ExplorationEventView(discord.ui.View):
         self.event = dict(result.get("event") or self.event)
         self._sync_buttons()
         try:
-            await interaction.edit_original_response(embed=self.embed(), view=self)
+            # content and embed cleared: a panel posted before v1.9.0 was an
+            # embed, and a Components V2 message may carry neither.
+            await interaction.edit_original_response(content=None, embed=None, view=self.show())
         except discord.HTTPException:
             pass
         lines = [f"**{str(result.get('label') or action.replace('_',' ').title())} — {'SUCCESS' if result.get('success') else 'FAILURE'}**"]
@@ -237,7 +245,7 @@ class ExplorationEventView(discord.ui.View):
             return
         self.event = dict(status or self.event)
         self._sync_buttons()
-        await interaction.response.edit_message(embed=self.embed(), view=self)
+        await interaction.response.edit_message(content=None, embed=None, view=self.show())
 
 
 def _wilds_lines(location: str) -> str:
@@ -291,19 +299,16 @@ async def explore(interaction: discord.Interaction) -> None:
                 guild_id=interaction.guild_id,
             )
             try:
-                await expedition_thread.send(
-                    content=f"{interaction.user.mention}, your previous exploration is still interrupted by this encounter.",
-                    embed=view.embed(),
-                    view=view,
-                )
+                fold_content(view, f"{interaction.user.mention}, your previous exploration is still interrupted by this encounter.")
+                await expedition_thread.send(view=view)
                 await interaction.followup.send(
                     f"🌌 You are still dealing with **{event.get('title','an unexpected event')}**. Controls reopened in {expedition_thread.mention}.",
                     ephemeral=False,
                 )
             except discord.HTTPException:
-                await interaction.followup.send(embed=view.embed(), view=view, ephemeral=False)
+                await interaction.followup.send(view=view, ephemeral=False)
         else:
-            await interaction.followup.send(embed=view.embed(), view=view, ephemeral=False)
+            await interaction.followup.send(view=view, ephemeral=False)
         return
     encounter = str(outcome.get("encounter") or "The region is strangely quiet.")
     cultivation = int(outcome.get("cultivation_awarded", 0))
@@ -524,7 +529,7 @@ async def explore(interaction: discord.Interaction) -> None:
                     interaction, discovered_location, thread=expedition_thread
                 )
             if personal_event_view is not None:
-                await expedition_thread.send(embed=personal_event_view.embed(), view=personal_event_view)
+                await expedition_thread.send(view=personal_event_view)
             await interaction.followup.send(
                 f"🧭 Exploration recorded in your private expedition journal: {expedition_thread.mention}",
                 ephemeral=False, view=narrate_view,
@@ -533,7 +538,7 @@ async def explore(interaction: discord.Interaction) -> None:
             log.exception("Could not write exploration result to private expedition thread")
             await reply_long(interaction, full_exploration, ephemeral=False)
             if personal_event_view is not None:
-                await interaction.followup.send(embed=personal_event_view.embed(), view=personal_event_view, ephemeral=False)
+                await interaction.followup.send(view=personal_event_view, ephemeral=False)
             if narrate_view is not None:
                 await interaction.followup.send("The account above is the world's plain record.", view=narrate_view, ephemeral=False)
     else:
@@ -544,7 +549,7 @@ async def explore(interaction: discord.Interaction) -> None:
         if discovered_location:
             await send_location_discovery_image(interaction, discovered_location)
         if personal_event_view is not None:
-            await interaction.followup.send(embed=personal_event_view.embed(), view=personal_event_view, ephemeral=False)
+            await interaction.followup.send(view=personal_event_view, ephemeral=False)
         if narrate_view is not None:
             await interaction.followup.send("The account above is the world's plain record.", view=narrate_view, ephemeral=False)
 

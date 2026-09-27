@@ -10,6 +10,7 @@ import discord
 from discord import app_commands
 
 from ..rules import feature_unlocks as unlocks
+from .cards import fold_content, is_layout
 from .registry import ACTIONS
 
 log = logging.getLogger("xianxia.hubs")
@@ -951,6 +952,14 @@ def _safe_edit_kwargs(kwargs: dict[str, Any], *, fallback_view: discord.ui.View 
     clean = dict(kwargs)
     clean.pop("ephemeral", None)
     clean.pop("silent", None)
+    if is_layout(clean.get("view")) and fold_content(clean["view"], clean.get("content")):
+        # A card (v1.9.0) is a Components V2 message: any text sent with it
+        # goes into the card, and the message it replaces loses its content
+        # and embeds, which a V2 message may not carry.
+        clean.pop("embeds", None)
+        clean["content"] = None
+        clean["embed"] = None
+        return clean
     if "content" in clean and "embed" not in clean and "embeds" not in clean:
         clean["embed"] = None
     if ("embed" in clean or "embeds" in clean) and "content" not in clean:
@@ -996,6 +1005,8 @@ async def _send_ephemeral_followup(
     followup_kwargs = dict(kwargs)
     followup_kwargs.pop("content", None)
     followup_kwargs["ephemeral"] = True
+    if is_layout(followup_kwargs.get("view")) and fold_content(followup_kwargs["view"], content):
+        content = None
     if not source.response.is_done():
         return await source.response.send_message(content, **followup_kwargs)
     return await source.followup.send(content, **followup_kwargs)
@@ -1005,9 +1016,16 @@ async def _fallback_followup(source: discord.Interaction, content: Any, kwargs: 
     """Send a fresh response when the original hub message is unavailable."""
     followup_kwargs = dict(kwargs)
     ephemeral = bool(followup_kwargs.pop("ephemeral", False))
-    # A public fallback should not duplicate the command hub view.
-    if not ephemeral:
+    view = followup_kwargs.get("view")
+    card = is_layout(view) and not getattr(view, "is_layout_hub", False)
+    # A public fallback should not duplicate the command hub view - but a
+    # card (v1.9.0) is the result itself, not the hub's view.
+    if not ephemeral and not card:
         followup_kwargs.pop("view", None)
+    if card and fold_content(view, content):
+        followup_kwargs.pop("embed", None)
+        followup_kwargs.pop("embeds", None)
+        return await source.followup.send(ephemeral=ephemeral, **followup_kwargs)
     return await source.followup.send(content, ephemeral=ephemeral, **followup_kwargs)
 
 
@@ -1131,8 +1149,12 @@ async def _layout_result_send(
     # along as a fallback: a second copy of the panel is not a result.
     if own_view is not None and own_view is not hub_view and not getattr(own_view, "is_layout_hub", False):
         if LAYOUT_COMPONENTS_AVAILABLE and isinstance(own_view, discord.ui.LayoutView):
-            # A Components V2 message carries no content or embeds.
+            # A Components V2 message carries no content or embeds. Text sent
+            # with a card goes into the card (v1.9.0); text sent with any
+            # other layout is sent first, on its own, rather than lost.
             wait = {"wait": followup_kwargs["wait"]} if "wait" in followup_kwargs else {}
+            if not fold_content(own_view, content):
+                await source.followup.send(content, ephemeral=False)
             return await source.followup.send(view=own_view, ephemeral=False, **wait)
         followup_kwargs["view"] = own_view
     if content is None and not any(key in followup_kwargs for key in ("embed", "embeds")):
