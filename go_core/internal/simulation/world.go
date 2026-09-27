@@ -670,6 +670,12 @@ func (r *Runner) sects(conn *storage.Conn, steps, gm int64) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// Neutral ground first (v1.12.0, sect_claims.go), so a place claimed
+	// this tick is already somebody's for the war step that follows.
+	claimed, err := r.npcSectClaims(conn, steps, gm)
+	if err != nil {
+		return "", err
+	}
 	declared, err := r.npcSectWars(conn, steps, gm)
 	if err != nil {
 		return "", err
@@ -680,7 +686,7 @@ func (r *Runner) sects(conn *storage.Conn, steps, gm int64) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("batch-advanced politics for %d sects; %d swore in, %d walked out, %d wars declared, %d stocked to the treasuries", count, joined, left, declared, stocked), nil
+	return fmt.Sprintf("batch-advanced politics for %d sects; %d swore in, %d walked out, %d places claimed, %d wars declared, %d stocked to the treasuries", count, joined, left, claimed, declared, stocked), nil
 }
 
 func (r *Runner) clans(conn *storage.Conn, steps, gm int64) (string, error) {

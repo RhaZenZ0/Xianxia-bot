@@ -5663,6 +5663,31 @@ the first gates. The page is at 0; `perfection` now opens on either ladder's sta
 `perfection_path` gate draws Quest, Clues, Trial and Abandon only while a path is under way, so
 opening the page did not put four refusals in front of a Body Tempering cultivator at stage 3.
 
+### The war step had nothing to look at (`sect_claims.go`, v1.12.0)
+
+Asked for directly: *let strong NPC sects claim neutral territories during the world tick, which
+would give the war step targets without needing players.* `seed_world_territories` makes every
+place a neutral `territory_state` row, the only writer that turned one into a sect's was
+`territory.claim` (a player standing on it), and `npcSectWars` moves only on ground a *rival* holds -
+so rc.15's NPC wars, their sieges and their occupations never ran on a server where nobody had
+claimed. `npcSectClaims` runs in the politics tick **before** the war step, so a place claimed this
+week is already somebody's when the war step looks.
+
+The map supplied no geography to expand from: all twelve gates are road-less and a sect's content
+carries nothing but its gate. So **home first** - the gate - then **one beachhead** in the gate's
+world picked by `hash64(sect, "beachhead", place)` so a sect always starts from the same town, then
+**outward by road** through `game.WhereAnNPCCanWalk`, a district a step reaches standing for its
+city. Claims are whole places (`game.TerritoryIsWholePlace`, cityOf's rule, beside `game.SectGate`
+so the simulation names the gate the doors do); a rival's gate is never taken; a place under an
+active war is not neutral; and the cap is `2 + (influence-62)/12`, at most four, so the six Mortal
+sects can hold 24 of its 28 places and players always have ground left. The eligibility thresholds
+are the war step's own constants: a sect strong enough to claim is one strong enough to fight.
+
+**One drill stayed green and needed its own test.** Removing the rival-gate rule changed nothing
+on the shipped map - no road step and no beachhead hash lands on another sect's gate - so
+`TestARivalsGateIsNeverABeachhead` corners it with a neutral pool holding only a rival's gate,
+rc.53's `!ok` lesson again: a rule the content never reaches is held by a test that makes it.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —
