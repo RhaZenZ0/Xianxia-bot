@@ -58,9 +58,9 @@ func claimCap(influence int64) int64 {
 // claimCap. Places under active war are excluded. steps counts weekly intervals:
 // the attempt chance is 25% for steps <= 1, 50% for 2, and 60% for 3 or more.
 // Claims raise unrest by 10, capped at 100, retain defense, and stamp gm as the
-// game minute. History insert errors are returned so the caller can roll back.
+// game minute. Public history is recorded on a best-effort basis.
 //
-// It returns the number of claims completed before a query, update, history,
+// It returns the number of claims made, including any before a query, update,
 // or attempt-roll error. A target-selection roll error skips that sect instead.
 // Missing territory or politics tables, or errors checking for them, return
 // zero and nil. The caller owns the transaction; this function does not commit
@@ -128,12 +128,10 @@ func (r *Runner) npcSectClaims(conn *storage.Conn, steps, gm int64) (int64, erro
 		if upd.RowsAffected != 1 {
 			continue
 		}
-		if err := r.recordTerritoryClaimed(conn, sect, target, gm, now); err != nil {
-			return claimed, err
-		}
 		delete(neutral, target)
 		held[sect] = append(held[sect], target)
 		claimed++
+		r.recordTerritoryClaimed(conn, sect, target, gm, now)
 	}
 	return claimed, nil
 }
@@ -224,10 +222,10 @@ func (r *Runner) wholePlace(location string) string {
 // quieter than a war (60 against 78), because nobody was driven off.
 // The event is public; gm is the game minute and now is Unix time in seconds.
 // Repeated claims for the same sect, territory, and game minute are ignored.
-// A missing history table is ignored; insert errors are returned to the caller.
-func (r *Runner) recordTerritoryClaimed(conn *storage.Conn, sect, territory string, gm int64, now float64) error {
+// A missing history table or any database error is silently ignored.
+func (r *Runner) recordTerritoryClaimed(conn *storage.Conn, sect, territory string, gm int64, now float64) {
 	if !simTableExists(conn, "world_history_events") {
-		return nil
+		return
 	}
 	world := ""
 	if loc, ok := r.World.Locations[territory]; ok {
@@ -236,7 +234,7 @@ func (r *Runner) recordTerritoryClaimed(conn *storage.Conn, sect, territory stri
 	title := sect + " claims " + territory
 	summary := fmt.Sprintf("%s has raised its banners over %s, which answered to no sect before.", sect, territory)
 	source := fmt.Sprintf("sect_claim:%s:%s:%d", sect, territory, gm)
-	_, err := conn.Execute(`INSERT INTO world_history_events(
+	_, _ = conn.Execute(`INSERT INTO world_history_events(
         source_key,event_type,title,summary,significance,visibility,location,world_name,faction,
         actor_type,actor_key,actor_name,target_type,target_key,target_name,related_user_id,
         related_npc_name,tags,game_minute,metadata_json,created_at,updated_at)
@@ -244,5 +242,4 @@ func (r *Runner) recordTerritoryClaimed(conn *storage.Conn, sect, territory stri
         ON CONFLICT(source_key) DO NOTHING`,
 		[]any{source, "territory_claimed", title, summary, 60, territory, world, sect,
 			sect, sect, territory, territory, "territory claim " + territory, gm, "{}", now, now})
-	return err
 }
