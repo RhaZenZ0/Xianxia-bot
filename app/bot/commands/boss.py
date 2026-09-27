@@ -562,11 +562,14 @@ async def boss_act(interaction: discord.Interaction, style: app_commands.Choice[
     if style.value == "technique" and not technique.strip():
         await interaction.response.send_message("Choose which unlocked Law technique to use.", ephemeral=False)
         return
+    # Acknowledged before the engine is asked, so an expired token can never
+    # leave a committed action unreported (test_ack_before_mutation).
+    await interaction.response.defer(ephemeral=False)
     card, events, error = await _raid_act(
         interaction.user.id, f"discord:{interaction.id}:boss.act", encounter, style.value, technique
     )
     if error or card is None:
-        await interaction.response.send_message(error or "❌ The raid action did not resolve.", ephemeral=False)
+        await interaction.followup.send(error or "❌ The raid action did not resolve.", ephemeral=False)
         return
     await _send_raid_card(interaction, card, events=events)
 
