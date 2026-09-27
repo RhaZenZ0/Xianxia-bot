@@ -124,3 +124,54 @@ func TestTheGatheringArrayARaisedInYourOwnHome(t *testing.T) {
 		t.Fatalf("formation_level=%d", got)
 	}
 }
+
+// Cultivating by a method practises it (v1.11.0). Mastery used to rise only by
+// studying the manual again or fighting with its techniques, so weeks of
+// sessions with one method left it exactly as mastered as the day it was read.
+func TestCultivatingByAMethodPractisesIt(t *testing.T) {
+	path := setupCultivationDB(t)
+	world := batch4WorldPath(t)
+	catalog, err := worlddata.Load(world)
+	if err != nil {
+		t.Fatal(err)
+	}
+	batch4Exec(t, path, `UPDATE characters SET realm_index=1,phase=3,cultivation=0 WHERE user_id=42`)
+	mortal, dao := manualOfGrade(t, catalog, "Mortal"), manualOfGrade(t, catalog, "Dao")
+	batch4Exec(t, path, `INSERT INTO character_manuals(user_id,manual_id,mastery,practice,learned_at,updated_at) VALUES(42,?,0,2,0,0),(42,?,0,5,0,0)`, mortal, dao)
+	batch4Apply(t, path, world, "cultivation.manual", 1, map[string]any{"manual_id": mortal})
+
+	session := trainOnce(t, path, world, 2)
+	practised, _ := session["manual_practice"].(map[string]any)
+	if practised == nil {
+		t.Fatalf("a session by a method must practise it: %v", session)
+	}
+	if practised["manual_id"] != mortal || storage.ParseInt(practised["practice"]) != 3 || practised["mastery_rose"] != true {
+		t.Fatalf("practice 2 -> 3 crosses the first mastery threshold: %v", practised)
+	}
+	practice := func(id string) int64 {
+		t.Helper()
+		conn, err := storage.Open(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer conn.Close()
+		res, err := conn.Execute(`SELECT practice FROM character_manuals WHERE user_id=42 AND manual_id=?`, []any{id})
+		if err != nil || len(res.Rows) != 1 {
+			t.Fatalf("read practice: %v", err)
+		}
+		return storage.ParseInt(res.Rows[0][0])
+	}
+	if got := practice(dao); got != 5 {
+		t.Fatalf("only the method cultivated by is practised; the Dao manual moved to %d", got)
+	}
+
+	// A full stage gathers nothing, so it practises nothing.
+	batch4Exec(t, path, `UPDATE characters SET cultivation=100000000 WHERE user_id=42`)
+	full := trainOnce(t, path, world, 3)
+	if _, ok := full["manual_practice"]; ok {
+		t.Fatalf("a session that gathered nothing practised the method: %v", full["manual_practice"])
+	}
+	if got := practice(mortal); got != 3 {
+		t.Fatalf("a full stage must not be a mastery farm: practice %d", got)
+	}
+}

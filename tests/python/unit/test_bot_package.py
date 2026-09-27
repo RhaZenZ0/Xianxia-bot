@@ -847,7 +847,7 @@ SURFACE = {
         "roots": (),
         "leaves": {
             "law_group": ('status', 'comprehend', 'technique'),
-            "manual_group": ('list', 'study', 'practise', 'technique'),
+            "manual_group": ('list', 'study', 'cultivate_by', 'technique'),
             "condition_group": ('status', 'treat'),
             "profession_group": ('status', 'exam'),
             "flame_group": ('status', 'capture', 'refine', 'bind'),

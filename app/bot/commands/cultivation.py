@@ -15,7 +15,7 @@ from discord import app_commands
 
 from ...ops.game_engine import GameEngineError
 from ...rules.progression_systems import ascension_gate
-from ...rules.advanced_runtime import spirit_gain_line
+from ...rules.advanced_runtime import manual_practice_line, spirit_gain_line
 from ..character_state import record_quest_progress, announce_quest_progress, current_effect_modifiers
 from ..formatting import roll_line
 from ..status_cards import _ELEMENT_MARKS
@@ -87,6 +87,10 @@ async def cultivate(interaction: discord.Interaction) -> None:
     if float(result.get("manual_mult", 1)) != 1.0:
         chosen = "you practise" if result.get("manual_chosen") else "the best method you have learned"
         extra += f"\n📖 **{result.get('manual_name')}** ({result.get('manual_grade')} grade, {chosen}): **x{float(result['manual_mult']):.2f}**."
+    # v1.11.0: the session practised the method it was cultivated by.
+    practice_line = manual_practice_line(result.get("manual_practice"), WORLD.technique_system.get("mastery_levels") or ())
+    if practice_line:
+        extra += "\n" + practice_line
     # v1.0.0-rc.9: the kind of qi the method draws, said only when the root
     # makes something of it - an indifferent element is not worth a line.
     # Since rc.55 element_mult is the relation alone, so an indifferent
