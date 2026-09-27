@@ -1121,8 +1121,20 @@ async def _layout_result_send(
     if not source.response.is_done():
         await source.response.defer()
     followup_kwargs = dict(kwargs)
+    own_view = followup_kwargs.get("view")
     for key in ("ephemeral", "silent", "view", "content"):
         followup_kwargs.pop(key, None)
+    # A result that brings buttons of its own keeps them (v1.8.5). This
+    # used to drop every view, so a card pressed from a panel - the raid
+    # card, a Narrate it - arrived beside it with nothing to press. What is
+    # still dropped is the panel's own view, which `_safe_edit_kwargs` hands
+    # along as a fallback: a second copy of the panel is not a result.
+    if own_view is not None and own_view is not hub_view and not getattr(own_view, "is_layout_hub", False):
+        if LAYOUT_COMPONENTS_AVAILABLE and isinstance(own_view, discord.ui.LayoutView):
+            # A Components V2 message carries no content or embeds.
+            wait = {"wait": followup_kwargs["wait"]} if "wait" in followup_kwargs else {}
+            return await source.followup.send(view=own_view, ephemeral=False, **wait)
+        followup_kwargs["view"] = own_view
     if content is None and not any(key in followup_kwargs for key in ("embed", "embeds")):
         content = "✅ Done."
     return await source.followup.send(content, ephemeral=False, **followup_kwargs)

@@ -590,7 +590,7 @@ async function loadAiRouting(){
  <h2>Per-player budget</h2>
  <p class="muted">One bucket per player, every door: typed lines, shorthand commands, slash commands and hub buttons, Narrate-it asks and vote claims. A refusal is answered, never queued.</p>
  <div class="cards">
-  ${Object.entries((d.user_budget||{}).doors||{}).map(([door,c])=>`<div class="card"><small>${esc({typed:'Typed play',shorthand:'Shorthand',slash:'Slash and hub',narrate_it:'Narrate it',vote_claim:'Vote claim'}[door]||door)}</small><div class="metric ${c.refused?'warn':''}">${n(c.refused||0)} refused</div><small>${n(c.granted||0)} granted</small></div>`).join('')||'<div class="card"><small>No door has been used yet.</small></div>'}
+  ${Object.entries((d.user_budget||{}).doors||{}).map(([door,c])=>`<div class="card"><small>${esc({typed:'Typed play',shorthand:'Shorthand',slash:'Slash and hub',narrate_it:'Narrate it',vote_claim:'Vote claim',raid_card:'Raid card'}[door]||door)}</small><div class="metric ${c.refused?'warn':''}">${n(c.refused||0)} refused</div><small>${n(c.granted||0)} granted</small></div>`).join('')||'<div class="card"><small>No door has been used yet.</small></div>'}
   <div class="card"><small>Bucket</small><div class="metric">${n((d.user_budget||{}).burst||0)}</div><small>burst, refilling ${n((d.user_budget||{}).per_minute||0)} a minute · ${n((d.user_budget||{}).tracked_users||0)} players tracked</small></div>
  </div>
  <h2>Chains</h2><div class="cards">${Object.entries(chains).map(([t,l])=>chainRow(t,l)).join('')}</div>
