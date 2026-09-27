@@ -33,6 +33,7 @@ from .admin.narration_control import (
     dashboard_narration_control,
     owns_narration_action,
 )
+from .cards import install_notices
 from .channels import post_server_log
 from .character_state import _remember_freeform_npc_scene
 from . import maintenance, seclusion, usage
@@ -143,6 +144,9 @@ class GatedCommandTree(app_commands.CommandTree):
 
 class XianxiaBot(commands.Bot):
     def __init__(self) -> None:
+        # Every interaction is built as a NoticeInteraction, so a plain-text
+        # reply is drawn as a notice card (v1.9.0).
+        install_notices()
         intents = discord.Intents.default()
         intents.guilds = True
         intents.messages = True

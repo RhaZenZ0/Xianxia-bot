@@ -228,3 +228,113 @@ class AClassicViewMovesByChangingItsBase(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class APlainReplyIsANotice(unittest.TestCase):
+    """v1.9.0: a reply that is text and nothing else is drawn as a notice card,
+    at the one class every interaction is built from - so the ~300 replies
+    written as a bare string never had to change."""
+
+    def setUp(self):
+        self.cards = _cards()
+        self.sent: list[tuple[str, dict]] = []
+
+    def _recorder(self, name):
+        async def record(_self, content=None, **kwargs):
+            self.sent.append((name, {"content": content, **kwargs}))
+        return record
+
+    def _parent(self, *, kind=discord.InteractionType.application_command, v2_message=False, iid=1):
+        from types import SimpleNamespace
+        flags = SimpleNamespace(components_v2=v2_message)
+        return SimpleNamespace(id=iid, type=kind, message=SimpleNamespace(flags=flags))
+
+    def test_the_colour_follows_how_the_text_opens(self):
+        c = self.cards
+        self.assertEqual(c.notice_colour("❌ No."), c.NOTICE_FAILURE)
+        self.assertEqual(c.notice_colour("  ✅ Done."), c.NOTICE_SUCCESS)
+        self.assertEqual(c.notice_colour("⌛ Stale."), c.NOTICE_WAIT)
+        self.assertEqual(c.notice_colour("You bought a pill."), c.NOTICE_NEUTRAL)
+
+    def test_only_text_and_nothing_else_is_plain(self):
+        c = self.cards
+        self.assertTrue(c.is_plain("hi", {"ephemeral": True, "embed": None}))
+        for key in ("view", "embed", "embeds", "file", "files"):
+            self.assertFalse(c.is_plain("hi", {key: object()}), key)
+        self.assertFalse(c.is_plain("   ", {}), "an empty reply is not a notice")
+        self.assertFalse(c.is_plain(None, {}))
+        out = c.as_notice("❌ no", {"ephemeral": True, "delete_after": 15, "tts": False,
+                                    "suppress_embeds": True, "embed": None})
+        self.assertEqual(sorted(out), ["delete_after", "ephemeral", "view"])
+        self.assertTrue(out["view"].has_components_v2())
+
+    def test_a_plain_reply_is_sent_as_a_card(self):
+        from unittest.mock import patch
+        response = self.cards.NoticeResponse(self._parent())
+        with patch.object(discord.InteractionResponse, "send_message", self._recorder("send")):
+            asyncio.run(response.send_message("❌ Not here.", ephemeral=True))
+        name, kwargs = self.sent[0]
+        self.assertIsNone(kwargs["content"], "a Components V2 message may not carry content")
+        self.assertTrue(kwargs["ephemeral"])
+        self.assertIn("❌ Not here.", self.cards.card_text(kwargs["view"]))
+
+    def test_a_reply_with_its_own_view_is_left_alone(self):
+        from unittest.mock import patch
+        response = self.cards.NoticeResponse(self._parent())
+        own = discord.ui.View()
+        with patch.object(discord.InteractionResponse, "send_message", self._recorder("send")):
+            asyncio.run(response.send_message("Are you sure?", view=own))
+        self.assertEqual(self.sent[0][1]["content"], "Are you sure?")
+        self.assertIs(self.sent[0][1]["view"], own)
+
+    def test_a_text_edit_becomes_a_card_only_on_a_layout(self):
+        from unittest.mock import patch
+
+        async def record(_self, **kwargs):
+            self.sent.append(("edit", kwargs))
+
+        with patch.object(discord.InteractionResponse, "edit_message", record):
+            asyncio.run(self.cards.NoticeResponse(
+                self._parent(kind=discord.InteractionType.component, v2_message=True, iid=7)).edit_message(content="⌛ Stale."))
+            asyncio.run(self.cards.NoticeResponse(
+                self._parent(kind=discord.InteractionType.component, v2_message=False, iid=8)).edit_message(content="Old style."))
+        on_layout, on_classic = self.sent[0][1], self.sent[1][1]
+        self.assertIsNone(on_layout["content"])
+        self.assertIn("view", on_layout)
+        self.assertEqual(on_classic, {"content": "Old style."}, "a classic message keeps its text edit as written")
+
+    def test_the_followup_draws_a_notice_too(self):
+        sent = []
+
+        class Webhook:
+            async def send(self, content=None, **kwargs):
+                sent.append((content, kwargs))
+
+        followup = self.cards._NoticeFollowup(Webhook())
+        asyncio.run(followup.send("You meditate.", ephemeral=False))
+        asyncio.run(followup.send("With buttons", view=discord.ui.View()))
+        self.assertIsNone(sent[0][0])
+        self.assertIn("view", sent[0][1])
+        self.assertEqual(sent[1][0], "With buttons")
+
+    def test_every_interaction_is_built_as_a_notice_interaction(self):
+        import discord.state as state
+
+        previous = state.Interaction
+        try:
+            self.cards.install_notices()
+            self.assertIs(state.Interaction, self.cards.NoticeInteraction)
+            self.assertTrue(issubclass(state.Interaction, discord.Interaction))
+        finally:
+            state.Interaction = previous
+        bot = ast.parse((BOT / "bot.py").read_text(encoding="utf-8"))
+        init = next(node for node in ast.walk(bot) if isinstance(node, ast.FunctionDef)
+                    and node.name == "__init__")
+        calls = {ast.unparse(call.func) for call in ast.walk(init) if isinstance(call, ast.Call)}
+        self.assertIn("install_notices", calls, "the bot never installs the notice interaction")
+
+    def test_typed_play_draws_a_notice_the_same_way(self):
+        tree = ast.parse((BOT / "typed_play.py").read_text(encoding="utf-8"))
+        send = next(node for node in ast.walk(tree) if isinstance(node, ast.AsyncFunctionDef) and node.name == "_send")
+        names = {ast.unparse(call.func) for call in ast.walk(send) if isinstance(call, ast.Call)}
+        self.assertTrue({"is_plain", "as_notice"} <= names, names)

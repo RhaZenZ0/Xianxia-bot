@@ -362,3 +362,159 @@ def fold_content(view: Any, content: Any) -> bool:
         card.lead = "\n".join(part for part in (text, card.lead) if part)
         view._lay_out()
     return True
+
+
+# ---------------------------------------------------------------------------
+# Notices: a plain-text reply, drawn as a card (v1.9.0)
+# ---------------------------------------------------------------------------
+# About three hundred replies are a bare line of text - a refusal, a
+# confirmation, a result too short to need a card - sent straight through
+# ``interaction.response`` and ``interaction.followup``. Rather than touch each
+# of them, the one class discord.py builds every interaction from is replaced
+# by a subclass whose three reply doors turn a plain-text reply into a notice
+# card as it is sent. A reply that carries a view, an embed or a file is left
+# exactly as its handler wrote it: its layout is the handler's decision.
+
+NOTICE_SUCCESS = 0x57F287
+NOTICE_FAILURE = 0xED4245
+NOTICE_WAIT = 0xF0A33E
+NOTICE_NEUTRAL = 0x6D78A8
+_FAILURE_MARKS = ("❌", "⛔", "🚫", "⚠️", "🛑")
+_WAIT_MARKS = ("⌛", "⏳", "🕒", "🔒")
+_SUCCESS_MARKS = ("✅", "🎉", "✨")
+#: Keywords that make a message something other than plain text.
+_NOT_PLAIN = ("view", "embed", "embeds", "file", "files", "attachments", "poll", "stickers")
+#: Keywords a plain message may carry that a Components V2 one may not.
+_TEXT_ONLY = ("tts", "suppress_embeds", "content")
+
+
+def notice_colour(text: str) -> int:
+    """The accent a notice wears, read off how its text opens."""
+    head = str(text or "").lstrip()
+    if head.startswith(_FAILURE_MARKS):
+        return NOTICE_FAILURE
+    if head.startswith(_WAIT_MARKS):
+        return NOTICE_WAIT
+    if head.startswith(_SUCCESS_MARKS):
+        return NOTICE_SUCCESS
+    return NOTICE_NEUTRAL
+
+
+def notice_card(text: Any) -> Card:
+    body = "" if text is None else str(text)
+    return Card(description=body, colour=notice_colour(body))
+
+
+def is_plain(content: Any, kwargs: dict[str, Any]) -> bool:
+    """A reply that is text and nothing else - the only kind a notice replaces."""
+    if content is None or not str(content).strip():
+        return False
+    return not any(kwargs.get(key) is not None for key in _NOT_PLAIN)
+
+
+def as_notice(content: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
+    """The keywords that send ``content`` as a notice card instead."""
+    out = {key: value for key, value in kwargs.items() if key not in _TEXT_ONLY and key not in _NOT_PLAIN}
+    out["view"] = card_view(notice_card(content))
+    return out
+
+
+# Which interactions' original responses are notices or a slash command's
+# "thinking" placeholder, so a later text-only edit of that response is drawn
+# as a notice too (a V2 message cannot take content). Keyed by interaction id,
+# because discord.Interaction has __slots__ and no room for a flag; bounded.
+_NOTICED: dict[int, bool] = {}
+_NOTICED_LIMIT = 4096
+
+
+def _mark(interaction_id: int) -> None:
+    _NOTICED[int(interaction_id)] = True
+    while len(_NOTICED) > _NOTICED_LIMIT:
+        _NOTICED.pop(next(iter(_NOTICED)))
+
+
+def _edits_a_layout(interaction: Any) -> bool:
+    """Whether the message a text-only edit would land on is Components V2."""
+    if _NOTICED.get(int(getattr(interaction, "id", 0) or 0)):
+        return True
+    message = getattr(interaction, "message", None)
+    flags = getattr(message, "flags", None)
+    return bool(getattr(flags, "components_v2", False))
+
+
+class NoticeResponse(discord.InteractionResponse):
+    """``interaction.response`` whose plain-text replies are notice cards."""
+
+    __slots__ = ()
+
+    async def send_message(self, content: Any = None, **kwargs: Any) -> Any:
+        if is_plain(content, kwargs):
+            _mark(self._parent.id)
+            return await super().send_message(**as_notice(content, kwargs))
+        return await super().send_message(content, **kwargs)
+
+    async def defer(self, **kwargs: Any) -> Any:
+        # A slash command's defer is a "thinking" message that its handler
+        # later edits into the reply; that edit is drawn as a notice.
+        if self._parent.type == discord.InteractionType.application_command or kwargs.get("thinking"):
+            _mark(self._parent.id)
+        return await super().defer(**kwargs)
+
+    async def edit_message(self, **kwargs: Any) -> Any:
+        content = kwargs.get("content")
+        if is_plain(content, kwargs) and _edits_a_layout(self._parent):
+            return await super().edit_message(content=None, embed=None, **as_notice(content, kwargs))
+        return await super().edit_message(**kwargs)
+
+
+class _NoticeFollowup:
+    """``interaction.followup``, whose plain-text sends are notice cards."""
+
+    def __init__(self, webhook: Any) -> None:
+        self._webhook = webhook
+
+    async def send(self, content: Any = None, **kwargs: Any) -> Any:
+        if is_plain(content, kwargs):
+            return await self._webhook.send(**as_notice(content, kwargs))
+        return await self._webhook.send(content, **kwargs)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._webhook, name)
+
+
+class NoticeInteraction(discord.Interaction):
+    """Every interaction the bot receives (see :func:`install_notices`)."""
+
+    __slots__ = ()
+
+    @property
+    def response(self) -> NoticeResponse:  # type: ignore[override]
+        response = discord.Interaction.response.__get__(self, type(self))
+        if type(response) is discord.InteractionResponse:
+            response.__class__ = NoticeResponse
+        return response  # type: ignore[return-value]
+
+    @property
+    def followup(self) -> Any:  # type: ignore[override]
+        return _NoticeFollowup(discord.Interaction.followup.__get__(self, type(self)))
+
+    async def edit_original_response(self, **kwargs: Any) -> Any:
+        content = kwargs.get("content")
+        if is_plain(content, kwargs) and _edits_a_layout(self):
+            _mark(self.id)
+            return await super().edit_original_response(content=None, embed=None, **as_notice(content, kwargs))
+        return await super().edit_original_response(**kwargs)
+
+
+def install_notices() -> None:
+    """Build every interaction as a :class:`NoticeInteraction`.
+
+    ``ConnectionState.parse_interaction_create`` constructs the one
+    ``Interaction`` every command, button, select and modal receives, by the
+    name ``Interaction`` in ``discord.state``. Pointing that name at the
+    subclass is the single place a reply's shape can be decided for the
+    whole bot. Idempotent."""
+    import discord.state as state
+
+    if getattr(state, "Interaction", None) is not NoticeInteraction:
+        state.Interaction = NoticeInteraction  # type: ignore[attr-defined]

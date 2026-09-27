@@ -5536,6 +5536,19 @@ may carry none - which lost whatever text came with it. `_layout_result_send` ha
 ping inside a text display where they never did inside an embed, so the raid card, which names
 every raider, is sent with `AllowedMentions.none()`.
 
+**A plain-text reply is a notice card, decided in one place.** About three hundred replies are a
+bare string through `interaction.response` or `interaction.followup`, and none was edited.
+`ConnectionState.parse_interaction_create` builds every interaction by the name `Interaction` in
+`discord.state`; `install_notices()` (called by `XianxiaBot.__init__`) points that name at
+`NoticeInteraction`, whose `response`, `followup` and `edit_original_response` turn a reply that is
+text and nothing else (`is_plain`: no view, embed or file) into a card coloured by how it opens.
+A reply that brings its own view is the handler's decision and is left as written. A text-only
+*edit* is converted only when the message it lands on is already a layout - a notice, a slash
+command's "thinking" placeholder (`_NOTICED`, keyed by interaction id because `Interaction` has
+`__slots__`), or a V2 message - because a V2 message refuses content and a classic one would lose
+its buttons. Typed play has its own sender and applies the same two helpers. Channel posts are not
+replies and stay as they are.
+
 `test_every_card_is_a_layout.py` forbids a `discord.Embed` or an `embed=` send anywhere in
 `app/bot` except the two classic fallbacks - the classic hub and the classic Scene Action panel,
 built only when discord.py lacks Components V2, which the pinned 2.7.1 never does. It walks scopes
