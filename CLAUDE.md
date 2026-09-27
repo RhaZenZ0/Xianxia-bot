@@ -5688,6 +5688,14 @@ on the shipped map - no road step and no beachhead hash lands on another sect's 
 `TestARivalsGateIsNeverABeachhead` corners it with a neutral pool holding only a rival's gate,
 rc.53's `!ok` lesson again: a rule the content never reaches is held by a test that makes it.
 
+**The review found the beachhead was not once.** A sect holding its gate and a beachhead with every
+road step out taken fell through to the beachhead search again and claimed a place cut off from
+everything it held. The fallback runs only while the gate is all a sect holds - a beachhead lost in
+a war lets it start over - and `TestASectWithNoRoadLeftDoesNotLeapAcrossTheMap` holds it. The same
+review asked for the history insert's error to fail the claim, and that was declined: one system's
+error ends the whole tick (rc.28), and `recordWarDeclared` already treats its history row the same
+way - a lost rumour is not worth every batch ordered after `sect_politics`.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

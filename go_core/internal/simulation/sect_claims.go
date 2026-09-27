@@ -167,6 +167,15 @@ func (r *Runner) claimTarget(sect string, holdings []string, neutral map[string]
 	// Nothing it holds has a road out (a gate never does): one beachhead in
 	// its own world, the same one every time, so a sect's expansion starts
 	// from a place of its own rather than wherever the dice fell this week.
+	// Only while the gate is all it holds: a sect whose beachhead's roads are
+	// all taken has stopped growing, and a second beachhead would be a claim
+	// cut off from everything it holds. A beachhead lost in a war leaves the
+	// gate alone again, and then it may start over.
+	for _, place := range holdings {
+		if place != gate {
+			return ""
+		}
+	}
 	best, bestHash := "", uint64(0)
 	for place := range neutral {
 		if !open(place) || r.World.Locations[place].World != world {

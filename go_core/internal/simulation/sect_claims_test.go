@@ -227,3 +227,46 @@ func TestARivalsGateIsNeverABeachhead(t *testing.T) {
 		t.Fatalf("a sect's own gate is its to claim: got %q", got)
 	}
 }
+
+// A sect that already holds a beachhead grows by road or not at all (found in
+// review). With every road step out of its holdings taken, the old fallback
+// reached into the gate's world again and claimed a place cut off from
+// everything the sect held.
+func TestASectWithNoRoadLeftDoesNotLeapAcrossTheMap(t *testing.T) {
+	_, r := claimWorld(t)
+	gate := game.SectGate(r.World, claimStrong)
+	world := r.World.Locations[gate].World
+	beachhead, elsewhere := "", ""
+	for name := range r.World.Locations {
+		if name == gate || r.World.Locations[name].World != world || !game.TerritoryIsWholePlace(r.World, name) {
+			continue
+		}
+		if beachhead == "" || name < beachhead {
+			beachhead = name
+		}
+	}
+	for name := range r.World.Locations {
+		if name != gate && name != beachhead && r.World.Locations[name].World == world && game.TerritoryIsWholePlace(r.World, name) {
+			walks := false
+			for _, step := range game.WhereAnNPCCanWalk(r.World, beachhead, 1<<30) {
+				if r.wholePlace(step) == name {
+					walks = true
+				}
+			}
+			if !walks {
+				elsewhere = name
+				break
+			}
+		}
+	}
+	if beachhead == "" || elsewhere == "" {
+		t.Fatalf("the fixture found no beachhead and no place off its roads: %q %q", beachhead, elsewhere)
+	}
+	neutral := map[string]bool{elsewhere: true}
+	if got := r.claimTarget(claimStrong, []string{gate, beachhead}, neutral, map[string]string{gate: claimStrong}); got != "" {
+		t.Fatalf("holding %q with no road left, the sect leapt to %q", beachhead, got)
+	}
+	if got := r.claimTarget(claimStrong, []string{gate}, neutral, map[string]string{gate: claimStrong}); got != elsewhere {
+		t.Fatalf("a sect holding only its gate may still take a beachhead: got %q", got)
+	}
+}
