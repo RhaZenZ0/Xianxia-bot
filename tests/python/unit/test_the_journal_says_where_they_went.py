@@ -101,7 +101,7 @@ class TheJournalSaysWhereTheyWent(unittest.TestCase):
             for call in ast.walk(node)
             if isinstance(call, ast.Call) and getattr(call.func, "id", "") == "objective_line_suffix"
         }
-        self.assertEqual(callers, {"quests_command", "_player_dashboard_embed"})
+        self.assertEqual(callers, {"quests_command", "_player_dashboard_card"})
 
 
 if __name__ == "__main__":
