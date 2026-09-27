@@ -24,6 +24,17 @@ var sectAbodeFacilityCols = map[string]string{
 	"formation": "formation_level", "storage": "storage_level", "herb_garden": "herb_garden_level",
 }
 
+// isSectAbodeFacilityColumn answers whether column is one of sect_abodes'
+// facility columns - the only names a query here may splice in.
+func isSectAbodeFacilityColumn(column string) bool {
+	for _, known := range sectAbodeFacilityCols {
+		if column == known {
+			return true
+		}
+	}
+	return false
+}
+
 type sectAbodeUpgradePayload struct {
 	Facility   string `json:"facility"`
 	GameMinute int64  `json:"game_minute"`
@@ -198,6 +209,13 @@ func sectAbodeUpgradeAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 func sectResidenceFacilityLevel(conn *storage.Conn, userID int64, locationKey, column string) (level int64, baseLocation string, found bool, err error) {
 	if !strings.HasPrefix(locationKey, "sect_abode:") {
 		return 0, "", false, nil
+	}
+	// The column is spliced into the SQL, because a column name cannot be a
+	// bound parameter. Every caller passes a constant, and that is exactly
+	// what a scanner cannot see, so the name is held to the table's own
+	// facility columns here rather than trusted.
+	if !isSectAbodeFacilityColumn(column) {
+		return 0, "", false, fmt.Errorf("unknown sect abode facility column %q", column)
 	}
 	res, err := conn.Execute(fmt.Sprintf(`SELECT base_location,%s AS facility_level FROM sect_abodes WHERE location_key=? AND user_id=?`, column), []any{locationKey, userID})
 	if err != nil {
