@@ -54,6 +54,17 @@ func claimCap(influence int64) int64 {
 }
 
 // npcSectClaims lets each strong sect claim at most one neutral place.
+// Eligible sects have at least 62 influence and 55 resources and are below
+// claimCap. Places under active war are excluded. steps counts weekly intervals:
+// the attempt chance is 25% for steps <= 1, 50% for 2, and 60% for 3 or more.
+// Claims raise unrest by 10, capped at 100, retain defense, and stamp gm as the
+// game minute. Public history is recorded on a best-effort basis.
+//
+// It returns the number of claims made, including any before a query, update,
+// or attempt-roll error. A target-selection roll error skips that sect instead.
+// Missing territory or politics tables, or errors checking for them, return
+// zero and nil. The caller owns the transaction; this function does not commit
+// or roll back claims.
 func (r *Runner) npcSectClaims(conn *storage.Conn, steps, gm int64) (int64, error) {
 	if !simTableExists(conn, "territory_state") || !simTableExists(conn, "sect_politics_state") {
 		return 0, nil
@@ -126,6 +137,11 @@ func (r *Runner) npcSectClaims(conn *storage.Conn, steps, gm int64) (int64, erro
 }
 
 // claimTarget is the one place this sect claims next, or "" for none.
+// neutral identifies available places; gateOf maps gates to their own sects.
+// It prefers the sect's gate, then a random whole place one walk step from its
+// holdings in the gate's world, excluding other sects' gates. With no such step
+// and no holdings beyond its gate, it picks a beachhead by a stable hash of the
+// eligible places. A missing gate or a failed random draw returns "".
 func (r *Runner) claimTarget(sect string, holdings []string, neutral map[string]bool, gateOf map[string]string) string {
 	gate := game.SectGate(r.World, sect)
 	if gate == "" {
@@ -190,6 +206,8 @@ func (r *Runner) claimTarget(sect string, holdings []string, neutral map[string]
 
 // wholePlace answers the place a walk step belongs to: a district a road
 // step reaches stands for its city.
+// Whole places are returned unchanged; other known locations use their outside
+// location when set. Otherwise it returns the input, including unknown names.
 func (r *Runner) wholePlace(location string) string {
 	if game.TerritoryIsWholePlace(r.World, location) {
 		return location
@@ -202,6 +220,9 @@ func (r *Runner) wholePlace(location string) string {
 
 // recordTerritoryClaimed puts a claim where the world can hear about it -
 // quieter than a war (60 against 78), because nobody was driven off.
+// The event is public; gm is the game minute and now is Unix time in seconds.
+// Repeated claims for the same sect, territory, and game minute are ignored.
+// A missing history table or any database error is silently ignored.
 func (r *Runner) recordTerritoryClaimed(conn *storage.Conn, sect, territory string, gm int64, now float64) {
 	if !simTableExists(conn, "world_history_events") {
 		return

@@ -237,6 +237,7 @@ func sectRecruitmentEnvoysActionGo(conn *storage.Conn, catalog worlddata.Catalog
 // SectGate is sectGate for the simulation package (v1.12.0), which claims a
 // sect's home ground in the world tick and must name the same gate the doors
 // do - one statement of where a sect stands, not a second copy.
+// It returns "" for an unknown or hidden sect, or a gate absent from the catalog.
 func SectGate(catalog worlddata.Catalog, sect string) string {
 	return sectGate(catalog, sect)
 }
