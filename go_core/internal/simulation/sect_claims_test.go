@@ -3,6 +3,7 @@ package simulation
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"xianxia/core/internal/game"
@@ -184,6 +185,45 @@ func TestClaimsGiveTheWarStepATarget(t *testing.T) {
 	}
 	if n := i64(simScalar(t, path, `SELECT COUNT(*) FROM world_history_events WHERE event_type='territory_claimed'`)); n != 2 {
 		t.Fatalf("each claim is heard of once: %d rows", n)
+	}
+}
+
+func TestClaimHistoryFailureRollsBackSectPolitics(t *testing.T) {
+	defer gamerng.UseRoller(func(int) int { return 0 })()
+	path, r := claimWorld(t)
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	// Complete the politics fixture and reject the second sect's history so
+	// the rollback must also undo the first sect's claim and history row.
+	if err := conn.ExecScript(`
+ALTER TABLE sect_politics_state ADD COLUMN leader_policy TEXT NOT NULL DEFAULT 'Balanced';
+ALTER TABLE sect_politics_state ADD COLUMN last_game_minute INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE world_simulation_state(system TEXT PRIMARY KEY, last_game_minute INTEGER, last_run_real REAL, runs INTEGER);
+INSERT INTO world_simulation_state VALUES('sect_politics',0,0,0);
+CREATE TRIGGER reject_claim_history BEFORE INSERT ON world_history_events
+WHEN NEW.event_type='territory_claimed' AND NEW.faction='Crimson Furnace Sect'
+BEGIN SELECT RAISE(ABORT, 'claim history rejected'); END;
+`); err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = r.runSystem(conn, "sect_politics", 1, 20000)
+	if err == nil || !strings.Contains(err.Error(), "claim history rejected") {
+		t.Fatalf("expected the history insert error, got %v", err)
+	}
+	if got := i64(simScalar(t, path, `SELECT COUNT(*) FROM territory_state WHERE controller_type!='neutral' OR controller_key!='' OR unrest!=0 OR updated_game_minute!=0 OR updated_at!=0`)); got != 0 {
+		t.Fatalf("failed history left %d changed territories", got)
+	}
+	if got := i64(simScalar(t, path, `SELECT COUNT(*) FROM world_history_events`)); got != 0 {
+		t.Fatalf("failed batch left %d history rows", got)
+	}
+	if got := i64(simScalar(t, path, `SELECT resources FROM sect_politics_state WHERE sect_name='Azure Cloud Sect'`)); got != 70 {
+		t.Fatalf("failed batch retained politics changes: resources=%d", got)
 	}
 }
 
