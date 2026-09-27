@@ -5696,6 +5696,26 @@ review asked for the history insert's error to fail the claim, and that was decl
 error ends the whole tick (rc.28), and `recordWarDeclared` already treats its history row the same
 way - a lost rumour is not worth every batch ordered after `sect_politics`.
 
+### A card pages, and a restart-safe panel keeps the cut (v1.12.1)
+
+Asked as *"if the discord layout is too long can we do page 2?"*. Hub panels already paged
+(actions behind "More actions", a plain result up to five pages), but a **card** past Discord's
+4,000 characters was cut with an ellipsis, so the end of a long sheet was lost. `Card._pages`
+splits it - title and footer on every page, the lead, description and fields in order, broken
+between paragraphs, then lines, then words, at most `MAX_PAGES` - and `CardView._page_row` puts
+◀ Page n/N ▶ under it. Two things are decisions. **A view with controls of its own and no timeout
+keeps the cut**: such a view may be re-registered at boot with `bot.add_view`, which needs every
+control to carry a fixed `custom_id`, and page buttons carry none, so paging one would stop it
+being re-registrable. **A pure card gets a timeout when it pages**, `register_page_timeout(panel_timeout)`
+from the surface, because a view that waits for ever holds memory for ever. The first run of
+`test_a_long_card_pages.py` found the button turning the page number without redrawing the card;
+its drill (the page row switched off) fails three of its tests.
+
+The same release moved `go.mod` to `go 1.26.0` with `toolchain go1.26.8`. The pair is deliberate:
+the engine image is `golang:1.26` pinned by digest, and the official images set `GOTOOLCHAIN=local`,
+so a `go` line naming a patch newer than the image's would fail the build; the `toolchain` line is
+what CI (setup-go reads it) and govulncheck run on, and a local build under `GOTOOLCHAIN=auto`.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

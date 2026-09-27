@@ -78,6 +78,10 @@ find the wait short - `120` is a comfortable page-and-come-back window - and `0`
 means a panel never expires, which costs one view held in memory per panel for
 the life of the process and is safe on a small server.
 
+The same window is how long the page buttons under a long card stay live
+(v1.12.1): a card too long for one Discord message pages with ◀ ▶, and after
+the window the buttons stop answering.
+
 ### The patron's tribute (`/tribute`)
 
 `/tribute` pays a cultivator a patron's gift once every twelve hours, doubled

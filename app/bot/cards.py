@@ -39,6 +39,11 @@ import discord
 TEXT_LIMIT = 3900
 #: A classic view holds five rows; a card keeps the same shape.
 CONTROL_ROWS = 5
+#: A card too long for one message pages (v1.12.1) rather than being cut, up
+#: to this many pages; only what runs past the last one is still cut.
+MAX_PAGES = 10
+#: How long a view waits for a press when nobody said: CardView's own default.
+_DEFAULT_TIMEOUT = 180.0
 _BLANK_NAMES = {"", "​", "​​"}
 
 
@@ -106,13 +111,14 @@ class Card:
 
     # --- reading it back --------------------------------------------------
     def text(self) -> str:
-        """Every word the card shows, in order: what a reader, a log line or a
-        test sees without walking the component tree."""
-        return "\n".join(part for part in self._parts() if part)
+        """Every word the card holds, in order and uncut: what a reader, a log
+        line or a test sees without walking the component tree or the pages."""
+        lead = self.lead.strip()
+        footer = f"-# {self.footer}" if self.footer else ""
+        return "\n".join(part for part in (lead, self._header(), self._fields(), footer) if part)
 
-    def _parts(self) -> list[str]:
-        lead, header, fields, footer = self._fitted()
-        return [lead, header, fields, footer]
+    def page_count(self) -> int:
+        return len(self._pages())
 
     def _header(self) -> str:
         lines = []
@@ -124,7 +130,7 @@ class Card:
             lines.append(self.description)
         return "\n".join(lines)
 
-    def _fields(self) -> str:
+    def _field_blocks(self) -> list[str]:
         blocks = []
         for name, value, _inline in self.fields:
             name = name.strip()
@@ -132,42 +138,85 @@ class Card:
                 blocks.append(value)
             else:
                 blocks.append(f"**{name}**\n{value}" if value else f"**{name}**")
-        return "\n\n".join(block for block in blocks if block)
+        return [block for block in blocks if block]
 
-    def _fitted(self) -> tuple[str, str, str, str]:
-        """The four text blocks, cut to fit Discord's 4,000 characters.
+    def _fields(self) -> str:
+        return "\n\n".join(self._field_blocks())
 
-        An embed allowed 6,000, so a long sheet can overflow. The fields are
-        cut first, then the description, then the lead - the title and the
-        footer are short and say what the card is."""
+    def _pages(self) -> list[tuple[str, str, str, str]]:
+        """The card as pages, each a (lead, header, fields, footer) that fits
+        Discord's 4,000 characters.
+
+        A card that fits is one page, exactly as it always was. One that does
+        not used to be cut with an ellipsis - the fields first, then the
+        description - so the end of a long sheet was simply lost. It pages
+        now: the title (with its author line) and the footer say what the card
+        is and sit on every page; the lead, the description and the fields
+        follow in order, broken between paragraphs, then lines, then words.
+        Only what runs past :data:`MAX_PAGES` is still cut."""
         lead = self.lead.strip()
         header = self._header()
         fields = self._fields()
         footer = f"-# {self.footer}" if self.footer else ""
-        budget = TEXT_LIMIT - len(footer)
-        for which in ("fields", "header", "lead"):
-            total = len(lead) + len(header) + len(fields)
-            if total <= budget:
-                break
-            over = total - budget
-            if which == "fields" and fields:
-                fields = _cut(fields, len(fields) - over)
-            elif which == "header" and header:
-                header = _cut(header, len(header) - over)
-            elif which == "lead" and lead:
-                lead = _cut(lead, len(lead) - over)
-        return lead, header, fields, footer
+        if len(lead) + len(header) + len(fields) + len(footer) <= TEXT_LIMIT:
+            return [(lead, header, fields, footer)]
+        top = []
+        if self.author:
+            top.append(f"-# {self.author}")
+        if self.title:
+            top.append(f"## {self.title}")
+        top_text = "\n".join(top)
+        # What a page may hold besides its title and footer, less the room for
+        # the joins between blocks.
+        budget = max(200, TEXT_LIMIT - len(top_text) - len(footer) - 8)
+        units: list[tuple[str, str]] = []
+        for text in _split(lead, budget):
+            units.append(("lead", text))
+        for text in _split(self.description, budget):
+            units.append(("header", text))
+        for block in self._field_blocks():
+            for text in _split(block, budget):
+                units.append(("fields", text))
+        pages: list[dict[str, list[str]]] = []
+        used = budget + 1
+        for kind, text in units:
+            cost = len(text) + 2
+            if used + cost > budget:
+                pages.append({"lead": [], "header": [], "fields": []})
+                used = 0
+            pages[-1][kind].append(text)
+            used += cost
+        out = []
+        for page in pages[:MAX_PAGES]:
+            head = "\n".join(part for part in (top_text, "\n".join(page["header"])) if part)
+            out.append(("\n\n".join(page["lead"]), head, "\n\n".join(page["fields"]), footer))
+        if len(pages) > MAX_PAGES:
+            lead_, head, body, foot = out[-1]
+            out[-1] = (lead_, head, _cut(body + "\n…", len(body) + 2) if body else body, foot)
+        return out or [("", top_text, "", footer)]
 
     # --- drawing ------------------------------------------------------------
-    def container(self, controls: Sequence[discord.ui.ActionRow] = ()) -> discord.ui.Container:
-        lead, header, fields, footer = self._fitted()
+    def container(self, controls: Sequence[discord.ui.ActionRow] = (), *, page: int = 0,
+                  paged: bool = True) -> discord.ui.Container:
+        """The card drawn as a container, showing ``page``. With ``paged``
+        False the view has no page buttons, so a long card shows its first
+        page and says that more was cut."""
+        pages = self._pages()
+        index = max(0, min(int(page), len(pages) - 1))
+        lead, header, fields, footer = pages[index]
+        first = index == 0
+        if not paged and len(pages) > 1:
+            if fields:
+                fields = fields + "\n…"
+            else:
+                header = header + "\n…"
         container = discord.ui.Container(accent_colour=self.colour)
         if lead:
             container.add_item(discord.ui.TextDisplay(lead))
             if header:
                 container.add_item(discord.ui.Separator())
         if header:
-            if self.thumbnail:
+            if self.thumbnail and first:
                 container.add_item(
                     discord.ui.Section(
                         discord.ui.TextDisplay(header),
@@ -176,7 +225,7 @@ class Card:
                 )
             else:
                 container.add_item(discord.ui.TextDisplay(header))
-        if self.image:
+        if self.image and first:
             container.add_item(
                 discord.ui.MediaGallery(discord.MediaGalleryItem(self.image))
             )
@@ -185,7 +234,7 @@ class Card:
             container.add_item(discord.ui.TextDisplay(fields))
         if footer:
             container.add_item(discord.ui.TextDisplay(footer))
-        if not (lead or header or fields or footer or self.image):
+        if not (lead or header or fields or footer or (self.image and first)):
             container.add_item(discord.ui.TextDisplay("​"))
         if controls:
             container.add_item(discord.ui.Separator())
@@ -198,6 +247,56 @@ def _cut(text: str, length: int) -> str:
     if length <= 1:
         return "…"
     return text if len(text) <= length else text[: length - 1].rstrip() + "…"
+
+
+def _split(text: str, limit: int) -> list[str]:
+    """Break text into pieces no longer than ``limit``, between paragraphs,
+    then lines, then words, then hard - the rule the hub panel's result pages
+    use."""
+    remaining = str(text or "").strip()
+    pieces: list[str] = []
+    while remaining:
+        if len(remaining) <= limit:
+            pieces.append(remaining)
+            break
+        cut = -1
+        for separator in ("\n\n", "\n", " "):
+            cut = remaining.rfind(separator, limit // 3, limit)
+            if cut != -1:
+                break
+        if cut == -1:
+            cut = limit
+        pieces.append(remaining[:cut].rstrip())
+        remaining = remaining[cut:].lstrip()
+    return pieces
+
+
+_PAGE_TIMEOUT: Any = lambda: _DEFAULT_TIMEOUT
+
+
+def register_page_timeout(timeout: Any) -> None:
+    """Tell a paged card how long its page buttons stay live, as a callable
+    answering seconds or None (never). The surface hands it the panels' own
+    idle window, so a page is as patient as the panel it came out of."""
+    global _PAGE_TIMEOUT
+    _PAGE_TIMEOUT = timeout
+
+
+class CardPageButton(discord.ui.Button):
+    """◀ or ▶ under a paged card: turns the page and redraws the message."""
+
+    def __init__(self, step: int) -> None:
+        super().__init__(style=discord.ButtonStyle.secondary, label="◀" if step < 0 else "▶")
+        self.step = step
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        view = self.view
+        if not isinstance(view, CardView) or view.card is None:
+            return
+        count = view.card.page_count()
+        view.page = (view.page + self.step) % max(1, count)
+        view._lay_out()
+        await interaction.response.edit_message(view=view)
 
 
 def _is_control(item: discord.ui.Item[Any]) -> bool:
@@ -229,10 +328,12 @@ class CardView(discord.ui.LayoutView):
                     children[name] = member
         cls.__view_children_items__ = children
 
-    def __init__(self, *, card: Card | None = None, timeout: float | None = 180.0) -> None:
+    def __init__(self, *, card: Card | None = None, timeout: float | None = _DEFAULT_TIMEOUT) -> None:
         self._card_controls: list[discord.ui.Item[Any]] = []
         self._card: Card | None = card
         self._laying_out = False
+        #: Which page of a long card is showing (v1.12.1).
+        self.page = 0
         super().__init__(timeout=timeout)
         # The decorated controls were built as top-level children; move them
         # into the rows.
@@ -313,13 +414,43 @@ class CardView(discord.ui.LayoutView):
             rows.append(row)
         return rows
 
+    def _page_row(self) -> discord.ui.ActionRow | None:
+        """◀ Page n/N ▶ under a card too long for one message, or None.
+
+        A view that brings controls of its own and waits for ever is one a
+        restart may re-register (`bot.add_view`), which needs every control to
+        carry a fixed id; page buttons carry none, so such a view keeps the old
+        cut rather than stop being re-registrable. A card with no controls is
+        given the page timeout, because a view that waits for ever holds
+        memory for ever."""
+        if self._card is None:
+            return None
+        count = self._card.page_count()
+        if count <= 1:
+            self.page = 0
+            return None
+        if self.timeout is None:
+            if self._card_controls:
+                return None
+            self.timeout = _PAGE_TIMEOUT()
+        self.page = max(0, min(self.page, count - 1))
+        row = discord.ui.ActionRow()
+        row.add_item(CardPageButton(-1))
+        row.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary,
+                                       label=f"Page {self.page + 1}/{count}", disabled=True))
+        row.add_item(CardPageButton(1))
+        return row
+
     def _lay_out(self) -> None:
         self._laying_out = True
         try:
             super().clear_items()
             rows = self._rows()
             if self._card is not None:
-                super().add_item(self._card.container(rows))
+                nav = self._page_row()
+                if nav is not None:
+                    rows = [*rows, nav]
+                super().add_item(self._card.container(rows, page=self.page, paged=nav is not None))
             else:
                 for row in rows:
                     super().add_item(row)

@@ -112,6 +112,7 @@ from .locations import here_summary
 from .registry import ACTIONS, EVENT_HANDLERS, registered_root_command
 from .runtime import DB, SETTINGS, WORLD, character_location_display, current_world_time, log, private_location_exit
 from .services import GUILD, QUESTS, SIM
+from .cards import register_page_timeout
 from .status_cards import _who_is_here, cultivation_status_fields, menu_facts_line
 
 
@@ -1483,6 +1484,8 @@ register_panel_gate(_panel_gate)
 # `hubs` and `runtime` in one tier - the shape `register_hidden_actions` and its
 # three siblings above already use.
 register_panel_idle(SETTINGS.hub_panel_idle_minutes)
+# A long card's page buttons are as patient as the panel it came out of.
+register_page_timeout(panel_timeout)
 
 
 register_hubs(*_HUB_DEFINITIONS, _ADMIN_HUB_DEFINITION)
