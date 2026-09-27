@@ -635,7 +635,7 @@ def _flame_card(c: dict, status: dict) -> Card:
                         (" • opens Transcendent when fully refined" if flame.get("opens_top_grade") else ""))]
             if flame.get("next_refine_items") is not None:
                 cost = WORLD.item_names({str(k): int(v) for k, v in dict(flame["next_refine_items"]).items()})
-                lines.append(f"Next refinement: {cost} + {int(flame.get('next_refine_qi') or 0)} qi (base)")
+                lines.append(f"Next refinement: {cost} and some qi")
         else:
             head = f"▫️ {name}"
             lines = [f"Captured at **{flame.get('location')}** ({flame.get('world')}) from "
@@ -774,8 +774,8 @@ def _spirit_card(c: dict, status: dict) -> Card:
         ready = progress >= need
         card.add_field(name="Toward the next stage",
                        value=(f"{'🟪' * filled}{'⬛' * (10 - filled)} **{progress}/{need}**\n"
-                              + (f"✅ Ready: **/spirit settle** for {int(status.get('settle_qi') or 0)} qi (base) → +{int(status.get('next_bonus') or 0)}"
-                                 if ready else f"Next stage adds +{int(status.get('next_bonus') or 0)}; settling it costs {int(status.get('settle_qi') or 0)} qi (base)")),
+                              + (f"✅ Ready: **/spirit settle** spends some qi → +{int(status.get('next_bonus') or 0)}"
+                                 if ready else f"The next stage adds +{int(status.get('next_bonus') or 0)}; settling it spends some qi")),
                        inline=False)
     gains = dict(status.get("gains") or {})
     card.add_field(name="What builds it",

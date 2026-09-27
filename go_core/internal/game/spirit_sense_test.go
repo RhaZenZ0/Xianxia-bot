@@ -86,6 +86,9 @@ func TestPracticeBuildsTheSenseAndSpiritQuickensIt(t *testing.T) {
 	if _, progress := senseRow(t, path); progress != spiritSenseNeed(rules, 0) {
 		t.Fatalf("practice banked %d past a full stage; it stops at %d until the stage is settled", progress, spiritSenseNeed(rules, 0))
 	}
+	if out := senseGain(t, path, "meditation", false, 0); out == nil || out["full"] != true || i64(out["gain"]) != 0 {
+		t.Fatalf("practice on a full stage said %v; it must report the stage full, not nothing", out)
+	}
 }
 
 func TestSceneActionsBuildItOnlyAFewTimesAWorldDay(t *testing.T) {

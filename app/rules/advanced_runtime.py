@@ -494,6 +494,9 @@ def spirit_gain_line(gained: Any) -> str:
     (v1.10.0): a Formation or Inscription craft, a meditation, a scene action."""
     gained = dict(gained) if isinstance(gained, Mapping) else {}
     gain = int(gained.get("gain") or 0)
+    if gained.get("full"):
+        return (f"🌀 Your spirit sense is full at {int(gained.get('progress') or 0)}/{int(gained.get('need') or 0)} "
+                "and takes nothing more until you settle it (**/spirit settle**)")
     if not gain:
         return ""
     line = f"🌀 Spirit sense **+{gain}** → {int(gained.get('progress') or 0)}/{int(gained.get('need') or 0)}"

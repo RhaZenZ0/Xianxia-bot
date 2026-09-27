@@ -137,7 +137,10 @@ func spiritSenseGainTx(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	ceiling := spiritSenseNeed(rules, stage)
 	next := min64(ceiling, progress+gain)
 	if next == progress {
-		return nil
+		// A full stage takes nothing more until it is settled, and says so:
+		// a practice that silently built nothing reads as a practice that
+		// does not build it (found by the engine playtest).
+		return map[string]any{"source": source, "gain": int64(0), "progress": progress, "need": ceiling, "stage": stage, "ready": true, "full": true}
 	}
 	if _, err := conn.Execute(`INSERT INTO character_spirit_sense(user_id,stage,progress,updated_at) VALUES(?,0,?,?)
 		ON CONFLICT(user_id) DO UPDATE SET progress=excluded.progress,updated_at=excluded.updated_at`,
@@ -170,7 +173,9 @@ func spiritSenseSettleAction(conn *storage.Conn, catalog worlddata.Catalog, user
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	qiCost := state.Cost(rules.SettleQi * (stage + 1))
+	// A content qi number is a share of the reference pool, capped at half a
+	// dantian, so it is flat; the stage's rising need is the price that grows.
+	qiCost := state.Cost(rules.SettleQi)
 	if state.Qi < qiCost {
 		return authoritativeMutation{}, fmt.Errorf("settling the stage takes %d qi and you hold %d", qiCost, state.Qi)
 	}
@@ -199,7 +204,7 @@ func spiritSenseStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if stage < rules.MaxStage {
 		out["need"] = spiritSenseNeed(rules, stage)
 		out["next_bonus"] = spiritSenseBonusAt(rules, stage+1)
-		out["settle_qi"] = rules.SettleQi * (stage + 1)
+		out["settle_qi"] = rules.SettleQi
 	}
 	return out, nil
 }

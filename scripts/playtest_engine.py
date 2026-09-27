@@ -2528,6 +2528,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     await audited("admin.player.grant_flame", {"user_id": PLAYER, "flame_id": "earth_heart_fire", "refinement": 0, "reason": "playtest"})
     await step(report, "grant the refinement's makings", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": "beast_core", "quantity": 5, "reason": "playtest"}))
     await step(report, "grant the refinement's ore", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": "spirit_iron", "quantity": 5, "reason": "playtest"}))
+    await audited("admin.player.revive", {"user_id": PLAYER, "reason": "playtest: a full qi pool to refine with"})
     refined = await step(report, "flame.refine the Earth-Heart Fire", act("flame.refine", PLAYER, {"flame_id": "earth_heart_fire"}))
     if refined is not None:
         report.add("PASS" if int(refined.get("refinement") or 0) == 1 else "FAIL", "refining raised it to 1", str(refined.get("refinement")))
@@ -2550,9 +2551,12 @@ async def run(url: str, token: str, db_path: str) -> Report:
     meditated = await step(report, "a meditation builds the spirit sense", act_free("cultivation.train", PLAYER, {}))
     if meditated is not None:
         gained = dict(meditated.get("spirit_sense_gain") or {})
-        report.add("PASS" if int(gained.get("gain") or 0) > 0 or int((sense_before or {}).get("stage") or 0) >= 9 else "FAIL",
-                   "the meditation reported spirit-sense progress", str(gained))
+        # Earlier sections craft and act in scenes, so the first stage may
+        # already be full: then the meditation must say so rather than build.
+        report.add("PASS" if int(gained.get("gain") or 0) > 0 or gained.get("full") else "FAIL",
+                   "the meditation reported spirit-sense progress, or that the stage is full", str(gained))
     await audited("admin.player.set_spirit_sense", {"user_id": PLAYER, "stage": 0, "progress": 40, "reason": "playtest: a full first stage"})
+    await audited("admin.player.revive", {"user_id": PLAYER, "reason": "playtest: a full qi pool to settle with"})
     settled = await step(report, "spirit_sense.settle a full stage", act("spirit_sense.settle", PLAYER, {}))
     if settled is not None:
         report.add("PASS" if int(settled.get("stage") or 0) == 1 else "FAIL", "settling raised the sense to stage 1", str(settled))

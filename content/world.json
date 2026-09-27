@@ -71432,14 +71432,14 @@
         "location": "Emberforge Forge Terraces",
         "min_realm_index": 2,
         "capture_tn": 12,
-        "capture_qi": 20,
+        "capture_qi": 6,
         "base_bonus": 1,
         "max_bonus": 2,
         "refine_items": {
           "beast_core": 1,
           "spirit_iron": 1
         },
-        "refine_qi": 10,
+        "refine_qi": 2,
         "opens_top_grade": false
       },
       "crimson_lotus_flame": {
@@ -71449,14 +71449,14 @@
         "location": "Vermilion Furnace Forge Terraces",
         "min_realm_index": 8,
         "capture_tn": 15,
-        "capture_qi": 40,
+        "capture_qi": 7,
         "base_bonus": 1,
         "max_bonus": 3,
         "refine_items": {
           "beast_core": 2,
           "spirit_crystal_ore": 1
         },
-        "refine_qi": 20,
+        "refine_qi": 2,
         "opens_top_grade": false
       },
       "nine_heavens_sun_flame": {
@@ -71466,14 +71466,14 @@
         "location": "Solar Furnace Forge Terraces",
         "min_realm_index": 16,
         "capture_tn": 18,
-        "capture_qi": 80,
+        "capture_qi": 8,
         "base_bonus": 2,
         "max_bonus": 4,
         "refine_items": {
           "beast_core": 3,
           "immortal_gold_ore": 1
         },
-        "refine_qi": 40,
+        "refine_qi": 3,
         "opens_top_grade": true
       },
       "primordial_chaos_flame": {
@@ -71483,14 +71483,14 @@
         "location": "Solar Crucible Forge Terraces",
         "min_realm_index": 24,
         "capture_tn": 21,
-        "capture_qi": 120,
+        "capture_qi": 9,
         "base_bonus": 3,
         "max_bonus": 5,
         "refine_items": {
           "beast_core": 4,
           "starsteel_ore": 1
         },
-        "refine_qi": 60,
+        "refine_qi": 3,
         "opens_top_grade": true
       }
     }
@@ -71503,7 +71503,7 @@
     ],
     "max_stage": 9,
     "stage_progress": 40,
-    "settle_qi": 15,
+    "settle_qi": 3,
     "gains": {
       "craft": 12,
       "meditation": 4,

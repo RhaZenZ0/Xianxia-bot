@@ -52,6 +52,8 @@ class TheLines(unittest.TestCase):
         self.assertEqual(spirit_gain_line({"gain": 14, "progress": 40, "need": 40, "ready": True}),
                          "🌀 Spirit sense **+14** → 40/40 • ready to settle (**/spirit settle**)")
         self.assertEqual(spirit_gain_line(None), "")
+        full = spirit_gain_line({"gain": 0, "progress": 40, "need": 40, "ready": True, "full": True})
+        self.assertIn("/spirit settle", full, "a full stage must say so rather than print nothing")
 
     def test_each_practice_prints_what_it_built(self):
         for rel in ("app/bot/commands/exploration.py", "app/bot/commands/cultivation.py", "app/bot/commands/scene.py"):

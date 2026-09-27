@@ -71,15 +71,18 @@ func flameOpensTopGrade(def worlddata.FlameDefinition, refinement, maxRefinement
 	return def.OpensTopGrade && refinement >= maxRefinement
 }
 
-// flameRefineCost is what the next refinement asks: each listed item and the
-// qi, times the level being reached.
+// flameRefineCost is what the next refinement asks: each listed item times
+// the level being reached, and the qi. The qi is a content number - a share of
+// the reference pool (`qiShare`), which the engine caps at half a dantian - so
+// it stays flat: multiplying it by the step would price every late refinement
+// at that cap, which is what the engine playtest found the first version do.
 func flameRefineCost(def worlddata.FlameDefinition, refinement int64) (map[string]int64, int64) {
 	step := refinement + 1
 	items := map[string]int64{}
 	for id, qty := range def.RefineItems {
 		items[id] = qty * step
 	}
-	return items, def.RefineQi * step
+	return items, def.RefineQi
 }
 
 func sortedFlameIDs(rules worlddata.FlameSystem) []string {
