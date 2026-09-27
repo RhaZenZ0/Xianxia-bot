@@ -24,8 +24,9 @@ from ...rules.creation_ui import (
     selectable_cultivation_styles,
 )
 from ...ops.game_engine import GameEngineError
+from ..cards import Card, CardView, card_view
 from ..channels import _report_game_ui_error, post_server_log
-from ..discovery import LOCATION_DISCOVERY_IMAGES, location_discovery_embed, location_discovery_image_path
+from ..discovery import LOCATION_DISCOVERY_IMAGES, location_discovery_card, location_discovery_image_path
 from ..runtime import DB, ENGINE, GENDER_CHOICES, WORLD, _explain_engine_error, _sync_cultivator_role, current_world_time, log, respond
 from ..threads import ensure_birth_family_household_thread, ensure_expedition_thread
 
@@ -130,7 +131,7 @@ class CharacterModal(discord.ui.Modal):
         theme = location_theme(location)
         style_profile = cultivation_style_profile(normalized_path)
         location_description = str(WORLD.locations.get(location, {}).get("description") or theme.get("mood") or "")
-        embed = discord.Embed(
+        embed = Card(
             title=f"{theme['emoji']} {name} — First Step on the Dao",
             description=origin_vignette(family, normalized_path, normalized_root, self.selected_gender),
             color=int(theme["color"]),
@@ -223,7 +224,7 @@ class CharacterModal(discord.ui.Modal):
             inline=False,
         )
         embed.set_footer(text="The authoritative game engine owns mechanics; AI only narrates validated canonical results.")
-        await respond(interaction, embed=embed, ephemeral=True)
+        await respond(interaction, view=card_view(embed), ephemeral=True)
         # First-sight art applies to every character, regardless of birthplace.
         # A character who starts in an illustrated location discovers it here;
         # everyone else receives the same art only when canonical exploration or
@@ -233,7 +234,7 @@ class CharacterModal(discord.ui.Modal):
             if discovery_art is not None:
                 filename = discovery_art.name
                 await interaction.followup.send(
-                    embed=location_discovery_embed(location, filename=filename),
+                    view=card_view(location_discovery_card(location, filename=filename)),
                     file=discord.File(discovery_art, filename=filename),
                     ephemeral=True,
                 )
@@ -297,7 +298,7 @@ class CharacterModal(discord.ui.Modal):
         )
 
 
-def _birth_family_preview_embed(
+def _birth_family_preview_card(
     family: dict[str, Any],
     *,
     index: int,
@@ -305,7 +306,7 @@ def _birth_family_preview_embed(
     selected_style: str | None = None,
     selected_gender: str | None = None,
     stage: str = "family",
-) -> discord.Embed:
+) -> Card:
     """Render exactly one family card at a time."""
     location = str(family.get("location") or "Unknown")
     theme = location_theme(location)
@@ -317,7 +318,7 @@ def _birth_family_preview_embed(
     root_text = " • ".join(f"**{root}**" for root in tendencies) or "No strong elemental tendency"
     location_description = str(WORLD.locations.get(location, {}).get("description") or theme.get("mood") or "Unknown homeland")
 
-    embed = discord.Embed(
+    embed = Card(
         title=f"{family_emoji(family)} Family {index + 1}/{total} — {family['family_name']}",
         description=(
             f"**{family['name']}**\n"
@@ -381,7 +382,7 @@ class BirthFamilyPreviousButton(discord.ui.Button):
         if not isinstance(view, BirthFamilyView):
             return
         view.current_index = (view.current_index - 1) % len(view.families)
-        await interaction.response.edit_message(embed=view.current_embed(), view=view)
+        await interaction.response.edit_message(view=view.set_card(view.current_card()))
 
 
 class BirthFamilyChooseButton(discord.ui.Button):
@@ -397,7 +398,7 @@ class BirthFamilyChooseButton(discord.ui.Button):
         view.selected_gender = None
         view.stage = "style"
         view.rebuild_components()
-        await interaction.response.edit_message(embed=view.current_embed(), view=view)
+        await interaction.response.edit_message(view=view.set_card(view.current_card()))
 
 
 class BirthFamilyNextButton(discord.ui.Button):
@@ -409,7 +410,7 @@ class BirthFamilyNextButton(discord.ui.Button):
         if not isinstance(view, BirthFamilyView):
             return
         view.current_index = (view.current_index + 1) % len(view.families)
-        await interaction.response.edit_message(embed=view.current_embed(), view=view)
+        await interaction.response.edit_message(view=view.set_card(view.current_card()))
 
 
 class CultivationStyleSelect(discord.ui.Select):
@@ -439,7 +440,7 @@ class CultivationStyleSelect(discord.ui.Select):
             return
         view.selected_style = str(self.values[0])
         view.rebuild_components()
-        await interaction.response.edit_message(embed=view.current_embed(), view=view)
+        await interaction.response.edit_message(view=view.set_card(view.current_card()))
 
 
 class BirthSexSelect(discord.ui.Select):
@@ -457,7 +458,7 @@ class BirthSexSelect(discord.ui.Select):
             return
         view.selected_gender = str(self.values[0])
         view.rebuild_components()
-        await interaction.response.edit_message(embed=view.current_embed(), view=view)
+        await interaction.response.edit_message(view=view.set_card(view.current_card()))
 
 
 class BirthFamilyBackButton(discord.ui.Button):
@@ -475,7 +476,7 @@ class BirthFamilyBackButton(discord.ui.Button):
         view.selected_gender = None
         view.stage = "family"
         view.rebuild_components()
-        await interaction.response.edit_message(embed=view.current_embed(), view=view)
+        await interaction.response.edit_message(view=view.set_card(view.current_card()))
 
 
 class BirthFamilyConfirmButton(discord.ui.Button):
@@ -498,7 +499,7 @@ class BirthFamilyConfirmButton(discord.ui.Button):
         ))
 
 
-class BirthFamilyView(discord.ui.View):
+class BirthFamilyView(CardView):
     def __init__(self, user_id: int, families: list[dict[str, Any]], offer_state_version: int):
         super().__init__(timeout=300)
         self.user_id = int(user_id)
@@ -510,12 +511,13 @@ class BirthFamilyView(discord.ui.View):
         self.selected_gender: str | None = None
         self.stage = "family"
         self.rebuild_components()
+        self.set_card(self.current_card())
 
-    def current_embed(self) -> discord.Embed:
+    def current_card(self) -> Card:
         if not self.families:
-            return discord.Embed(title="No birth families available", color=0xAA0000)
+            return Card(title="No birth families available", color=0xAA0000)
         idx = self.selected_index if self.stage == "style" and self.selected_index is not None else self.current_index
-        return _birth_family_preview_embed(
+        return _birth_family_preview_card(
             self.families[idx],
             index=idx,
             total=len(self.families),

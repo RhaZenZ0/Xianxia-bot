@@ -47,8 +47,8 @@ def raid_card(*args, **kwargs):
         return importlib.import_module("app.bot.commands.boss").raid_card(*args, **kwargs)
 
 
-def _fields(embed):
-    return {field.name: field.value for field in embed.fields}
+def _fields(card):
+    return {name: value for name, value, _inline in card.fields}
 
 
 class TheRaidHasACard(unittest.TestCase):
@@ -79,7 +79,7 @@ class TheRaidHasACard(unittest.TestCase):
     def test_a_won_raid_says_how_to_claim(self):
         embed = raid_card(_encounter(status="victory", boss_hp=0))
         self.assertIn("🏆", embed.title)
-        self.assertIn("/boss claim encounter_id:7", embed.footer.text)
+        self.assertIn("/boss claim encounter_id:7", embed.footer)
         self.assertNotIn("shifts", _fields(embed)["Phase"], "a finished raid does not promise a phase shift")
 
     def test_a_large_party_stays_inside_one_field(self):

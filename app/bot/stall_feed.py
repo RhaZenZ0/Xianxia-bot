@@ -19,6 +19,7 @@ from typing import Any
 
 import discord
 
+from .cards import Card, card_view
 from .channels import _resolve_text_channel, stall_channel, world_of_location
 from .runtime import DB, WORLD, log
 
@@ -35,11 +36,11 @@ def _distance_percent() -> int:
     return int((WORLD.data.get("stall_system") or {}).get("distance_percent_per_hop") or 0)
 
 
-def stall_embed(stall: dict[str, Any]) -> discord.Embed:
+def stall_card(stall: dict[str, Any]) -> Card:
     """The card: the stall, its keeper and city, and everything laid on it."""
     coin = WORLD.currency_name(str(stall.get("currency_id") or "low_spirit_stone"))
     listings = list(stall.get("listings") or [])
-    embed = discord.Embed(
+    embed = Card(
         title=f"\U0001f9fa {stall.get('name') or 'A stall'} — {stall.get('city') or 'somewhere'}",
         colour=0xA5863B,
         description=f"Kept by **{stall.get('owner_name') or 'a cultivator'}** · priced in {coin}",
@@ -80,27 +81,41 @@ async def _keep_card(guild: discord.Guild, stall: dict[str, Any], record: dict[s
         if record is not None:
             await _delete_card(guild, record)
         return
-    embed = stall_embed(stall)
+    card = stall_card(stall)
     key = (guild.id, int(stall["user_id"]))
-    said = embed.to_dict()
+    said = card.text()
+    stale = None
     if record is not None and int(record.get("channel_id") or 0) == channel.id:
         if not force and _LAST_SAID.get(key) == said:
             return
         try:
             message = await channel.fetch_message(int(record["message_id"]))
-            await message.edit(embed=embed)
-            _LAST_SAID[key] = said
-            return
         except discord.HTTPException:
-            pass
+            message = None
+        if message is not None:
+            try:
+                # content and embed cleared: a card posted before v1.9.0 was an
+                # embed, and a Components V2 message may carry neither.
+                await message.edit(content=None, embed=None, view=card_view(card))
+                _LAST_SAID[key] = said
+                return
+            except discord.HTTPException:
+                # An old embed card that would not become a layout is
+                # replaced below and taken down, so a stall keeps one card.
+                stale = message
     elif record is not None:
         await _delete_card(guild, record)
     try:
-        message = await channel.send(embed=embed)
+        message = await channel.send(view=card_view(card))
     except discord.HTTPException:
         log.exception("Could not post the stall card for %s", stall.get("user_id"))
         return
     _LAST_SAID[key] = said
+    if stale is not None:
+        try:
+            await stale.delete()
+        except discord.HTTPException:
+            pass
     await DB.remember_stall_card(guild_id=guild.id, user_id=int(stall["user_id"]), channel_id=channel.id, message_id=message.id)
 
 

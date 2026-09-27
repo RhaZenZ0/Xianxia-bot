@@ -23,6 +23,7 @@ from ...rules.game import World
 from ...ops.game_engine import GameEngineError
 from ...database.remote import RemoteDatabaseError
 from ...rules.worldtime import from_game_minutes
+from ..cards import Card, CardView
 from ..formatting import human_duration
 from ..hubs import HubDynamicOption, panel_timeout, register_hub_option_provider
 from ..pickers import auction_currency_autocomplete
@@ -727,10 +728,10 @@ register_hub_option_provider(admin_closeevent, "event_key", admin_closeevent_hub
 # ---------------------------------------------------------------------------
 # Quest Forge (v0.20.6): draft a quest from a story, approve or discard it.
 # ---------------------------------------------------------------------------
-def _quest_draft_embed(row: dict[str, Any]) -> discord.Embed:
+def _quest_draft_card(row: dict[str, Any]) -> Card:
     status = str(row.get("status", "draft"))
     colour = {"draft": 0xC9A227, "approved": 0x2E8B57, "retired": 0x777777, "discarded": 0x8B2E2E}.get(status, 0x777777)
-    embed = discord.Embed(title=f"📜 {row['title']}", description=str(row.get("description", ""))[:1500], colour=colour)
+    embed = Card(title=f"📜 {row['title']}", description=str(row.get("description", ""))[:1500], colour=colour)
     objectives = "\n".join(
         f"▫️ {obj.get('label', obj.get('id'))} ×{int(obj.get('count', 1))}"
         + (f" — `{obj['target']}`" if obj.get("target") else "")
@@ -760,12 +761,14 @@ def _quest_draft_embed(row: dict[str, Any]) -> discord.Embed:
     return embed
 
 
-class QuestDraftReviewView(discord.ui.View):
+class QuestDraftReviewView(CardView):
     """Approve / Discard for one draft; admin-gated like every /admin surface."""
 
-    def __init__(self, quest_key: str) -> None:
-        super().__init__(timeout=panel_timeout())
-        self.quest_key = quest_key
+    def __init__(self, row: dict[str, Any], *, lead: str = "") -> None:
+        card = _quest_draft_card(row)
+        card.lead = lead
+        super().__init__(card=card, timeout=panel_timeout())
+        self.quest_key = str(row["quest_key"])
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         return await require_admin(interaction)
@@ -778,9 +781,11 @@ class QuestDraftReviewView(discord.ui.View):
         await DB.set_quest_definition_status(self.quest_key, status, reviewed_by=interaction.user.id)
         await QUESTS.catalog(refresh=True)
         await audit_admin(interaction, f"quest.{status}", target=self.quest_key, before={"status": row.get("status")}, after={"status": status})
-        for child in self.children:
-            child.disabled = True
-        await interaction.response.edit_message(content=f"{verb} **{row['title']}** (`{self.quest_key}`).", embed=_quest_draft_embed({**row, "status": status}), view=self)
+        card = _quest_draft_card({**row, "status": status})
+        card.lead = f"{verb} **{row['title']}** (`{self.quest_key}`)."
+        self.set_card(card)
+        self.disable_controls()
+        await interaction.response.edit_message(view=self)
 
     @discord.ui.button(label="Approve — players can accept it", style=discord.ButtonStyle.success)
     async def approve(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
@@ -811,8 +816,10 @@ async def admin_questforge(interaction: discord.Interaction, story: str) -> None
     if result.procedural:
         note = "\n_(The model was unavailable or kept producing an invalid draft" + (f": {result.errors[0]}" if result.errors else "") + "; this is the procedural draft.)_"
     await interaction.followup.send(
-        f"Draft ready. Approve to put it in every cultivator's **/quests**, or discard it.{note}",
-        embed=_quest_draft_embed(row), view=QuestDraftReviewView(row["quest_key"]), ephemeral=False,
+        view=QuestDraftReviewView(
+            row, lead=f"Draft ready. Approve to put it in every cultivator's **/quests**, or discard it.{note}"
+        ),
+        ephemeral=False,
     )
 
 
@@ -853,7 +860,7 @@ async def admin_quests(interaction: discord.Interaction, retire: str = "") -> No
                      "a trade's examination).")
     await interaction.response.send_message("\n".join(lines) or "No approved forged quests.", ephemeral=False)
     for row in drafts[:5]:
-        await interaction.followup.send(embed=_quest_draft_embed(row), view=QuestDraftReviewView(row["quest_key"]), ephemeral=False)
+        await interaction.followup.send(view=QuestDraftReviewView(row), ephemeral=False)
     if len(drafts) > 5:
         await interaction.followup.send(f"…and {len(drafts) - 5} more drafts; review these first and run the command again.", ephemeral=False)
 

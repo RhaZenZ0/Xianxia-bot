@@ -20,6 +20,7 @@ from ...rules.fate import fate_label
 from ...ops.game_engine import GameEngineError
 from ...simulation import MINUTES_PER_DAY
 from ...rules.worldtime import MINUTES_PER_YEAR
+from ..cards import Card, CardView, card_view
 from ..channels import configured_begin_channel
 from ..character_state import current_effect_modifiers
 from ..formatting import human_duration, player_property_emoji, player_property_facility_lines
@@ -93,11 +94,7 @@ async def begin(interaction: discord.Interaction) -> None:
         await interaction.response.send_message("No canonical birth families are available. Try **/begin** again.", ephemeral=True)
         return
     view = BirthFamilyView(interaction.user.id, families, int(offer_envelope.get("state_version", 0)))
-    await interaction.response.send_message(
-        embed=view.current_embed(),
-        view=view,
-        ephemeral=True,
-    )
+    await interaction.response.send_message(view=view, ephemeral=True)
 
 
 @registered_root_command(name="sheet", description="View your cultivation character", guild=GUILD)
@@ -123,7 +120,7 @@ async def sheet(interaction: discord.Interaction) -> None:
     a = c["attributes"]
     wt = await current_world_time()
     life = await authoritative_lifespan(interaction.user.id)
-    embed = discord.Embed(title=f"{c['name']} — {realm}", description=c["concept"][:4096])
+    embed = Card(title=f"{c['name']} — {realm}", description=c["concept"][:4096])
     embed.add_field(
         name="Qi Cultivation",
         value=f"**{realm} • Stage {c['phase']}**\nEssence {c['cultivation']} / {cost}",
@@ -300,20 +297,20 @@ async def sheet(interaction: discord.Interaction) -> None:
         inline=False,
     )
     embed.set_footer(text=f"Origin: {c['origin']}")
-    await interaction.response.send_message(embed=embed)
+    await interaction.response.send_message(view=card_view(embed))
 
 
-async def _player_dashboard_embed(user_id: int, *, guild_id: int | None, page: str = "overview") -> discord.Embed:
+async def _player_dashboard_card(user_id: int, *, guild_id: int | None, page: str = "overview") -> Card:
     c = await DB.get_character(int(user_id))
     if not c:
-        return discord.Embed(title="🧑 Cultivator Dashboard", description="No character exists yet. Use `/begin`.")
+        return Card(title="🧑 Cultivator Dashboard", description="No character exists yet. Use `/begin`.")
     scene = await SCENES.current(int(user_id), guild_id=guild_id)
     membership = await DB.get_sect_membership(int(user_id))
     abode = await DB.get_abode(int(user_id))
     sect_abode = await DB.get_sect_abode(int(user_id))
     active_quests = await DB.list_character_quests(int(user_id), status="active")
     realm = WORLD.realm_name(int(c.get("realm_index", 0)), c.get("gender"))
-    embed = discord.Embed(title=f"🧑 {c['name']} — Player Dashboard", description=f"**{realm} • Stage {c.get('phase',1)}**")
+    embed = Card(title=f"🧑 {c['name']} — Player Dashboard", description=f"**{realm} • Stage {c.get('phase',1)}**")
 
     if page == "scene":
         if scene:
@@ -368,7 +365,7 @@ async def _player_dashboard_embed(user_id: int, *, guild_id: int | None, page: s
     return embed
 
 
-class PlayerDashboardView(discord.ui.View):
+class PlayerDashboardView(CardView):
     def __init__(self, user_id: int, guild_id: int | None) -> None:
         super().__init__(timeout=300)
         self.user_id = int(user_id)
@@ -381,7 +378,8 @@ class PlayerDashboardView(discord.ui.View):
         return True
 
     async def _show(self, interaction: discord.Interaction, page: str) -> None:
-        await interaction.response.edit_message(embed=await _player_dashboard_embed(self.user_id, guild_id=self.guild_id, page=page), view=self)
+        self.set_card(await _player_dashboard_card(self.user_id, guild_id=self.guild_id, page=page))
+        await interaction.response.edit_message(view=self)
 
     @discord.ui.button(label="Overview", emoji="🧑", style=discord.ButtonStyle.primary)
     async def overview(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
@@ -406,11 +404,8 @@ async def player_dashboard(interaction: discord.Interaction) -> None:
     if not c:
         return
     view = PlayerDashboardView(interaction.user.id, interaction.guild_id)
-    await interaction.response.send_message(
-        embed=await _player_dashboard_embed(interaction.user.id, guild_id=interaction.guild_id),
-        view=view,
-        ephemeral=False,
-    )
+    view.set_card(await _player_dashboard_card(interaction.user.id, guild_id=interaction.guild_id))
+    await interaction.response.send_message(view=view, ephemeral=False)
 
 
 class QuestAcceptSelect(discord.ui.Select):

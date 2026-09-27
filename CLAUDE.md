@@ -5512,6 +5512,36 @@ bot), what an entry is called, and the page's path. `test_release_pages.py` buil
 real changelog and holds a page to exist at every link the bot can post. The builder escapes before
 it renders the Markdown subset, so an entry cannot put markup on the site.
 
+### Every card is a layout (`app/bot/cards.py`, v1.9.0)
+
+The hubs moved to Components V2 in v0.19.5 and every card stayed a classic embed, so the bot drew
+two looks side by side. A card is written as an embed was - `Card` keeps `discord.Embed`'s
+constructor, `add_field`, `set_footer`, `set_thumbnail`, `set_image` - and draws itself as a
+`Container`: the title and description, the fields under bold headings, the footer small, the
+buttons in rows beneath. `CardView` is a `LayoutView` that takes a view written the classic way
+(`@discord.ui.button`, `add_item` with `row=`, `clear_items`), so each view moved by changing its
+base class; its buttons are `view.controls`, because `view.children` is the layout discord.py
+itself walks, and the persistent event and exploration panels stamp their ids over `controls`.
+
+**A V2 message carries no content and no embeds**, which is the rule every site had to meet.
+Text that used to ride beside a card goes into it (`fold_content`, drawn above the title), and an
+edit that turns an old embed message into a card clears both (`content=None, embed=None`). The
+auction and stall feeds edit cards posted before this release, and if Discord ever refuses the
+conversion they post the card again and take the old one down, so a lot or a stall keeps one card.
+
+**The hub was dropping every view it was handed.** `_layout_result_send` popped `view` from what
+it sent beside the panel, on the reasoning that it could only be the panel's duplicate - so a
+battle panel opened from a hub arrived with no buttons, and a card, being a view, would have
+arrived as "✅ Done.". It keeps a V2 view that is not the hub's own now. Mentions ping inside a
+text display where they never did inside an embed, so the raid card is sent with
+`AllowedMentions.none()`.
+
+`test_every_card_is_a_layout.py` forbids a `discord.Embed` or an `embed=` send anywhere in
+`app/bot` except the two classic fallbacks - the classic hub and the classic Scene Action panel,
+built only when discord.py lacks Components V2, which the pinned 2.7.1 never does. It walks scopes
+by AST, holds that every allowed fallback is still there, and asserts it can find one before it
+trusts an empty answer.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

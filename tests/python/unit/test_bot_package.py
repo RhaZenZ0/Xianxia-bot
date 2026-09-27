@@ -359,7 +359,7 @@ def _module_level_relative_imports(path):
 # noted (command modules read each other: law -> battle, exploration -> sect;
 # inspect_sim reads world_ops). The graph is also required to be acyclic.
 TIERS = (
-    ("registry.py", "scene_layout.py", "typed_play_router.py", "maintenance.py", "seclusion.py", "usage.py"),
+    ("registry.py", "scene_layout.py", "cards.py", "typed_play_router.py", "maintenance.py", "seclusion.py", "usage.py"),
     ("runtime.py", "hubs.py"),
     ("services.py", "typed_play.py"),
     ("formatting.py", "locations.py", "pickers.py"),
@@ -562,7 +562,7 @@ OWNERS = {
     "locations.py": ("current_npc_location", "_world_min_realm_index", "_world_is_unlocked", "_known_locations",
                      "_location_is_visible", "location_autocomplete", "local_npc_autocomplete"),
     "pickers.py": ("auction_currency_autocomplete", "_market_item_matches", "usable_item_autocomplete"),
-    "discovery.py": ("LOCATION_DISCOVERY_IMAGES", "location_discovery_image_path", "location_discovery_embed",
+    "discovery.py": ("LOCATION_DISCOVERY_IMAGES", "location_discovery_image_path", "location_discovery_card",
                      "send_location_discovery_image", "travel_first_discovers_location"),
     "character_state.py": ("current_effect_modifiers",
                            "_npc_name_mentioned", "_remember_freeform_npc_scene"),
@@ -584,7 +584,7 @@ OWNERS = {
                           "EventNpcSelect", "EventNpcSelectView", "EventSystemsSelect", "EventSystemsView",
                           "EventSceneView", "_event_scene_location", "_event_scene_profile", "spawn_event_thread",
                           "spawn_system_event_thread"),
-    "ui/creation.py": ("CharacterModal", "_birth_family_preview_embed", "BirthFamilyPreviousButton",
+    "ui/creation.py": ("CharacterModal", "_birth_family_preview_card", "BirthFamilyPreviousButton",
                        "BirthFamilyChooseButton", "BirthFamilyNextButton", "CultivationStyleSelect", "BirthSexSelect",
                        "BirthFamilyBackButton", "BirthFamilyConfirmButton", "BirthFamilyView"),
     "bot.py": ("XianxiaBot", "bot"),

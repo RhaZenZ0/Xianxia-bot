@@ -460,6 +460,23 @@ class ResultsInThePanelTests(unittest.TestCase):
         self.assertEqual(calls["edit_original"], [])
         self.assertEqual(hub_view.last_result, "")
 
+    def test_a_card_goes_beside_the_panel_with_its_own_view(self):
+        """v1.9.0: a card is a Components V2 view. This path used to drop every
+        view it was handed as the panel's duplicate, which for a card is the
+        card itself - the sheet would have arrived as "✅ Done." - and a V2
+        message carries no content, so text sent with it goes into the card."""
+        hubs, source, hub_view, calls = self._fixtures(source_is_panel=True)
+        from app.bot.cards import Card, card_view  # after _hubs(), which imports the package under a test environment
+
+        card = card_view(Card(title="Sheet"))
+        self._run(hubs._layout_result_send(source, "Your sheet:", {"view": card}, hub_view))
+        self.assertEqual(len(calls["followup"]), 1)
+        content, kwargs = calls["followup"][0]
+        self.assertIsNone(content, "a Components V2 message may not carry content")
+        self.assertIs(kwargs.get("view"), card, "the card was dropped instead of sent")
+        self.assertIn("Your sheet:", card.card.lead)
+        self.assertEqual(calls["edit_original"], [])
+
     def test_the_panel_renders_the_result_block_and_refresh_clears_it(self):
         # `##`: one step above the page block below it, so the answer the
         # player asked for does not read as a peer of the action menu.

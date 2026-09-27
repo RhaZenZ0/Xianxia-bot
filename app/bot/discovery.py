@@ -11,6 +11,7 @@ from typing import Any
 
 import discord
 
+from .cards import Card, card_view
 from .runtime import ROOT, WORLD, log
 
 # Optional landmark art shown exactly when a character first reaches/discovers
@@ -26,9 +27,9 @@ def location_discovery_image_path(location: str) -> Path | None:
     return path if path is not None and path.is_file() else None
 
 
-def location_discovery_embed(location: str, *, filename: str) -> discord.Embed:
+def location_discovery_card(location: str, *, filename: str) -> Card:
     world_name = str((WORLD.locations.get(str(location)) or {}).get("world") or "Mortal World")
-    embed = discord.Embed(
+    card = Card(
         title=f"🏙️ First Sight — {location}",
         description=(
             f"For the first time, **{location}** opens before you — the central city of the **{world_name}**."
@@ -36,8 +37,8 @@ def location_discovery_embed(location: str, *, filename: str) -> discord.Embed:
             else f"For the first time, **{location}** opens before you."
         ),
     )
-    embed.set_image(url=f"attachment://{filename}")
-    return embed
+    card.set_image(url=f"attachment://{filename}")
+    return card
 
 
 async def send_location_discovery_image(
@@ -57,14 +58,14 @@ async def send_location_discovery_image(
         return False
     filename = path.name
     file = discord.File(path, filename=filename)
-    embed = location_discovery_embed(location, filename=filename)
+    view = card_view(location_discovery_card(location, filename=filename))
     try:
         if thread is not None:
-            await thread.send(embed=embed, file=file)
+            await thread.send(view=view, file=file)
         elif interaction.response.is_done():
-            await interaction.followup.send(embed=embed, file=file, ephemeral=False)
+            await interaction.followup.send(view=view, file=file, ephemeral=False)
         else:
-            await interaction.response.send_message(embed=embed, file=file, ephemeral=False)
+            await interaction.response.send_message(view=view, file=file, ephemeral=False)
         return True
     except discord.HTTPException:
         log.exception("Could not send discovery image for %s", location)

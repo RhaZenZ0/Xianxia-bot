@@ -19,6 +19,7 @@ from ...ai.narrator import roll_npc_memory
 from ...rules import commissions as commission_rules
 from ...rules.npc_memory import classify_memory, exchange_memory_summary, public_mood_hint
 from .. import scene_layout
+from ..cards import Card, card_view
 from ..character_state import record_quest_progress, announce_quest_progress, current_effect_modifiers
 from ..formatting import roll_line
 from ..locations import DEAD, _location_is_visible, current_npc_location, local_npc_autocomplete, npcs_present
@@ -473,7 +474,7 @@ async def _resolve_scene_action(
         card_colour = 0xED4245
         result_text = roll_line(result)
         result_footer = "Canonical roll resolved by game rules • AI narration cannot change mechanics"
-    embed = discord.Embed(
+    embed = Card(
         title=f"{profile['emoji']} {profile['label']} → {target}"[:256],
         description=narration[:4096],
         color=card_colour,
@@ -483,7 +484,7 @@ async def _resolve_scene_action(
     embed.add_field(name="🎯 Target", value=f"**{target[:180]}**", inline=True)
     embed.add_field(name="📝 Attempt", value=detail[:1024], inline=False)
     embed.set_footer(text=result_footer)
-    await interaction.followup.send(embed=embed, ephemeral=False)
+    await interaction.followup.send(view=card_view(embed), ephemeral=False)
 
 
 class SceneActionDetailModal(discord.ui.Modal):

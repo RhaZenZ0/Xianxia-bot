@@ -11,6 +11,7 @@ from discord import app_commands
 from ...rules.advanced_runtime import BOSS_TEMPLATES, boss_encounter_phase, boss_lair
 from ...rules.battle import vitality_bar
 from ...ops.game_engine import GameEngineError
+from ..cards import Card, card_view
 from ..hubs import register_hub_option_hint
 from ..registry import registered_group_command
 from ..runtime import (
@@ -49,7 +50,7 @@ def _mention_participants(text: str, participants: list[dict[str, Any]]) -> str:
     return text
 
 
-def raid_card(encounter: dict[str, Any], *, events: list[str] | None = None, note: str = "") -> discord.Embed:
+def raid_card(encounter: dict[str, Any], *, events: list[str] | None = None, note: str = "") -> Card:
     """The raid drawn as one card (v1.8.3): the boss's health, its phase,
     the round, and every raider's vitality and whether they have acted.
 
@@ -73,7 +74,7 @@ def raid_card(encounter: dict[str, Any], *, events: list[str] | None = None, not
                 "defeat": "The party has fallen. The boss keeps its lair.",
             }.get(status, "Each raider acts once a round; the boss answers when the whole party has acted.")
         )
-    embed = discord.Embed(
+    embed = Card(
         title=f"{_RAID_TITLES.get(status, '👹')} Raid #{encounter.get('encounter_id')} — {encounter.get('boss_name', 'Boss')}",
         description="\n".join(f"• {line}" if events else line for line in lines)[:4000],
         colour=_RAID_COLOURS.get(status, _RAID_COLOURS["active"]),
@@ -126,11 +127,14 @@ def raid_card(encounter: dict[str, Any], *, events: list[str] | None = None, not
     return embed
 
 
-async def _send_raid_card(interaction: discord.Interaction, embed: discord.Embed) -> None:
+async def _send_raid_card(interaction: discord.Interaction, card: Card) -> None:
+    # The party is named by mention; in an embed a mention never pinged, and
+    # in a text display it would, so the card says who without calling them.
+    quiet = discord.AllowedMentions.none()
     if interaction.response.is_done():
-        await interaction.followup.send(embed=embed, ephemeral=False)
+        await interaction.followup.send(view=card_view(card), allowed_mentions=quiet, ephemeral=False)
     else:
-        await interaction.response.send_message(embed=embed, ephemeral=False)
+        await interaction.response.send_message(view=card_view(card), allowed_mentions=quiet, ephemeral=False)
 
 
 async def law_technique_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
