@@ -14,7 +14,7 @@ import discord
 from discord import app_commands
 
 from ...rules import commissions as commission_rules
-from ...rules.advanced_runtime import describe_equipment, describe_era
+from ...rules.advanced_runtime import describe_equipment, describe_era, equipment_passive_line
 from ...rules.birthfamily import family_tier_name, karma_description, karma_label
 from ...rules.fate import fate_label
 from ...ops.game_engine import GameEngineError
@@ -538,6 +538,9 @@ async def inventory(interaction: discord.Interaction) -> None:
             gear = describe_equipment(item_id, ladder=WORLD.item_grades)
             if gear:
                 lines.append(f"  {gear}")
+            passive = equipment_passive_line(item_id)
+            if passive:
+                lines.append(f"  {passive}")
         text = "\n".join(lines)
     await reply_long(
         interaction,

@@ -85,14 +85,19 @@ class PlayerFacingTextTests(unittest.TestCase):
     def test_equipment_status_shows_indestructible_instead_of_a_durability_fraction(self):
         # Since v1.7.5 the card draws each piece through describe_equipment, so
         # the rule is held on what that line says rather than on its spelling.
-        from app.rules.advanced_runtime import describe_equipment
+        # Since v1.9.1 through describe_equipment_in_full, which also says what
+        # the passive does - "how do I see the description of Heavenly
+        # Flawfinder?" was asked in play, and the card only named it.
+        from app.rules.advanced_runtime import describe_equipment, describe_equipment_in_full
 
         status = bot_function_source("equipment_status")
-        self.assertIn("describe_equipment(", status)
+        self.assertIn("describe_equipment_in_full(", status)
         line = describe_equipment("bugslayer_sword", quality=100, durability=100, max_durability=100)
         self.assertIn("indestructible", line)
         self.assertNotIn("durability", line)
         self.assertIn("Heavenly Flawfinder", line)
+        full = describe_equipment_in_full("bugslayer_sword", quality=100, durability=100, max_durability=100)
+        self.assertIn("+2 bonus damage", full, "the card names the passive without saying what it does")
 
     def test_battle_narration_reports_the_passive_and_does_not_misattribute_it(self):
         main = bot_package_source()

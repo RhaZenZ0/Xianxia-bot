@@ -1160,6 +1160,9 @@ func combatFinalizeAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 				if took {
 					contribution += node.Contribution
 					detail = "Killed " + node.Name + " during " + eventKey + "."
+					if deed := eventSiteClearedKarmaTx(conn, userID, eventKey, now); deed != nil {
+						out["deed_karma"] = deed
+					}
 					reward := canonicalReward{Cultivation: node.Cultivation, SpiritStones: node.SpiritStones, Items: map[string]int64{}}
 					if node.ItemID != "" && node.ItemQty > 0 {
 						reward.Items[node.ItemID] = node.ItemQty

@@ -2,10 +2,12 @@ package game
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"strings"
 	"testing"
 
+	"xianxia/core/internal/gamerng"
 	"xianxia/core/internal/storage"
 )
 
@@ -206,5 +208,120 @@ func TestAClearedRaidClosesItsSoloParty(t *testing.T) {
 	}
 	if st := actionScalar(t, path, `SELECT status FROM parties WHERE leader_user_id=42`); st != "disbanded" {
 		t.Fatalf("the party made for a cleared raid is %v, want disbanded", st)
+	}
+}
+
+// A miss says it missed (v1.9.1). It used to read "Attack deals 0 damage.",
+// reported from play as "sometimes I do 0 damage": a hit always deals at least
+// 1, so a zero was only ever a miss nobody was told about. The roll is a
+// stable hash of the encounter, round, raider, style and version, so the test
+// picks the version whose roll lands where it needs it - no dice are borrowed.
+func bossStrikeAt(t *testing.T, agility int64, wantHit bool) (map[string]any, int64) {
+	t.Helper()
+	return bossStrikeWith(t, setupSoloRaidDB(t), agility, wantHit, "attack", "")
+}
+
+func bossStrikeWith(t *testing.T, path string, agility int64, wantHit bool, style, manualTechnique string) (map[string]any, int64) {
+	t.Helper()
+	out, err := soloBoarStart(t, path, 42)
+	if err != nil {
+		t.Fatalf("the raid did not start: %v", err)
+	}
+	encounterID := i64(out["encounter_id"])
+	batch4Exec(t, path, fmt.Sprintf(`UPDATE characters SET attributes_json='{"body":3,"spirit":3,"agility":%d}' WHERE user_id=42`, agility))
+	chance := clamp(65+agility*2-bossTemplatesGo["iron_tusk_boar_king"].Phases[0].Defense*2, 15, 95)
+	version := int64(-1)
+	for v := int64(0); v < 500; v++ {
+		if (stablePercentGo(encounterID, int64(1), int64(42), style, v) < chance) == wantHit {
+			version = v
+			break
+		}
+	}
+	if version < 0 {
+		t.Fatalf("no version in 500 gives a roll that hit=%v at %d%%", wantHit, chance)
+	}
+	batch4Exec(t, path, fmt.Sprintf(`UPDATE boss_encounters SET version=%d`, version))
+	before := i64(actionScalar(t, path, `SELECT boss_hp FROM boss_encounters`))
+	raw, _ := json.Marshal(map[string]any{"encounter_id": encounterID, "style": style, "manual_technique": manualTechnique, "version": version})
+	var acted map[string]any
+	if err := crossingApply(t, path, func(conn *storage.Conn) error {
+		m, err := bossActActionGo(conn, crossingCatalog(t), 42, raw)
+		acted, _ = m.Result.(map[string]any)
+		return err
+	}); err != nil {
+		t.Fatalf("the blow was refused: %v", err)
+	}
+	return acted, before - i64(actionScalar(t, path, `SELECT boss_hp FROM boss_encounters`))
+}
+
+func TestAMissSaysItMissed(t *testing.T) {
+	acted, lost := bossStrikeAt(t, -100, false)
+	events := fmt.Sprint(acted["events"])
+	if !strings.Contains(events, "Attack misses - a 15% chance to hit.") {
+		t.Fatalf("a miss did not say so: %v", events)
+	}
+	if strings.Contains(events, "deals 0 damage") {
+		t.Fatalf("a miss still reads as a hit for nothing: %v", events)
+	}
+	if acted["action_hit"] != false || i64(acted["hit_chance"]) != 15 || i64(acted["action_damage"]) != 0 || lost != 0 {
+		t.Fatalf("a miss reported hit=%v chance=%v damage=%v and the boss lost %d", acted["action_hit"], acted["hit_chance"], acted["action_damage"], lost)
+	}
+}
+
+func TestAHitStillSaysWhatItDealt(t *testing.T) {
+	// The hit is a stable hash the helper picks; the dice are lent because the
+	// action can reach a draw the gate cannot tell it never takes here.
+	defer gamerng.UseRoller(func(n int) int { return 0 })()
+	acted, lost := bossStrikeAt(t, 100, true)
+	damage := i64(acted["action_damage"])
+	if acted["action_hit"] != true || damage < 1 || lost != damage {
+		t.Fatalf("a hit reported hit=%v damage=%d and the boss lost %d", acted["action_hit"], damage, lost)
+	}
+	if want := fmt.Sprintf("Attack deals %d damage.", damage); !strings.Contains(fmt.Sprint(acted["events"]), want) {
+		t.Fatalf("a hit did not say %q: %v", want, acted["events"])
+	}
+}
+
+// A manual's technique is fought with in a raid too (v1.9.1). The raid's
+// Technique button offered Law techniques only, so a cultivator whose art was
+// a manual had nothing to press - reported from play as "I can't use my manual
+// techniques". It is paid for as in a battle and deals its damage plus mastery
+// in place of an attack's 1. The shipped catalogue's Low Flame (damage 4, qi 2)
+// at mastery 2 is +6; an attack at the same fixture never deals more than 7.
+func TestAManualTechniqueStrikesInARaid(t *testing.T) {
+	defer gamerng.UseRoller(func(n int) int { return 0 })()
+	path := setupSoloRaidDB(t)
+	batch4Exec(t, path, `INSERT INTO character_manuals(user_id,manual_id,mastery,practice,learned_at,updated_at) VALUES(42,'one_in_ten_furnace_record',2,0,0,0)`)
+	acted, lost := bossStrikeWith(t, path, 100, true, "technique", "one_in_ten_furnace_record_low_flame")
+	damage := i64(acted["action_damage"])
+	if damage < 8 || lost != damage {
+		t.Fatalf("Low Flame at mastery 2 dealt %d (the boss lost %d); an attack deals at most 7 here", damage, lost)
+	}
+	if events := fmt.Sprint(acted["events"]); !strings.Contains(events, "Low Flame costs") {
+		t.Fatalf("the raid did not say what the technique cost: %v", events)
+	}
+	// settleQi refills the pool off the qi body before the cost is taken, so
+	// the cost is read off what the raid said rather than off a before/after.
+	if events := fmt.Sprint(acted["events"]); strings.Contains(events, "costs 0 Qi") {
+		t.Fatalf("the technique cost no qi: %v", events)
+	}
+	if practice := i64(actionScalar(t, path, `SELECT practice FROM character_manuals WHERE user_id=42`)); practice < 1 {
+		t.Fatalf("using the technique did not practise its manual")
+	}
+}
+
+func TestAManualTechniqueNotStudiedIsRefusedInARaid(t *testing.T) {
+	path := setupSoloRaidDB(t)
+	out, err := soloBoarStart(t, path, 42)
+	if err != nil {
+		t.Fatalf("the raid did not start: %v", err)
+	}
+	raw, _ := json.Marshal(map[string]any{"encounter_id": out["encounter_id"], "style": "technique", "manual_technique": "one_in_ten_furnace_record_low_flame"})
+	err = crossingApply(t, path, func(conn *storage.Conn) error {
+		_, err := bossActActionGo(conn, crossingCatalog(t), 42, raw)
+		return err
+	})
+	if err == nil || !strings.Contains(err.Error(), "mastery is insufficient") {
+		t.Fatalf("a manual never studied was usable in a raid: %v", err)
 	}
 }

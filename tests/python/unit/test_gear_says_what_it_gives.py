@@ -139,7 +139,8 @@ def _calls(path, function: str) -> set[str]:
 
 class EverySurfaceSaysIt(unittest.TestCase):
     SITES = (
-        ("equipment.py", "equipment_status", "describe_equipment"),
+        # v1.9.1: the card also prints the item's description and its passive.
+        ("equipment.py", "equipment_status", "describe_equipment_in_full"),
         ("equipment.py", "_equipment_option", "describe_equipment"),
         ("equipment.py", "equipment_bind_hub_options", "describe_equipment"),
         ("character.py", "inventory", "describe_equipment"),

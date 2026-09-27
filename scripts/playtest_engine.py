@@ -2512,6 +2512,62 @@ async def run(url: str, token: str, db_path: str) -> Report:
     await step(report, "the realm the earlier sections left", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": realm_before[0], "phase": realm_before[1], "reason": "playtest"}))
     await step(report, "home to the town", gm("admin.player.teleport", {"user_id": PLAYER, "location": town, "reason": "playtest"}))
 
+    # ---- 20z. flames (v1.10.0) -------------------------------------------------
+    # A flame is captured at its world's forge terraces on a real roll, so the
+    # capture is driven and its outcome reported, never asserted. What follows
+    # must not hang on that roll, so the GM's grant lever gives the flame -
+    # which is also the audited lever being proved - and refine, bind and the
+    # status read are then certain. The heavenly flame, granted fully refined,
+    # is what the status must say opens Transcendent.
+    await step(report, "stand at Foundation Establishment for a flame", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 2, "phase": 1, "reason": "playtest: a flame asks for it"}))
+    await step(report, "to the Emberforge forge terraces", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Emberforge Forge Terraces", "reason": "playtest"}))
+    captured = await step(report, "flame.capture at the terraces (a roll: taken or burned)", act_free("flame.capture", PLAYER, {}))
+    if captured is not None:
+        report.add("PASS", "the capture, for the record",
+                   f"{captured.get('name')}: {'taken' if captured.get('success') else 'got away and burned the meridians'}")
+    await audited("admin.player.grant_flame", {"user_id": PLAYER, "flame_id": "earth_heart_fire", "refinement": 0, "reason": "playtest"})
+    await step(report, "grant the refinement's makings", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": "beast_core", "quantity": 5, "reason": "playtest"}))
+    await step(report, "grant the refinement's ore", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": "spirit_iron", "quantity": 5, "reason": "playtest"}))
+    await audited("admin.player.revive", {"user_id": PLAYER, "reason": "playtest: a full qi pool to refine with"})
+    refined = await step(report, "flame.refine the Earth-Heart Fire", act("flame.refine", PLAYER, {"flame_id": "earth_heart_fire"}))
+    if refined is not None:
+        report.add("PASS" if int(refined.get("refinement") or 0) == 1 else "FAIL", "refining raised it to 1", str(refined.get("refinement")))
+    await audited("admin.player.grant_flame", {"user_id": PLAYER, "flame_id": "nine_heavens_sun_flame", "refinement": 9, "reason": "playtest"})
+    bound = await step(report, "flame.bind the Nine-Heavens Sun Flame", act("flame.bind", PLAYER, {"flame_id": "nine_heavens_sun_flame"}))
+    if bound is not None:
+        report.add("PASS" if bound.get("flame_id") == "nine_heavens_sun_flame" else "FAIL", "the heavenly flame is the bound one", str(bound))
+    flames = await step(report, "flame.status", query("flame.status", PLAYER, {}))
+    if flames is not None:
+        sun = next((f for f in flames.get("flames") or [] if f.get("flame_id") == "nine_heavens_sun_flame"), {})
+        report.add("PASS" if sun.get("bound") and sun.get("opens_now") else "FAIL",
+                   "the fully refined heavenly flame is bound and opens Transcendent", str(sun))
+    await step(report, "back to the town", gm("admin.player.teleport", {"user_id": PLAYER, "location": town, "reason": "playtest"}))
+    await step(report, "flame.capture from the town is refused", act_free("flame.capture", PLAYER, {}), expect_error="no flame burns here")
+    # The spirit sense (v1.10.0): built by practice, never captured. A
+    # meditation must build it; a full stage is staged with the GM's lever
+    # (audited) and settled, and a fully built sense must say it opens
+    # Transcendent for Formation and Inscription.
+    sense_before = await step(report, "spirit_sense.status before", query("spirit_sense.status", PLAYER, {}))
+    meditated = await step(report, "a meditation builds the spirit sense", act_free("cultivation.train", PLAYER, {}))
+    if meditated is not None:
+        gained = dict(meditated.get("spirit_sense_gain") or {})
+        # Earlier sections craft and act in scenes, so the first stage may
+        # already be full: then the meditation must say so rather than build.
+        report.add("PASS" if int(gained.get("gain") or 0) > 0 or gained.get("full") else "FAIL",
+                   "the meditation reported spirit-sense progress, or that the stage is full", str(gained))
+    await audited("admin.player.set_spirit_sense", {"user_id": PLAYER, "stage": 0, "progress": 40, "reason": "playtest: a full first stage"})
+    await audited("admin.player.revive", {"user_id": PLAYER, "reason": "playtest: a full qi pool to settle with"})
+    settled = await step(report, "spirit_sense.settle a full stage", act("spirit_sense.settle", PLAYER, {}))
+    if settled is not None:
+        report.add("PASS" if int(settled.get("stage") or 0) == 1 else "FAIL", "settling raised the sense to stage 1", str(settled))
+    await step(report, "spirit_sense.settle an empty stage is refused", act("spirit_sense.settle", PLAYER, {}), expect_error="toward its next stage")
+    await audited("admin.player.set_spirit_sense", {"user_id": PLAYER, "stage": 9, "progress": 0, "reason": "playtest: fully built"})
+    sense = await step(report, "spirit_sense.status fully built", query("spirit_sense.status", PLAYER, {}))
+    if sense is not None:
+        report.add("PASS" if sense.get("opens_now") and int(sense.get("bonus") or 0) == 5 else "FAIL",
+                   "a fully built sense gives +5 and opens Transcendent", str(sense))
+    await step(report, "the realm the earlier sections left, again", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": realm_before[0], "phase": realm_before[1], "reason": "playtest"}))
+
     # ---- 21. samsara, and what the hands remember (v1.0.0-rc.32) -------------
     # Last, because it ends the character. The trades this life practised go
     # into its record before the wipe, and a fresh rebirth remembers nothing

@@ -261,26 +261,130 @@ func applyForbiddenWorldTx(conn *storage.Conn, catalog worlddata.Catalog, userID
 	return impacts, e
 }
 
+// manualTechniqueFor is the one statement of whether a cultivator may use a
+// manual's technique at all: the technique and its manual are in the catalogue
+// and the manual is studied to the technique's mastery. The battle and the raid
+// both ask it (v1.9.1), before either spends anything.
+func manualTechniqueFor(conn *storage.Conn, catalog worlddata.Catalog, userID int64, techID string) (worlddata.ManualTechniqueDefinition, worlddata.ManualDefinition, int64, error) {
+	t, ok := catalog.TechniqueSystem.Techniques[techID]
+	if !ok {
+		return t, worlddata.ManualDefinition{}, 0, errors.New("unknown manual technique")
+	}
+	m, ok := catalog.TechniqueSystem.Manuals[t.Manual]
+	if !ok {
+		return t, m, 0, errors.New("technique manual is missing")
+	}
+	mr, e := manualRow(conn, userID, t.Manual)
+	if e != nil {
+		return t, m, 0, e
+	}
+	if mr == nil || i64(mr["mastery"]) < t.MinMastery {
+		return t, m, 0, errors.New("manual mastery is insufficient")
+	}
+	return t, m, i64(mr["mastery"]), nil
+}
+
+// manualTechniqueUse is what spending a manual technique cost and set off,
+// whichever fight it was used in.
+type manualTechniqueUse struct {
+	QiCost    int64
+	Forbidden bool
+	Karma     int64
+	Exposure  int64
+	Witnessed bool
+	Crime     map[string]any
+	Impacts   []string
+}
+
+// spendManualTechniqueTx pays for one use of a manual technique and answers
+// for it: the qi (scaled by the qi body) and vitality it costs, a point of
+// practice on the manual, and - for a forbidden art - the karma, the witnesses,
+// the crime and the world's reaction at `location`. What the technique does to
+// an opponent is the caller's, because a battle and a raid hold their
+// opponents in different tables (v1.9.1).
+func spendManualTechniqueTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, techID string, t worlddata.ManualTechniqueDefinition, m worlddata.ManualDefinition, gameMinute int64, location string) (manualTechniqueUse, error) {
+	use := manualTechniqueUse{Impacts: []string{}}
+	cr, e := conn.Execute(`SELECT qi,vitality,vitality_max,karma_score,concealment_active FROM characters WHERE user_id=?`, []any{userID})
+	if e != nil {
+		return use, e
+	}
+	ch := firstRowMap(cr)
+	if ch == nil {
+		return use, errors.New("character not found")
+	}
+	// The qi body (v1.0.0-rc.7): the content's qi cost is a base, scaled into
+	// this cultivator's own pool and by the purity of what they hold.
+	now := float64(time.Now().UnixNano()) / 1e9
+	state, e := settleQi(conn, catalog, userID, gameMinute, now)
+	if e != nil {
+		return use, e
+	}
+	use.QiCost = state.Cost(t.QiCost)
+	if state.Qi < use.QiCost || i64(ch["vitality"])-t.VitalityCost < 1 {
+		return use, fmt.Errorf("insufficient Qi or Vitality: %d qi required, %d held", use.QiCost, state.Qi)
+	}
+	if _, e = conn.Execute(`UPDATE characters SET qi=qi-?,vitality=vitality-?,updated_at=? WHERE user_id=?`, []any{use.QiCost, t.VitalityCost, now, userID}); e != nil {
+		return use, e
+	}
+	if _, e = practiceManualTx(conn, userID, t.Manual, 1, now); e != nil {
+		return use, e
+	}
+	use.Forbidden = techniqueForbidden(t, m)
+	use.Karma = i64(ch["karma_score"])
+	use.Exposure = clampI(max64(1, t.Exposure), 1, 10)
+	if !use.Forbidden {
+		return use, nil
+	}
+	karmaCost := max64(0, t.KarmaCost)
+	if karmaCost > 0 {
+		use.Karma -= karmaCost
+		if _, e = conn.Execute(`UPDATE characters SET karma_score=?,updated_at=? WHERE user_id=?`, []any{use.Karma, now, userID}); e != nil {
+			return use, e
+		}
+	}
+	chance := int64(100)
+	if i64(ch["concealment_active"]) != 0 {
+		chance = clampI(use.Exposure*8, 5, 95)
+	}
+	if chance >= 100 {
+		use.Witnessed = true
+	} else {
+		n, e := gamerng.Intn(100)
+		if e != nil {
+			return use, e
+		}
+		use.Witnessed = int64(n) < chance
+	}
+	use.Impacts, e = applyForbiddenWorldTx(conn, catalog, userID, techID, t.Name, location, gameMinute, use.Exposure, karmaCost, use.Witnessed, now)
+	if e != nil {
+		return use, e
+	}
+	if use.Witnessed {
+		severity := clampI(use.Exposure+karmaCost, 1, 10)
+		evidence := clampI(45+use.Exposure*8, 50, 100)
+		use.Crime, e = recordCrimeTx(conn, userID, location, "forbidden_cultivation", fmt.Sprintf("Witnessed use of forbidden technique %s", t.Name), "public", "witnesses:"+location, severity, evidence, gameMinute, now)
+		if e != nil {
+			return use, e
+		}
+		if _, e = adjustReputationTx(conn, userID, "Orthodox Society", -max64(2, use.Exposure*2), fmt.Sprintf("witnessed forbidden art: %s", t.Name), now); e != nil {
+			return use, e
+		}
+		if _, e = adjustReputationTx(conn, userID, "Demonic Circles", max64(1, use.Exposure), fmt.Sprintf("witnessed forbidden art: %s", t.Name), now); e != nil {
+			return use, e
+		}
+	}
+	return use, nil
+}
+
 func manualTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p manualTechniquePayload
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
 	}
 	p.TechniqueID = strings.TrimSpace(p.TechniqueID)
-	t, ok := catalog.TechniqueSystem.Techniques[p.TechniqueID]
-	if !ok {
-		return authoritativeMutation{}, errors.New("unknown manual technique")
-	}
-	m, ok := catalog.TechniqueSystem.Manuals[t.Manual]
-	if !ok {
-		return authoritativeMutation{}, errors.New("technique manual is missing")
-	}
-	mr, e := manualRow(conn, userID, t.Manual)
+	t, m, mastery, e := manualTechniqueFor(conn, catalog, userID, p.TechniqueID)
 	if e != nil {
 		return authoritativeMutation{}, e
-	}
-	if mr == nil || i64(mr["mastery"]) < t.MinMastery {
-		return authoritativeMutation{}, errors.New("manual mastery is insufficient")
 	}
 	br, e := conn.Execute(`SELECT * FROM battles WHERE user_id=? AND status='active' ORDER BY battle_id DESC LIMIT 1`, []any{userID})
 	if e != nil {
@@ -290,30 +394,11 @@ func manualTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	if battle == nil || i64(battle["npc_hp"]) <= 0 {
 		return authoritativeMutation{}, errors.New("an active living battle target is required")
 	}
-	cr, e := conn.Execute(`SELECT qi,vitality,vitality_max,karma_score,concealment_active FROM characters WHERE user_id=?`, []any{userID})
+	use, e := spendManualTechniqueTx(conn, catalog, userID, p.TechniqueID, t, m, p.GameMinute, fmt.Sprint(battle["location"]))
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	ch := firstRowMap(cr)
-	if ch == nil {
-		return authoritativeMutation{}, errors.New("character not found")
-	}
-	// The qi body (v1.0.0-rc.7): the content's qi cost is a base, scaled into
-	// this cultivator's own pool and by the purity of what they hold.
 	now := float64(time.Now().UnixNano()) / 1e9
-	state, e := settleQi(conn, catalog, userID, p.GameMinute, now)
-	if e != nil {
-		return authoritativeMutation{}, e
-	}
-	qiCost := state.Cost(t.QiCost)
-	if state.Qi < qiCost || i64(ch["vitality"])-t.VitalityCost < 1 {
-		return authoritativeMutation{}, fmt.Errorf("insufficient Qi or Vitality: %d qi required, %d held", qiCost, state.Qi)
-	}
-	_, e = conn.Execute(`UPDATE characters SET qi=qi-?,vitality=vitality-?,updated_at=? WHERE user_id=?`, []any{qiCost, t.VitalityCost, now, userID})
-	if e != nil {
-		return authoritativeMutation{}, e
-	}
-	mastery := i64(mr["mastery"])
 	damage := max64(0, t.Damage+mastery)
 	heal := max64(0, t.Heal+mastery)
 	suppress := max64(0, t.SuppressTurns)
@@ -322,71 +407,15 @@ func manualTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	if suppress > newSupp {
 		newSupp = suppress
 	}
-	_, e = conn.Execute(`UPDATE battles SET npc_hp=?,npc_suppressed_turns=?,version=version+1,updated_at=? WHERE battle_id=?`, []any{nhp, newSupp, now, i64(battle["battle_id"])})
-	if e != nil {
+	if _, e = conn.Execute(`UPDATE battles SET npc_hp=?,npc_suppressed_turns=?,version=version+1,updated_at=? WHERE battle_id=?`, []any{nhp, newSupp, now, i64(battle["battle_id"])}); e != nil {
 		return authoritativeMutation{}, e
 	}
 	if heal > 0 {
-		_, e = conn.Execute(`UPDATE characters SET vitality=MIN(vitality_max,vitality+?),updated_at=? WHERE user_id=?`, []any{heal, now, userID})
-		if e != nil {
+		if _, e = conn.Execute(`UPDATE characters SET vitality=MIN(vitality_max,vitality+?),updated_at=? WHERE user_id=?`, []any{heal, now, userID}); e != nil {
 			return authoritativeMutation{}, e
 		}
 	}
-	_, e = practiceManualTx(conn, userID, t.Manual, 1, now)
-	if e != nil {
-		return authoritativeMutation{}, e
-	}
-	forbidden := techniqueForbidden(t, m)
-	karma := i64(ch["karma_score"])
-	witnessed := false
-	exposure := clampI(max64(1, t.Exposure), 1, 10)
-	var crime map[string]any
-	impacts := []string{}
-	if forbidden {
-		karmaCost := max64(0, t.KarmaCost)
-		if karmaCost > 0 {
-			karma -= karmaCost
-			_, e = conn.Execute(`UPDATE characters SET karma_score=?,updated_at=? WHERE user_id=?`, []any{karma, now, userID})
-			if e != nil {
-				return authoritativeMutation{}, e
-			}
-		}
-		chance := int64(100)
-		if i64(ch["concealment_active"]) != 0 {
-			chance = clampI(exposure*8, 5, 95)
-		}
-		if chance >= 100 {
-			witnessed = true
-		} else {
-			n, e := gamerng.Intn(100)
-			if e != nil {
-				return authoritativeMutation{}, e
-			}
-			witnessed = int64(n) < chance
-		}
-		location := fmt.Sprint(battle["location"])
-		impacts, e = applyForbiddenWorldTx(conn, catalog, userID, p.TechniqueID, t.Name, location, p.GameMinute, exposure, karmaCost, witnessed, now)
-		if e != nil {
-			return authoritativeMutation{}, e
-		}
-		if witnessed {
-			severity := clampI(exposure+karmaCost, 1, 10)
-			evidence := clampI(45+exposure*8, 50, 100)
-			crime, e = recordCrimeTx(conn, userID, location, "forbidden_cultivation", fmt.Sprintf("Witnessed use of forbidden technique %s", t.Name), "public", "witnesses:"+location, severity, evidence, p.GameMinute, now)
-			if e != nil {
-				return authoritativeMutation{}, e
-			}
-			_, e = adjustReputationTx(conn, userID, "Orthodox Society", -max64(2, exposure*2), fmt.Sprintf("witnessed forbidden art: %s", t.Name), now)
-			if e != nil {
-				return authoritativeMutation{}, e
-			}
-			_, e = adjustReputationTx(conn, userID, "Demonic Circles", max64(1, exposure), fmt.Sprintf("witnessed forbidden art: %s", t.Name), now)
-			if e != nil {
-				return authoritativeMutation{}, e
-			}
-		}
-	}
-	result := map[string]any{"technique_id": p.TechniqueID, "name": t.Name, "qi_cost": qiCost, "qi_cost_base": t.QiCost, "vitality_cost": t.VitalityCost, "damage": damage, "heal": heal, "suppress_turns": suppress, "npc_hp": nhp, "battle_id": i64(battle["battle_id"]), "forbidden": forbidden, "karma_score": karma, "karma_cost": t.KarmaCost, "exposure": exposure, "witnessed": witnessed, "crime": crime, "impacts": impacts}
+	result := map[string]any{"technique_id": p.TechniqueID, "name": t.Name, "qi_cost": use.QiCost, "qi_cost_base": t.QiCost, "vitality_cost": t.VitalityCost, "damage": damage, "heal": heal, "suppress_turns": suppress, "npc_hp": nhp, "battle_id": i64(battle["battle_id"]), "forbidden": use.Forbidden, "karma_score": use.Karma, "karma_cost": t.KarmaCost, "exposure": use.Exposure, "witnessed": use.Witnessed, "crime": use.Crime, "impacts": use.Impacts}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "manuals", EventType: "manual.technique", EntityType: "technique", EntityID: p.TechniqueID, GameMinute: p.GameMinute, Payload: result}}, nil
 }
 

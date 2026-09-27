@@ -171,6 +171,10 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 		result, err = adminForceReincarnationReady(conn, req.ActorID, req.Payload)
 	case "admin.player.set_pill_toxicity":
 		result, err = adminSetPillToxicity(conn, req.ActorID, req.Payload)
+	case "admin.player.grant_flame":
+		result, err = adminGrantFlame(conn, catalog, req.ActorID, req.Payload)
+	case "admin.player.set_spirit_sense":
+		result, err = adminSetSpiritSense(conn, catalog, req.ActorID, req.Payload)
 	case "admin.player.set_beast_stats":
 		result, err = adminSetBeastStats(conn, req.ActorID, req.Payload)
 	case "admin.player.remove_equipment":

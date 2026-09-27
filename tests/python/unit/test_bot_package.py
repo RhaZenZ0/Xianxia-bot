@@ -271,7 +271,8 @@ class WrappingDecoratorAnnotationTests(unittest.TestCase):
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
             for decorator in node.decorator_list:
-                name = getattr(decorator, "id", None)
+                # `@serialized_user_action(metered=False)` wraps as well (v1.9.1).
+                name = getattr(getattr(decorator, "func", decorator), "id", None)
                 if name not in self.WRAPPING_DECORATORS:
                     continue
                 annotations = [a.annotation for a in node.args.args if a.annotation]
@@ -842,13 +843,15 @@ SURFACE = {
         },
     },
     "commands/law.py": {
-        "groups": ('law_group', 'manual_group', 'condition_group', 'profession_group', 'crime_group'),
+        "groups": ('law_group', 'manual_group', 'condition_group', 'profession_group', 'crime_group', 'flame_group', 'spirit_group'),
         "roots": (),
         "leaves": {
             "law_group": ('status', 'comprehend', 'technique'),
             "manual_group": ('list', 'study', 'practise', 'technique'),
             "condition_group": ('status', 'treat'),
             "profession_group": ('status', 'exam'),
+            "flame_group": ('status', 'capture', 'refine', 'bind'),
+            "spirit_group": ('status', 'settle'),
             "crime_group": ('status', 'atone'),
         },
     },

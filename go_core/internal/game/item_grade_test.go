@@ -88,7 +88,7 @@ func TestTheCraftGradeFollowsTheRollAndStopsAtTheRank(t *testing.T) {
 		{"refined", 2, 0, 0, 1},
 	}
 	for _, c := range cases {
-		got, reached := craftGradeIndex(catalog, c.quality, c.margin, c.rank)
+		got, reached := craftGradeIndex(catalog, c.quality, c.margin, c.rank, false)
 		if got != c.want || reached != c.reached {
 			t.Errorf("%s at margin %d, rank %d: grade %d (reached %d), want %d (reached %d)", c.quality, c.margin, c.rank, got, reached, c.want, c.reached)
 		}

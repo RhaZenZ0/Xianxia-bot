@@ -312,6 +312,12 @@ func explorationEventActAction(conn *storage.Conn, catalog worlddata.Catalog, us
 			return authoritativeMutation{}, err
 		}
 		resolved = true
+		// Seeing somebody's trouble through is a good deed (v1.9.1), beside
+		// whatever karma the event itself authors; robbing it is not.
+		paid, karma := grantDeedKarmaTx(conn, userID, "personal_event_helped", "personal_event:"+record.EventID, personalEventDeedKarma, 1, now)
+		if deed := deedKarmaResult("personal_event_helped", paid, karma); deed != nil {
+			outcome["deed_karma"] = deed
+		}
 	}
 	if success && p.Action == "rob" {
 		stolen := map[string]any{"spirit_stones": storage.ParseInt(definition.PlayerReward["spirit_stones"]), "items": definition.PlayerReward["items"]}

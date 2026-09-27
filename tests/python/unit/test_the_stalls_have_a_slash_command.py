@@ -65,7 +65,10 @@ class TheRaidsHaveSlashCommands(unittest.TestCase):
     located?", the answer was a hub page, because neither group had ever been
     registered - the `/stall` fault twice over."""
 
-    GROUPS = {"boss": {"list", "start", "status", "act", "claim"}, "party": {"create", "join", "leave"}}
+    GROUPS = {"boss": {"list", "start", "status", "act", "claim"}, "party": {"create", "join", "leave"},
+              # v1.9.1: body cultivation is a slash command of its own too.
+              "body": {"cultivate", "sheet", "breakthrough"},
+              "profession": {"status", "exam"}}
 
     def test_each_is_a_tree_command_resolving_to_the_hub_pages_group(self):
         surface = _surface()

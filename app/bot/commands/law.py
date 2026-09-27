@@ -15,6 +15,7 @@ from discord import app_commands
 from ...rules.effects import normalize_effect_payload
 from ...ops.game_engine import GameEngineError
 from ...rules.progression_systems import condition_definition, profession_rank, profession_xp_needed
+from ..cards import Card, card_view
 from ..character_state import record_quest_progress, announce_quest_progress, current_effect_modifiers
 from ..formatting import roll_line
 from ..registry import registered_group_command
@@ -419,7 +420,6 @@ async def profession_status(interaction: discord.Interaction) -> None:
             f" • TN {int(definition.get('tn') or 0)}{tail}"
         )
 
-    lines = [f"🛠️ **Profession Mastery — {c['name']}**"]
     if not rows and not known:
         # The page used to stop here whatever else was true, which meant a
         # cultivator who had bought a slip and read it was told they had no
@@ -430,34 +430,52 @@ async def profession_status(interaction: discord.Interaction) -> None:
             "with **/craft → Profession → Learn**.", ephemeral=False,
         )
         return
+    await interaction.response.send_message(view=card_view(_profession_card(c, rows, by_trade, bool(known))))
+
+
+def _xp_bar(xp: int, needed: int, *, width: int = 10) -> str:
+    """How far a trade is toward its next rank, as a bar a glance can read."""
+    cap = max(1, int(needed))
+    value = max(0, min(cap, int(xp)))
+    filled = min(width, round(value * width / cap))
+    return f"{'🟧' * filled}{'⬛' * (width - filled)} **{value}/{cap} XP**"
+
+
+def _profession_card(c: dict, rows: list, by_trade: dict[str, list[str]], knows_methods: bool) -> Card:
+    """The profession panel (v1.9.1): one section per trade - its rank, a bar
+    toward the next, the record, and every method known in it with what it
+    needs against what is carried. Asked for in play as "a panel to check the
+    status of your profession"; it had been a wall of text."""
+    card = Card(title=f"🛠️ Profession Mastery — {c['name']}", colour=0xE67E22)
     if not rows:
-        lines.append("_No craft attempt has been recorded yet — the methods below are what you know._")
+        card.description = "_No craft attempt has been recorded yet — the methods below are what you know._"
     for row in rows:
         level = int(row.get("level", 0)); xp = int(row.get("xp", 0))
         trade = str(row["profession"])
-        lines.append(
-            f"\n**{trade} — {profession_rank(level, trade)}** (Level {level})\n"
-            f"XP **{xp}/{profession_xp_needed(level)}** • Successes {row.get('successes',0)} • Failures {row.get('failures',0)} • Quality {row.get('quality_points',0)}"
-        )
-        for line in by_trade.pop(trade, []):
-            lines.append(line)
+        methods = by_trade.pop(trade, [])
+        value = [
+            _xp_bar(xp, profession_xp_needed(level)),
+            f"✔️ {row.get('successes', 0)} successes • ✖️ {row.get('failures', 0)} failures • ✨ {row.get('quality_points', 0)} quality",
+            *(methods or ["  _no method known in this trade yet_"]),
+        ]
+        card.add_field(name=f"{trade} — {profession_rank(level, trade)} (Level {level})", value="\n".join(value), inline=False)
     # A method in a trade with no progress row yet is still one you know, and
     # leaving it out is how the old page managed to show nothing at all.
     for trade, entries in sorted(by_trade.items()):
-        lines.append(f"\n**{trade} — {profession_rank(0, trade)}** (Level 0)")
-        lines.extend(entries)
-    if known:
-        lines.append(
-            "\n✅ you can make it now • ❌ short of materials • 🔴 your rank is too low"
-            "\nBuy materials at a hall of the trade (**/economy → City Shops → Here**) or gather "
-            "them (**/craft → Alchemy → Forage**). New methods come from slips: **/craft → Profession → Learn**."
+        card.add_field(name=f"{trade} — {profession_rank(0, trade)} (Level 0)", value="\n".join(entries), inline=False)
+    if knows_methods:
+        card.add_field(
+            name="Reading this",
+            value=("✅ you can make it now • ❌ short of materials • 🔴 your rank is too low\n"
+                   "Buy materials at a hall of the trade (**/economy → City Shops → Here**) or gather "
+                   "them (**/craft → Alchemy → Forage**). New methods come from slips: **/craft → Profession → Learn**."),
+            inline=False,
         )
     else:
-        lines.append(
-            "\nYou know no methods yet. Slips are sold in most halls of a trade — buy one and read "
-            "it with **/craft → Profession → Learn**."
-        )
-    await reply_long(interaction, "\n".join(lines), ephemeral=False)
+        card.add_field(name="Methods", value=("You know no methods yet. Slips are sold in most halls of a trade — buy one and read "
+                                             "it with **/craft → Profession → Learn**."), inline=False)
+    card.set_footer(text="Craft with /craft • sit a hall's examination with /profession exam")
+    return card
 
 
 PROFESSION_EXAM_CHOICES = [
@@ -579,3 +597,225 @@ async def crime_atone(interaction: discord.Interaction, crime_id: int) -> None:
         f"⚖️ Crime **#{crime_id}** is marked **atoned** and any bounty sourced only from it is resolved. "
         f"Paid **{fine} {WORLD.currency_name(currency)}** • remaining balance **{balance}**.",ephemeral=False
     )
+
+
+# ---------------------------------------------------------------------------
+# Flames (v1.10.0)
+# ---------------------------------------------------------------------------
+# A flame is captured at its world's forge terraces, refined with beast cores
+# and ore, and bound to steady an Alchemy or Forging roll; a fully refined
+# heavenly flame is what opens the Transcendent grade. Everything below is the
+# engine's answer (flames.go): nothing here decides a cost, a bonus or a roll.
+flame_group = app_commands.Group(name="flame", description="Capture, refine and bind the flames that steady alchemy and forging")
+
+
+async def _flame_status(user_id: int) -> dict:
+    return dict(await ENGINE.action("flame.status", int(user_id), {}) or {})
+
+
+def _refinement_bar(level: int, maximum: int) -> str:
+    maximum = max(1, int(maximum))
+    level = max(0, min(maximum, int(level)))
+    return f"{'🔥' * level}{'▫️' * (maximum - level)} **{level}/{maximum}**"
+
+
+def _flame_card(c: dict, status: dict) -> Card:
+    trades = " and ".join(str(t) for t in status.get("trades") or []) or "crafting"
+    card = Card(title=f"🔥 Flames — {c['name']}", colour=0xE74C3C,
+                description=(f"A bound flame steadies every **{trades}** roll. A fully refined heavenly flame "
+                             "lets a crafter at the sixth rank make **Transcendent** work."))
+    maximum = int(status.get("max_refinement") or 9)
+    for flame in status.get("flames") or []:
+        name = str(flame.get("name") or flame.get("flame_id"))
+        if flame.get("held"):
+            head = f"{'✅ ' if flame.get('bound') else ''}{name}{' — bound' if flame.get('bound') else ''}"
+            lines = [_refinement_bar(int(flame.get("refinement") or 0), maximum),
+                     f"Adds **+{int(flame.get('bonus') or 0)}** to a craft roll"
+                     + (" • opens **Transcendent**" if flame.get("opens_now") else
+                        (" • opens Transcendent when fully refined" if flame.get("opens_top_grade") else ""))]
+            if flame.get("next_refine_items") is not None:
+                cost = WORLD.item_names({str(k): int(v) for k, v in dict(flame["next_refine_items"]).items()})
+                lines.append(f"Next refinement: {cost} and some qi")
+        else:
+            head = f"▫️ {name}"
+            lines = [f"Captured at **{flame.get('location')}** ({flame.get('world')}) from "
+                     f"{WORLD.realm_name(int(flame.get('min_realm_index') or 0))}",
+                     f"+{int(flame.get('base_bonus') or 0)} to +{int(flame.get('max_bonus') or 0)} to a craft roll"
+                     + (" • opens Transcendent when fully refined" if flame.get("opens_top_grade") else "")]
+        if flame.get("description"):
+            lines.append(f"*{flame['description']}*")
+        card.add_field(name=head, value="\n".join(lines), inline=False)
+    card.set_footer(text="Capture with /flame capture at a forge terrace • refine and bind with /flame refine and /flame bind")
+    return card
+
+
+async def held_flame_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    """The flames this cultivator holds - the only ones refine and bind accept."""
+    try:
+        status = await _flame_status(interaction.user.id)
+    except Exception:
+        log.warning("Could not load flames for a picker", exc_info=True)
+        return []
+    needle = current.casefold().strip()
+    out = []
+    for flame in status.get("flames") or []:
+        if not flame.get("held"):
+            continue
+        name = str(flame.get("name") or flame.get("flame_id"))
+        if needle and needle not in name.casefold():
+            continue
+        out.append(app_commands.Choice(name=f"{name} • refinement {int(flame.get('refinement') or 0)}"[:100],
+                                       value=str(flame.get("flame_id"))[:100]))
+    return out[:25]
+
+
+@registered_group_command(flame_group, name="status", description="See the flames you hold, what they give, and where the rest are captured")
+async def flame_status(interaction: discord.Interaction) -> None:
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        status = await _flame_status(interaction.user.id)
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    await interaction.response.send_message(view=card_view(_flame_card(c, status)))
+
+
+@registered_group_command(flame_group, name="capture", description="Try to capture the flame that burns at this forge terrace")
+@serialized_user_action
+async def flame_capture(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction):
+        return
+    try:
+        envelope = await ENGINE.authoritative_action("flame.capture", interaction.user.id, {},
+                                                     action_id=f"discord:{interaction.id}:flame.capture")
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    name = str(result.get("name") or "the flame")
+    lines = [f"🔥 **Capturing the {name}** — {int(result.get('qi_cost') or 0)} qi spent",
+             roll_line(SimpleNamespace(**dict(result.get("roll") or {})))]
+    if result.get("success"):
+        lines.append(f"✅ The {name} is yours, for good. It adds **+{int(result.get('bonus') or 0)}** to Alchemy and Forging rolls"
+                     + (" and is bound." if result.get("bound") else "; bind it with **/craft → Flames → Bind**."))
+    else:
+        scorched = dict(result.get("scorched") or {})
+        lines.append(f"🩸 The flame gets away and burns your meridians — **{scorched.get('name', 'Meridian Damage')}** "
+                     f"(severity {int(scorched.get('severity', 1))}). `/condition treat` with a **Jade Life Herb** mends it.")
+    await interaction.followup.send("\n".join(lines), ephemeral=False)
+
+
+@registered_group_command(flame_group, name="refine", description="Refine a flame you hold with beast cores, ore and qi")
+@app_commands.autocomplete(flame=held_flame_autocomplete)
+@serialized_user_action
+async def flame_refine(interaction: discord.Interaction, flame: str) -> None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction):
+        return
+    try:
+        envelope = await ENGINE.authoritative_action("flame.refine", interaction.user.id, {"flame_id": str(flame)},
+                                                     action_id=f"discord:{interaction.id}:flame.refine")
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    spent = WORLD.item_names({str(k): int(v) for k, v in dict(result.get("spent_items") or {}).items()})
+    lines = [f"🔥 **{result.get('name')}** refined — {_refinement_bar(int(result.get('refinement') or 0), int(result.get('max_refinement') or 9))}",
+             f"Spent {spent} and {int(result.get('qi_cost') or 0)} qi. It now adds **+{int(result.get('bonus') or 0)}** to a craft roll."]
+    if result.get("opens_top_grade"):
+        lines.append("✨ Fully refined: while it is bound, a crafter at the sixth rank can make **Transcendent** work.")
+    await interaction.followup.send("\n".join(lines), ephemeral=False)
+
+
+@registered_group_command(flame_group, name="bind", description="Bind one of your flames as the one your crafting reads")
+@app_commands.autocomplete(flame=held_flame_autocomplete)
+@serialized_user_action
+async def flame_bind(interaction: discord.Interaction, flame: str) -> None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction):
+        return
+    try:
+        envelope = await ENGINE.authoritative_action("flame.bind", interaction.user.id, {"flame_id": str(flame)},
+                                                     action_id=f"discord:{interaction.id}:flame.bind")
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    await interaction.followup.send(f"✅ **{result.get('name')}** is bound: it adds **+{int(result.get('bonus') or 0)}** "
+                                    "to your Alchemy and Forging rolls.", ephemeral=False)
+
+
+# ---------------------------------------------------------------------------
+# The spirit sense (v1.10.0)
+# ---------------------------------------------------------------------------
+# Built, never captured: Formation and Inscription crafts, meditation and
+# scene actions fill it, qi settles each stage, and it steadies Formation and
+# Inscription rolls. Fully built, it opens the Transcendent grade for those
+# two trades. Every number here is the engine's (spirit_sense.go).
+spirit_group = app_commands.Group(name="spirit", description="Build the spirit sense that steadies formation and inscription")
+
+
+def _spirit_card(c: dict, status: dict) -> Card:
+    trades = " and ".join(str(t) for t in status.get("trades") or []) or "those trades"
+    stage = int(status.get("stage") or 0)
+    maximum = int(status.get("max_stage") or 9)
+    card = Card(title=f"🌀 Spirit Sense — {c['name']}", colour=0x8E44AD,
+                description=(f"Built, not found: practice fills it and qi settles each stage. It steadies every "
+                             f"**{trades}** roll, and fully built it lets a crafter at the sixth rank make **Transcendent** work."))
+    card.add_field(name=f"Stage {stage}/{maximum}",
+                   value=(f"{'🌀' * stage}{'▫️' * (maximum - stage)}\nAdds **+{int(status.get('bonus') or 0)}** to a {trades} roll"
+                          + (" • opens **Transcendent**" if status.get("opens_now") else "")), inline=False)
+    if status.get("need") is not None:
+        progress, need = int(status.get("progress") or 0), int(status.get("need") or 1)
+        filled = min(10, round(progress * 10 / max(1, need)))
+        ready = progress >= need
+        card.add_field(name="Toward the next stage",
+                       value=(f"{'🟪' * filled}{'⬛' * (10 - filled)} **{progress}/{need}**\n"
+                              + (f"✅ Ready: **/spirit settle** spends some qi → +{int(status.get('next_bonus') or 0)}"
+                                 if ready else f"The next stage adds +{int(status.get('next_bonus') or 0)}; settling it spends some qi")),
+                       inline=False)
+    gains = dict(status.get("gains") or {})
+    card.add_field(name="What builds it",
+                   value=(f"🛠️ a {trades} craft **+{int(gains.get('craft') or 0)}** (half on a miss)\n"
+                          f"🧘 a meditation **+{int(gains.get('meditation') or 0)}**\n"
+                          f"🎭 a successful scene action **+{int(gains.get('scene') or 0)}**, {int(status.get('scene_gains_per_day') or 0)} a world day\n"
+                          f"Each gains a little more for your Spirit (+1 per {int(status.get('spirit_divisor') or 4)} Spirit)."),
+                   inline=False)
+    card.set_footer(text="Settle a full stage with /spirit settle")
+    return card
+
+
+@registered_group_command(spirit_group, name="status", description="See your spirit sense, its stage and what builds it")
+async def spirit_status(interaction: discord.Interaction) -> None:
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        status = dict(await ENGINE.action("spirit_sense.status", interaction.user.id, {}) or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    await interaction.response.send_message(view=card_view(_spirit_card(c, status)))
+
+
+@registered_group_command(spirit_group, name="settle", description="Settle a full stage of your spirit sense into the next, for qi")
+@serialized_user_action
+async def spirit_settle(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction):
+        return
+    try:
+        envelope = await ENGINE.authoritative_action("spirit_sense.settle", interaction.user.id, {},
+                                                     action_id=f"discord:{interaction.id}:spirit_sense.settle")
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    lines = [f"🌀 **Spirit sense settled — stage {int(result.get('stage') or 0)}/{int(result.get('max_stage') or 9)}** "
+             f"for {int(result.get('qi_cost') or 0)} qi. It now adds **+{int(result.get('bonus') or 0)}** to Formation and Inscription rolls."]
+    if result.get("opens_top_grade"):
+        lines.append("✨ Fully built: a crafter at the sixth rank can make **Transcendent** Formation and Inscription work.")
+    await interaction.followup.send("\n".join(lines), ephemeral=False)

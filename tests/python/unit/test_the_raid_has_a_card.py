@@ -215,7 +215,6 @@ def _press(user_id, style, encounter):
 
     async def run():
         with patch.object(boss, "DB", db), patch.object(boss, "ENGINE", engine), \
-             patch.object(boss, "budget_refusal_line", lambda uid, door: None), \
              patch.object(boss, "_user_action_lock", lambda uid: asyncio.Lock()), \
              patch.object(boss, "current_world_time", clock):
             await boss.RaidView(7, boss.raid_card(encounter)).dispatch(interaction, style)

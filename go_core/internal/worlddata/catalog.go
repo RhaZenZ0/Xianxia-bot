@@ -1032,6 +1032,11 @@ type Catalog struct {
 	// multiplies and the trade rank that can make it. Which items are graded is
 	// not listed here: it is every recipe's output, read off Recipes.
 	ItemGrades ItemGradeSystem `json:"item_grade_system"`
+	// FlameSystem (v1.10.0): the flames a cultivator captures at a world's
+	// forge terraces, refines, and binds to steady an Alchemy or Forging roll.
+	FlameSystem FlameSystem `json:"flame_system"`
+	// SpiritSense (v1.10.0): the spirit sense built for Formation and Inscription.
+	SpiritSense SpiritSenseSystem `json:"spirit_sense_system"`
 }
 
 // ItemGradeSystem is the grade ladder a crafted item climbs (v1.7.0). A graded
@@ -1051,6 +1056,54 @@ type ItemGrade struct {
 	MinRank    int64    `json:"min_rank"`
 	Qualities  []string `json:"qualities"`
 	MinMargin  *int64   `json:"min_margin"`
+	// OpenedMinRank (v1.10.0), when set, is the rank at which a crafter whose
+	// bound flame (Alchemy, Forging) or fully built spirit sense (Formation,
+	// Inscription) opens the top grade may make this rung below its MinRank.
+	OpenedMinRank *int64 `json:"opened_min_rank"`
+}
+
+// SpiritSenseSystem is the spirit sense a cultivator builds (v1.10.0): the
+// Formation and Inscription twin of a flame, filled by practice rather than
+// captured. Every field is read by one rule in the game package
+// (spirit_sense.go).
+type SpiritSenseSystem struct {
+	Description      string           `json:"description"`
+	Trades           []string         `json:"trades"`
+	MaxStage         int64            `json:"max_stage"`
+	StageProgress    int64            `json:"stage_progress"`
+	SettleQi         int64            `json:"settle_qi"`
+	Gains            map[string]int64 `json:"gains"`
+	SceneGainsPerDay int64            `json:"scene_gains_per_day"`
+	SpiritDivisor    int64            `json:"spirit_divisor"`
+	MinBonus         int64            `json:"min_bonus"`
+	MaxBonus         int64            `json:"max_bonus"`
+}
+
+// FlameSystem is the flame roster (v1.10.0). Every field is read by one rule
+// in the game package (flames.go).
+type FlameSystem struct {
+	Description               string                     `json:"description"`
+	Trades                    []string                   `json:"trades"`
+	MaxRefinement             int64                      `json:"max_refinement"`
+	CaptureScorchSevereMargin int64                      `json:"capture_scorch_severe_margin"`
+	Flames                    map[string]FlameDefinition `json:"flames"`
+}
+
+// FlameDefinition is one flame: where it is captured, how hard, what binding
+// it adds to a craft at each refinement, and what refining it costs.
+type FlameDefinition struct {
+	Name          string           `json:"name"`
+	Description   string           `json:"description"`
+	World         string           `json:"world"`
+	Location      string           `json:"location"`
+	MinRealmIndex int64            `json:"min_realm_index"`
+	CaptureTN     int64            `json:"capture_tn"`
+	CaptureQi     int64            `json:"capture_qi"`
+	BaseBonus     int64            `json:"base_bonus"`
+	MaxBonus      int64            `json:"max_bonus"`
+	RefineItems   map[string]int64 `json:"refine_items"`
+	RefineQi      int64            `json:"refine_qi"`
+	OpensTopGrade bool             `json:"opens_top_grade"`
 }
 
 // StallSystem is that roster. Every field is read by one rule in the game

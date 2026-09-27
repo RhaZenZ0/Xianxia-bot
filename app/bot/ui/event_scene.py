@@ -18,6 +18,7 @@ from typing import Any
 import discord
 
 from ...ops.game_engine import GameEngineError
+from ...rules.advanced_runtime import deed_karma_line
 from ...rules.sect import sect_points_line
 from ..cards import Card, CardView, fold_content
 from ..character_state import announce_quest_progress, record_quest_progress
@@ -437,6 +438,8 @@ class EventSceneView(CardView):
         if reward_details: lines.append("First-participation outcome: "+" • ".join(reward_details))
         points_line=sect_points_line(outcome.get("sect_points"))
         if points_line: lines.append(points_line)
+        karma_line=deed_karma_line(outcome.get("deed_karma"))
+        if karma_line: lines.append(karma_line)
         await interaction.response.send_message("\n".join(lines),ephemeral=False)
 
     async def engage_node(self, interaction: discord.Interaction, node_key: str) -> None:
@@ -478,6 +481,8 @@ class EventSceneView(CardView):
             lines.append(f"You fail to {verb} it. Nothing is taken; it is still there.")
         points_line=sect_points_line(outcome.get("sect_points"))
         if points_line: lines.append(points_line)
+        karma_line=deed_karma_line(outcome.get("deed_karma"))
+        if karma_line: lines.append(karma_line)
         site=dict(outcome.get("site") or {})
         if site.get("total"):
             lines.append(f"Site progress: **{int(site.get('percent',0))}%** — {int(site.get('cleared',0))}/{int(site.get('total',0))} handled.")

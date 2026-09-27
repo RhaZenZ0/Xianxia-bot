@@ -14,7 +14,7 @@ from discord import app_commands
 from ...rules.black_market import access_reason as black_market_access_reason
 from ...ops.game_engine import GameEngineError
 from ..locations import _known_locations, _location_is_visible, _world_is_unlocked, location_autocomplete
-from ...rules.advanced_runtime import describe_equipment
+from ...rules.advanced_runtime import describe_equipment, equipment_passive_line
 from ...rules.progression_systems import profession_rank
 from ...rules.trade_receipt import format_trade_receipt
 from ..auction_feed import announce_lot, refresh_lot
@@ -442,7 +442,8 @@ def _gear_line(item_id:Any,indent:str="  ")->str:
     """What a weapon, armour or accessory gives, on its own line under the
     row that sells it (v1.7.5); nothing for anything that is not gear."""
     gear=describe_equipment(str(item_id or ""),ladder=WORLD.item_grades)
-    return f"\n{indent}{gear}" if gear else ""
+    passive=equipment_passive_line(str(item_id or ""))
+    return (f"\n{indent}{gear}" if gear else "")+(f"\n{indent}{passive}" if passive else "")
 
 
 def _merchant_stock_lines(row:dict[str,Any])->list[str]:

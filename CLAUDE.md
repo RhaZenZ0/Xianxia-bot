@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 69; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 71; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -5554,6 +5554,68 @@ replies and stay as they are.
 built only when discord.py lacks Components V2, which the pinned 2.7.1 never does. It walks scopes
 by AST, holds that every allowed fallback is still there, and asserts it can find one before it
 trusts an empty answer.
+
+### A flame is what opens the top grade (`flames.go`, schema 70, v1.10.0)
+
+On the owner's calls: Alchemy and Forging only, permanent, and a flame is what unlocks
+Transcendent. The rung asks `min_rank` 7 and a trade stops rising at rank 6
+(`crafting_actions.go`), so nobody could ever make it - `craftGradeIndex` now takes whether the
+bound flame opens the top grade, and `gradeRankAllows` lets a rung carrying `flame_min_rank` (6) be
+made from that rank with one. The margin it asks is still the roll's to reach; the flame's own
+bonus is what helps it get there. `flame_system` in `world.json` is the roster: four flames, one per
+world, captured at that world's Forge Terraces (`flameAt`, and `LOCATION_GATES["flame_source"]`
+the panel twin), each with a realm floor, a capture TN and qi, a bonus from `base_bonus` to
+`max_bonus` over `max_refinement` steps, refine items per step and whether it opens the top grade.
+
+A capture is the purge scorch's shape - `fire_resistance`/5 on the roll and `meridian_damage` on a
+miss - plus `flame_affinity`, the one new modifier stat, which the Heavenly Flame Root carries. A
+refinement is certain: it is the price, not a gamble. `character_flames` is read through
+`heldFlamesTx`, which answers "no flames" rather than erroring when the table is not there yet, for
+v1.1.0's migration-window reason - a craft reads it, and a craft must never refuse over a flame.
+`admin.player.grant_flame` is audited and is how the engine playtest reaches refine and bind
+without winning a roll.
+
+**The spirit sense is the flame's twin and deliberately its opposite** (`spirit_sense.go`, schema
+71): on the owner's call, "no spirit capture, you build your spirit". Nothing is found or rolled.
+`spiritSenseGainTx` is the one door progress comes in by, called from `craftResolveAction` (a
+Formation or Inscription craft, half on a miss), `cultivationTrain` (a qi meditation) and
+`resolveSceneAction` (a success, capped per world day off `event_log` like good-deed karma), and
+`TestEveryPracticeBuildsTheSenseWhereItHappens` reads the three calls by AST. Progress stops at the
+stage's need until `spirit_sense.settle` spends qi to take the next stage, so practice cannot run
+past a stage nobody chose to settle. A fully built sense opens the top rung for its two trades
+through the same `opened_min_rank` the flame uses - one rung field, two things that can open it -
+which is why it is not called `flame_min_rank`. `admin.player.set_spirit_sense` is audited.
+
+### A raid is fought at its own pace (v1.9.1)
+
+Four reports from one solo raid, and three are one shape: a rule written for one surface that
+reached another it was never meant for. **The action meter paced the fight.** Every raid press
+spent a token from the per-player bucket (`TYPED_PLAY_BURST` 4, then one every ten seconds),
+which v0.31.0 built to guard the AI narration allowance - and a raid press calls no model, while
+the engine already holds a raider to one action a round. Solo, every press is a round, so the
+meter was the whole pace. `serialized_user_action(metered=False)` keeps the lock and spends no
+token; `/boss act`, `/boss claim` and the raid card use it, and `test_bot_package`'s decorator gate
+now reads a decorator that is a call. **A miss read as damage.** `boss.act` reported a miss as
+"Attack deals 0 damage", and a hit always deals at least 1, so the zero was only ever a miss
+nobody was told about; `bossStrikeLine` says it missed and the chance it had. **The Technique
+button offered Laws only**, so a cultivator whose art was a manual had nothing to press.
+`manualTechniqueFor` and `spendManualTechniqueTx` are the one statement of whether a manual
+technique may be used and what it costs, shared by the battle and the raid; in a raid its damage
+plus mastery replaces an attack's +1 on the same hit roll.
+
+**Good deeds pay karma** (`karma_deeds.go`), each capped because karma gates the hidden sect and a
+sect's trial preference: a world-event Aid/Support/Stabilize/Evacuate/Defend (+1, three per
+event), a Resolve scene action against anything but oneself (+1 a world day - a Resolve on "Self"
+always succeeds), a personal event helped to its end (+1), the last unit of a site (+3). The count
+is `event_log` rows of type `karma_deed` keyed on the deed, and a missing table pays nothing
+rather than refusing the action. `TestEveryGoodDeedIsPaidWhereItHappens` reads the four doors by
+AST, because the helper's own tests pass against a tree nothing calls it from.
+
+A technique picker prints what a manual technique does (`describe_manual_technique`, the display
+twin of `manualTechniqueAction` and the raid's bonus), gear prints its description and what its
+passive does (`describe_equipment_in_full`, `equipment_passive_line`), profession status is a
+card with a section per trade (`_profession_card`), and `/body` and `/profession` are tree
+commands, the v1.7.4 `/stall` fault found twice more.
 
 ## Testing conventions
 
