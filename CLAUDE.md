@@ -26,7 +26,17 @@ bindings (`libsqlite3-dev` on Debian/Ubuntu). `.env.example` is keys, defaults a
 separators only — a contract test holds it to that — and `docs/CONFIGURATION.md` is where every
 key is explained; a new key gets its line in both.
 
-Full local check suite (mirrors CI):
+**The full suite runs on GitHub, not here.** `.github/workflows/ci.yml` runs all of it on every
+pull request and every push to main, so to verify a change, run only the targeted checks for what
+it touches (the tests that name the changed file, module or content key; `gofmt`, `go vet` and
+`go test` for the touched Go package; `scripts/release_manifest.py --write`), push, and read CI.
+Do not run `make check` or a whole `pytest -q` to verify a change: it takes about eight minutes
+here and still proves nothing about the Go race detector, the pinned tools or the containers. A
+branch with no pull request runs no CI, so a change is checked once its PR is open. The one
+exception is the two playtests below, which never run in GitHub and are run here before a release.
+The `github-ci` skill (`.claude/skills/github-ci/SKILL.md`) has the details.
+
+`make check` is still the whole suite in one command, for a person on a machine that has time:
 
 ```bash
 make check          # lint + format-check + test-python + test-go
