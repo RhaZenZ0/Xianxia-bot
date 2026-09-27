@@ -233,3 +233,21 @@ func sectRecruitmentEnvoysActionGo(conn *storage.Conn, catalog worlddata.Catalog
 		EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: out,
 	}}, nil
 }
+
+// SectGate is sectGate for the simulation package (v1.12.0), which claims a
+// sect's home ground in the world tick and must name the same gate the doors
+// do - one statement of where a sect stands, not a second copy.
+// It returns "" for an unknown or hidden sect, or a gate absent from the catalog.
+func SectGate(catalog worlddata.Catalog, sect string) string {
+	return sectGate(catalog, sect)
+}
+
+// TerritoryIsWholePlace says whether a location is a place in its own right
+// - a city, a road site, a stretch of wilds, a sect's gate - rather than a
+// part of a city (a gate, a district, a shop, an auction hall) or somebody's
+// private room (v1.12.0). A sect claims a city, not one of its streets; the
+// rule is cityOf's, so a city's parts answer the city.
+func TerritoryIsWholePlace(catalog worlddata.Catalog, location string) bool {
+	loc, ok := catalog.Locations[location]
+	return ok && !loc.Private && cityOf(catalog, location) == location
+}

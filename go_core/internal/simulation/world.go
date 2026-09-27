@@ -653,6 +653,13 @@ price_index=MAX(0.25,MIN(4.0,1.0 + ((demand-supply)*1.0/MAX(20,supply))/2.5)),la
 	return fmt.Sprintf("batch-repriced %d regional market listings; %d stall purchase(s) by the town", count, bought), nil
 }
 
+// sects advances politics, factions, NPC membership, claims, wars, and treasury
+// tribute, returning a summary of the counts. steps is the number of weekly
+// intervals batched into this call; gm is the game minute stamped on changes.
+// Claims precede wars so newly claimed ground can be attacked in the same call.
+// The caller owns the transaction. A politics update error or an error returned
+// by membership, claims, wars, or tribute stops the batch with an empty summary.
+// Faction update errors are ignored; a failed sect count is reported as zero.
 func (r *Runner) sects(conn *storage.Conn, steps, gm int64) (string, error) {
 	now := nowFloat()
 	_, err := conn.Execute(`UPDATE sect_politics_state SET influence=MAX(0,MIN(100,influence+CASE WHEN resources>60 AND cohesion>55 THEN 1 WHEN cohesion<30 THEN -1 ELSE 0 END)),cohesion=MAX(0,MIN(100,cohesion+CASE WHEN doctrine_pressure>75 THEN -1 WHEN resources>55 THEN 1 ELSE 0 END)),resources=MAX(0,MIN(100,resources+CASE WHEN influence>55 THEN MAX(1,?/8) ELSE -1 END)),recruitment_pressure=MAX(0,MIN(100,recruitment_pressure+CASE WHEN influence>65 THEN -1 ELSE 1 END)),doctrine_pressure=MAX(0,MIN(100,doctrine_pressure+CASE WHEN cohesion<40 THEN 1 ELSE 0 END)),leader_policy=CASE WHEN cohesion<30 THEN 'Stabilize Internal Factions' WHEN resources<30 THEN 'Secure Resources' WHEN influence>70 THEN 'Expand Influence' ELSE 'Balanced' END,last_game_minute=?,updated_at=?`, []any{steps, gm, now})
@@ -670,6 +677,12 @@ func (r *Runner) sects(conn *storage.Conn, steps, gm int64) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// Neutral ground first (v1.12.0, sect_claims.go), so a place claimed
+	// this tick is already somebody's for the war step that follows.
+	claimed, err := r.npcSectClaims(conn, steps, gm)
+	if err != nil {
+		return "", err
+	}
 	declared, err := r.npcSectWars(conn, steps, gm)
 	if err != nil {
 		return "", err
@@ -680,7 +693,7 @@ func (r *Runner) sects(conn *storage.Conn, steps, gm int64) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("batch-advanced politics for %d sects; %d swore in, %d walked out, %d wars declared, %d stocked to the treasuries", count, joined, left, declared, stocked), nil
+	return fmt.Sprintf("batch-advanced politics for %d sects; %d swore in, %d walked out, %d places claimed, %d wars declared, %d stocked to the treasuries", count, joined, left, claimed, declared, stocked), nil
 }
 
 func (r *Runner) clans(conn *storage.Conn, steps, gm int64) (string, error) {
