@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import re
+from typing import Any
+
 import discord
 from discord import app_commands
 
 from ...rules.advanced_runtime import BOSS_TEMPLATES, boss_encounter_phase, boss_lair
+from ...rules.battle import vitality_bar
 from ...ops.game_engine import GameEngineError
 from ..hubs import register_hub_option_hint
 from ..registry import registered_group_command
@@ -30,6 +34,103 @@ hunter_group = app_commands.Group(
     name="hunter",
     description="Respond to autonomous bounty-hunter pursuits",
 )
+
+
+_RAID_COLOURS = {"active": 0x8E44AD, "victory": 0x2ECC71, "defeat": 0xE74C3C}
+_RAID_TITLES = {"active": "👹", "victory": "🏆", "defeat": "💀"}
+
+
+def _mention_participants(text: str, participants: list[dict[str, Any]]) -> str:
+    """The engine names a struck raider by user id; the card names them."""
+    for participant in participants:
+        uid = str(participant.get("user_id") or "")
+        if uid:
+            text = re.sub(rf"\b{uid}\b", f"<@{uid}>", text)
+    return text
+
+
+def raid_card(encounter: dict[str, Any], *, events: list[str] | None = None, note: str = "") -> discord.Embed:
+    """The raid drawn as one card (v1.8.3): the boss's health, its phase,
+    the round, and every raider's vitality and whether they have acted.
+
+    Every number is read off the encounter row the engine wrote and the
+    template it was started from; nothing here decides anything.
+    """
+    status = str(encounter.get("status") or "active")
+    participants = list(encounter.get("participants") or [])
+    template = BOSS_TEMPLATES.get(str(encounter.get("template_key")), {})
+    phases = list(template.get("phases") or [])
+    phase_index = min(max(0, int(encounter.get("phase_index") or 0)), max(0, len(phases) - 1))
+    round_index = int(encounter.get("round_index") or 1)
+
+    lines = [_mention_participants(str(event), participants) for event in list(events or [])[:12]]
+    if note:
+        lines.append(note)
+    if not lines:
+        lines.append(
+            {
+                "victory": "The boss has fallen. Every raider has a reward waiting.",
+                "defeat": "The party has fallen. The boss keeps its lair.",
+            }.get(status, "Each raider acts once a round; the boss answers when the whole party has acted.")
+        )
+    embed = discord.Embed(
+        title=f"{_RAID_TITLES.get(status, '👹')} Raid #{encounter.get('encounter_id')} — {encounter.get('boss_name', 'Boss')}",
+        description="\n".join(f"• {line}" if events else line for line in lines)[:4000],
+        colour=_RAID_COLOURS.get(status, _RAID_COLOURS["active"]),
+    )
+    embed.add_field(
+        name="Boss",
+        value=vitality_bar(int(encounter.get("boss_hp") or 0), int(encounter.get("boss_hp_max") or 0)),
+        inline=False,
+    )
+    if phases:
+        phase = boss_encounter_phase(encounter)
+        threshold = float(phase.get("threshold") or 0)
+        shift = f"\n-# shifts below {round(threshold * 100)}% health" if status == "active" and threshold > 0 else ""
+        embed.add_field(
+            name="Phase",
+            value=f"**{phase.get('name', 'Unknown')}** • {phase_index + 1}/{len(phases)}{shift}",
+            inline=True,
+        )
+    embed.add_field(name="Round", value=f"**{round_index}**", inline=True)
+    embed.add_field(name="Lair", value=str(encounter.get("location") or "Unknown"), inline=True)
+
+    party: list[str] = []
+    for participant in participants:
+        if str(participant.get("status")) == "knocked_out":
+            state = "💀 down"
+        elif status != "active":
+            state = "standing"
+        elif int(participant.get("acted_round") or 0) >= round_index:
+            state = "🛡️ guarding" if int(participant.get("guard") or 0) else "✅ acted"
+        else:
+            state = "⏳ to act"
+        party.append(
+            f"<@{participant.get('user_id')}> • {state} • dealt **{int(participant.get('total_damage') or 0)}**\n"
+            f"{vitality_bar(int(participant.get('vitality') or 0), int(participant.get('vitality_max') or 0), width=8)}"
+        )
+    if party:
+        shown: list[str] = []
+        for entry in party:
+            if len("\n".join([*shown, entry])) > 980:
+                break
+            shown.append(entry)
+        if len(shown) < len(party):
+            shown.append(f"-# and {len(party) - len(shown)} more raiders")
+        embed.add_field(name=f"Raid Party ({len(participants)})", value="\n".join(shown), inline=False)
+
+    if status == "victory":
+        embed.set_footer(text=f"Claim your reward: /boss claim encounter_id:{encounter.get('encounter_id')}")
+    elif status == "active":
+        embed.set_footer(text="Act: Attack • Technique • Defend • Support — once each round")
+    return embed
+
+
+async def _send_raid_card(interaction: discord.Interaction, embed: discord.Embed) -> None:
+    if interaction.response.is_done():
+        await interaction.followup.send(embed=embed, ephemeral=False)
+    else:
+        await interaction.response.send_message(embed=embed, ephemeral=False)
 
 
 async def law_technique_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
@@ -88,13 +189,13 @@ async def boss_start(interaction: discord.Interaction, boss: str) -> None:
     # A lone cultivator is given a party of one for the raid (v1.7.8); the
     # engine says so, and closes it when the raid ends.
     alone = (
-        "\nYou face it alone: a party of one was formed for this raid and closes when the raid ends."
+        "You face it alone: a party of one was formed for this raid and closes when the raid ends."
         if result.get("solo_party") else ""
     )
-    await interaction.followup.send(
-        f"👹 **Boss Encounter #{result.get('encounter_id')} — {result.get('boss_name', 'Boss')}** begins with **{result.get('boss_hp', 0)}/{result.get('boss_hp_max', 0)} HP**.{alone}",
-        ephemeral=False,
-    )
+    encounter = await DB.get_boss_encounter(encounter_id=int(result.get("encounter_id") or 0)) if result.get("encounter_id") else None
+    if not encounter:
+        encounter = {**result, "boss_name": result.get("boss_name", "Boss"), "status": "active"}
+    await _send_raid_card(interaction, raid_card(encounter, note=alone))
 
 
 @boss_start.autocomplete("boss")
@@ -133,13 +234,7 @@ async def boss_status(interaction: discord.Interaction) -> None:
     if not encounter:
         await interaction.response.send_message("Your party has no active boss encounter.", ephemeral=False)
         return
-    lines = [
-        f"👹 **#{encounter['encounter_id']} {encounter['boss_name']}** • Round **{encounter['round_index']}**",
-        f"Boss HP **{encounter['boss_hp']}/{encounter['boss_hp_max']}** • Phase **{boss_encounter_phase(encounter).get('name', 'Unknown')}**",
-    ]
-    for participant in encounter['participants']:
-        lines.append(f"• <@{participant['user_id']}> — **{participant['vitality']}/{participant['vitality_max']}** • {participant['status']} • damage {participant['total_damage']}")
-    await reply_long(interaction, "\n".join(lines), ephemeral=False)
+    await _send_raid_card(interaction, raid_card(encounter))
 
 
 @registered_group_command(boss_group, name="act", description="Take your once-per-round raid action; boss retaliates after the full party acts")
@@ -173,11 +268,12 @@ async def boss_act(interaction: discord.Interaction, style: app_commands.Choice[
     except GameEngineError as exc:
         await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
-    events = "\n".join(f"• {event}" for event in list(result.get('events') or [])[:12])
-    await interaction.response.send_message(
-        f"👹 **Boss #{result.get('encounter_id', encounter['encounter_id'])}** • {result.get('status', 'active')} • Round {result.get('round_index', '?')} • HP **{result.get('boss_hp', '?')}/{result.get('boss_hp_max', '?')}**\n{events}",
-        ephemeral=False,
-    )
+    # The card is drawn from the row the action just wrote, read by id
+    # because a finished raid is no longer the party's active one.
+    after = await DB.get_boss_encounter(encounter_id=int(result.get("encounter_id") or encounter["encounter_id"]))
+    card = {**encounter, **result, **(after or {})}
+    card["status"] = str(result.get("status") or card.get("status") or "active")
+    await _send_raid_card(interaction, raid_card(card, events=[str(e) for e in list(result.get("events") or [])]))
 
 
 @registered_group_command(boss_group, name="claim", description="Claim your reward from a completed boss encounter")
