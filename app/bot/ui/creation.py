@@ -13,6 +13,7 @@ from typing import Any
 import discord
 
 from ...rules.birthfamily import family_connections_line, family_tier_name, family_tutoring_line
+from ...rules.path_traits import trait_line
 from ...rules.creation_ui import (
     cultivation_style_profile,
     family_emoji,
@@ -170,7 +171,8 @@ class CharacterModal(discord.ui.Modal):
         )
         embed.add_field(
             name="☯️ Chosen Cultivation Path",
-            value=f"{style_profile['emoji']} **{normalized_path}**\n{style_profile['summary']}\nFocus: {style_profile['focus']}",
+            value=(f"{style_profile['emoji']} **{normalized_path}**\n{style_profile['summary']}\nFocus: {style_profile['focus']}"
+                   + (f"\n{trait_line(WORLD.paths, normalized_path)}" if trait_line(WORLD.paths, normalized_path) else "")),
             inline=True,
         )
         root_elements = ", ".join(str(x) for x in aptitude_profile["root"].get("elements", [normalized_root]))

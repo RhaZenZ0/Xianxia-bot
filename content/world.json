@@ -544,7 +544,13 @@
       "insight": 1,
       "will": 3,
       "presence": 1,
-      "skill": "Sword"
+      "skill": "Sword",
+      "trait": {
+        "name": "Sword Intent",
+        "summary": "Every battle or duel you win sharpens your intent, up to {intent_cap}. In battle, Intent Strike spends one for an attack at +{intent_strike_bonus} that the foe cannot answer that turn.",
+        "intent_cap": 3,
+        "intent_strike_bonus": 5
+      }
     },
     "Qi Refiner": {
       "body": 1,
@@ -553,7 +559,12 @@
       "insight": 3,
       "will": 2,
       "presence": 1,
-      "skill": "Spiritual Arts"
+      "skill": "Spiritual Arts",
+      "trait": {
+        "name": "Refined Circulation",
+        "summary": "A cultivation stance only you can take: x{stance_gain_mult} gain with no risk of deviation.",
+        "stance_gain_mult": 1.2
+      }
     },
     "Body Refiner": {
       "body": 3,
@@ -562,7 +573,13 @@
       "insight": 1,
       "will": 3,
       "presence": 2,
-      "skill": "Martial Arts"
+      "skill": "Martial Arts",
+      "trait": {
+        "name": "Iron Flesh",
+        "summary": "Your body mends {recovery_mult}x as fast, and a lost fight leaves a wound {wound_relief} severity lighter.",
+        "recovery_mult": 2,
+        "wound_relief": 1
+      }
     },
     "Soul Cultivator": {
       "body": 1,
@@ -571,7 +588,13 @@
       "insight": 2,
       "will": 3,
       "presence": 2,
-      "skill": "Soul Arts"
+      "skill": "Soul Arts",
+      "trait": {
+        "name": "Still Heart",
+        "summary": "+{heart_wave_bonus} on a tribulation's Heart wave, and your spirit sense builds {sense_gain_mult}x as fast.",
+        "heart_wave_bonus": 2,
+        "sense_gain_mult": 1.5
+      }
     },
     "Beast Binder": {
       "body": 2,
@@ -580,16 +603,26 @@
       "insight": 1,
       "will": 1,
       "presence": 3,
-      "skill": "Beastcraft"
+      "skill": "Beastcraft",
+      "trait": {
+        "name": "Beast Bond",
+        "summary": "Beasts come to you: a strong hunt can bond one outright, wild beasts are easier to find and to tame, and a contract roll is steadier."
+      }
     },
     "Formation Adept": {
       "body": 1,
       "agility": 2,
-      "spirit": 2,
+      "spirit": 3,
       "insight": 3,
       "will": 2,
-      "presence": 2,
-      "skill": "Formations"
+      "presence": 1,
+      "skill": "Formations",
+      "trait": {
+        "name": "Enduring Arrays",
+        "summary": "Arrays you deploy hold {array_duration_mult}x as long, and {free_deploys_per_day} deploy a world day costs no disk.",
+        "array_duration_mult": 2,
+        "free_deploys_per_day": 1
+      }
     },
     "Ghost Cultivator": {
       "body": 1,
@@ -598,8 +631,16 @@
       "insight": 2,
       "will": 3,
       "presence": 1,
-      "skill": "Ghost Arts"
+      "skill": "Ghost Arts",
+      "trait": {
+        "name": "Death Qi",
+        "summary": "You gather the death qi a place keeps, and wear the forms it leaves behind."
+      }
     }
+  },
+  "path_system": {
+    "own_manual_gathering_mult": 1.15,
+    "own_manual_practice_bonus": 1
   },
   "roots": [
     "Fire",
@@ -27860,7 +27901,8 @@
       "description": "A lost alchemical inheritance teaching medicinal harmony, flame restraint and adaptive pill formulas.",
       "preferred_paths": [
         "Qi Refiner",
-        "Formation Adept"
+        "Formation Adept",
+        "Beast Binder"
       ],
       "bonuses": {
         "qi_max": 2,
@@ -27965,7 +28007,8 @@
       "description": "A soul inheritance of the lantern-keepers, who lit the wetland road for the dead and were the last thing many of them saw.",
       "preferred_paths": [
         "Soul Cultivator",
-        "Qi Refiner"
+        "Qi Refiner",
+        "Ghost Cultivator"
       ],
       "bonuses": {
         "qi_max": 3,
@@ -28047,7 +28090,8 @@
           "tn": 13,
           "preferred_paths": [
             "Formation Adept",
-            "Qi Refiner"
+            "Qi Refiner",
+            "Beast Binder"
           ],
           "cultivation": 10,
           "spirit_stones": 5,
@@ -28071,7 +28115,10 @@
           "items": {
             "ice_spirit_blazing_grass": 1,
             "jade_life_herb": 1
-          }
+          },
+          "preferred_paths": [
+            "Beast Binder"
+          ]
         },
         {
           "name": "Broken Pill Hall",
@@ -28616,7 +28663,8 @@
           "attribute": "presence",
           "tn": 18,
           "preferred_paths": [
-            "Soul Cultivator"
+            "Soul Cultivator",
+            "Ghost Cultivator"
           ],
           "cultivation": 20,
           "spirit_stones": 10,
@@ -28647,7 +28695,8 @@
           "attribute": "will",
           "tn": 22,
           "preferred_paths": [
-            "Soul Cultivator"
+            "Soul Cultivator",
+            "Ghost Cultivator"
           ],
           "cultivation": 30,
           "spirit_stones": 16,
@@ -31275,7 +31324,8 @@
         "description": "Invited applicants keep vigil among bound memories and must distinguish fear, grief and spiritual deception without losing their own identity.",
         "path_bonuses": {
           "Soul Cultivator": 2,
-          "Formation Adept": 1
+          "Formation Adept": 1,
+          "Ghost Cultivator": 2
         },
         "root_affinities": [
           "Yin",
@@ -31393,7 +31443,8 @@
         "description": "Applicants sit in the ash and let the pavilion's soul-fire test what is left of them when the body is set aside; the pavilion keeps those who come back.",
         "path_bonuses": {
           "Soul Cultivator": 2,
-          "Qi Refiner": 1
+          "Qi Refiner": 1,
+          "Ghost Cultivator": 1
         },
         "root_affinities": [
           "Yin",
@@ -32083,6 +32134,9 @@
         "supreme": false,
         "affinity_roots": [
           "Fire Root"
+        ],
+        "affinity_paths": [
+          "Qi Refiner"
         ]
       },
       "water": {
@@ -32093,6 +32147,9 @@
         "affinity_roots": [
           "Water Root",
           "Ice Root"
+        ],
+        "affinity_paths": [
+          "Qi Refiner"
         ]
       },
       "sword": {
@@ -32112,6 +32169,9 @@
         "affinity_roots": [
           "Void Root",
           "Chaos Root"
+        ],
+        "affinity_paths": [
+          "Formation Adept"
         ]
       },
       "time": {
@@ -32121,6 +32181,9 @@
         "supreme": true,
         "affinity_roots": [
           "Chaos Root"
+        ],
+        "affinity_paths": [
+          "Formation Adept"
         ]
       },
       "karma": {
@@ -32130,6 +32193,9 @@
         "supreme": true,
         "affinity_roots": [
           "Chaos Root"
+        ],
+        "affinity_paths": [
+          "Soul Cultivator"
         ]
       },
       "fate": {
@@ -32139,6 +32205,9 @@
         "supreme": true,
         "affinity_roots": [
           "Chaos Root"
+        ],
+        "affinity_paths": [
+          "Soul Cultivator"
         ]
       },
       "life": {
@@ -32149,6 +32218,10 @@
         "affinity_roots": [
           "Wood Root",
           "Chaos Root"
+        ],
+        "affinity_paths": [
+          "Beast Binder",
+          "Body Refiner"
         ]
       },
       "death": {
@@ -32159,6 +32232,9 @@
         "affinity_roots": [
           "Void Root",
           "Chaos Root"
+        ],
+        "affinity_paths": [
+          "Ghost Cultivator"
         ]
       },
       "chaos": {
@@ -32168,6 +32244,9 @@
         "supreme": true,
         "affinity_roots": [
           "Chaos Root"
+        ],
+        "affinity_paths": [
+          "Body Refiner"
         ]
       },
       "void": {
@@ -32178,6 +32257,10 @@
         "affinity_roots": [
           "Void Root",
           "Chaos Root"
+        ],
+        "affinity_paths": [
+          "Ghost Cultivator",
+          "Soul Cultivator"
         ]
       }
     },
@@ -33094,7 +33177,7 @@
         "name": "Blood Sea Scripture",
         "item_id": "blood_sea_scripture_manual",
         "alignment": "Demonic",
-        "path": "Blood",
+        "path": "Sword Cultivator",
         "grade": "Earth",
         "element": "Yin",
         "min_realm_index": 1,
@@ -33108,7 +33191,7 @@
         "name": "Soul-Devouring Codex",
         "item_id": "soul_devouring_codex_manual",
         "alignment": "Demonic",
-        "path": "Soul",
+        "path": "Soul Cultivator",
         "grade": "Earth",
         "element": "Yin",
         "min_realm_index": 2,
@@ -33122,7 +33205,7 @@
         "name": "White Bone Demon Manual",
         "item_id": "white_bone_demon_manual",
         "alignment": "Demonic",
-        "path": "Body",
+        "path": "Body Refiner",
         "grade": "Spirit",
         "element": "Metal",
         "min_realm_index": 1,
@@ -33136,7 +33219,7 @@
         "name": "Ten Thousand Venoms Record",
         "item_id": "ten_thousand_venoms_manual",
         "alignment": "Unorthodox",
-        "path": "Poison",
+        "path": "Qi Refiner",
         "grade": "Earth",
         "element": "Water",
         "min_realm_index": 1,
@@ -33150,7 +33233,7 @@
         "name": "Heart-Demon Whispering Art",
         "item_id": "heart_demon_whispering_manual",
         "alignment": "Demonic",
-        "path": "Illusion",
+        "path": "Soul Cultivator",
         "grade": "Heaven",
         "element": "Yin",
         "min_realm_index": 3,
@@ -33164,7 +33247,7 @@
         "name": "Netherworld Sacrificial Sutra",
         "item_id": "netherworld_sacrificial_manual",
         "alignment": "Demonic",
-        "path": "Sacrifice",
+        "path": "Ghost Cultivator",
         "grade": "Heaven",
         "element": "Void",
         "min_realm_index": 4,

@@ -122,11 +122,14 @@ func TestCrossingARealmRaisesTheCultivatorsAttributes(t *testing.T) {
 		t.Fatalf("crossing: %v", crossed)
 	}
 	gains, _ := crossed["attribute_gains"].(map[string]any)
-	if storage.ParseInt(gains["will"]) != 1 || storage.ParseInt(gains["agility"]) != 1 {
-		t.Fatalf("a Sword Cultivator gains will and their agility: %v", gains)
+	// v1.13.0: a path grows every attribute tied for its highest - a Sword
+	// Cultivator's agility and will, 3 and 3 - and the qi ladder adds its own
+	// will beside them, so will rises twice.
+	if storage.ParseInt(gains["will"]) != 2 || storage.ParseInt(gains["agility"]) != 1 {
+		t.Fatalf("a Sword Cultivator gains both tied attributes and the qi ladder's will: %v", gains)
 	}
 	after := attributesOf(t, path)
-	if after["will"] != before["will"]+1 || after["agility"] != before["agility"]+1 || after["spirit"] != before["spirit"] {
+	if after["will"] != before["will"]+2 || after["agility"] != before["agility"]+1 || after["spirit"] != before["spirit"] {
 		t.Fatalf("attributes %v -> %v", before, after)
 	}
 }

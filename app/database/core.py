@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 71
+SCHEMA_VERSION = 72
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -2874,6 +2874,17 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                 updated_at REAL NOT NULL,
                 FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE
             )""",
+        ),
+    ),
+    (
+        72,
+        "path_resource",
+        (
+            # v1.13.0: what a cultivation path banks between actions. Today that
+            # is a Sword Cultivator's intent - one a win, spent on an Intent
+            # Strike - and it is a column on the character rather than a row of
+            # its own so a reset or an erasure takes it with the life.
+            "ALTER TABLE characters ADD COLUMN path_resource INTEGER NOT NULL DEFAULT 0",
         ),
     ),
 )

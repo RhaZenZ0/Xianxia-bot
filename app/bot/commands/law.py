@@ -78,6 +78,10 @@ async def law_comprehend(interaction:discord.Interaction,law:str,spend_insight:b
     result=dict(envelope.get("result") or {})
     roll=SimpleNamespace(**dict(result.get("roll") or {}))
     legacy_note=f"\n☸️ Soul Legacy Law Echo: **+{int(result.get('legacy_bonus',0))}** to the comprehension check." if int(result.get('legacy_bonus',0)) else ""
+    # v1.13.0: the +3 a root or a path with an affinity for this Law adds was
+    # rolled since the Laws were written and printed nowhere.
+    if int(result.get('affinity_bonus',0)):
+        legacy_note+=f"\n🜂 Your root or path has an affinity for this Law: **+{int(result['affinity_bonus'])}** to the check."
     if int(result.get('insight_spent',0)):
         legacy_note+=f"\n💡 You put **{int(result['insight_spent'])} Insight XP** into it: **+{int(result.get('insight_bonus',0))}** to the check."
     await interaction.response.send_message(
@@ -158,12 +162,20 @@ async def learned_manual_autocomplete(interaction:discord.Interaction,current:st
     can practise (v1.0.0-rc.6)."""
     needle=current.casefold().strip(); learned={str(r['manual_id']) for r in await DB.get_manuals(interaction.user.id)}
     order={g:i for i,g in enumerate(("Dao","Immortal","Heaven","Spirit","Earth","Mortal"))}
+    # v1.13.0: a method written for your own path gathers and practises faster,
+    # so the picker says which ones are.
+    try:
+        own_path=str((await DB.get_character(interaction.user.id) or {}).get("path") or "")
+    except Exception:
+        own_path=""
+    own_mult=float((WORLD.data.get("path_system") or {}).get("own_manual_gathering_mult") or 1)
     rows=[]
     for mid in learned:
         m=WORLD.manual_definition(mid) or {}
         name=str(m.get('name',mid)); grade=str(m.get('grade','Unknown'))
         if needle and needle not in name.casefold() and needle not in mid.casefold(): continue
-        rows.append((order.get(grade,99),name,app_commands.Choice(name=f"{name} • {grade}"[:100],value=mid[:100])))
+        suited=" • your path x"+f"{own_mult:g}" if own_path and str(m.get('path') or '')==own_path else ""
+        rows.append((order.get(grade,99),name,app_commands.Choice(name=f"{name} • {grade}{suited}"[:100],value=mid[:100])))
     rows.sort(key=lambda r:(r[0],r[1]))
     return [r[2] for r in rows[:25]]
 

@@ -17,6 +17,40 @@ type Path struct {
 	Will     int    `json:"will"`
 	Presence int    `json:"presence"`
 	Skill    string `json:"skill"`
+	// Trait (v1.13.0) is what the path does that no other path does. Its
+	// numbers are read by game.pathTrait; the name and summary are the bot's
+	// to print, and the summary fills its numbers from these same fields.
+	Trait PathTrait `json:"trait"`
+}
+
+// PathTrait is one path's ability (v1.13.0). Each path authors only the fields
+// its own rule reads; an absent field is zero and reads as "no ability".
+type PathTrait struct {
+	Name    string `json:"name"`
+	Summary string `json:"summary"`
+	// Sword Cultivator: intent banked by wins and spent on an Intent Strike.
+	IntentCap         int64 `json:"intent_cap"`
+	IntentStrikeBonus int64 `json:"intent_strike_bonus"`
+	// Qi Refiner: the gain of the stance only this path may take.
+	StanceGainMult float64 `json:"stance_gain_mult"`
+	// Body Refiner: how much faster vitality mends, and how much lighter a
+	// lost fight's wound is.
+	RecoveryMult float64 `json:"recovery_mult"`
+	WoundRelief  int64   `json:"wound_relief"`
+	// Soul Cultivator: the tribulation's Heart wave and the spirit sense.
+	HeartWaveBonus int64   `json:"heart_wave_bonus"`
+	SenseGainMult  float64 `json:"sense_gain_mult"`
+	// Formation Adept: how much longer a deployed array holds, and how many
+	// deploys a world day cost no disk.
+	ArrayDurationMult float64 `json:"array_duration_mult"`
+	FreeDeploysPerDay int64   `json:"free_deploys_per_day"`
+}
+
+// PathSystem (v1.13.0) is what every path shares: a manual of your own path
+// suits you better than anybody else's.
+type PathSystem struct {
+	OwnManualGatheringMult float64 `json:"own_manual_gathering_mult"`
+	OwnManualPracticeBonus int64   `json:"own_manual_practice_bonus"`
 }
 
 type RootGrade struct {
@@ -951,6 +985,7 @@ type Catalog struct {
 	Realms              []Realm                        `json:"realms"`
 	BodyRealms          []Realm                        `json:"body_realms"`
 	Paths               map[string]Path                `json:"paths"`
+	PathSystem          PathSystem                     `json:"path_system"`
 	Roots               []string                       `json:"roots"`
 	SpiritualRootSystem RootSystem                     `json:"spiritual_root_system"`
 	Bloodlines          map[string]BloodlineDefinition `json:"bloodlines"`

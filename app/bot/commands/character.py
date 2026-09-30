@@ -15,6 +15,7 @@ from discord import app_commands
 
 from ...rules import commissions as commission_rules
 from ...rules.advanced_runtime import describe_equipment, describe_era, equipment_passive_line
+from ...rules.path_traits import sword_intent_cap, trait_line
 from ...rules.birthfamily import family_tier_name, karma_description, karma_label
 from ...rules.fate import fate_label
 from ...ops.game_engine import GameEngineError
@@ -146,7 +147,16 @@ async def sheet(interaction: discord.Interaction) -> None:
     # The path's skill (v1.3.4): `paths.<name>.skill` was parsed and read by
     # nothing for the life of the file; it is the line under the path now.
     skill = str((WORLD.paths.get(c["path"]) or {}).get("skill") or "").strip()
-    embed.add_field(name="Path", value=f"{c['path']}\n-# {skill}" if skill else c["path"], inline=True)
+    path_text = f"{c['path']}\n-# {skill}" if skill else c["path"]
+    # v1.13.0: what the path does, filled from the numbers the engine reads,
+    # and a Sword Cultivator's banked intent.
+    ability = trait_line(WORLD.paths, c["path"])
+    if ability:
+        path_text += f"\n{ability}"
+    intent_cap = sword_intent_cap(WORLD.paths, c["path"])
+    if intent_cap:
+        path_text += f"\n🗡️ Sword intent **{int(c.get('path_resource') or 0)}/{intent_cap}**"
+    embed.add_field(name="Path", value=path_text, inline=True)
     location_display=await character_location_display(c)
     embed.add_field(name="Location", value=location_display, inline=True)
     wallet_lines=[f"{WORLD.currency_name(cid)}: **{int(balance):,}**" for cid,balance in wallet.items() if int(balance)>0]

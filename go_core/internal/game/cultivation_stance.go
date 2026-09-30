@@ -56,6 +56,48 @@ func stanceDefinition(key string) (cultivationStanceDefinition, bool) {
 	return cultivationStanceDefinition{}, false
 }
 
+// refinedCirculationStance is the Qi Refiner's own stance (v1.13.0): its gain
+// is the path trait's `stance_gain_mult`, and it carries neither Refine's
+// insight nor Force's deviation - applyStanceToTraining's switch names neither
+// key, so it risks nothing by construction. It is built from the catalogue
+// rather than listed beside the other three, because its number is content and
+// the other three are code; a path the catalogue does not give the stance to
+// answers false.
+func refinedCirculationStance(catalog worlddata.Catalog, path string) (cultivationStanceDefinition, bool) {
+	trait, ok := pathTrait(catalog, path)
+	if !ok || strings.TrimSpace(path) != pathQi || trait.StanceGainMult <= 0 {
+		return cultivationStanceDefinition{}, false
+	}
+	return cultivationStanceDefinition{
+		Key: qiRefinerStanceKey, Label: trait.Name, GainMult: trait.StanceGainMult,
+		Description: fmt.Sprintf("The Qi Refiner's own circulation: x%.2f gain with no deviation risk and nothing banked.", trait.StanceGainMult),
+	}, true
+}
+
+// stancesForPath is every stance this cultivator may take, in the order a
+// picker offers them - so the bot's /stance lists what the engine will accept
+// rather than a copy of it (rc.46).
+func stancesForPath(catalog worlddata.Catalog, path string) []map[string]any {
+	out := []map[string]any{}
+	keys := []string{stanceCirculate, stanceRefine, stanceForce, qiRefinerStanceKey}
+	for _, key := range keys {
+		if def, ok := stanceForPath(catalog, key, path); ok {
+			out = append(out, map[string]any{"key": def.Key, "label": def.Label, "gain_mult": def.GainMult, "description": def.Description})
+		}
+	}
+	return out
+}
+
+// stanceForPath is the one answer to "may this cultivator hold this stance":
+// the three every path may take, and the refined one for a Qi Refiner alone.
+func stanceForPath(catalog worlddata.Catalog, key, path string) (cultivationStanceDefinition, bool) {
+	key = strings.ToLower(strings.TrimSpace(key))
+	if key == qiRefinerStanceKey {
+		return refinedCirculationStance(catalog, path)
+	}
+	return stanceDefinition(key)
+}
+
 func cultivationStanceKey(userID int64) string { return fmt.Sprintf("cultivation_stance:%d", userID) }
 
 // The moment seized (v1.0.0-rc.4): a failed breakthrough leaves the stage's
@@ -124,13 +166,15 @@ func writeWorldStateMap(conn *storage.Conn, key string, value map[string]any, no
 }
 
 // loadCultivationStance is the stance the player holds; Circulate when none
-// was ever chosen or the stored one is no longer a stance.
-func loadCultivationStance(conn *storage.Conn, userID int64) (cultivationStanceDefinition, error) {
+// was ever chosen, the stored one is no longer a stance, or it is a path's
+// stance the cultivator no longer walks (a samsara into another path, a GM's
+// path change) - a stored choice is not a licence.
+func loadCultivationStance(conn *storage.Conn, catalog worlddata.Catalog, userID int64, path string) (cultivationStanceDefinition, error) {
 	state, err := readWorldStateMap(conn, cultivationStanceKey(userID))
 	if err != nil {
 		return cultivationStanceDefinition{}, err
 	}
-	if def, ok := stanceDefinition(strings.ToLower(strings.TrimSpace(fmt.Sprint(state["stance"])))); ok {
+	if def, ok := stanceForPath(catalog, fmt.Sprint(state["stance"]), path); ok {
 		return def, nil
 	}
 	def, _ := stanceDefinition(stanceCirculate)
@@ -142,7 +186,7 @@ type cultivationStancePayload struct {
 	Stance     string `json:"stance"`
 }
 
-func cultivationStanceAction(conn *storage.Conn, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func cultivationStanceAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p cultivationStancePayload
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
@@ -154,11 +198,14 @@ func cultivationStanceAction(conn *storage.Conn, userID int64, raw json.RawMessa
 	if c.LifeStatus != "alive" {
 		return authoritativeMutation{}, errors.New("a deceased incarnation holds no stance")
 	}
-	def, ok := stanceDefinition(strings.ToLower(strings.TrimSpace(p.Stance)))
+	def, ok := stanceForPath(catalog, p.Stance, c.Path)
 	if !ok {
+		if strings.EqualFold(strings.TrimSpace(p.Stance), qiRefinerStanceKey) {
+			return authoritativeMutation{}, errors.New("only a Qi Refiner can take the refined circulation")
+		}
 		return authoritativeMutation{}, fmt.Errorf("unknown stance %q: choose circulate, refine or force", p.Stance)
 	}
-	previous, err := loadCultivationStance(conn, userID)
+	previous, err := loadCultivationStance(conn, catalog, userID, c.Path)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -363,7 +410,7 @@ func cultivationStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if err != nil {
 		return nil, err
 	}
-	stance, err := loadCultivationStance(conn, userID)
+	stance, err := loadCultivationStance(conn, catalog, userID, c.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -435,6 +482,7 @@ func cultivationStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 		"insight_banked": banked, "insight_cost": insightGateCost(c.RealmIndex), "insight_xp": xp,
 		"perfection_completed": perfect, "perfection_active": perfectionActive,
 		"stance": stance.Key, "stance_label": stance.Label, "stance_mult": stance.GainMult, "stance_description": stance.Description,
+		"stances":            stancesForPath(catalog, c.Path),
 		"cooldown_remaining": cooldown, "body_cooldown_remaining": bodyCooldown,
 		"odds": odds, "dual_resonance": dualResonance(c),
 		"period": tm.Period, "season": tm.Season, "time_mult": tm.QiMult, "body_time_mult": tm.BodyMult, "root_resonance": tm.RootResonance,

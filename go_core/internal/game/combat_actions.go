@@ -590,8 +590,8 @@ func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		return authoritativeMutation{}, e
 	}
 	style := strings.ToLower(strings.TrimSpace(p.Style))
-	if style != "attack" && style != "defend" && style != "flee" {
-		return authoritativeMutation{}, errors.New("style must be attack, defend, or flee")
+	if style != "attack" && style != "defend" && style != "flee" && style != "intent" {
+		return authoritativeMutation{}, errors.New("style must be attack, defend, flee, or intent")
 	}
 	c, e := loadMechanicsCharacter(conn, userID)
 	if e != nil {
@@ -639,6 +639,29 @@ func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		out["action"] = strings.TrimSpace(p.Action)
 	}
 	defenseBonus := def
+	// An Intent Strike (v1.13.0) is a Sword Cultivator's alone: one banked
+	// intent, spent before the roll whether it lands or not, for an attack at
+	// the path's bonus that the opponent cannot answer this turn. Refused
+	// before anything is spent for anybody else, or with nothing banked.
+	intentStrike := false
+	if style == "intent" {
+		trait, _ := pathTrait(catalog, c.Path)
+		if swordIntentCap(catalog, c.Path) <= 0 {
+			return authoritativeMutation{}, errors.New("only a Sword Cultivator can make an Intent Strike")
+		}
+		if swordIntentTx(conn, userID) < 1 {
+			return authoritativeMutation{}, errors.New("no sword intent banked; win a battle or a duel to sharpen it")
+		}
+		if _, e = conn.Execute(`UPDATE characters SET path_resource=path_resource-1 WHERE user_id=? AND path_resource>=1`, []any{userID}); e != nil {
+			return authoritativeMutation{}, e
+		}
+		intentStrike = true
+		atk += trait.IntentStrikeBonus
+		out["intent_strike"] = true
+		out["intent_strike_bonus"] = trait.IntentStrikeBonus
+		out["sword_intent"] = swordIntentTx(conn, userID)
+		style = "attack"
+	}
 	if style == "flee" {
 		// A Law control effect on the opponent (v1.3.3): their `escape_bonus`
 		// is how far they can follow, so a lockdown's -5 is +5 to get away.
@@ -705,7 +728,11 @@ func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		out["status"] = "active"
 		return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "combat", EventType: "opponent_defeated", EntityType: "battle", EntityID: fmt.Sprint(b.BattleID), GameMinute: p.GameMinute, Payload: out}}, nil
 	}
-	if b.Suppressed > 0 {
+	if intentStrike {
+		// The strike is not answered, and it spends no suppression turn a
+		// technique earned: those stay the opponent's to wait out.
+		out["counter_suppressed"] = true
+	} else if b.Suppressed > 0 {
 		b.Suppressed--
 		out["counter_suppressed"] = true
 	} else {
@@ -763,6 +790,8 @@ func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 					key = "soul_wound"
 					sev = 3
 				}
+				// A Body Refiner's flesh takes it lighter (v1.13.0).
+				sev = defeatWoundSeverity(catalog, c.Path, sev)
 				inj, e := survivedDefeatTx(conn, userID, key, sev, "fate_rescue", fmt.Sprint(b.BattleID), p.GameMinute)
 				if e != nil {
 					return authoritativeMutation{}, e
@@ -785,6 +814,8 @@ func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 				key = "bone_fracture"
 				sev = 2
 			}
+			// A Body Refiner's flesh takes it lighter (v1.13.0).
+			sev = defeatWoundSeverity(catalog, c.Path, sev)
 			inj, e := survivedDefeatTx(conn, userID, key, sev, "battle", fmt.Sprint(b.BattleID), p.GameMinute)
 			if e != nil {
 				return authoritativeMutation{}, e
@@ -1018,6 +1049,8 @@ func combatTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 					key = "soul_wound"
 					sev = 3
 				}
+				// A Body Refiner's flesh takes it lighter (v1.13.0).
+				sev = defeatWoundSeverity(catalog, c.Path, sev)
 				inj, e := survivedDefeatTx(conn, userID, key, sev, "fate_rescue", fmt.Sprint(b.BattleID), p.GameMinute)
 				if e != nil {
 					return authoritativeMutation{}, e
@@ -1040,6 +1073,8 @@ func combatTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 				key = "bone_fracture"
 				sev = 2
 			}
+			// A Body Refiner's flesh takes it lighter (v1.13.0).
+			sev = defeatWoundSeverity(catalog, c.Path, sev)
 			inj, e := survivedDefeatTx(conn, userID, key, sev, "battle", fmt.Sprint(b.BattleID), p.GameMinute)
 			if e != nil {
 				return authoritativeMutation{}, e
@@ -1147,7 +1182,10 @@ func combatFinalizeAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 		return authoritativeMutation{}, e
 	}
 	severity := clampI64(1+b.NPCRealm/4+b.NPCStage/3, 1, 10)
-	out := map[string]any{"battle_id": b.BattleID, "outcome": outcome, "npc_name": b.NPCName, "npc_realm_index": b.NPCRealm, "npc_stage": b.NPCStage, "location": b.Location, "source": b.Source, "severity": severity, "insight_xp_awarded": reward, "event_manifestation": strings.HasPrefix(b.Source, "event:")}
+	// A win sharpens a Sword Cultivator's intent (v1.13.0); anybody else banks
+	// nothing, and a lost point never costs the win.
+	intent := bankSwordIntentTx(conn, catalog, userID)
+	out := map[string]any{"battle_id": b.BattleID, "outcome": outcome, "sword_intent": intent, "npc_name": b.NPCName, "npc_realm_index": b.NPCRealm, "npc_stage": b.NPCStage, "location": b.Location, "source": b.Source, "severity": severity, "insight_xp_awarded": reward, "event_manifestation": strings.HasPrefix(b.Source, "event:")}
 	if !strings.HasPrefix(b.Source, "event:") {
 		karmaDelta := int64(2)
 		repDelta := int64(2)

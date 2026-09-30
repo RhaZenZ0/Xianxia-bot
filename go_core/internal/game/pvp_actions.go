@@ -248,6 +248,10 @@ func pvpActAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, r
 			return authoritativeMutation{}, e
 		}
 		if fought {
+			// A duel won by a yield sharpens the winner's sword intent
+			// (v1.13.0) - but only one that was fought, the reputation rule's
+			// own reason: a challenge-accept-surrender cycle is no win.
+			result["winner_sword_intent"] = bankSwordIntentTx(conn, catalog, opponentID)
 			_, e = adjustReputationTx(conn, opponentID, "Martial Society", 2, fmt.Sprintf("won consensual duel #%d", p.MatchID), now)
 			if e != nil {
 				return authoritativeMutation{}, e
@@ -337,6 +341,7 @@ func pvpActAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, r
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
+		result["winner_sword_intent"] = bankSwordIntentTx(conn, catalog, userID)
 		_, e = adjustReputationTx(conn, opponentID, "Martial Society", 1, fmt.Sprintf("honorably completed consensual duel #%d", p.MatchID), now)
 		if e != nil {
 			return authoritativeMutation{}, e

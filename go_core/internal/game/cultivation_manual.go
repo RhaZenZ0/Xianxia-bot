@@ -129,14 +129,17 @@ func practiseCultivatedManualTx(conn *storage.Conn, catalog worlddata.Catalog, u
 	if err != nil || id == "" {
 		return nil, err
 	}
-	row, err := practiceManualTx(conn, userID, id, cultivationPracticeGain, now)
+	definition := catalog.TechniqueSystem.Manuals[id]
+	path := characterPathTx(conn, userID)
+	gain := manualPracticeGain(catalog, definition, path)
+	row, err := practiceManualTx(conn, userID, id, gain, now)
 	if err != nil {
 		return nil, err
 	}
 	after := i64(row["mastery"])
 	return map[string]any{
-		"manual_id": id, "manual_name": catalog.TechniqueSystem.Manuals[id].Name,
-		"gain": cultivationPracticeGain, "practice": i64(row["practice"]),
+		"manual_id": id, "manual_name": definition.Name,
+		"gain": gain, "practice": i64(row["practice"]), "own_path": manualSuitsPath(definition.Path, path),
 		"mastery": after, "mastery_before": before, "mastery_rose": after > before,
 	}, nil
 }
@@ -154,8 +157,8 @@ func manualCultivationMultiplier(conn *storage.Conn, catalog worlddata.Catalog, 
 	if !ok {
 		return "", "", "", 1, false, nil
 	}
-	mult = manualGradeMultiplier(definition.Grade) * (1 + masteryGatheringShare*float64(clampI64(mastery, 0, 4)))
-	return definition.Name, definition.Grade, strings.TrimSpace(definition.Element), round4(mult), chosen, nil
+	mult = manualGatheringMult(catalog, definition, mastery, characterPathTx(conn, userID))
+	return definition.Name, definition.Grade, strings.TrimSpace(definition.Element), mult, chosen, nil
 }
 
 type cultivationManualPayload struct {
@@ -198,7 +201,7 @@ func cultivationManualAction(conn *storage.Conn, catalog worlddata.Catalog, user
 	if err := writeWorldStateMap(conn, cultivationManualKey(userID), map[string]any{"manual_id": p.ManualID, "chosen_game_minute": p.GameMinute}, now); err != nil {
 		return authoritativeMutation{}, err
 	}
-	mult := round4(manualGradeMultiplier(definition.Grade) * (1 + masteryGatheringShare*float64(clampI64(mastery, 0, 4))))
+	mult := manualGatheringMult(catalog, definition, mastery, c.Path)
 	bundle, err := loadAptitudes(conn, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
@@ -206,7 +209,7 @@ func cultivationManualAction(conn *storage.Conn, catalog worlddata.Catalog, user
 	absorption := absorptionFor(catalog, bundle.Root, definition.Element)
 	result := map[string]any{
 		"manual_id": p.ManualID, "manual_name": definition.Name, "manual_grade": definition.Grade,
-		"manual_mult": mult, "mastery": mastery, "alignment": definition.Alignment, "path": definition.Path,
+		"manual_mult": mult, "mastery": mastery, "alignment": definition.Alignment, "path": definition.Path, "own_path": manualSuitsPath(definition.Path, c.Path),
 		"previous_manual": previousName, "previous_mult": previousMult, "changed": previousName != definition.Name,
 		// v1.0.0-rc.9: the kind of qi it draws, and what this root makes of it.
 		// Spelled out rather than merged in, so the Python/Go result-key

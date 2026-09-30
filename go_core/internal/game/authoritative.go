@@ -585,7 +585,7 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			case "cultivation.body_breakthrough":
 				mutation, err = cultivationBreakthrough(conn, catalog, req.ActorID, req.Payload, true)
 			case "cultivation.stance":
-				mutation, err = cultivationStanceAction(conn, req.ActorID, req.Payload)
+				mutation, err = cultivationStanceAction(conn, catalog, req.ActorID, req.Payload)
 			case "cultivation.insight":
 				mutation, err = cultivationInsightAction(conn, catalog, req.ActorID, req.Payload)
 			case "cultivation.manual":

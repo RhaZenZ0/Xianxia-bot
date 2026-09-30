@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -117,6 +118,11 @@ func spiritSenseGainTx(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		if c, err := loadMechanicsCharacter(conn, userID); err == nil {
 			gain += c.Attributes["spirit"] / rules.SpiritDivisor
 		}
+	}
+	// A Soul Cultivator's sense builds faster (v1.13.0), rounded and never
+	// below the gain it would have had.
+	if mult := senseGainMult(catalog, characterPathTx(conn, userID)); mult > 1 {
+		gain = max64(gain, int64(math.Round(float64(gain)*mult)))
 	}
 	if half {
 		gain = max64(1, gain/2)

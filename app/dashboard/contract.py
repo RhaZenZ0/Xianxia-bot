@@ -41,7 +41,9 @@ DASHBOARD_API_VERSION = 2
 # with no lever - a flame is taken, refined and bound by the player.
 # Schema 71 (v1.10.0) adds `character_spirit_sense`, the sense a cultivator
 # builds for Formation and Inscription: read-only on Crafting & Assets too.
-DASHBOARD_REVIEWED_SCHEMA_VERSION = 71
+# Schema 72 (v1.13.0) adds `characters.path_resource`, a Sword Cultivator's
+# banked intent: a column on a table the Player Editor already reads, no table.
+DASHBOARD_REVIEWED_SCHEMA_VERSION = 72
 
 DASHBOARD_GET_API_PATHS = frozenset({
     "/api/overview", "/api/capabilities", "/api/timeline", "/api/npcs", "/api/npc",

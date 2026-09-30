@@ -85,6 +85,7 @@ from .commands import support as _commands_support  # noqa: F401  (registers /tr
 from .commands.territory import caravan_group, party_group, party_status, territory_group, war_group, war_status
 from . import maintenance, seclusion, usage
 from .hubs import (
+    NOT_YOUR_PATH,
     LAYOUT_COMPONENTS_AVAILABLE,
     HubAction,
     HubDefinition,
@@ -1425,6 +1426,30 @@ async def _seclusion_site_here(uid: int, here: str) -> bool:
     return bool(manor) and str(manor.get("base_location") or "") == here
 
 
+# The doors a path can never open (v1.13.0). Player feedback: *"Hide
+# command/buttons you can't use if you play the wrong type of cultivator."*
+# Each entry names a path and the leaves the engine refuses to everybody else:
+# the ghost road is `requireGhostCultivator`'s, and its status read goes with
+# it so the whole page leaves the panel. These are hidden with no padlock
+# (`NOT_YOUR_PATH`), because a path is chosen at birth and a padlock would name
+# a road the player can never walk to. The Sword Cultivator's Intent Strike and
+# the Qi Refiner's stance need no entry here: the battle panel draws the one
+# and the stance picker offers the other only to their own path.
+GHOST_PATH = str((WORLD.data.get("death_qi_system") or {}).get("path") or "Ghost Cultivator")
+PATH_GATES: dict[str, tuple[str, ...]] = {
+    GHOST_PATH: ("ghost status", "ghost harvest", "ghost appease"),
+}
+
+
+async def _path_hidden_actions(interaction: discord.Interaction, c: dict) -> dict[str, str]:
+    path = str(c.get("path") or "").strip()
+    hidden: dict[str, str] = {}
+    for owner, leaves in PATH_GATES.items():
+        if path.casefold() != owner.casefold():
+            hidden.update(_action_paths(NOT_YOUR_PATH, *leaves))
+    return hidden
+
+
 async def _hidden_actions(interaction: discord.Interaction) -> dict[str, str]:
     """Every door the panel leaves off for this player, and why. The character
     is read once and handed to each provider (each used to read its own); each
@@ -1434,7 +1459,7 @@ async def _hidden_actions(interaction: discord.Interaction) -> dict[str, str]:
     if not c:
         return {}
     hidden: dict[str, str] = {}
-    for provider in (_household_hidden_actions, _progression_hidden_actions, _location_hidden_actions):
+    for provider in (_household_hidden_actions, _progression_hidden_actions, _location_hidden_actions, _path_hidden_actions):
         try:
             hidden.update(await provider(interaction, c))
         except Exception:

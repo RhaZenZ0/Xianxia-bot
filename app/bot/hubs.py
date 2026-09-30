@@ -445,6 +445,29 @@ async def not_yet_unlocked(interaction: discord.Interaction) -> dict[str, int]:
         return {}
 
 
+# A door this cultivator's path can never open (v1.13.0). Player feedback:
+# *"Hide command/buttons you can't use if you play the wrong type of
+# cultivator."* The other hides print a padlock naming the reason, because a
+# road nobody can see is a road nobody learns exists (rc.32) - and that is
+# exactly wrong here: a path is chosen at birth and changes only in a new life,
+# so the Ghost road is not a road a Sword Cultivator can walk to. A provider
+# answers this reason for such a leaf; it is left off with no padlock, and a
+# page left with nothing on it is left out of the page list.
+NOT_YOUR_PATH = "not your path"
+
+
+def visible_pages(definition: "HubDefinition", hidden: dict[str, str] | None) -> list["HubPage"]:
+    """The pages to draw: every page but one whose every leaf is another
+    path's. A page with no leaves at all is drawn as before, and a hub is
+    never left with no page."""
+    hidden = hidden or {}
+    pages = [
+        page for page in definition.pages
+        if not (leaves := _leaf_actions(page)) or any(hidden.get(action.path) != NOT_YOUR_PATH for action in leaves)
+    ]
+    return pages or list(definition.pages)
+
+
 async def hidden_actions(interaction: discord.Interaction) -> dict[str, str]:
     """path -> why it is shut for this player ("" when the provider gave no
     reason). A provider may answer with a set of paths or a mapping."""
@@ -1950,7 +1973,7 @@ class HubPageSelect(discord.ui.Select):
                 emoji=_page_emoji(page.key),
                 default=page.key == hub_view.page_key,
             )
-            for page in hub_view.definition.pages[:25]
+            for page in hub_view.visible_pages()[:25]
         ]
         super().__init__(placeholder=f"Page • {hub_view.page.label if hub_view.page else 'Choose system'}", min_values=1, max_values=1, options=options, row=row)
 
@@ -2073,7 +2096,7 @@ class HubPageButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
-        pages = list(self.hub_view.definition.pages)
+        pages = list(self.hub_view.visible_pages())
         if not pages:
             await interaction.response.defer()
             return
@@ -2150,7 +2173,7 @@ class HubLayoutSystemStepButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
-        pages = list(self.hub_view.definition.pages)
+        pages = list(self.hub_view.visible_pages())
         if not pages:
             await interaction.response.defer()
             return
@@ -2422,12 +2445,15 @@ class LayoutHubView(_LayoutHubBase):
             row.add_item(button)
         return row
 
+    def visible_pages(self) -> list[HubPage]:
+        return visible_pages(self.definition, getattr(self, "hidden_paths", None))
+
     @property
     def page(self) -> HubPage | None:
-        for page in self.definition.pages:
+        for page in self.visible_pages():
             if page.key == self.page_key:
                 return page
-        return self.definition.pages[0] if self.definition.pages else None
+        return self.visible_pages()[0] if self.visible_pages() else None
 
     async def refresh_status(self, interaction: discord.Interaction) -> None:
         self.hidden_paths = await hidden_actions(interaction)
@@ -2463,7 +2489,7 @@ class LayoutHubView(_LayoutHubBase):
         hidden = getattr(self, "hidden_paths", None) or {}
         lines = []
         for action in _leaf_actions(page):
-            if action.path in hidden:
+            if action.path in hidden and hidden[action.path] != NOT_YOUR_PATH:
                 reason = hidden[action.path]
                 lines.append(f"🔒 {action.label}" + (f" — {reason}" if reason else ""))
         later = self.unlock_line(page)
@@ -2506,10 +2532,10 @@ class LayoutHubView(_LayoutHubBase):
 
     def _page_text(self, page: HubPage, total: int, shown: int) -> str:
         page_index = next(
-            (index for index, item in enumerate(self.definition.pages, 1) if item.key == page.key),
+            (index for index, item in enumerate(self.visible_pages(), 1) if item.key == page.key),
             1,
         )
-        total_pages = max(1, len(self.definition.pages))
+        total_pages = max(1, len(self.visible_pages()))
         if total > shown:
             first = self.action_offset + 1
             meta = (
@@ -2599,7 +2625,7 @@ class LayoutHubView(_LayoutHubBase):
             )
         container.add_item(discord.ui.Separator())
 
-        multi_page = len(self.definition.pages) > 1
+        multi_page = len(self.visible_pages()) > 1
         controls = discord.ui.ActionRow()
         if multi_page:
             controls.add_item(HubLayoutSystemStepButton(self, direction=-1))
@@ -2683,12 +2709,15 @@ class CommandHubView(discord.ui.View):
         self.message: discord.Message | None = None
         self.rebuild()
 
+    def visible_pages(self) -> list[HubPage]:
+        return visible_pages(self.definition, getattr(self, "hidden_paths", None))
+
     @property
     def page(self) -> HubPage | None:
-        for page in self.definition.pages:
+        for page in self.visible_pages():
             if page.key == self.page_key:
                 return page
-        return self.definition.pages[0] if self.definition.pages else None
+        return self.visible_pages()[0] if self.visible_pages() else None
 
     async def refresh_status(self, interaction: discord.Interaction) -> None:
         self.hidden_paths = await hidden_actions(interaction)
@@ -2726,7 +2755,7 @@ class CommandHubView(discord.ui.View):
         hidden = getattr(self, "hidden_paths", None) or {}
         lines = []
         for action in _leaf_actions(page):
-            if action.path in hidden:
+            if action.path in hidden and hidden[action.path] != NOT_YOUR_PATH:
                 reason = hidden[action.path]
                 lines.append(f"🔒 {action.label}" + (f" — {reason}" if reason else ""))
         later = self.unlock_line(page)
@@ -2765,8 +2794,8 @@ class CommandHubView(discord.ui.View):
             return embed
 
         actions = self.page_actions(page)
-        page_index = next((idx for idx, item in enumerate(self.definition.pages, 1) if item.key == page.key), 1)
-        total_pages = max(1, len(self.definition.pages))
+        page_index = next((idx for idx, item in enumerate(self.visible_pages(), 1) if item.key == page.key), 1)
+        total_pages = max(1, len(self.visible_pages()))
         embed.description = (
             f"### {_page_emoji(page.key)} {page.label}\n"
             f"{page.description or 'System actions'}{self.locked_lines(page)}\n"
@@ -2800,7 +2829,7 @@ class CommandHubView(discord.ui.View):
 
     def rebuild(self) -> None:
         self.clear_items()
-        if len(self.definition.pages) > 1:
+        if len(self.visible_pages()) > 1:
             self.add_item(HubPageSelect(self, row=0))
             action_row = 1
         else:
@@ -2813,10 +2842,10 @@ class CommandHubView(discord.ui.View):
         for index, action in enumerate(actions[:_QUICK_ACTION_LIMIT]):
             self.add_item(HubQuickActionButton(self, action, index=index, row=quick_row))
         controls_row = quick_row + 1
-        if len(self.definition.pages) > 1:
+        if len(self.visible_pages()) > 1:
             self.add_item(HubPageButton(self, direction=-1, row=controls_row))
         self.add_item(HubRefreshButton(self, row=controls_row))
-        if len(self.definition.pages) > 1:
+        if len(self.visible_pages()) > 1:
             self.add_item(HubPageButton(self, direction=1, row=controls_row))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:

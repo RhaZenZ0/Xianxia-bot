@@ -19,7 +19,7 @@ PACKAGES = {
     "rules": {
         "advanced_catalog", "advanced_runtime", "alchemy", "aptitudes", "battle", "birthfamily",
         "black_market", "changelog", "commissions", "creation_ui", "death_qi", "effects", "family", "fate", "feature_unlocks", "game", "item_grades",
-        "moderation", "narration_pool", "npc_memory", "progression_systems", "quests", "realm_hubs", "samsara",
+        "moderation", "narration_pool", "npc_memory", "path_traits", "progression_systems", "quests", "realm_hubs", "samsara",
         "sect", "sect_manor", "sect_recruitment", "sense", "trade_receipt", "worldtime",
     },
     "ai": {

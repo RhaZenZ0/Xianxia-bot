@@ -20,6 +20,7 @@ import discord
 from discord import app_commands
 
 from ...rules.advanced_runtime import deed_karma_line, describe_manual_technique
+from ...rules.path_traits import sword_intent_cap
 from ...rules.item_grades import effect_mult, graded_amount
 from ...rules.sect import sect_points_line
 from ...rules.battle import matchup_label, opponent_debuff_label, suppression_label, vitality_band, vitality_bar
@@ -141,7 +142,8 @@ def _battle_card(c:dict,b:dict,techniques:list[tuple[str,str,str]],items:list[tu
     if defeated:
         e.add_field(name="Final Decision",value="🤝 Spare — end the battle without killing\n☠️ Kill — true NPC death with persistent world consequences",inline=False)
     else:
-        e.add_field(name="Core Actions",value="⚔️ Attack • 🛡️ Defend • 🏃 Flee • 🔄 Refresh",inline=False)
+        intent=battle_intent(c)
+        e.add_field(name="Core Actions",value="⚔️ Attack • 🛡️ Defend • 🏃 Flee • 🔄 Refresh"+(f" • 🗡️ Intent Strike ({intent})" if intent else ""),inline=False)
         e.add_field(name="Battle Menus",value=f"🌌 Techniques: **{len(techniques)}**\n🧪 Recovery items: **{len(items)}**",inline=False)
     e.set_footer(text=f"Battle #{int(b['battle_id'])} • Owner locked • Panel updates in place")
     return e
@@ -169,10 +171,30 @@ class BattleRecoverySelect(discord.ui.Select):
         await self.parent_view._dispatch(interaction,"item",self.values[0])
 
 
+class BattleIntentButton(discord.ui.Button):
+    """A Sword Cultivator's Intent Strike (v1.13.0). Drawn only for somebody
+    who holds intent, because the engine refuses the strike to anybody else
+    (rc.46)."""
+    def __init__(self,parent:"BattleView",intent:int):
+        self.parent_view=parent
+        super().__init__(label=f"Intent Strike ({int(intent)})",style=discord.ButtonStyle.danger,emoji="🗡️",row=0)
+    async def callback(self,interaction:discord.Interaction)->None:
+        await self.parent_view._dispatch(interaction,"intent")
+
+
+def battle_intent(c:dict)->int:
+    """The intent a character may strike with: what they hold, for a path that
+    holds any - `swordIntentCap` in the engine, through `sword_intent_cap`."""
+    if sword_intent_cap(WORLD.paths,c.get("path"))<=0: return 0
+    try: return max(0,int(c.get("path_resource") or 0))
+    except (TypeError,ValueError): return 0
+
+
 class BattleView(CardView):
-    def __init__(self,user_id:int,battle_id:int,techniques:list[tuple[str,str,str]],items:list[tuple[str,str,str]]):
+    def __init__(self,user_id:int,battle_id:int,techniques:list[tuple[str,str,str]],items:list[tuple[str,str,str]],intent:int=0):
         super().__init__(timeout=300); self.user_id=int(user_id); self.battle_id=int(battle_id)
         self.add_item(BattleTechniqueSelect(self,techniques)); self.add_item(BattleRecoverySelect(self,items))
+        if int(intent)>0: self.add_item(BattleIntentButton(self,int(intent)))
     async def interaction_check(self,interaction:discord.Interaction)->bool:
         if interaction.user.id!=self.user_id:
             await interaction.response.send_message("This battle panel belongs to another cultivator.",ephemeral=False); return False
@@ -185,7 +207,7 @@ class BattleView(CardView):
             active=await DB.get_active_battle(self.user_id)
             if not battle or not active or int(active['battle_id'])!=self.battle_id:
                 await _battle_reply(interaction,content="⌛ This battle panel is stale. Use **/combat → Active Battle → Status** for the current battle.",view=None,edit_panel=True);return
-            if kind in {"attack","defend","flee"}:
+            if kind in {"attack","defend","flee","intent"}:
                 await _resolve_battle_turn(interaction,kind,expected_battle_id=self.battle_id,edit_panel=True);return
             c=await DB.get_character(self.user_id)
             if not c:
@@ -255,7 +277,7 @@ async def _battle_panel(user_id:int,c:dict,b:dict,*,result_text:str|None=None)->
     if awakened:
         embed.add_field(name="Artifact Resonance",value=" • ".join(f"{WORLD.item_name(x['item_id'])} ({x['resonance']}%)" for x in awakened[:3]),inline=False)
     if int(b.get('npc_hp',0))<=0: return embed,BattleFinishView(user_id,int(b['battle_id'])).set_card(embed)
-    return embed,BattleView(user_id,int(b['battle_id']),techniques,items).set_card(embed)
+    return embed,BattleView(user_id,int(b['battle_id']),techniques,items,intent=battle_intent(c)).set_card(embed)
 
 
 async def _use_battle_recovery_item(interaction: discord.Interaction, battle_id: int, item_id: str) -> str:
@@ -455,6 +477,8 @@ async def _finish_battle(interaction:discord.Interaction,outcome:str,*,expected_
             lines.append(f"☯️ Karma shifts to **{int(result['karma_score']):+d}**.")
         if "fate_after" in result:
             lines.append(f"🌠 Meaningful mercy draws providence: **Fate {int(result['fate_after'])}/9**.")
+    if int(result.get("sword_intent",0)):
+        lines.append(f"🗡️ The win sharpens your sword intent: **{int(result['sword_intent'])}** held.")
     impacts=list(impact.get("impacts") or [])
     if impacts:
         lines.append("🌍 **World consequences:**")
@@ -492,6 +516,8 @@ async def _resolve_battle_turn(interaction:discord.Interaction,style:str,action:
     if int(result.get("companion_bonus",0)): lines.append(f"🐉 Artifact/companion support grants **+{int(result['companion_bonus'])}** to this exchange.")
     if int(result.get("equipment_attack",0)) or int(result.get("equipment_defense",0)):
         lines.append(f"🛡️ Equipment contributes **+{int(result.get('equipment_attack',0))} offense / +{int(result.get('equipment_defense',0))} defense**. Durability is consumed by combat exchanges.")
+    if result.get("intent_strike"):
+        lines.append(f"🗡️ **Intent Strike** — your sword intent adds **+{int(result.get('intent_strike_bonus',0))}**, and the foe cannot answer it. Intent left: **{int(result.get('sword_intent',0))}**.")
     if result.get("player_roll"):
         lines.append(roll_line(SimpleNamespace(**dict(result["player_roll"]))))
     if result.get("defending"): lines.append("🛡️ You brace and reinforce your defenses.")
@@ -507,7 +533,9 @@ async def _resolve_battle_turn(interaction:discord.Interaction,style:str,action:
     # The passive suppresses the counter through the same npc_suppressed_turns
     # mechanism as spatial techniques; only attribute it to "spatial control"
     # when the sword was not the cause.
-    if result.get("counter_suppressed") and not result.get("bugslayer_passive"):
+    if result.get("intent_strike"):
+        pass
+    elif result.get("counter_suppressed") and not result.get("bugslayer_passive"):
         lines.append("🌌 Opponent counter suppressed by spatial control.")
     elif result.get("counter_roll"):
         lines.append(f"**Opponent counter:** {roll_line(SimpleNamespace(**dict(result['counter_roll'])))}")

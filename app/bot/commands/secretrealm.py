@@ -169,6 +169,10 @@ async def secret_explore(interaction: discord.Interaction) -> None:
         f"🌀 **{result.get('realm_name', 'Secret Realm')} — {room.get('name', 'Unknown Area')}**\n"
         f"{room.get('description', '')}\n\n{roll_line(roll)}"
     )
+    # v1.13.0: what a room that favours you added, which the roll always counted.
+    favoured = [part for part, bonus in (("your path", int(result.get("path_bonus") or 0)), ("your root", int(result.get("root_bonus") or 0))) if bonus]
+    if favoured:
+        text += f"\n🧭 This room favours {' and '.join(favoured)}: **+{int(result.get('path_bonus') or 0) + int(result.get('root_bonus') or 0)}** to the roll."
     if bool(result.get("success")):
         cultivation = int(result.get("cultivation_awarded") or 0)
         stones = int(result.get("spirit_stones") or 0)

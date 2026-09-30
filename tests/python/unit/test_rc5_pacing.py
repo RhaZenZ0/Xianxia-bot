@@ -100,7 +100,7 @@ class CultivatorsGrow(unittest.TestCase):
         self.assertIn("func growAttributesOnRealmCrossing(", GO_PACE)
         self.assertIn("UPDATE characters SET attributes_json=?", GO_PACE)
         self.assertIn("attributeGains, err = growAttributesOnRealmCrossing(conn, catalog, userID, c, body, now)", GO_ACTIONS)
-        self.assertIn("func pathPrimaryAttribute(", GO_PACE)
+        self.assertIn("func pathGrowthAttributes(", GO_PACE)
         self.assertIn("attribute_gains", CULTIVATION_SOURCE)
 
     def test_the_higher_worlds_have_their_own_qi_density(self):
