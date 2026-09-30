@@ -456,6 +456,13 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	// nothing for the other three trades; it is spent on the grade of what is
 	// made now, capped by the crafter's rank in this trade.
 	gradeIndex, gradeReached := craftGradeIndex(catalog, qkey, margin, level, flameOpens || senseOpens)
+	// What making the rung the roll reached would really take (v1.12.3): the
+	// rank that can, and the opener it needs if that is the only road.
+	gradeReachedRank, needsOpener := craftGradeRequirement(catalog, gradeReached)
+	gradeReachedOpener := ""
+	if needsOpener {
+		gradeReachedOpener = craftGradeOpener(catalog, profession)
+	}
 	output := map[string]int64{}
 	for k, v := range recipe.Output {
 		output[gradedID(catalog, k, gradeIndex)] = v
@@ -605,7 +612,8 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		"profession_bonus":     level,
 		"grade":                craftGradeLabel(catalog, gradeIndex),
 		"grade_reached":        craftGradeLabel(catalog, gradeReached),
-		"grade_reached_rank":   craftGradeRank(catalog, gradeReached),
+		"grade_reached_rank":   gradeReachedRank,
+		"grade_reached_opener": gradeReachedOpener,
 		"location":             location,
 		"game_minute":          gameMinute,
 		"effect_bonus":         effectBonus,
@@ -622,7 +630,15 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		"flame_opens_top":      flameOpens,
 		"spirit_sense_bonus":   senseBonus,
 		"spirit_sense_opens":   senseOpens,
-		"spirit_sense_gain":    spiritSenseGainTx(conn, catalog, userID, "craft", !success, gameMinute, float64(time.Now().UnixNano())/1e9),
+	}
+	// Only a Formation or Inscription craft builds the spirit sense (v1.12.3):
+	// the call was unconditional, so a Forging craft filled a sense it cannot
+	// use - craftSpiritSenseTx already says "nothing for a trade it does not
+	// serve", and the practice has to say the same.
+	if spiritSenseServesTrade(spiritSenseRules(catalog), profession) {
+		if gained := spiritSenseGainTx(conn, catalog, userID, "craft", !success, gameMinute, float64(time.Now().UnixNano())/1e9); gained != nil {
+			result["spirit_sense_gain"] = gained
+		}
 	}
 	evp, _ := json.Marshal(result)
 	return authoritativeMutation{

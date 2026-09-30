@@ -143,11 +143,9 @@ func tradeItemsView(catalog worlddata.Catalog, items map[string]int64) []map[str
 	sort.Strings(ids)
 	out := make([]map[string]any, 0, len(ids))
 	for _, id := range ids {
-		name := id
-		if it, _, ok := itemDef(catalog, id); ok && it.Name != "" {
-			name = it.Name
-		}
-		out = append(out, map[string]any{"item_id": id, "name": name, "quantity": items[id]})
+		// The item at its grade (v1.12.3): the base Name read the same for
+		// qi_pill and qi_pill@high, so an offer hid what was being traded.
+		out = append(out, map[string]any{"item_id": id, "name": itemDisplayName(catalog, id), "quantity": items[id]})
 	}
 	return out
 }

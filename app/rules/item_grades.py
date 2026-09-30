@@ -60,3 +60,46 @@ def graded_name(base_name: str, ladder: Mapping[str, Any] | None, item_id: str) 
     """``"Qi Pill"`` at High is ``"Qi Pill (High)"``; Low is the bare name."""
     label = grade_label(ladder, item_id)
     return f"{base_name} ({label})" if label else base_name
+
+
+def effect_mult(ladder: Mapping[str, Any] | None, item_id: str) -> float:
+    """What a grade multiplies an item's use by: the display twin of the
+    engine's ``itemEffectMult``. A bare id is the first rung, and an id whose
+    grade the ladder does not carry is worth 1 (never some other rung's
+    multiplier), as the engine answers."""
+    _, grade = split_item_grade(item_id)
+    index, entry = grade_rung(ladder, grade)
+    if grade and not entry:
+        return 1.0
+    try:
+        mult = float(entry.get("effect_mult") or 1)
+    except (TypeError, ValueError):
+        return 1.0
+    return mult if mult > 0 else 1.0
+
+
+def graded_amount(base: int, mult: float) -> int:
+    """A whole-number use scaled by a grade: the twin of the engine's
+    ``gradedAmount`` - rounded half away from zero (``round`` would round half
+    to even and disagree at x1.25 of an amount ending in 2), and never below
+    the base, because a grade only ever adds."""
+    base = int(base)
+    if base <= 0:
+        return max(0, base)
+    return max(base, int(base * float(mult) + 0.5))
+
+
+def grade_cap_note(reached: str, grade: str, rank_label: str = "", opener: str = "") -> str:
+    """The line under a craft whose rank held its grade back: what the roll had
+    reached, what the rank made of it, and what making the higher one really
+    takes - the engine's ``grade_reached_rank`` and ``grade_reached_opener``.
+    The top grade asks a rank no trade reaches on rank alone, so the road the
+    engine reports is the lower rank *with* an opener (a fully refined flame, a
+    fully built spirit sense); printing the rank by itself named a rank nobody
+    could have (v1.12.3). ``rank_label`` is already the trade's own name for the
+    rank, because ``rules`` names trades in ``progression_systems``."""
+    note = f"The roll reached **{reached}**; your rank caps it at {grade}."
+    if rank_label:
+        note += f" {reached} needs **{rank_label}**"
+        note += f" and **{opener}**." if opener else "."
+    return note

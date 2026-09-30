@@ -20,6 +20,7 @@ import discord
 from discord import app_commands
 
 from ...rules.advanced_runtime import deed_karma_line, describe_manual_technique
+from ...rules.item_grades import effect_mult, graded_amount
 from ...rules.sect import sect_points_line
 from ...rules.battle import matchup_label, opponent_debuff_label, suppression_label, vitality_band, vitality_bar
 from ...ops.game_engine import GameEngineError
@@ -102,8 +103,12 @@ async def _battle_available_options(user_id:int,c:dict)->tuple[list[tuple[str,st
         if qty>0 and idef.get('use',{}).get('instant'):
             instant=idef.get('use',{}).get('instant',{})
             recovery=[]
-            if int(instant.get('vitality_restore',0)): recovery.append(f"Vitality +{int(instant['vitality_restore'])}")
-            if int(instant.get('qi_restore',0)): recovery.append(f"Qi +{int(instant['qi_restore'])}")
+            # What the carried grade heals (v1.12.3): the engine scales a
+            # recovery item's restores by its grade, and the picker printed
+            # the base figures, so a High pill read as a Low one.
+            mult=effect_mult(WORLD.item_grades,iid)
+            if int(instant.get('vitality_restore',0)): recovery.append(f"Vitality +{graded_amount(int(instant['vitality_restore']),mult)}")
+            if int(instant.get('qi_restore',0)): recovery.append(f"Qi +{graded_amount(int(instant['qi_restore']),mult)}")
             usable.append((str(iid),f"{idef.get('name',iid)} x{qty}"," • ".join(recovery) or "Instant recovery"))
     return techniques[:25],usable[:25]
 
@@ -332,8 +337,14 @@ async def _execute_battle_law_technique(interaction: discord.Interaction, battle
         # What the effect did to the opponent (v1.3.3), read off the engine's
         # own sum rather than the content: the battle row carries it now.
         debuff = opponent_debuff_label(result.get("opponent_modifiers"))
-        if debuff:
+        if result.get("effect_repeated"):
+            # The same control effect lands once a battle (v1.12.3).
+            lines.append(f"🕸️ **{battle['npc_name']}** is already held by that effect; casting it again adds nothing.")
+        elif debuff:
             lines.append(f"🕸️ On **{battle['npc_name']}** for this battle: {debuff}.")
+        if result.get("effect_target") == "user":
+            # A Domain is the caster's own ground, not the opponent's debuff.
+            lines.append(f"🌀 **{result.get('effect_label') or result.get('technique_name', technique)}** settles around **you** for {max(1, int(result.get('duration_game_minutes', 0)) // 60)} world hour(s).")
         if technique == "spatial_lockdown":
             lines.append(f"Space freezes around **{battle['npc_name']}**. Their counteractions are suppressed for **{int(result.get('suppressed_turns', 1))} turn(s)**.")
         elif technique == "spatial_strangulation":

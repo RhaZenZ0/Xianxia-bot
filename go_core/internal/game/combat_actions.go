@@ -73,15 +73,56 @@ func (b battleRow) opponentDebuff(stat string) int64 {
 	return int64(math.Round(b.OpponentMods[stat]))
 }
 
-// applyOpponentEffect folds a special effect's `modifiers` into the battle's
-// opponent debuff. The stats are the content's (`agility`, `escape_bonus`,
-// `body`), read where a value is consumed: `agility` and `body` weaken the
-// counter-attack, and `escape_bonus` on the *opponent* is how far they can
-// follow, so it is subtracted from what the player needs to get away.
-func (b *battleRow) applyOpponentEffect(effect map[string]any) {
+// opponentEffectMark prefixes the key that records which effect has already
+// landed on the opponent (v1.12.3). The record rides the same JSON object the
+// stats do - `{"agility": -3, "effect:spatial_lockdown": 1}` - because a
+// second column would be a migration for a fact that lives and dies with the
+// battle, and because every reader already tolerates a key it does not ask
+// for: `opponentDebuff` fetches named stats, `loadBattle` unmarshals into a
+// map of floats, and the bot's label skips the mark (`opponent_debuff_label`).
+const opponentEffectMark = "effect:"
+
+// opponentEffectApplied is whether this effect has already landed on the
+// opponent this battle.
+func (b battleRow) opponentEffectApplied(effectID string) bool {
+	return b.OpponentMods[opponentEffectMark+effectID] != 0
+}
+
+// opponentStats is the opponent's debuff as stats only: what the reply and the
+// bot's card print. The marks of which effects landed are the engine's record
+// and not a stat, so they are left out of anything a player reads.
+func (b battleRow) opponentStats() map[string]float64 {
+	out := map[string]float64{}
+	for stat, value := range b.OpponentMods {
+		if !strings.HasPrefix(stat, opponentEffectMark) {
+			out[stat] = value
+		}
+	}
+	return out
+}
+
+// applyOpponentEffect folds a control effect's `modifiers` into the battle's
+// opponent debuff, once per battle (v1.12.3): the same effect cast again
+// refreshes nothing and adds nothing. spatial_lockdown has no in-battle
+// cooldown, so summed with `+=` a player could press it until the opponent's
+// agility was minus forty and every counter-attack missed for ever. It answers
+// whether the effect landed now. The stats are the content's (`agility`,
+// `escape_bonus`, `body`), read where a value is consumed: `agility` and
+// `body` weaken the counter-attack, and `escape_bonus` on the *opponent* is how
+// far they can follow, so it is subtracted from what the player needs to get
+// away.
+//
+// Only a control effect describes the target. A Domain (`space_domain`,
+// `world_collapse`) is the caster's own ground and goes onto the caster - see
+// lawEffectIsControl and writeLawEffectTx.
+func (b *battleRow) applyOpponentEffect(effectID string, effect map[string]any) bool {
 	if b.OpponentMods == nil {
 		b.OpponentMods = map[string]float64{}
 	}
+	if b.opponentEffectApplied(effectID) {
+		return false
+	}
+	b.OpponentMods[opponentEffectMark+effectID] = 1
 	mods, _ := effect["modifiers"].([]any)
 	for _, raw := range mods {
 		m, ok := raw.(map[string]any)
@@ -94,6 +135,7 @@ func (b *battleRow) applyOpponentEffect(effect map[string]any) {
 		}
 		b.OpponentMods[stat] += toFloat(m["value"])
 	}
+	return true
 }
 
 // counterAttackDebuff is what the opponent's counter-attack loses to the
@@ -801,14 +843,8 @@ func combatTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	if lawStageIndex(catalog, comp) < t.RequiresStage || c.RealmIndex < int64(t.MinRealmIndex) {
 		return authoritativeMutation{}, errors.New("technique requirements are no longer met")
 	}
-	if p.Technique == "world_collapse" {
-		pw, e := conn.Execute(`SELECT 1 FROM personal_worlds WHERE user_id=? LIMIT 1`, []any{userID})
-		if e != nil {
-			return authoritativeMutation{}, e
-		}
-		if len(pw.Rows) == 0 {
-			return authoritativeMutation{}, errors.New("the World Collapse technique requires a stabilized personal world")
-		}
+	if e := requireLawTechniqueGroundTx(conn, userID, p.Technique); e != nil {
+		return authoritativeMutation{}, e
 	}
 	mod := comp/10 + c.RealmIndex*2 + c.Phase/3 + c.Attributes["insight"]
 	tn := b.NPCRealm*2 + b.NPCStage/3 + 8
@@ -836,12 +872,32 @@ func combatTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 		// And apply it (v1.3.3): the effect's modifiers describe the target,
 		// and the target is this battle's opponent. They ride the battle row
 		// for its length and are read by the counter-attack and the flee roll.
-		if landedEffect != nil {
-			b.applyOpponentEffect(landedEffect)
-			if e := writeOpponentMods(conn, b); e != nil {
+		//
+		// Only a control effect does (v1.12.3). A Domain describes the
+		// caster's own ground and was being written onto the opponent: a
+		// world_collapse put combat +6 and escape +4 on them, which made the
+		// caster's own flee four harder. It goes onto the user now, through
+		// the one writer the out-of-battle technique uses. And a control effect
+		// lands once a battle: a second cast adds nothing.
+		if landedEffect != nil && lawEffectIsControl(landedEffect) {
+			landed := b.applyOpponentEffect(t.Effect, landedEffect)
+			if landed {
+				if e := writeOpponentMods(conn, b); e != nil {
+					return authoritativeMutation{}, e
+				}
+			}
+			out["opponent_modifiers"] = b.opponentStats()
+			out["effect_target"] = "opponent"
+			out["effect_repeated"] = !landed
+		} else if landedEffect != nil {
+			label, e := writeLawEffectTx(conn, userID, p.Technique, t.Name, t.Effect, landedEffect, strings.TrimSpace(fmt.Sprint(out["effect_name"])), p.GameMinute)
+			if e != nil {
 				return authoritativeMutation{}, e
 			}
-			out["opponent_modifiers"] = b.OpponentMods
+			out["effect_target"] = "user"
+			out["effect_label"] = label
+			out["duration_game_minutes"] = lawTechniqueEffectMinutes
+			out["ends_game_minute"] = p.GameMinute + lawTechniqueEffectMinutes
 		}
 		margin := i64(roll["margin"])
 		turns := int64(1)
@@ -1032,6 +1088,10 @@ func combatRecoveryItemAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	now := float64(time.Now().UnixNano()) / 1e9
 	grade := itemEffectMult(catalog, p.ItemID)
 	qiRestore := gradedAmount(item.Use.Instant.QiRestore, grade)
+	// What the reply reports is the graded figure (v1.12.3): it printed the
+	// base qi beside a graded vitality and the ungraded name, so a High pill
+	// read as a Low one while healing as a High one.
+	reportedQi := qiRestore
 	if qiRestore > 0 {
 		if state, err := settleQi(conn, catalog, userID, p.GameMinute, now); err == nil {
 			qiRestore = state.Restore(qiRestore)
@@ -1057,7 +1117,7 @@ func combatRecoveryItemAction(conn *storage.Conn, catalog worlddata.Catalog, use
 			return authoritativeMutation{}, e
 		}
 	}
-	out := map[string]any{"battle_id": p.BattleID, "item_id": p.ItemID, "item_name": item.Name, "qi": i64(x[0]), "qi_max": i64(x[1]), "vitality": newVitality, "vitality_max": newVitalityMax, "qi_restore": item.Use.Instant.QiRestore, "vitality_restore": gradedAmount(item.Use.Instant.VitalityRestore, grade)}
+	out := map[string]any{"battle_id": p.BattleID, "item_id": p.ItemID, "item_name": itemDisplayName(catalog, p.ItemID), "qi": i64(x[0]), "qi_max": i64(x[1]), "vitality": newVitality, "vitality_max": newVitalityMax, "qi_restore": reportedQi, "vitality_restore": gradedAmount(item.Use.Instant.VitalityRestore, grade)}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "combat", EventType: "recovery_item", EntityType: "battle", EntityID: fmt.Sprint(p.BattleID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 

@@ -2565,8 +2565,15 @@ async def run(url: str, token: str, db_path: str) -> Report:
         gained = dict(meditated.get("spirit_sense_gain") or {})
         # Earlier sections craft and act in scenes, so the first stage may
         # already be full: then the meditation must say so rather than build.
-        report.add("PASS" if int(gained.get("gain") or 0) > 0 or gained.get("full") else "FAIL",
-                   "the meditation reported spirit-sense progress, or that the stage is full", str(gained))
+        # And a session that gathered nothing - the cultivation stage itself
+        # is full - builds nothing (v1.12.3, the rule the method's practice
+        # states), so it reports no gain at all and that is correct.
+        if int(meditated.get("gain") or 0) > 0:
+            report.add("PASS" if int(gained.get("gain") or 0) > 0 or gained.get("full") else "FAIL",
+                       "the meditation reported spirit-sense progress, or that the stage is full", str(gained))
+        else:
+            report.add("PASS" if not gained else "FAIL",
+                       "a meditation that gathered nothing built no spirit sense", str(gained))
     await audited("admin.player.set_spirit_sense", {"user_id": PLAYER, "stage": 0, "progress": 40, "reason": "playtest: a full first stage"})
     await audited("admin.player.revive", {"user_id": PLAYER, "reason": "playtest: a full qi pool to settle with"})
     settled = await step(report, "spirit_sense.settle a full stage", act("spirit_sense.settle", PLAYER, {}))
