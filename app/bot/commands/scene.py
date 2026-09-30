@@ -49,6 +49,27 @@ from ..services import (
 )
 from ..ui.commissions import commission_reply_extras, offer_for as commission_offer_for
 from ..threads import _private_scene_for_thread, active_private_location_thread, ensure_expedition_thread
+from .exploration import _city_of, _commission_giver_home
+
+
+def offer_where_it_can_be_accepted(offer: Any, here: str) -> Any:
+    """An offer the engine would refuse is not made (v1.12.3).
+
+    `commission.accept` takes work only in the city the giver posts it in
+    (`commissionGiverHome`, v1.3.1), so a giver met elsewhere - an NPC the
+    simulation walked to another city - must not offer a commission whose
+    Accept button can only be refused. The ladder's other branches (work held,
+    a cooldown, nothing to give) need no place, and a giver with no home
+    imposes none. The narrator is told why, so it does not improvise one."""
+    if getattr(offer, "kind", "") != "offer":
+        return offer
+    home = _commission_giver_home(str(offer.giver))
+    if not home or _city_of(home) == _city_of(str(here)):
+        return offer
+    return commission_rules.Offer(
+        kind="unavailable", giver=offer.giver, standing=offer.standing, last_outcome=offer.last_outcome,
+        reason=f"{offer.giver} posts work on {_city_of(home)}'s board, and you are in {_city_of(str(here))}",
+    )
 
 
 async def _claim_grave_if_here(user_id: int, c: dict, npc: str, wt) -> str:
@@ -185,6 +206,7 @@ async def talk(
                 realm_index=int(c.get("realm_index", 0) or 0),
                 game_minute=wt_offer.total_minutes,
             )
+            commission_offer = offer_where_it_can_be_accepted(commission_offer, str(c.get("location") or ""))
             commission_block = commission_rules.commission_context(
                 commission_offer, item_names=COMMISSIONS.item_names())
         except Exception:

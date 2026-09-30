@@ -1420,13 +1420,19 @@ def _city_inn(city: str) -> str:
     return next((name for name in _city_parts(city) if WORLD.locations[name].get("district") == "inn"), "")
 
 
+def _commission_giver_home(giver: str) -> str:
+    """Where a giver's work is posted: the giver's own `location` in the
+    commission roster, else the NPC's - the twin of `commissionGiverHome`."""
+    givers = WORLD.data.get("commission_givers", {}) or {}
+    return str((givers.get(giver) or {}).get("location") or (WORLD.npcs.get(giver) or {}).get("location") or "").strip()
+
+
 def _city_board(city: str) -> list[dict[str, Any]]:
     """The commissions whose givers live in this city or its parts."""
-    givers = WORLD.data.get("commission_givers", {}) or {}
     rows = []
     for c in WORLD.data.get("commissions", []) or []:
         giver = str(c.get("giver_npc") or "")
-        where = str((givers.get(giver) or {}).get("location") or (WORLD.npcs.get(giver) or {}).get("location") or "")
+        where = _commission_giver_home(giver)
         if where and _city_of(where) == city:
             rows.append(dict(c))
     return sorted(rows, key=lambda c: (int(c.get("tier") or 1), str(c.get("title"))))
