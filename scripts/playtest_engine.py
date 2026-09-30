@@ -1032,7 +1032,11 @@ async def run(url: str, token: str, db_path: str) -> Report:
         after_attr = dict(await db.get_character(PLAYER) or {})
         before_will = will_of(before_attr)
         after_will = will_of(after_attr)
-        report.add("PASS" if after_will == before_will + 1 and dict(crossed.get("attribute_gains") or {}) else "FAIL",
+        # The gain is the engine's own report, not a number restated here:
+        # since v1.13.0 a Sword Cultivator grows both tied attributes (agility
+        # and will) and the qi ladder adds its will, so will rises by two.
+        gains = dict(crossed.get("attribute_gains") or {})
+        report.add("PASS" if gains and after_will == before_will + int(gains.get("will") or 0) and int(gains.get("agility") or 0) >= 1 else "FAIL",
                    "crossing a realm raises the cultivator", f"will {before_will} -> {after_will}, gains {crossed.get('attribute_gains')}")
     elif crossed is not None:
         report.add("PASS", "crossing a realm raises the cultivator", "the roll failed; attributes unchanged by design")
