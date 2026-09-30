@@ -302,6 +302,14 @@ func clanRivalryOpens() int64 { return clanRelationOpeningScore["rivalry"] }
 //   - a blood_feud never ends here. It came from a body (`combat_aftermath`
 //     owns it), and drift only deepens it.
 //
+// A relation is written from both sides or not at all, and so it ends that
+// way (v1.12.3). `combat_aftermath` lowers only the victim house's rows, so
+// the production shape is one side at 0 and the partner's still warm; ending
+// the exhausted row alone left the partner holding an active alliance beside
+// the rivalry this function opens, and `family.support` kept paying it. The
+// partner's active row of the same type ends with it, the world remembers the
+// pair once, and each side opens one rivalry.
+//
 // The invented bootstrap partners carry no family id, so their treaties end
 // the same way and their rivalry is written from the one side that exists.
 func endExhaustedClanRelations(conn *storage.Conn, gm int64, now float64) (int64, error) {
@@ -313,8 +321,12 @@ WHERE r.active=1 AND ((r.relation_type IN ('alliance','marriage_pact','trade_pac
 		return 0, err
 	}
 	ended := int64(0)
+	closed := map[int64]bool{}
 	for _, row := range rows.Rows {
 		relationID, familyID := i64(row[0]), i64(row[1])
+		if closed[relationID] {
+			continue // already ended with its partner's side
+		}
 		partnerID := int64(0)
 		if row[2] != nil {
 			partnerID = i64(row[2])
@@ -329,6 +341,22 @@ WHERE r.active=1 AND ((r.relation_type IN ('alliance','marriage_pact','trade_pac
 			return ended, err
 		}
 		ended++
+		closed[relationID] = true
+		if partnerID > 0 {
+			mirror, err := conn.Execute(`SELECT relation_id FROM martial_clan_relations
+WHERE family_id=? AND partner_family_id=? AND relation_type=? AND active=1`, []any{partnerID, familyID, relation})
+			if err != nil {
+				return ended, err
+			}
+			for _, m := range mirror.Rows {
+				id := i64(m[0])
+				if _, err := conn.Execute(`UPDATE martial_clan_relations SET active=0,updated_at=? WHERE relation_id=?`, []any{now, id}); err != nil {
+					return ended, err
+				}
+				closed[id] = true
+				ended++
+			}
+		}
 		if err := recordClanRelationEnded(conn, familyID, familyName, partner, relation, gm, now); err != nil {
 			return ended, err
 		}

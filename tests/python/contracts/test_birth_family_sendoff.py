@@ -103,5 +103,31 @@ class TheGiftFitsTheHousehold(unittest.TestCase):
                     self.assertLess(attack, shop_floor, f"{key} outclasses the starter shop blade")
 
 
+class TheBackfillReportsConnectionsWithoutAnHeirloom(unittest.TestCase):
+    """v1.12.3: the engine reports a raised reputation floor on its own when the
+    heirloom was already handed over (`{"reputation": {...}}`, no name), and the
+    line must say the connections rather than naming an object that was not given."""
+
+    def _line(self, result: dict) -> str:
+        from app.rules.birthfamily import family_connections_line, family_tutoring_line
+
+        scope = {"family_connections_line": family_connections_line, "family_tutoring_line": family_tutoring_line}
+        exec(_body(FAMILY, "family_sendoff_line"), scope)
+        return scope["family_sendoff_line"](result)
+
+    def test_a_reputation_only_block_names_the_connections_and_no_heirloom(self):
+        line = self._line({"family_sendoff": {"reputation": {"Underworld Contacts": 15}}})
+        self.assertIn("Underworld Contacts +15", line)
+        self.assertNotIn("None", line)
+        self.assertNotIn("sends you out with", line, "an heirloom that was not handed over was named")
+
+    def test_a_full_send_off_still_names_the_heirloom(self):
+        line = self._line({"family_sendoff": {"name": "Tomb Lantern", "line": "Lit for the dead."}})
+        self.assertIn("The household sends you out with **Tomb Lantern**", line)
+
+    def test_nothing_reported_says_nothing(self):
+        self.assertEqual(self._line({}), "")
+
+
 if __name__ == "__main__":
     unittest.main()

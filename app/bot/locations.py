@@ -40,6 +40,23 @@ from .services import SIM
 DEAD = "\x00dead"
 
 
+def scheduled_location(npc_name: str, period: str) -> str:
+    """What the content file's daily schedule says for this period, and nothing
+    else - no fallback to the NPC's `location`.
+
+    This is the engine's own term (`npcWhereaboutsTx`: `npc.Schedule[period]`,
+    blank when there is no entry), and v1.12.3 holds the Python twin to it.
+    `WORLD.npc_location_at` answers the schedule *or* the content location,
+    which is right for asking where content puts somebody and wrong for a
+    somebody the simulation has a row for: a period with no schedule entry
+    leaves them where the simulation says, and the content location is not a
+    whereabouts. Reading it here answered the file's place for an NPC whose
+    row - after a content edit moved them - said somewhere else.
+    """
+    schedule = (WORLD.npcs.get(npc_name) or {}).get("schedule") or {}
+    return str(schedule.get(period) or "").strip()
+
+
 async def current_npc_location(npc_name: str, period: str | None = None) -> str | None:
     """Resolve the mechanical NPC location from initialized simulation state.
 
@@ -83,7 +100,7 @@ async def current_npc_location(npc_name: str, period: str | None = None) -> str 
         # region. Autonomous civilization travel overrides the schedule only when
         # the NPC has actually moved away from that home region.
         if current == home:
-            return WORLD.npc_location_at(npc_name, period) or current
+            return scheduled_location(npc_name, period) or current
         return current
     # Somebody the world made for itself who has no simulation row (schema 49).
     # A matured descendant gets one at the moment they come of age, so this is
@@ -113,6 +130,14 @@ async def current_npc_location(npc_name: str, period: str | None = None) -> str 
         cast = None
     if cast and str(cast.get("location") or ""):
         return str(cast["location"])
+    # A catalogue NPC no simulation has touched: the content's own placement,
+    # their schedule this period else where the file puts them - the engine's
+    # last term (`npcWhereaboutsTx`), held equal in v1.12.3. It used to answer
+    # `None` here, which every caller reads as "do not filter by location", so
+    # the picker and `/talk` let somebody the engine would place through from
+    # anywhere. Somebody content does not carry is still `None`.
+    if npc_name in WORLD.npcs:
+        return WORLD.npc_location_at(npc_name, period) or None
     return None
 
 
@@ -173,7 +198,7 @@ async def npcs_present(location: str, period: str | None = None) -> list[str]:
         # (schema 47) and their row is the whole truth about where they are.
         home = str(row.get("home_location") or where)
         if str(row.get("status") or "") != "missing" and str(row.get("current_location") or where) == home:
-            if (WORLD.npc_location_at(name, period) or where) != where:
+            if (scheduled_location(name, period) or where) != where:
                 continue
         present.append(name)
         seen.add(name)

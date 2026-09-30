@@ -29,9 +29,10 @@ import (
 
 // grantOrdinaryQuestTx hands a player a quest that has no giver.
 //
-// Reports whether it actually granted one, and refuses in three ways that are
+// Reports whether it actually granted one, and refuses in four ways that are
 // all "no", never an error: the tables are not there yet, the definition is
-// not there yet, or they have held it before. That matters most at character
+// not there yet, the definition is not approved (a GM retired or discarded it,
+// or the Forge has only drafted it - v1.12.3), or they have held it before. That matters most at character
 // creation - a world whose content has not finished seeding must still be
 // able to make a character, so a missing definition costs the player a quest
 // and never the character they were making.
@@ -56,12 +57,20 @@ func grantOrdinaryQuestTx(conn *storage.Conn, userID int64, questKey string, gam
 	// you in person - it occupies the one-at-a-time slot and carries a
 	// deadline. Nothing may hand one over behind the player's back.
 	defined, err := conn.Execute(
-		`SELECT COALESCE(giver_npc,'') AS giver FROM quest_definitions WHERE quest_key=?`, []any{questKey})
+		`SELECT COALESCE(giver_npc,'') AS giver, COALESCE(status,'') AS status FROM quest_definitions WHERE quest_key=?`, []any{questKey})
 	if err != nil {
 		return false, err
 	}
 	row := firstRowMap(defined)
 	if row == nil {
+		return false, nil
+	}
+	// The catch-up runs on every action (v1.3.1) and reads `follow_on` off a
+	// completed quest, so a chain pointing at a definition a GM retired would
+	// hand it over again on the player's next action, after the holder rows
+	// were revoked. Every seeder writes 'approved' and the Forge's drafts are
+	// not offered until a GM approves them: anything else is a "no".
+	if fmt.Sprint(row["status"]) != "approved" {
 		return false, nil
 	}
 	if fmt.Sprint(row["giver"]) != "" {

@@ -42,7 +42,7 @@ func TestAClearedTribulationHandsOverTheCrossingQuest(t *testing.T) {
 		t.Fatal("content authors no ascension quest out of the Mortal World")
 	}
 	batch4Exec(t, path, `UPDATE characters SET realm_index=7,phase=9,cultivation=10000000 WHERE user_id=42`)
-	batch4Exec(t, path, `INSERT INTO quest_definitions(quest_key,title,created_at,updated_at) VALUES(?,'The Seam Above You',0,0)`, key)
+	batch4Exec(t, path, `INSERT INTO quest_definitions(quest_key,title,status,created_at,updated_at) VALUES(?,'The Seam Above You','approved',0,0)`, key)
 
 	var out map[string]any
 	if err := crossingApply(t, path, func(conn *storage.Conn) error {
@@ -77,7 +77,7 @@ func TestACrossingQuestWithAGiverIsRefused(t *testing.T) {
 	catalog := crossingCatalog(t)
 	key := catalog.WorldCrossing.Quests["Mortal World"].QuestKey
 	batch4Exec(t, path, `UPDATE characters SET realm_index=7,phase=9,cultivation=10000000 WHERE user_id=42`)
-	batch4Exec(t, path, `INSERT INTO quest_definitions(quest_key,title,giver_npc,created_at,updated_at) VALUES(?,'The Seam Above You','Elder Mu',0,0)`, key)
+	batch4Exec(t, path, `INSERT INTO quest_definitions(quest_key,title,status,giver_npc,created_at,updated_at) VALUES(?,'The Seam Above You','approved','Elder Mu',0,0)`, key)
 	var out map[string]any
 	if err := crossingApply(t, path, func(conn *storage.Conn) error {
 		mutation, err := tribulationAttemptAction(conn, catalog, 42, json.RawMessage(`{"game_minute":500,"path":"qi"}`))
