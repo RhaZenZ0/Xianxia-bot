@@ -27,6 +27,7 @@ from app.dashboard.server import (  # noqa: E402
 )
 from app.ops.release_channel import (  # noqa: E402
     RELEASE_CARD_MAX_AGE_SECONDS,
+    pending_release_refresh,
     read_release_check,
     release_check_is_stale,
 )
@@ -159,37 +160,116 @@ class TheCardAsksAgainWhenItsAnswerIsOld(unittest.TestCase):
         await asyncio.sleep(0)
         self.store["release_channel"] = {"ok": True, "newest": "1.7.2", "checked_at": self.now}
 
-    def run_read(self, *, enabled=True, concurrent=1):
+    def run_read(self, *, enabled=True, concurrent=1, settle=True):
+        """Read `concurrent` times at once, then (settle) let the refresh finish
+        and read once more. Returns (first reads, the read after the refresh)."""
         lock = asyncio.Lock()
 
         async def go():
-            return await asyncio.gather(*(
+            first = await asyncio.gather(*(
                 read_release_check(self.read, self.check, lock, lambda: self.now, enabled=enabled)
                 for _ in range(concurrent)
             ))
+            task = pending_release_refresh(lock)
+            if settle and task is not None:
+                await task
+            after = await read_release_check(self.read, self.check, lock, lambda: self.now, enabled=enabled)
+            return first, after
         return asyncio.run(go())
 
-    def test_a_stale_answer_is_refreshed_before_it_is_shown(self):
+    def test_a_stale_answer_is_shown_at_once_and_the_next_read_sees_the_new_one(self):
         self.store["release_channel"] = {"ok": True, "newest": "1.7.1", "checked_at": NOW - RELEASE_CARD_MAX_AGE_SECONDS - 1}
-        (result,) = self.run_read()
-        self.assertEqual(result["newest"], "1.7.2", "the card showed the morning's answer after a release was published")
+        (first,), after = self.run_read()
+        self.assertEqual(first["newest"], "1.7.1", "the read waited for GitHub instead of answering at once")
+        self.assertEqual(after["newest"], "1.7.2", "the card showed the morning's answer after a release was published")
         self.assertEqual(self.checks, 1)
+
+    def test_a_stale_read_never_awaits_the_fetch(self):
+        self.store["release_channel"] = {"ok": True, "newest": "1.7.1", "checked_at": NOW - RELEASE_CARD_MAX_AGE_SECONDS - 1}
+        started = []
+
+        async def slow_check():
+            started.append(1)
+            await asyncio.Event().wait()
+
+        async def go():
+            lock = asyncio.Lock()
+            result = await asyncio.wait_for(
+                read_release_check(self.read, slow_check, lock, lambda: self.now), timeout=2)
+            task = pending_release_refresh(lock)
+            self.assertIsNotNone(task, "no background refresh was started")
+            task.cancel()
+            return result
+
+        try:
+            result = asyncio.run(go())
+        except asyncio.TimeoutError:
+            self.fail("a stale read awaited the fetch")
+        self.assertEqual(result["newest"], "1.7.1")
 
     def test_a_fresh_answer_is_shown_without_asking(self):
         self.store["release_channel"] = {"ok": True, "newest": "1.7.1", "checked_at": NOW - 60}
-        (result,) = self.run_read()
+        (result,), after = self.run_read()
         self.assertEqual(result["newest"], "1.7.1")
+        self.assertEqual(after["newest"], "1.7.1")
         self.assertEqual(self.checks, 0)
 
     def test_many_loads_at_once_cost_one_check(self):
-        results = self.run_read(concurrent=6)
+        self.store["release_channel"] = {"ok": True, "newest": "1.7.1", "checked_at": NOW - RELEASE_CARD_MAX_AGE_SECONDS - 1}
+        results, after = self.run_read(concurrent=6)
         self.assertEqual(self.checks, 1, "concurrent card loads each asked GitHub")
-        self.assertTrue(all(r["newest"] == "1.7.2" for r in results))
+        self.assertTrue(all(r["newest"] == "1.7.1" for r in results))
+        self.assertEqual(after["newest"], "1.7.2")
+
+    def test_a_refresh_already_running_is_not_started_twice(self):
+        self.store["release_channel"] = {"ok": True, "newest": "1.7.1", "checked_at": NOW - RELEASE_CARD_MAX_AGE_SECONDS - 1}
+        release = []
+
+        async def slow_check():
+            self.checks += 1
+            while not release:
+                await asyncio.sleep(0)
+            self.store["release_channel"] = {"ok": True, "newest": "1.7.2", "checked_at": self.now}
+
+        async def go():
+            lock = asyncio.Lock()
+            for _ in range(4):
+                await asyncio.wait_for(
+                    read_release_check(self.read, slow_check, lock, lambda: self.now), timeout=1)
+                await asyncio.sleep(0)
+            release.append(1)
+            await pending_release_refresh(lock)
+            return await read_release_check(self.read, slow_check, lock, lambda: self.now)
+
+        try:
+            after = asyncio.run(go())
+        except asyncio.TimeoutError:
+            self.fail("a read waited for the fetch instead of answering at once")
+        self.assertEqual(self.checks, 1, "a second fetch was started while one was running")
+        self.assertEqual(after["newest"], "1.7.2")
+
+    def test_a_failed_refresh_still_stamps_the_time_so_github_is_not_hammered(self):
+        self.store["release_channel"] = {"ok": True, "newest": "1.7.1", "checked_at": NOW - RELEASE_CARD_MAX_AGE_SECONDS - 1}
+
+        async def failing_check():
+            self.checks += 1
+            self.store["release_channel"] = {"ok": False, "error": "boom", "checked_at": self.now}
+
+        async def go():
+            lock = asyncio.Lock()
+            await read_release_check(self.read, failing_check, lock, lambda: self.now)
+            await pending_release_refresh(lock)
+            return await read_release_check(self.read, failing_check, lock, lambda: self.now)
+
+        after = asyncio.run(go())
+        self.assertEqual(self.checks, 1)
+        self.assertFalse(after["ok"])
 
     def test_a_switched_off_check_is_never_asked(self):
-        results = self.run_read(enabled=False)
+        results, after = self.run_read(enabled=False)
         self.assertEqual(self.checks, 0)
         self.assertEqual(results, [{}])
+        self.assertEqual(after, {})
 
     def test_staleness_reads_the_timestamp_honestly(self):
         self.assertTrue(release_check_is_stale(None, NOW))
