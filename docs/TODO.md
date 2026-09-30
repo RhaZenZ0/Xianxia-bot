@@ -16,6 +16,24 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **deferred (design)** — *Grandfathering a beast lowers its rank and leaves its evolution stage.*
+  `beast_grandfather.go` settles an old beast to the rank its owner's cores can pay for and keeps
+  `evolution_stage` where it was, so a stage can stand above the rank and the stage's combat term
+  is still paid in full. Whether a stage should be taken back from a beast that already climbed it
+  is the owner's call; the shipped test asserts rank 0 with stage 16 left in place.
+- **deferred** — *A stale watcher lock after a power loss.* `update_watch.sh` refuses to start when
+  the lock's pid answers `kill -0`, and a rebooted NAS can hand that pid to another process. Rare,
+  and the remedy is `rm -rf` on the lock directory; a lock that also records a boot id would tell
+  the two apart.
+- **deferred** — *An erased GM's id in the update rows.* `world_state['update_request']` and
+  `update_result` carry `requested_by` inside their JSON, and the erasure sweep walks columns, so an
+  erased GM's Discord id stays in those two blobs. A one-line anonymise beside the sweep; low
+  privacy weight, since only administrators can request an update.
+- **deferred (design)** — *A stranger's way to Underworld Contacts 15.* v1.11.1 let a broker buy
+  from a stranger, +1 standing a sale, but a post stocks six rows drawn from ninety restricted,
+  special or legendary items none of which any shelf sells, so each +1 costs a rare item and the
+  threshold is effectively reachable only through the five underworld households. Whether a
+  broker should also buy ordinary contraband is a content decision.
 - **fixed (v1.7.10)** — *No `/boss` or `/party`.* Both groups backed a Combat hub page and were never
   in `TREE_COMMANDS`, so the names a player types reached nothing (v1.7.4's `/stall`). Registered.
 - **deferred (design)** — *The other hub-only groups.* `_GROUP_ACTION_ROOTS` holds some fifty groups
