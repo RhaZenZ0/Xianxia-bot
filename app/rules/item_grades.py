@@ -13,6 +13,7 @@ passed in, because ``rules`` imports nothing above it.
 
 from __future__ import annotations
 
+import math
 from typing import Any, Mapping
 
 SEPARATOR = "@"
@@ -60,3 +61,26 @@ def graded_name(base_name: str, ladder: Mapping[str, Any] | None, item_id: str) 
     """``"Qi Pill"`` at High is ``"Qi Pill (High)"``; Low is the bare name."""
     label = grade_label(ladder, item_id)
     return f"{base_name} ({label})" if label else base_name
+
+
+def effect_mult(ladder: Mapping[str, Any] | None, item_id: str) -> float:
+    """What a grade multiplies an item's use by - restores, lifespan, duration:
+    the twin of the engine's ``itemEffectMult``. A bare id, an id the ladder
+    does not carry and a rung with no usable multiplier are all 1, because a
+    grade only ever adds."""
+    _, grade = split_item_grade(item_id)
+    _, entry = grade_rung(ladder, grade)
+    mult = float(entry.get("effect_mult") or 0)
+    return mult if mult > 0 else 1.0
+
+
+def graded_amount(base: int, mult: float) -> int:
+    """A whole-number use scaled by a grade, rounded half away from zero and
+    never below the base: the twin of the engine's ``gradedAmount``. Python's
+    ``round`` is banker's rounding and would disagree with the engine on an
+    exact half (5 at x1.5 is 8, and round(7.5) is 8 only by luck; 25 at x1.5 is
+    38 and round(37.5) is 38, but 15 at x1.5 is 23 and round(22.5) is 22)."""
+    base = int(base)
+    if base <= 0:
+        return max(0, base)
+    return max(base, int(math.floor(base * float(mult) + 0.5)))

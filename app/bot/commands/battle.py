@@ -20,6 +20,7 @@ import discord
 from discord import app_commands
 
 from ...rules.advanced_runtime import deed_karma_line, describe_manual_technique
+from ...rules.item_grades import effect_mult, graded_amount
 from ...rules.sect import sect_points_line
 from ...rules.battle import matchup_label, opponent_debuff_label, suppression_label, vitality_band, vitality_bar
 from ...ops.game_engine import GameEngineError
@@ -101,9 +102,13 @@ async def _battle_available_options(user_id:int,c:dict)->tuple[list[tuple[str,st
         idef=WORLD.item_definition(iid)
         if qty>0 and idef.get('use',{}).get('instant'):
             instant=idef.get('use',{}).get('instant',{})
+            # What the pill restores at its grade, the amount the engine pays
+            # (v1.12.3): `item_definition` is the base entry's use, and a Mid
+            # pill printed its Low numbers while restoring a quarter more.
+            mult=effect_mult(WORLD.item_grades,str(iid))
             recovery=[]
-            if int(instant.get('vitality_restore',0)): recovery.append(f"Vitality +{int(instant['vitality_restore'])}")
-            if int(instant.get('qi_restore',0)): recovery.append(f"Qi +{int(instant['qi_restore'])}")
+            if int(instant.get('vitality_restore',0)): recovery.append(f"Vitality +{graded_amount(int(instant['vitality_restore']),mult)}")
+            if int(instant.get('qi_restore',0)): recovery.append(f"Qi +{graded_amount(int(instant['qi_restore']),mult)}")
             usable.append((str(iid),f"{idef.get('name',iid)} x{qty}"," • ".join(recovery) or "Instant recovery"))
     return techniques[:25],usable[:25]
 
