@@ -68,8 +68,34 @@ func TestATreatyAtZeroEndsAndARivalryOpensFromBothSides(t *testing.T) {
 			t.Fatalf("house %d holds no rivalry with %d at the opening score (got %d)", side[0], side[1], score)
 		}
 	}
-	if n := clanInt(t, path, `SELECT COUNT(*) FROM world_history_events WHERE event_type='clan_relation_ended'`); n != 2 {
-		t.Fatalf("the world remembers %d ending(s), want one per side", n)
+	if n := clanInt(t, path, `SELECT COUNT(*) FROM world_history_events WHERE event_type='clan_relation_ended'`); n != 1 {
+		t.Fatalf("the world remembers %d ending(s), want one for the pair", n)
+	}
+}
+
+// A killing lowers only the victim house's rows (`combat_aftermath.go`), so
+// production never has both sides at zero: A's side is exhausted and B's is
+// still +40. The treaty ends from both sides or it is not a treaty that ended.
+func TestATreatyBrokenFromOneSideEndsFromBoth(t *testing.T) {
+	path := clanDB(t)
+	neverSigns(t)
+	a := addHouse(t, path, "Wei", "Riverguard City", 60, 10, 0)
+	b := addHouse(t, path, "Zhao", "Riverguard City", 60, 10, 0)
+	seedClanRelation(t, path, a, b, "Zhao", "alliance", -1)
+	seedClanRelation(t, path, b, a, "Wei", "alliance", 40)
+	tickClans(t, path)
+	if n := clanInt(t, path, `SELECT COUNT(*) FROM martial_clan_relations WHERE relation_type='alliance' AND active=1`); n != 0 {
+		t.Fatalf("%d alliance row(s) still active; the partner's side kept paying a treaty the other house broke", n)
+	}
+	for _, side := range [][2]int64{{a, b}, {b, a}} {
+		rows := clanInt(t, path, `SELECT COUNT(*) FROM martial_clan_relations WHERE family_id=? AND partner_family_id=? AND active=1`, side[0], side[1])
+		rivals := clanInt(t, path, `SELECT COUNT(*) FROM martial_clan_relations WHERE family_id=? AND partner_family_id=? AND active=1 AND relation_type='rivalry'`, side[0], side[1])
+		if rows != 1 || rivals != 1 {
+			t.Fatalf("house %d holds %d active relation(s) with %d, %d of them rivalry; want exactly one, a rivalry", side[0], rows, side[1], rivals)
+		}
+	}
+	if n := clanInt(t, path, `SELECT COUNT(*) FROM world_history_events WHERE event_type='clan_relation_ended'`); n != 1 {
+		t.Fatalf("the world remembers %d ending(s), want one for the pair", n)
 	}
 }
 
