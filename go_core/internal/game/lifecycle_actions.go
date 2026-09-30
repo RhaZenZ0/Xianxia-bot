@@ -852,6 +852,41 @@ func samsaraFamilySourceWorld(catalog worlddata.Catalog, familyLocation string, 
 	return realmWorld(catalog.Realms, realmIndex)
 }
 
+// incarnationScopedTables are the tables a new life starts without: everything
+// keyed on the character's `user_id` that belongs to the life rather than to
+// the soul. `soul_legacy` is deliberately not here - it is what a rebirth
+// carries.
+var incarnationScopedTables = []string{"inventory", "active_effects", "character_conditions", "tribulation_state", "tribulation_attempts", "profession_progress", "faction_reputation", "bounty_hunter_pursuits", "boss_reward_claims", "formation_positions", "equipment_instances", "bounties", "grudges", "crime_records", "character_manuals", "character_recipes", "spirit_beasts", "artifact_bonds", "item_provenance", "character_social_state", "hidden_sect_membership", "character_bloodlines", "character_physiques", "character_spiritual_roots", "cooldowns", "realm_perfection", "body_realm_perfection", "law_progress", "dao_progress", "inheritances", "currency_wallets", "storage_inventory", "storage_containers", "sect_membership", "secret_realm_runs", "auction_door_risks", "personal_worlds"}
+
+// incarnationScopedLaterTables are incarnation-scoped tables a later schema
+// added (v1.12.3: a captured flame, schema 70, and the spirit sense, schema
+// 71). Samsara's list named neither, so a soul reborn kept a flame it had
+// captured in a body it no longer has and a spirit sense it had built - both of
+// which open the top grade of a craft. They are skipped when the table is not
+// there yet, for v1.1.0's migration-window reason: in the compose stack the
+// engine is healthy before db-init migrates, and a rebirth must not be refused
+// over a table a later schema owns.
+var incarnationScopedLaterTables = []string{"character_flames", "character_spirit_sense"}
+
+// clearIncarnationStateTx is what a rebirth wipes before the new body is
+// installed.
+func clearIncarnationStateTx(conn *storage.Conn, userID int64) error {
+	for _, t := range incarnationScopedTables {
+		if _, err := conn.Execute(fmt.Sprintf(`DELETE FROM %s WHERE user_id=?`, t), []any{userID}); err != nil {
+			return err
+		}
+	}
+	for _, t := range incarnationScopedLaterTables {
+		if ok, err := tableHasColumns(conn, t, "user_id"); err != nil || !ok {
+			continue
+		}
+		if _, err := conn.Execute(fmt.Sprintf(`DELETE FROM %s WHERE user_id=?`, t), []any{userID}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func reincarnateAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p reincarnatePayload
 	if err := json.Unmarshal(raw, &p); err != nil {
@@ -1010,11 +1045,8 @@ func reincarnateAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		return authoritativeMutation{}, err
 	}
 	// Clear incarnation-scoped state before installing the new body.
-	tables := []string{"inventory", "active_effects", "character_conditions", "tribulation_state", "tribulation_attempts", "profession_progress", "faction_reputation", "bounty_hunter_pursuits", "boss_reward_claims", "formation_positions", "equipment_instances", "bounties", "grudges", "crime_records", "character_manuals", "character_recipes", "spirit_beasts", "artifact_bonds", "item_provenance", "character_social_state", "hidden_sect_membership", "character_bloodlines", "character_physiques", "character_spiritual_roots", "cooldowns", "realm_perfection", "body_realm_perfection", "law_progress", "dao_progress", "inheritances", "currency_wallets", "storage_inventory", "storage_containers", "sect_membership", "secret_realm_runs", "auction_door_risks", "personal_worlds"}
-	for _, t := range tables {
-		if _, err = conn.Execute(fmt.Sprintf(`DELETE FROM %s WHERE user_id=?`, t), []any{userID}); err != nil {
-			return authoritativeMutation{}, err
-		}
+	if err = clearIncarnationStateTx(conn, userID); err != nil {
+		return authoritativeMutation{}, err
 	}
 	_, _ = conn.Execute(`DELETE FROM boss_participants WHERE user_id=?`, []any{userID})
 	_, _ = conn.Execute(`DELETE FROM party_members WHERE user_id=?`, []any{userID})
