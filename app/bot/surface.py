@@ -1079,6 +1079,9 @@ PROGRESSION_GATES: dict[str, tuple[str, ...]] = {
     # A stall (v1.5.0): tending one needs one, opening one needs none and the
     # realm the roster asks for. The board and the status are reads and stay.
     "stall_keeper": ("stall list", "stall withdraw", "stall close"),
+    # Tending is done standing in the city the stall is kept in, not in any
+    # city (v1.12.3): `stallOwnerHereTx` compares the two.
+    "stall_elsewhere": ("stall list", "stall withdraw", "stall close"),
     "stall_open": ("stall open",),
     "samsara": ("family ancestry", "family legacy", "family investigate", "family quest", "family claim", "family conflict"),
 }
@@ -1141,11 +1144,17 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
         shut["samsara"] = "a first life has no past to trace"
     stall = await _player_stall(uid)
     if stall is None:
-        if realm < STALL_MIN_REALM_INDEX:
-            shut["stall_open"] = f"a stall asks for {WORLD.realm_name(STALL_MIN_REALM_INDEX)}; you stand at {WORLD.realm_name(realm)}"
+        # `stall.open` asks `accessRealmIndex()` - the higher of the two
+        # ladders - so a body cultivator ahead of their qi stage is let in.
+        access = max(realm, body_realm)
+        if access < STALL_MIN_REALM_INDEX:
+            shut["stall_open"] = f"a stall asks for {WORLD.realm_name(STALL_MIN_REALM_INDEX)}; you stand at {WORLD.realm_name(access)}"
         shut["stall_keeper"] = "you keep no stall yet — Open one in a city's street"
     else:
         shut["stall_open"] = f"you already keep {stall.get('name')} in {stall.get('city')}"
+        stall_city = str(stall.get("city") or "")
+        if stall_city and _city_of(here) != stall_city:
+            shut["stall_elsewhere"] = f"your stall stands in {stall_city}; travel there to tend it"
     hidden: dict[str, str] = {}
     for gate, reason in shut.items():
         hidden.update(_action_paths(reason, *PROGRESSION_GATES[gate]))
