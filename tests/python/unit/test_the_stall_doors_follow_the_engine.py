@@ -87,7 +87,7 @@ class TendingIsDoneInTheStallsOwnCity(unittest.TestCase):
     def test_the_keeper_in_another_city_is_not_shown_the_tending_doors(self):
         hidden = _hidden(self.surface, _character(self.surface, self.other, realm=3), self.stall)
         for path in TENDING:
-            self.assertIn(path, hidden, f"{path} is drawn in {self.other}, where the stall is not - the engine refuses it")
+            self.assertTrue(path in hidden, f"{path} is drawn in {self.other}, where the stall is not - the engine refuses it")
             self.assertIn(self.home, hidden[path], "the lock line does not say where the stall stands")
 
     def test_the_keeper_in_their_own_city_or_any_part_of_it_is_shown_them(self):
@@ -95,12 +95,12 @@ class TendingIsDoneInTheStallsOwnCity(unittest.TestCase):
             with self.subTest(place=place):
                 hidden = _hidden(self.surface, _character(self.surface, place, realm=3), self.stall)
                 for path in TENDING:
-                    self.assertNotIn(path, hidden, f"{path} is hidden from the keeper standing in {place}")
+                    self.assertFalse(path in hidden, f"{path} is hidden from the keeper standing in {place}")
 
     def test_a_private_room_is_not_the_stalls_city(self):
         hidden = _hidden(self.surface, _character(self.surface, "birth_family:1", realm=3), self.stall)
         for path in TENDING:
-            self.assertIn(path, hidden)
+            self.assertTrue(path in hidden)
 
 
 class OpeningAsksTheHigherLadder(unittest.TestCase):
@@ -112,16 +112,16 @@ class OpeningAsksTheHigherLadder(unittest.TestCase):
 
     def test_a_body_cultivator_ahead_of_their_qi_stage_may_open(self):
         hidden = _hidden(self.surface, _character(self.surface, self.city, realm=0, body_realm=self.floor), None)
-        self.assertNotIn("/stall open", hidden, "the door is hidden from somebody the engine would let in")
+        self.assertFalse("/stall open" in hidden, "the door is hidden from somebody the engine would let in")
 
     def test_the_qi_ladder_alone_still_opens_it(self):
         hidden = _hidden(self.surface, _character(self.surface, self.city, realm=self.floor, body_realm=0), None)
-        self.assertNotIn("/stall open", hidden)
+        self.assertFalse("/stall open" in hidden)
 
     def test_neither_ladder_at_the_floor_hides_it_and_names_the_higher_stage(self):
         below = self.floor - 1
         hidden = _hidden(self.surface, _character(self.surface, self.city, realm=0, body_realm=below), None)
-        self.assertIn("/stall open", hidden)
+        self.assertTrue("/stall open" in hidden)
         self.assertIn(self.surface.WORLD.realm_name(below), hidden["/stall open"],
                       "the lock line names the qi stage, not the stage the engine compares")
 
