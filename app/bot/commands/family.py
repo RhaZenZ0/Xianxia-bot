@@ -284,6 +284,11 @@ def family_sendoff_line(result: dict) -> str:
     sendoff = dict(result.get("family_sendoff") or {})
     if not sendoff:
         return ""
+    if not sendoff.get("name"):
+        # The heirloom was already theirs (v1.12.3): the engine reports only
+        # what it raised this time, the household's connections, and naming an
+        # object that was not handed over would print "None".
+        return family_connections_line(sendoff)
     line = str(sendoff.get("line") or "").strip()
     return (
         f"\n🎁 The household sends you out with **{sendoff.get('name')}**"
