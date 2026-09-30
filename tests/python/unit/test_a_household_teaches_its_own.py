@@ -83,10 +83,25 @@ class AHouseholdTeachesItsOwnTests(unittest.TestCase):
     def test_no_two_households_share_a_tradition(self):
         """Two houses with one manual read identically at the hearth, which is
         how `azure_cloud_foundation_sword_canon` came to be four households'
-        "own" tradition at once."""
+        "own" tradition at once.
+
+        Held over the thirteen starter households, the Mortal World's - the
+        ones a character is born into and the ones whose manuals were authored
+        for them (v1.0.3). v1.12.3 gave the thirty-three upper-world houses a
+        samsara rebirth can land in a lesson of their own, and on the owner's
+        brief they teach the Mortal house's method of the same trade rather
+        than thirty-three more manuals: a household there is the Mortal one
+        raised a world up. What must still hold is that the method an upper house
+        teaches is one of the thirteen, never another sect's canon, and
+        `test_household_lesson.py` holds that (same trade, same keepsake)."""
+        from app.rules.birthfamily import FAMILY_ARCHETYPES
+
+        mortal = {str(a["id"]) for a in FAMILY_ARCHETYPES}
+        self.assertEqual(len(mortal), 13, "the starter households changed shape")
         seen: dict[str, list[str]] = {}
         for household, entry in LESSON.items():
-            seen.setdefault(entry["manual"], []).append(household)
+            if household in mortal:
+                seen.setdefault(entry["manual"], []).append(household)
         shared = {m: sorted(hs) for m, hs in seen.items() if len(hs) > 1}
         self.assertEqual(shared, {}, f"one manual is several households' own tradition: {shared}")
 

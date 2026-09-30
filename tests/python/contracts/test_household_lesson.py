@@ -27,25 +27,70 @@ MANUALS = dict(CONTENT["technique_system"]["manuals"])
 STAGES = list(CONTENT["beginner_path"])
 
 
+def houses_without_a_lesson(sendoff: dict, lessons: dict) -> list[str]:
+    """Every household a send-off names and no lesson answers for."""
+    return sorted(set(sendoff) - set(lessons))
+
+
+def shared_prose(lessons: dict) -> list[str]:
+    """`lesson`, `test` and `story` lines two houses both speak."""
+    found = []
+    for field in ("lesson", "test", "story"):
+        seen: dict[str, str] = {}
+        for archetype, entry in sorted(lessons.items()):
+            text = str(entry.get(field) or "").strip()
+            if text in seen:
+                found.append(f"{field}: {seen[text]} and {archetype}")
+            seen[text] = archetype
+    return found
+
+
 class EveryHouseHasALessonToGive(unittest.TestCase):
     def test_every_archetype_the_sendoff_names_has_one(self):
-        """Every starter household - the thirteen a character is created into.
+        """All forty-six households, not only the thirteen a character is
+        created into.
 
         v1.3.0 gave the thirty-three upper-world houses a samsara rebirth can
-        land in send-offs of their own, and none of them a lesson: the lesson
-        is the beginner path's last stage, and the path is handed over at
-        creation only (`grantBeginnerPathTx` has one production caller), so
-        an upper-house rebirth never holds the stage and the Hearth's Lesson
-        refuses it honestly. Their lessons are content still to author
-        (`docs/TODO.md`). So the sendoff's Mortal subset is what must have
-        one, and every lesson must be a sendoff's.
+        land in send-offs and v1.12.3 gave them lessons: `familyLessonActionGo`
+        looks the lesson up by the household's archetype and refused "this
+        household has no lesson to give" for every one of them, so a life
+        reborn into the Spiritual, Immortal or Celestial World could never take
+        the once-per-life lesson - never the four trades' entry methods, never
+        the house's manual.
         """
         from app.rules.birthfamily import FAMILY_ARCHETYPES
 
         mortal = {str(a["id"]) for a in FAMILY_ARCHETYPES}
         self.assertEqual(len(mortal), 13, "the starter households changed shape")
-        self.assertEqual(sorted(LESSONS), sorted(a for a in SENDOFF if a in mortal))
-        self.assertTrue(set(LESSONS) <= set(SENDOFF), "a lesson for a house with no send-off")
+        self.assertEqual(len(SENDOFF), 46, "the send-off roster changed shape; the reader is broken, not the tree")
+        self.assertEqual(houses_without_a_lesson(SENDOFF, LESSONS), [])
+        self.assertEqual(sorted(LESSONS), sorted(SENDOFF), "a lesson for a house with no send-off")
+        self.assertTrue(mortal <= set(LESSONS))
+
+    def test_the_gate_names_the_house_that_lost_its_lesson(self):
+        """The drill, kept inside the gate."""
+        lessons = dict(LESSONS)
+        del lessons["celestial_medicine_house"]
+        self.assertEqual(houses_without_a_lesson(SENDOFF, lessons), ["celestial_medicine_house"])
+
+    def test_no_two_houses_speak_the_same_words(self):
+        self.assertEqual(shared_prose(LESSONS), [])
+        twin = {k: dict(v) for k, v in LESSONS.items()}
+        twin["spirit_forge_house"]["test"] = twin["celestial_forge_house"]["test"]
+        self.assertEqual(shared_prose(twin), ["test: celestial_forge_house and spirit_forge_house"])
+
+    def test_a_household_teaches_a_method_of_its_own_trade(self):
+        """The manual and the keepsake are a Mortal house's of the same trade,
+        so an upper house's child is given what a Mortal one would be."""
+        from app.rules.birthfamily import FAMILY_ARCHETYPES
+
+        mortal = {str(a["id"]) for a in FAMILY_ARCHETYPES}
+        pairs: dict[str, set[tuple[str, str]]] = {}
+        for archetype in mortal:
+            pairs.setdefault(str(SENDOFF[archetype]["trade"]), set()).add((LESSONS[archetype]["manual"], LESSONS[archetype]["keepsake"]))
+        for archetype, entry in LESSONS.items():
+            with self.subTest(archetype=archetype):
+                self.assertIn((entry["manual"], entry["keepsake"]), pairs[str(SENDOFF[archetype]["trade"])])
 
     def test_the_head_speaks_five_times_and_hands_over_two_things(self):
         for archetype, lesson in LESSONS.items():
@@ -61,6 +106,8 @@ class EveryHouseHasALessonToGive(unittest.TestCase):
         for archetype, lesson in LESSONS.items():
             with self.subTest(archetype=archetype):
                 manual = MANUALS[lesson["manual"]]
+                self.assertEqual(manual.get("path"), "Any", "a household's manual is for every path")
+                self.assertFalse(str(manual.get("sect", "")).strip(), "a household does not teach a sect's canon")
                 self.assertEqual(int(manual.get("min_realm_index", 0)), 0, "a new cultivator must be able to study it")
                 self.assertNotEqual(str(manual.get("alignment")), "Demonic")
                 self.assertFalse({"forbidden", "demonic", "evil"} & {str(t).lower() for t in manual.get("tags") or []})
