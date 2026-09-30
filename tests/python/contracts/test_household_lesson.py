@@ -70,7 +70,7 @@ class EveryHouseHasALessonToGive(unittest.TestCase):
     def test_the_gate_names_the_house_that_lost_its_lesson(self):
         """The drill, kept inside the gate."""
         lessons = dict(LESSONS)
-        del lessons["celestial_medicine_house"]
+        lessons.pop("celestial_medicine_house", None)
         self.assertEqual(houses_without_a_lesson(SENDOFF, lessons), ["celestial_medicine_house"])
 
     def test_no_two_houses_speak_the_same_words(self):
