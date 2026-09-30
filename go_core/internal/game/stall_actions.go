@@ -43,6 +43,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 
@@ -323,6 +324,26 @@ func stallOwnerHereTx(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	return stall, c, nil
 }
 
+// stallMaxUnitPrice is the most one unit may be listed for (v1.12.3), the
+// range the Discord command already offers, held here because a bound that
+// lives in the client is not a bound: unit times quantity is what a buyer is
+// charged and a seller is paid, and a listing asking 10^18 a unit wrapped the
+// product. It is refused, never clamped - a seller who asked for more would be
+// told twice over that they had what they asked for.
+const stallMaxUnitPrice = int64(1_000_000)
+
+// stallLineTotal is unit times quantity, or an error when the product cannot
+// be held: the black market's guard, for the stall's two multiplications.
+func stallLineTotal(unit, quantity int64) (int64, error) {
+	if unit < 1 || unit > stallMaxUnitPrice {
+		return 0, fmt.Errorf("a listing asks between 1 and %d a unit", stallMaxUnitPrice)
+	}
+	if quantity > 0 && unit > math.MaxInt64/quantity {
+		return 0, errors.New("stall total overflow")
+	}
+	return unit * quantity, nil
+}
+
 type stallListPayload struct {
 	ItemID     string `json:"item_id"`
 	Quantity   int64  `json:"quantity"`
@@ -345,6 +366,9 @@ func stallListAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	p.Quantity = clamp(p.Quantity, 1, 99)
 	if p.UnitPrice < 1 {
 		return authoritativeMutation{}, errors.New("a listing asks at least one coin")
+	}
+	if p.UnitPrice > stallMaxUnitPrice {
+		return authoritativeMutation{}, fmt.Errorf("a listing asks at most %d a unit", stallMaxUnitPrice)
 	}
 	stall, _, err := stallOwnerHereTx(conn, catalog, userID)
 	if err != nil {
@@ -468,8 +492,12 @@ func stallBuyAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 	}
 	currency := fmt.Sprint(listing["currency_id"])
 	unit := i64(listing["unit_price"])
+	line, err := stallLineTotal(unit, p.Quantity)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
 	surcharge := stallSurchargePerUnit(catalog, unit, hops) * p.Quantity
-	total := unit*p.Quantity + surcharge
+	total := line + surcharge
 	now := nowSeconds()
 	balance, err := walletDeltaTx(conn, catalog, userID, currency, -total, now)
 	if err != nil {
@@ -560,7 +588,10 @@ func stallSaleTx(conn *storage.Conn, catalog worlddata.Catalog, listing map[stri
 	}
 	currency := fmt.Sprint(listing["currency_id"])
 	unit := i64(listing["unit_price"])
-	total := unit * quantity
+	total, err := stallLineTotal(unit, quantity)
+	if err != nil {
+		return 0, 0, err
+	}
 	level, err := stallMerchantLevelTx(conn, sellerID)
 	if err != nil {
 		return 0, 0, err

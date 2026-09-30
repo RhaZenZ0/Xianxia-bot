@@ -229,8 +229,8 @@ func ItemSectValue(catalog worlddata.Catalog, itemID string) int64 {
 	return itemSectValue(catalog, itemID)
 }
 
-// craftGradeLabel and craftGradeRank describe a rung for a craft's reply: its
-// label, and the trade rank that may make it.
+// craftGradeLabel describes a rung for a craft's reply: its label. The rank
+// that may make it is craftGradeRequirement's, which says the real one.
 func craftGradeLabel(catalog worlddata.Catalog, index int) string {
 	grades := catalog.ItemGrades.Grades
 	if index < 0 || index >= len(grades) {
@@ -239,12 +239,36 @@ func craftGradeLabel(catalog worlddata.Catalog, index int) string {
 	return grades[index].Label
 }
 
-func craftGradeRank(catalog worlddata.Catalog, index int) int64 {
+// craftGradeRequirement is what a crafter really needs to make a rung: the
+// lowest rank that can, and whether that rank needs something that opens the
+// grade (a fully refined flame or a fully built spirit sense). Transcendent
+// carries `min_rank` 7 and a trade stops rising at rank 6, so a reply that
+// said "needs rank 7" named a rank nobody reaches (v1.12.3); the road to it is
+// `opened_min_rank` 6 *with* an opener, and that is what this answers.
+func craftGradeRequirement(catalog worlddata.Catalog, index int) (int64, bool) {
 	grades := catalog.ItemGrades.Grades
 	if index < 0 || index >= len(grades) {
-		return 0
+		return 0, false
 	}
-	return grades[index].MinRank
+	g := grades[index]
+	if g.OpenedMinRank != nil && *g.OpenedMinRank < g.MinRank {
+		return *g.OpenedMinRank, true
+	}
+	return g.MinRank, false
+}
+
+// craftGradeOpener names, for a trade, what opens the top grade - "" for a
+// trade nothing opens. Flames serve Alchemy and Forging and the spirit sense
+// serves Formation and Inscription; each is asked of the roster that says so,
+// not of a list kept here.
+func craftGradeOpener(catalog worlddata.Catalog, profession string) string {
+	if flameServesTrade(flameRules(catalog), profession) {
+		return "a fully refined flame"
+	}
+	if spiritSenseServesTrade(spiritSenseRules(catalog), profession) {
+		return "a fully built spirit sense"
+	}
+	return ""
 }
 
 // gradedAmount scales a whole-number quantity of an item's use by its grade,

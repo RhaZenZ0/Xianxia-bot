@@ -1,6 +1,8 @@
 package game
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"xianxia/core/internal/storage"
@@ -130,5 +132,30 @@ func TestTheGMsTravelPaceBeatsTheEnvAndIsAudited(t *testing.T) {
 	travel, wait := storage.ParseInt(result["travel_minutes"]), storage.ParseInt(result["wait_minutes"])
 	if travel <= 0 || wait != travel*50/100 {
 		t.Fatalf("travel=%d wait=%d, want half the road at the stored pace", travel, wait)
+	}
+}
+
+// A pace that is not a whole number is refused, not read as 0 (v1.12.3).
+// `storage.ParseInt` answers 0 for 50.5, a word and null, and 0 is in range -
+// it is instant travel - so a GM typing 50.5 silently switched the waits off.
+func TestAPaceThatIsNotAWholeNumberIsRefused(t *testing.T) {
+	t.Setenv(travelTimePercentKey, "")
+	path, _ := instantTravelDB(t)
+	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS admin_audit_log(audit_id INTEGER PRIMARY KEY AUTOINCREMENT,admin_user_id INTEGER NOT NULL,action TEXT,target TEXT,before_json TEXT,after_json TEXT,reason TEXT,created_at REAL)`)
+	if _, err := applyAdminRaw(t, path, "admin.world.set_travel_pace", 7, map[string]any{"percent": 40, "reason": "t"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range []any{50.5, "fifty", "50", nil, true, -1, 100.5, 1e300} {
+		if _, err := applyAdminRaw(t, path, "admin.world.set_travel_pace", 7, map[string]any{"percent": bad, "reason": "t"}); err == nil {
+			t.Fatalf("a pace of %#v was accepted; it would have been stored as 0 (instant travel)", bad)
+		}
+	}
+	stored := fmt.Sprint(scalar(t, path, `SELECT value_json FROM world_state WHERE key='travel_pace'`))
+	if !strings.Contains(stored, "40") {
+		t.Fatalf("a refused pace changed the stored one: %s", stored)
+	}
+	// A whole number written as a float is still a whole number.
+	if _, err := applyAdminRaw(t, path, "admin.world.set_travel_pace", 7, map[string]any{"percent": 60.0, "reason": "t"}); err != nil {
+		t.Fatalf("60.0 is the whole number 60: %v", err)
 	}
 }

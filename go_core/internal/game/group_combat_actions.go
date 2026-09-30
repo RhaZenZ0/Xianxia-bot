@@ -822,6 +822,13 @@ func bossActActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 			if lawStageIndex(catalog, comp) < techDef.RequiresStage || i64(cr["realm_index"]) < int64(techDef.MinRealmIndex) {
 				return authoritativeMutation{}, errors.New("technique requirements are no longer met")
 			}
+			// World Collapse's ground, the same helper the battle and the
+			// out-of-battle cast call (v1.12.3): the raid checked stage and
+			// realm only, so a cultivator with no personal world could press
+			// the capstone here.
+			if e := requireLawTechniqueGroundTx(conn, userID, p.Technique); e != nil {
+				return authoritativeMutation{}, e
+			}
 			bonus = 2 + comp/20
 		}
 		roll := stablePercentGo(p.EncounterID, round, userID, p.Style, i64(enc["version"]))

@@ -58684,7 +58684,8 @@
         "qi_replenishment_pill@mid": 10,
         "moonveil_recovery_pill@mid": 30,
         "spirit_condensation_pill@mid": 34,
-        "marrow_tempering_pill": 40
+        "marrow_tempering_pill": 40,
+        "marrow_tempering_pill@mid": 80
       }
     },
     "azure_crown_talisman_hall": {
@@ -59438,7 +59439,8 @@
         "immortal_marrow_pill@mid": 88,
         "heavenpetal_elixir@mid": 186,
         "starlight_dao_pill@mid": 218,
-        "marrow_tempering_pill": 40
+        "marrow_tempering_pill": 40,
+        "marrow_tempering_pill@mid": 80
       }
     },
     "celestial_mandate_talisman_hall": {
@@ -64415,7 +64417,8 @@
         "immortal_marrow_pill@mid": 88,
         "heavenpetal_elixir@mid": 186,
         "starlight_dao_pill@mid": 218,
-        "marrow_tempering_pill": 40
+        "marrow_tempering_pill": 40,
+        "marrow_tempering_pill@mid": 80
       }
     },
     "nine_heavens_talisman_hall": {
@@ -66445,7 +66448,8 @@
         "spirit_condensation_pill@mid": 34,
         "dawnlotus_vitality_pill@mid": 74,
         "immortal_marrow_pill@mid": 88,
-        "marrow_tempering_pill": 40
+        "marrow_tempering_pill": 40,
+        "marrow_tempering_pill@mid": 80
       }
     },
     "spirit_jade_talisman_hall": {
@@ -70066,6 +70070,303 @@
       "pass": "The sand is out and the pattern is whole. That array has held the gate for nine generations, and now it has been held by you.",
       "fail": "It frayed at the third turn. That turn is where everyone frays. Tomorrow.",
       "story": "The Qin sword was given to the clan's founder by an emperor who needed a family that would guard a gate without asking what was behind it. The clan has never asked. It is still not entirely sure it wants to know."
+    },
+    "river_ward_house": {
+      "manual": "unfamous_house_method",
+      "keepsake": "first_hammer_token",
+      "lesson": "The river taught this house its forms, and the forge taught it to keep them. Sit by the water-gate; a smith who cannot hear the current does not know what he is hammering against.",
+      "test": "Take the ward-oar in both hands and hold it level over the sluice, blade clear of the water, while the current pulls at it. Do not let the tip touch.",
+      "pass": "Dry to the last. The river pulled and your arm answered, and it is the answer this house has always given.",
+      "fail": "The blade kissed the water twice. The river will pull just as hard tomorrow; come back and be stronger than it.",
+      "story": "The house took its name from a ward of the river market, where its founder beat a flood-gate shut with a hammer the night the marsh dikes broke. The gate still holds, and the hammer marks on it are the family's only signature."
+    },
+    "spirit_caravan_house": {
+      "manual": "first_contract_array",
+      "keepsake": "household_array_plate",
+      "lesson": "A caravan is a formation that walks. The wagons, the wardens and the water-carriers are its lines, and a line that breaks in the marsh does not come back. Sit, and I will show you where ours bend.",
+      "test": "Close your eyes at the table and tell me where the six wagons would stand on the causeway tonight, by the feel of the ward-rope run between them.",
+      "pass": "All six, and the rear one farthest out, as it should be. You felt the rope before you named the wagon; the road will trust you.",
+      "fail": "You put the water-cart in the lead, and it would have been the first lost. The rope will be strung again tomorrow.",
+      "story": "The house began as one mule and a debt owed to a salt-factor in the reed towns. It crossed the marshes forty times in a year to pay it and lost nothing, and the banner is the receipt."
+    },
+    "spirit_forge_house": {
+      "manual": "no_crest_blade_record",
+      "keepsake": "first_hammer_token",
+      "lesson": "Everything this furnace makes leaves by the front door, and so will you. Before it does, you will learn what the fire asks of the arm that holds the hammer. Sit; the coals can wait.",
+      "test": "Take the quench hammer by the very end of its handle and hold it straight out, head up, until the bell in the yard has rung twice.",
+      "pass": "Two bells, and the head never dipped. Your mother held it through three, but she was older and angrier.",
+      "fail": "It drooped before the second bell. A vermilion hammer forgives nothing; come back tomorrow and hold it longer.",
+      "story": "The furnace was lit in the year the marsh fires burned for a month, and nobody has let it go out since. The house sells what it makes and keeps what it learns, and the second is what you are being given."
+    },
+    "spirit_body_house": {
+      "manual": "hungry_season_tempering_record",
+      "keepsake": "old_cauldron_vial",
+      "lesson": "Your grandfather made you walk until the greaves felt light, and now you know what a body spends. The pills that pay it back are this house's other half. Sit, and look at what is on the table.",
+      "test": "Three jars of stone-marrow powder, one of them cut with chalk. Tell me which, and how you know, before the tea cools.",
+      "pass": "The middle one. The chalk drags on the tongue and sits pale in the light, and you saw it before you tasted it. Keep looking first.",
+      "fail": "You chose the pure jar and called it cut. A buyer would have called you a cheat, and worse. Come back tomorrow.",
+      "story": "The house was founded by a quarryman who found that the marrow of the old stone seams would mend a body as readily as a wall. His first patient was a mule, his second was the magistrate, and that is why the house has held its licence ever since."
+    },
+    "spirit_sword_house": {
+      "manual": "left_hand_forge_canon",
+      "keepsake": "first_hammer_token",
+      "lesson": "The courtyard teaches the form to anyone who will stand in it. This house teaches its own children how the steel is born, which is a harder form and pays worse. Sit, and leave the sword on the rack.",
+      "test": "Take a courtyard sword down and hold the first guard until the seniors finish their drill. Do not shift your feet and do not look at them.",
+      "pass": "They finished and you were still there, blade steady, eyes forward. The courtyard has kept worse students standing.",
+      "fail": "You glanced at the second row, and the blade followed your eyes. The drill runs again tomorrow; so do you.",
+      "story": "The courtyard was a market square until a swordsman paid for its paving with the only blade he would ever sell. The house has never sold another, and the stones still ring faintly where he stood."
+    },
+    "spirit_guard_house": {
+      "manual": "river_ford_spear_canon",
+      "keepsake": "first_hammer_token",
+      "lesson": "A watch haft is a length of iron that has been told to hold a gate. This house is the one that tells it, and the telling is in the hammer. Sit; the wall does not need us this hour.",
+      "test": "Take the watch haft and hold it upright at arm's length, one-handed, while I call the change of the watch. The butt must not touch the floor.",
+      "pass": "Upright through the whole change. That is the arm the wall has always needed, and now it is yours.",
+      "fail": "The butt touched on the second call. The watch changes again tomorrow, and so does your grip.",
+      "story": "The house has held its stretch of the spirit wall for six generations and has never once opened the gate to a face it did not know. Each haft is kept by the gate and carries the name of the watch that first lifted it."
+    },
+    "spirit_hidden_house": {
+      "manual": "unaccepted_fan_primer",
+      "keepsake": "first_brush_seal",
+      "lesson": "Everything this house makes is small, and everything small is inscribed, because a needle with no mark is only a needle. Sit, keep your hands in view, and do not look behind you.",
+      "test": "Inscribe the house's mark on the flat of a needle by lamplight while I recite to you the names of those who sold it.",
+      "pass": "Fine as a hair, and your hand did not stop at the names. This house has lost better than you to a wavering stroke, and does not mean to lose you.",
+      "fail": "The mark broke at the third name. Tomorrow I will say the same names, and your hand will not hear them.",
+      "story": "No ledger in the marsh towns has ever carried the house's name, and three magistrates have been paid to keep it so. What the house owes the night is paid in needles, and what the night owes the house is silence."
+    },
+    "spirit_frontier_house": {
+      "manual": "stick_in_the_mud_array_primer",
+      "keepsake": "household_array_plate",
+      "lesson": "A frontier is a formation with people in it, and the horn is how its lines speak. Every post on this wall sounds the same note on a different breath. Sit and learn to hear the breath.",
+      "test": "I will sound the horn three times from the far yard. Tell me, from the feel of the qi alone, which post answered first and which one lied.",
+      "pass": "The east post answered, and the third call was the lie. You heard the qi before you heard the note, which is the whole of the skill.",
+      "fail": "You named the east post and missed the lie. The horn sounds again tomorrow, and the wall does not wait.",
+      "story": "The horn was carved from a beast that came over the wall in the house's second generation, and it is sounded only for the house or the wall. The one night it was sounded for neither, the post it called was never found."
+    },
+    "spirit_fallen_house": {
+      "manual": "eastern_gate_remnant_form",
+      "keepsake": "first_hammer_token",
+      "lesson": "Your uncle took the shard out of a strongbox with nothing else in it, and that is all this house has left. I am its head anyway. Sit; a fallen house still remembers how a thing is made.",
+      "test": "Hold the shard-tongs out straight, jaws open, until I tell you to close them. A smith's arm does not shake, even over an empty box.",
+      "pass": "Steady to the end. This house was never short of arms; it was short of reasons. You are a reason.",
+      "fail": "The tongs wavered. Put them down and sleep. The shard has waited longer than a day.",
+      "story": "The house once lent its halo to the Crown, and the Crown returned it in pieces and called the matter closed. The clan has kept the largest shard in an empty strongbox for ninety years, so that its children would ask what was in it."
+    },
+    "spirit_cadet_house": {
+      "manual": "gate_without_asking_canon",
+      "keepsake": "household_array_plate",
+      "lesson": "A cadet house is a small array inside a larger one, and its lines must match the Crown's exactly or not be drawn. Sit; I will show you where the Crown's lines end and ours begin.",
+      "test": "Trace the cadet seal's array in the air and hold your spirit in it until the incense is out. If the line frays, stop and begin again.",
+      "pass": "The incense burnt to the stem and the seal held. The Crown counts its cadets by exactly this, and it will count you.",
+      "fail": "It frayed at the fifth turn. Everyone's does. Come back tomorrow with the turn in your hand.",
+      "story": "The house was given its seal for holding a bridge through a succession quarrel that nobody else would hold, and the Crown has repaid the favour with a cadet's seat and nothing more. The seal is worn smooth, and so is the family's patience."
+    },
+    "spirit_medicine_house": {
+      "manual": "one_in_ten_furnace_record",
+      "keepsake": "old_cauldron_vial",
+      "lesson": "Your grandmother checks the straps twice because she has seen what a spilled pannier costs. I will teach you the other half, which is when a batch is not worth the fire. Sit, and watch the pot, not me.",
+      "test": "The pot has simmered an hour. Tell me, from the steam alone, whether this batch is fit for a patient or for the drain.",
+      "pass": "The drain, and you saw it in the colour of the steam. Half the apothecaries in the river towns would have poured it into a bottle.",
+      "fail": "You said fit, and it is not. A patient would have told you so, at some cost. Tomorrow.",
+      "story": "The house has filled its panniers from the same hundred cliff-ledges for eight generations and will not show any outsider the route. A rival once followed a pannier for two days and was found on the third, lost, and carrying a gift of tea."
+    },
+    "immortal_river_house": {
+      "manual": "unfamous_house_method",
+      "keepsake": "first_hammer_token",
+      "lesson": "Listen before you act: that is the whole of this house's teaching, and the rest is hammer. Sit by the window and hear what the river under the court says to the iron in the forge.",
+      "test": "Hold the shell at your ear with one hand and the tide-hammer straight out with the other, until the shell's note changes.",
+      "pass": "The note turned, and the hammer never moved. You listened with one arm and worked with the other, which is how this house was built.",
+      "fail": "The hammer dipped before the note turned. Come back tomorrow and listen longer.",
+      "story": "The house's founder was a ferryman who could hear a storm two days before it broke, and who made the first tide-shell to teach that skill to his sons. It is still how the house knows whether to raise the bridge."
+    },
+    "immortal_wayfarer_clan": {
+      "manual": "first_contract_array",
+      "keepsake": "household_array_plate",
+      "lesson": "Every wayfarer's first road is the one away from here, and every road is a line in a formation too large to see. Sit, and let me show you one end of it.",
+      "test": "Plant the staff and feel for the skyroad's ward-lines through it. Tell me, without opening your eyes, which way the nearest waystation lies.",
+      "pass": "North by east, and you turned before you spoke. The road told you and you listened. That is the clan's first lesson and its last.",
+      "fail": "You pointed south, which is where the last wayfarer who guessed went wrong. Tomorrow, and listen to the staff.",
+      "story": "The clan walked the skyroads before there were waystations, and every waystation that stands today was a place one of its members refused to leave. The staff in the yard is the first of them, and nobody remembers who planted it."
+    },
+    "immortal_forge_lineage": {
+      "manual": "no_crest_blade_record",
+      "keepsake": "first_hammer_token",
+      "lesson": "The lineage does not forge things; it forges smiths, and the things are what falls off. You were shaped as carefully as that anvil was, and now you learn what that cost. Sit.",
+      "test": "Take the ember-anvil's tongs and hold a glowing bar steady at arm's length until it turns from gold to red. It must not droop.",
+      "pass": "Gold to red, and the bar never dipped. The anvil ticked and you did not flinch, and the lineage counts that as a pass.",
+      "fail": "It drooped at the gold. The anvil will be just as warm tomorrow.",
+      "story": "The lineage's first anvil was struck from a fallen sun-shard and has never been allowed to go cold. Four generations of smiths have slept beside it, and each has been a little warmer than the last."
+    },
+    "immortal_body_lineage": {
+      "manual": "hungry_season_tempering_record",
+      "keepsake": "old_cauldron_vial",
+      "lesson": "The eldest tested the bracer with a blow so you would learn what a body can bear. Now you will learn what it takes to mend one. Sit; the pills on this table are the lineage's other forge.",
+      "test": "Four pills on the tray, three from one batch and one from another. Tell me which does not belong, and how you know, before the incense ends.",
+      "pass": "The fourth. The glaze is a shade duller and it sits heavier in the dish. You saw it before you lifted it, which means you will not poison anybody by accident.",
+      "fail": "You picked the third, and it was the best of the batch. Tomorrow, and look at the glaze.",
+      "story": "The lineage tempers its bodies against adamant and mends them with pills it makes itself, and has never lost a member to either. The one it lost to a third thing is not discussed, and the pill he needed is the first the house makes now."
+    },
+    "immortal_sword_house": {
+      "manual": "left_hand_forge_canon",
+      "keepsake": "first_hammer_token",
+      "lesson": "The edge is yours now, and the sky was always. But an edge is something a hammer put there, and this house makes its children learn the hammer too. Sit; the rack can wait another hour.",
+      "test": "Lift the practice blade from its rack and hold it level at arm's length until the temple bell strikes. Do not steady it with your other hand.",
+      "pass": "The bell struck and the blade stood. It waited on that rack since your first form, and it waited well.",
+      "fail": "The other hand came up before the bell. The bell strikes again tomorrow.",
+      "story": "The house's blades cut clouds in the old songs, an exaggeration the family does not correct. What they did cut, in the third generation, was a mountain road through the snow, and every traveller on it has been grateful since."
+    },
+    "immortal_guard_house": {
+      "manual": "river_ford_spear_canon",
+      "keepsake": "first_hammer_token",
+      "lesson": "A pennon is a scrap of silk that tells a hundred spears where to stand. The spear-heads are where this house's work lives. Sit, and learn what the silk is sewn to.",
+      "test": "Take up the company's lance and hold it levelled at the gate until the watch-drum has sounded three times. The head must not waver.",
+      "pass": "Three drums and the head as still as the gate. The company would take you; the house takes you as a smith.",
+      "fail": "It wavered on the second drum. The watch-drum sounds again tomorrow.",
+      "story": "The company has stood to at the same gate on the same morning for four hundred years and has never once been late. The lances are reforged at each generation's coming of age, and yours will be the next."
+    },
+    "immortal_hidden_house": {
+      "manual": "unaccepted_fan_primer",
+      "keepsake": "first_brush_seal",
+      "lesson": "The house was never here, and neither, from now on, were you. What we do leave behind is marks, and every mark is a promise somebody else can break. Sit, and keep your voice low.",
+      "test": "Inscribe the house's mark on the inside of the veil, in the dark, while I tell you what becomes of a hand that wavers.",
+      "pass": "Clean, in the dark, and you did not stop at the part about the hand. You will be missed by nobody, which is the highest praise this house has.",
+      "fail": "The mark slipped at the second stroke. Tomorrow I will tell it again, and your hand will not hear.",
+      "story": "The house lost its name in the third generation by design, and every record that held it was paid for and burned. What remains is a mask, a mark and a rule: if someone remembers you, you have failed."
+    },
+    "immortal_frontier_house": {
+      "manual": "stick_in_the_mud_array_primer",
+      "keepsake": "household_array_plate",
+      "lesson": "A beacon is a lamp that speaks to a formation, and this house keeps the gate. You have carried one; now you will learn what it says. Sit, and be quiet while the wall talks.",
+      "test": "Feel along the polar wall through the beacon's glass and tell me where the ward-line is thinnest, before I tell you where the last one broke.",
+      "pass": "The north tower, and that is where it broke. You felt the thinning before I spoke of it; the wall trusts you already.",
+      "fail": "You named the south tower. Tomorrow, and keep your hand on the glass.",
+      "story": "The house has lit the gate beacon every night for nine hundred years and has failed once, on the single night it was needed most. It was lit again at dawn by a child nobody had asked, and the house has sung about that child ever since."
+    },
+    "immortal_successor_house": {
+      "manual": "eastern_gate_remnant_form",
+      "keepsake": "first_hammer_token",
+      "lesson": "Your aunt keeps a shrine with nothing else in it, and she was right to give you the shard. A successor house has nothing to succeed to but the work. Sit; let me show you the work.",
+      "test": "Hold the shard-tongs out at arm's length, open, until I count to thirty. The shrine is cold and the arm is not.",
+      "pass": "Thirty, and the tongs as level as at one. The shrine has a keeper again.",
+      "fail": "Twenty-one. The count will be thirty tomorrow, and so will you be.",
+      "story": "The house was named successor to a line that ended in one night of falling stars, and it has never been told what it succeeds to. The shard in the shrine is the only evidence that it ever had a predecessor."
+    },
+    "immortal_cadet_house": {
+      "manual": "gate_without_asking_canon",
+      "keepsake": "household_array_plate",
+      "lesson": "The house counts its cadets, and the ninefold seal is how it counts. Every cadet is a line in an array nine lines wide, and a line that is missing is felt. Sit and learn which line is yours.",
+      "test": "Close your eyes and feel for the ninefold array through the tablet; tell me which of the nine lines is yours before I tell you which is missing.",
+      "pass": "The seventh, and the missing one was the third. You felt both. The house counts you, and it will notice if you are gone.",
+      "fail": "You named the ninth, and it was the fourth. Tomorrow, and count slowly.",
+      "story": "The ninefold seal was granted for a single hour's service on the last day of a forgotten war, and has been worn as though it were an eternity's. The family's nine lines have never been wholly full, and the missing one is the one that matters."
+    },
+    "immortal_medicine_house": {
+      "manual": "one_in_ten_furnace_record",
+      "keepsake": "old_cauldron_vial",
+      "lesson": "Fill the cauldron before you fill your name, your grandmother says, and she is right. The ledge map was the first half of the work; the second is knowing which of what you gathered is worth the fire. Sit.",
+      "test": "Six herbs on the tray, three gathered at dawn and three at dusk. Tell me which three went into the ladle, and how you know, before it cools.",
+      "pass": "The dawn ones. The dusk leaves are a shade limper and sag over the edge of the tray, and you saw it before you asked. Keep looking first.",
+      "fail": "You chose the dusk ones and were sure of it. Tomorrow, and look at the stems.",
+      "story": "The house once nursed a dying emperor on its ledge herbs and had its cauldron blessed and its ledge closed to the public for it. Nobody has found the path since, which is the point."
+    },
+    "celestial_river_house": {
+      "manual": "unfamous_house_method",
+      "keepsake": "first_hammer_token",
+      "lesson": "The river carried this house, and now you carry the river. A rudder is only as good as the iron in it, and this house makes the iron. Sit on the deck; the current can wait.",
+      "test": "Take hold of the rudder-bar and hold it level over the rail against the current's pull until the star-bell rings. The blade must not dip.",
+      "pass": "It rang and the blade was still in the stream. The river pulled and you answered, and so you are a rudder now.",
+      "fail": "The blade dipped and the skiff yawed. The river will pull just as hard tomorrow.",
+      "story": "The house's founder steered a skiff down the star-river through a night when the stars themselves came down to the water, and never spoke of what he saw. The rudder that carried him is bolted to the prow, and it has never once failed."
+    },
+    "celestial_wayfarer_house": {
+      "manual": "first_contract_array",
+      "keepsake": "household_array_plate",
+      "lesson": "Every wayfarer's first constellation is the one over home, and a constellation is a formation the sky has drawn for us. Sit, and look up; I will show you where it leans.",
+      "test": "Take the wayfinder and, eyes closed, tell me which of its points is the one over this house, by the feel of the qi that turns it.",
+      "pass": "The fourth, and it turned to you before you named it. The sky has a place for you, and it is not far from here.",
+      "fail": "The second, and the wayfinder spun under your hand. It will spin again tomorrow.",
+      "story": "The house has no land; it has a map of the sky that it has been redrawing for a thousand years. Every road-master adds a line and never strikes one, and the map is now the only thing in the house older than the house."
+    },
+    "celestial_forge_house": {
+      "manual": "no_crest_blade_record",
+      "keepsake": "first_hammer_token",
+      "lesson": "The crucible made you, and it does not want you back unmade. The tongs are the last thing it asks a smith to hold, and you will hold them today. Sit; the forge is watching.",
+      "test": "Take the crucible tongs, loaded, and hold them out level over the coals until the solar bell sounds. The crucible is hotter than it looks.",
+      "pass": "The bell sounded and the crucible never dipped. The whole forge watched and has nothing to say, which is how you know.",
+      "fail": "The tongs dipped and the coals spat. The bell sounds again tomorrow.",
+      "story": "The crucible was poured from a captured piece of the noon sun and has been held by the same four hands for a thousand years. It is said that when a fifth is found the crucible will be put out, and the house has never been sure it wants to be found."
+    },
+    "celestial_body_house": {
+      "manual": "hungry_season_tempering_record",
+      "keepsake": "old_cauldron_vial",
+      "lesson": "The eldest tied the wraps too tight so you would learn what a body can carry. Now learn what mends it. The pills on this table are the other half of the weight.",
+      "test": "Three tinctures in three worldstone vials, one of them spoiled. Tell me which, and how you know, before the vials warm in your hand.",
+      "pass": "The left. The cork sweats and the colour has clouded, and you saw it before you broke the wax. The world is lighter for you.",
+      "fail": "You chose the clear one and called it spoiled. A patient would have paid for it. Tomorrow.",
+      "story": "The house once carried a mountain on its back for a wager with a god, and the wraps are the only thing that survived the climb. What it learned in the carrying is what it brews in the dark."
+    },
+    "celestial_sword_house": {
+      "manual": "left_hand_forge_canon",
+      "keepsake": "first_hammer_token",
+      "lesson": "The form leaves with you, and the court does not. But the form began as a blade in a fire, and this house insists its children learn that before they learn the sky. Sit.",
+      "test": "Draw the first-form sword and hold the opening guard until the court's bell has sounded four times. Your hand must not adjust.",
+      "pass": "Four bells, and your grip the same at the last as at the first. The firmament court would seat you; the house seats you as a smith.",
+      "fail": "You shifted your grip at the third bell. The bell sounds again tomorrow.",
+      "story": "The firmament court was built around a single sword, and every blade the house has forged since has been a variation on it. The original is kept in a sealed chamber under the court, and nobody has asked to see it in four hundred years."
+    },
+    "celestial_guard_house": {
+      "manual": "river_ford_spear_canon",
+      "keepsake": "first_hammer_token",
+      "lesson": "Go where the mandate goes; the house is behind you. But the house is also in front of you, in the spear-heads this family forges for the company. Sit and learn what you are following.",
+      "test": "Take the mandate spear and hold it upright and level at the gate until the company's drum has sounded five times. The pennant may not droop.",
+      "pass": "Five, and the pennant stood. The mandate walked past you and did not slow, and that is a compliment.",
+      "fail": "The pennant drooped on the fourth drum. The drum sounds again tomorrow.",
+      "story": "The company has held the gate since the mandate was first written, and its spears have been forged by the same house since the company was first mustered. Neither remembers which asked the other."
+    },
+    "celestial_hidden_house": {
+      "manual": "unaccepted_fan_primer",
+      "keepsake": "first_brush_seal",
+      "lesson": "The house does not say farewell; it says be unseen. What it does not say is that unseen is a craft, and that every veil is an inscription. Sit; I will not repeat myself.",
+      "test": "Inscribe the house's mark on the veil's hem, in the dark, while I recite the name of every person the house has ever lost.",
+      "pass": "Steady, and it was a long list. The veil hides you now, and it will take a better eye than mine to find you.",
+      "fail": "The line broke at the twelfth name. Tomorrow I will recite it again, and I will not slow.",
+      "story": "The house has been rumoured to be a constellation, a ghost and a debt, and has let all three rumours stand. It has outlived each of them."
+    },
+    "celestial_frontier_house": {
+      "manual": "stick_in_the_mud_array_primer",
+      "keepsake": "household_array_plate",
+      "lesson": "Raise it for the house or not at all. A watch-lantern is a node in an array that spans the edge of the sky, and this house keeps it lit. Sit; the watch will change without you.",
+      "test": "Hold the lantern up and feel, through its frost-glass, where the edge-array is thinnest tonight. Name it before the watch-bell rings.",
+      "pass": "The eastern reach, and the bell rang after you spoke. The watch will be glad to have you standing on it.",
+      "fail": "You named the western reach, which has been whole for a century. Tomorrow, and hold the lantern higher.",
+      "story": "The house has kept the edge of the sky for as long as there has been an edge, and has never once been thanked. Its lanterns are lit by hand every dusk, and the night they went dark is the night the house still does not talk about."
+    },
+    "celestial_successor_house": {
+      "manual": "eastern_gate_remnant_form",
+      "keepsake": "first_hammer_token",
+      "lesson": "Your uncle took the shard from the empty shrine and did not meet your eye, because this house succeeds a thing that no longer exists. The work is what is left, so you will do the work. Sit.",
+      "test": "Hold the shard-tongs out straight, jaws open, until the shrine's last star is overhead. Do not rest your elbow and do not hurry.",
+      "pass": "The star came and went and the tongs stood. A house with nothing to succeed to needs exactly that arm.",
+      "fail": "The elbow dropped before the star. The star returns tomorrow.",
+      "story": "The house succeeds a constellation that fell out of the sky in a single night, and has never been told by whom. Its shrine holds one shard and a great deal of space around it, and the family keeps both in good order."
+    },
+    "celestial_cadet_house": {
+      "manual": "gate_without_asking_canon",
+      "keepsake": "household_array_plate",
+      "lesson": "The Crown counts its minor houses, and the token is how it counts. Every cadet is a line in the mandate's array, and a missing line is felt across the sky. Sit and learn the weight of yours.",
+      "test": "Hold the cadet token against your brow and feel for the mandate's array through it. Name the line that is yours before the token grows warm.",
+      "pass": "The fifth, and the token warmed after you said it. The Crown counts you, and it will notice if you are gone.",
+      "fail": "You named a line that belongs to another house. Tomorrow, and count slowly.",
+      "story": "The house took its cadet token in exchange for a debt it never explained, and the Crown keeps the receipt in a vault nobody has opened. The family does not know what it owes, only that it is owed."
+    },
+    "celestial_medicine_house": {
+      "manual": "one_in_ten_furnace_record",
+      "keepsake": "old_cauldron_vial",
+      "lesson": "Fill it before you fill your name, and then learn what the filling is for. The gourd is only a vessel; the work is knowing what to pour and what to pour away. Sit; your grandmother is checking the strap.",
+      "test": "Seven herbs in seven dishes, one of them a counterfeit cut from a common weed. Tell me which, and how you know, before the dishes dry.",
+      "pass": "The fourth. The vein runs wrong and the edge is too clean, and you saw it before you smelled it. The gourd will be safe with you.",
+      "fail": "You named the sixth, and it was the best of the seven. Tomorrow, and look at the veins.",
+      "story": "The house grows its herbs on a terrace that the sky was once asked to keep clear of weather, and it has never been sure whether the sky agreed. The gourd is the only vessel that has ever carried one of them down."
     }
   },
   "profession_exams": {

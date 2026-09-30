@@ -574,7 +574,7 @@ INSTALL_TREE=$(mktemp -d "$PARENT_DIR/.xianxia-release-$TARGET_VERSION.XXXXXX")
 for item in "$NEW_ROOT"/* "$NEW_ROOT"/.[!.]* "$NEW_ROOT"/..?*; do
     [ -e "$item" ] || continue
     name=$(basename "$item")
-    case "$name" in .env|.env.bak.*|data|updates|update_backups) continue ;; esac
+    case "$name" in .env|.env.bak.*|data|updates|update_backups|update_watch.log|.xianxia-watcher*) continue ;; esac
     cp -a "$item" "$INSTALL_TREE/"
 done
 [ -f "$INSTALL_TREE/update.sh" ] && chmod +x "$INSTALL_TREE/update.sh" || true
@@ -598,7 +598,7 @@ echo "Creating code snapshot: $SNAPSHOT"
 for old_item in "$PROJECT_DIR"/* "$PROJECT_DIR"/.[!.]* "$PROJECT_DIR"/..?*; do
     [ -e "$old_item" ] || continue
     name=$(basename "$old_item")
-    case "$name" in .env|.env.bak.*|data|updates|update_backups) continue ;; esac
+    case "$name" in .env|.env.bak.*|data|updates|update_backups|update_watch.log|.xianxia-watcher*) continue ;; esac
     # Preserve custom update/backup trees even when they live under an unusual top-level directory.
     case "$UPDATES_DIR/" in "$old_item"/*) continue ;; esac
     case "$BACKUP_DIR/" in "$old_item"/*) continue ;; esac
@@ -652,7 +652,7 @@ restore_code() {
     for old_item in "$PROJECT_DIR"/* "$PROJECT_DIR"/.[!.]* "$PROJECT_DIR"/..?*; do
         [ -e "$old_item" ] || continue
         name=$(basename "$old_item")
-        case "$name" in .env|.env.bak.*|data|updates|update_backups) continue ;; esac
+        case "$name" in .env|.env.bak.*|data|updates|update_backups|update_watch.log|.xianxia-watcher*) continue ;; esac
         case "$UPDATES_DIR/" in "$old_item"/*) continue ;; esac
         case "$BACKUP_DIR/" in "$old_item"/*) continue ;; esac
         rm -rf "$old_item"
@@ -707,7 +707,7 @@ echo "Installing Xianxia RP $TARGET_VERSION..."
 for old_item in "$PROJECT_DIR"/* "$PROJECT_DIR"/.[!.]* "$PROJECT_DIR"/..?*; do
     [ -e "$old_item" ] || continue
     name=$(basename "$old_item")
-    case "$name" in .env|.env.bak.*|data|updates|update_backups|update.sh) continue ;; esac
+    case "$name" in .env|.env.bak.*|data|updates|update_backups|update_watch.log|.xianxia-watcher*|update.sh) continue ;; esac
     case "$UPDATES_DIR/" in "$old_item"/*) continue ;; esac
     case "$BACKUP_DIR/" in "$old_item"/*) continue ;; esac
     # A delete or copy that fails (a tree owned by another NAS account is the
@@ -720,7 +720,7 @@ done
 for item in "$INSTALL_TREE"/* "$INSTALL_TREE"/.[!.]* "$INSTALL_TREE"/..?*; do
     [ -e "$item" ] || continue
     name=$(basename "$item")
-    case "$name" in .env|.env.bak.*|data|updates|update_backups|update.sh) continue ;; esac
+    case "$name" in .env|.env.bak.*|data|updates|update_backups|update_watch.log|.xianxia-watcher*|update.sh) continue ;; esac
     cp -a "$item" "$PROJECT_DIR/" || { echo "ERROR: Could not copy $name into $PROJECT_DIR." >&2; exit 1; }
 done
 if [ -f "$INSTALL_TREE/update.sh" ]; then NEXT_UPDATER="$PROJECT_DIR/.update.sh.next"; cp -a "$INSTALL_TREE/update.sh" "$NEXT_UPDATER"; chmod +x "$NEXT_UPDATER"; fi

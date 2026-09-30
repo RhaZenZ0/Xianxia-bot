@@ -2339,6 +2339,9 @@ class ReadOnlyDashboardStore:
 # A watcher that has not written its heartbeat for this long is reported as
 # not running. It writes one every five minutes, so this is three missed.
 UPDATE_WATCHER_STALE_SECONDS = 15 * 60
+# The states that close an update request. Mirrors the engine's
+# updateRequestState.open (go_core/internal/game/update_request.go).
+UPDATE_TERMINAL_STATUSES = ("", "done", "failed", "cancelled")
 
 
 def update_card_state(rows: dict[str, Any] | None, release: dict[str, Any] | None, now: float) -> dict[str, Any]:
@@ -2366,19 +2369,33 @@ def update_card_state(rows: dict[str, Any] | None, release: dict[str, Any] | Non
             checked_ago = max(0, int(float(now) - float(release["checked_at"])))
         except (TypeError, ValueError):
             checked_ago = None
-    in_progress = bool(request) and str(request.get("status") or "") not in ("", "done", "failed")
+    # A request is open until it is terminal: done, failed or (v1.12.3)
+    # cancelled. The engine's `updateRequestState.open` is the same list.
+    in_progress = bool(request) and str(request.get("status") or "") not in UPDATE_TERMINAL_STATUSES
+    # v1.12.3: the check ran and GitHub answered, but nothing is published on
+    # this channel. That is an answer, not a silence - blaming the bot for it
+    # ("the bot has not answered") sent operators looking for a fault that
+    # was not there.
+    no_release = reachable and not release.get("newest")
+    watcher_running = seen is not None and seen < UPDATE_WATCHER_STALE_SECONDS
     return {
         "installed_version": INSTALLED_VERSION,
         "channel": str(release.get("channel") or "") or None,
         "newest_on_channel": (str(release.get("newest")) if release.get("newest") else None) if reachable else None,
         "update_available": bool(release.get("update_available")) if reachable else None,
         "release_error": None if reachable else str(release.get("error") or "the bot has not answered"),
+        "no_release_on_channel": bool(no_release),
         "checked_seconds_ago": checked_ago,
         "request": request,
         "result": result,
         "watcher_seen_seconds_ago": None if seen is None else int(seen),
-        "watcher_running": seen is not None and seen < UPDATE_WATCHER_STALE_SECONDS,
+        "watcher_running": watcher_running,
         "in_progress": in_progress,
+        # An open request a GM may close: still `requested` (nothing has picked
+        # it up), or any later state once the watcher is not running. An install
+        # in progress under a live watcher is not cancellable. The engine
+        # decides again; this only decides whether the card offers the button.
+        "can_cancel": in_progress and (str((request or {}).get("status") or "") == "requested" or not watcher_running),
     }
 
 
@@ -2408,6 +2425,9 @@ class AdminDashboardController:
         # runs it. The engine writes the request and its audit row; nothing in
         # this process installs anything.
         "server.request_update": "admin.server.request_update",
+        # v1.12.3: close a request that will never finish (still `requested`,
+        # or the watcher has gone quiet). Audited by the engine.
+        "server.cancel_update": "admin.server.cancel_update",
         "simulation.interval": "admin.simulation.interval",
         "player.set_realm": "admin.player.set_realm",
         "player.set_resource_caps": "admin.player.set_resource_caps",

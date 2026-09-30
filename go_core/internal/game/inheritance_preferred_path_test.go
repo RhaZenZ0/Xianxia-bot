@@ -1,6 +1,7 @@
 package game
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -45,10 +46,20 @@ func scriptureStudied(t *testing.T, path string) int64 {
 	return storage.ParseInt(actionScalar(t, path, "SELECT COUNT(*) FROM character_manuals WHERE user_id=42 AND manual_id='stygian_ghost_scripture'"))
 }
 
+func scriptureKarma(t *testing.T, path string) int64 {
+	t.Helper()
+	return storage.ParseInt(actionScalar(t, path, "SELECT karma_score FROM characters WHERE user_id=42"))
+}
+
+// The scripture is the path's high manual at realm 4 (v1.12.3: the fixture
+// used to seed realm 3, which is below that floor and so encoded the bypass
+// this release closes - the inheritance wrote the study row without asking the
+// realm floor manual.study asks).
 func TestAGhostCultivatorStudiesTheStygianScriptureAtOnce(t *testing.T) {
 	path := setupBatch5AuthorityDB(t)
 	world := batch4WorldPath(t)
-	batch4Exec(t, path, "UPDATE characters SET location='Greenriver Town',realm_index=3,path='Ghost Cultivator' WHERE user_id=42")
+	batch4Exec(t, path, "UPDATE characters SET location='Greenriver Town',realm_index=4,path='Ghost Cultivator' WHERE user_id=42")
+	karmaBefore := scriptureKarma(t, path)
 	last := stygianTombRun(t, path, world, 5000)
 	inh, _ := last["inheritance"].(map[string]any)
 	if inh == nil || inh["gained"] != true {
@@ -59,6 +70,46 @@ func TestAGhostCultivatorStudiesTheStygianScriptureAtOnce(t *testing.T) {
 	}
 	if got := scriptureStudied(t, path); got != 1 {
 		t.Fatalf("the scripture's first-study row is missing (%d rows); the inheritance handed it over unstudied", got)
+	}
+	// It is a Demonic manual: the first study of a forbidden manual costs the
+	// karma manual.study charges, through the same door.
+	if got := scriptureKarma(t, path); got != karmaBefore-1 {
+		t.Fatalf("studying the forbidden scripture at once left karma at %d from %d; manual.study charges 1 for the first study of a forbidden manual", got, karmaBefore)
+	}
+}
+
+// A realm-1 Ghost Cultivator clears the tomb (its floor is realm 1) and is
+// handed a realm-4 Heaven-grade scripture. It was studied at once and its
+// technique usable - the floor manual.study refuses. Below the floor the sealed
+// copy is in the bag, nothing is studied, and the result says why.
+func TestABelowTheFloorGhostCultivatorIsHandedTheSealedCopyAndToldWhy(t *testing.T) {
+	path := setupBatch5AuthorityDB(t)
+	world := batch4WorldPath(t)
+	batch4Exec(t, path, "UPDATE characters SET location='Greenriver Town',realm_index=1,path='Ghost Cultivator' WHERE user_id=42")
+	karmaBefore := scriptureKarma(t, path)
+	last := stygianTombRun(t, path, world, 5200)
+	inh, _ := last["inheritance"].(map[string]any)
+	if inh == nil || inh["gained"] != true {
+		t.Fatalf("the last room granted no inheritance: %v", last)
+	}
+	if inh["preferred_path"] != true {
+		t.Fatalf("the path the legacy prefers was not recognised: %v", inh)
+	}
+	if inh["studied"] != "" {
+		t.Fatalf("a realm-1 cultivator had the realm-4 scripture studied at once (%v); that is the floor manual.study refuses", inh["studied"])
+	}
+	if why, _ := inh["study_blocked"].(string); !strings.Contains(why, "realm 4") || !strings.Contains(why, "realm 1") {
+		t.Fatalf("the result does not say why the scripture was not studied: %q", inh["study_blocked"])
+	}
+	if got := scriptureStudied(t, path); got != 0 {
+		t.Fatalf("the scripture has a study row below its realm floor (%d rows)", got)
+	}
+	held := storage.ParseInt(actionScalar(t, path, "SELECT COALESCE(SUM(quantity),0) FROM inventory WHERE user_id=42 AND item_id='stygian_ghost_scripture'"))
+	if held != 1 {
+		t.Fatalf("the sealed copy did not reach the bags (%d)", held)
+	}
+	if got := scriptureKarma(t, path); got != karmaBefore {
+		t.Fatalf("karma moved from %d to %d though nothing was studied; the forbidden-study price is for a study", karmaBefore, got)
 	}
 }
 

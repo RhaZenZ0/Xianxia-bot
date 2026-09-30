@@ -51,7 +51,12 @@ article p, article li { overflow-wrap: break-word; }
 
 def inline(text: str) -> str:
     """One paragraph's inline Markdown, escaped first so an entry cannot inject markup."""
-    out = html.escape(text, quote=False)
+    # Quotes are escaped with everything else (v1.12.3): this string is also
+    # what a link's href and a code span are cut from, so a `"` left raw here
+    # ended up inside an attribute. Nothing below escapes again - a URL taken
+    # from this string is already escaped once, and escaping it twice printed
+    # `&amp;amp;`.
+    out = html.escape(text, quote=True)
     spans: list[str] = []
 
     def keep(match: re.Match[str]) -> str:
@@ -61,8 +66,10 @@ def inline(text: str) -> str:
     out = re.sub(r"`([^`]+)`", keep, out)
     out = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", out)
     out = re.sub(r"(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])", r"<em>\1</em>", out)
-    out = re.sub(r"\[([^\]]+)\]\((https?://[^)\s]+)\)",
-                 lambda m: f'<a href="{html.escape(m.group(2))}">{m.group(1)}</a>', out)
+    # A code span's placeholder (\x00) is never part of a URL: swapped back
+    # after the link is made, it would put a tag inside the attribute.
+    out = re.sub(r"\[([^\]]+)\]\((https?://[^)\s\x00]+)\)",
+                 lambda m: f'<a href="{m.group(2)}">{m.group(1)}</a>', out)
     return re.sub(r"\x00(\d+)\x00", lambda m: spans[int(m.group(1))], out)
 
 

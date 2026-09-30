@@ -227,6 +227,23 @@ class RouteLimiter:
         while self._day and self._day[0] <= now - 86400.0:
             self._day.popleft()
 
+    def has_room(self) -> bool:
+        """Whether a slot is free, without taking it.
+
+        The router asks this before it spends the shared OpenRouter slot, so a
+        route already at its own ceiling is skipped without costing the account
+        a request it never made (v1.12.3). A "no" is counted as a refusal, the
+        same as ``try_acquire`` counts one; a "yes" changes nothing.
+        """
+        self._trim(time.monotonic())
+        if len(self._day) >= self.per_day:
+            self.refused_day += 1
+            return False
+        if len(self._minute) >= self.per_minute:
+            self.refused_minute += 1
+            return False
+        return True
+
     def try_acquire(self) -> bool:
         now = time.monotonic()
         self._trim(now)
@@ -1522,6 +1539,14 @@ class AITaskRouter:
                 self._model_row(model)["skipped_cooling"] += 1
                 continue
             google_call = is_aistudio_route(model)
+            # A route at ITS OWN provider ceiling is skipped, not failed: the
+            # next model has a separate quota. It is asked before the shared
+            # slot is taken (v1.12.3), so a skipped route costs the account
+            # nothing - taken after it, each skipped route burned one of the
+            # day's free requests on a call that was never made.
+            if not self._route_limiter(model).has_room():
+                self._model_row(model)["skipped_route_limit"] += 1
+                continue
             # The OpenRouter budget is not spent on a call that never reaches
             # OpenRouter. Charging the AI Studio route against it would defeat
             # the entire reason the route exists. It is asked before the
@@ -1541,9 +1566,8 @@ class AITaskRouter:
                     )
                 raise RuntimeError("OpenRouter local request-rate ceiling reached")
             if not self._route_limiter(model).try_acquire():
-                # A route at ITS OWN provider ceiling is skipped, not failed: the
-                # next model has a separate quota. Spending an upstream attempt to
-                # be told 429 is the waste this replaces.
+                # Only reachable if another walk took the route's last slot
+                # while the shared one was awaited; the ask above is the rule.
                 self._model_row(model)["skipped_route_limit"] += 1
                 continue
             attempted.append(model)

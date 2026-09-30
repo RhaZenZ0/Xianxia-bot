@@ -16,6 +16,36 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.12.3)** — *What a second deep review found.* Eight reviewers over v1.2.1 to v1.12.2,
+  then "fix all": the market counter sold for less than a ranked crafter or the town at a stall would
+  pay (`highestNPCPays` is the floor now); a sect's treasury could be donated to and redeemed from at
+  a profit and the lifetime count never fell (a treasury redeem costs at least what a donation earns
+  and debits the count); a Domain technique cast in battle buffed the opponent; every craft built the
+  spirit sense; samsara kept flames and the sense; an inheritance studied a manual below its realm
+  floor; a treaty broken by a killing ended from one side; a server-update request could wedge for
+  good with nothing to clear it (`admin.server.cancel_update`, and a watcher that no longer cuts JSON
+  by hand, remembers a nonce only after its ack, keeps its closing report, exits on a signal and
+  reopens only a world it closed); a skipped narration route spent a shared OpenRouter slot; the
+  dashboard waited on GitHub; and a dozen surfaces that offered what the engine refuses. The four
+  findings left as decisions are the `deferred` entries above.
+- **deferred (design)** — *Grandfathering a beast lowers its rank and leaves its evolution stage.*
+  `beast_grandfather.go` settles an old beast to the rank its owner's cores can pay for and keeps
+  `evolution_stage` where it was, so a stage can stand above the rank and the stage's combat term
+  is still paid in full. Whether a stage should be taken back from a beast that already climbed it
+  is the owner's call; the shipped test asserts rank 0 with stage 16 left in place.
+- **deferred (rare)** — *A stale watcher lock after a power loss.* `update_watch.sh` refuses to start when
+  the lock's pid answers `kill -0`, and a rebooted NAS can hand that pid to another process. Rare,
+  and the remedy is `rm -rf` on the lock directory; a lock that also records a boot id would tell
+  the two apart.
+- **deferred (privacy, low)** — *An erased GM's id in the update rows.* `world_state['update_request']` and
+  `update_result` carry `requested_by` inside their JSON, and the erasure sweep walks columns, so an
+  erased GM's Discord id stays in those two blobs. A one-line anonymise beside the sweep; low
+  privacy weight, since only administrators can request an update.
+- **deferred (design)** — *A stranger's way to Underworld Contacts 15.* v1.11.1 let a broker buy
+  from a stranger, +1 standing a sale, but a post stocks six rows drawn from ninety restricted,
+  special or legendary items none of which any shelf sells, so each +1 costs a rare item and the
+  threshold is effectively reachable only through the five underworld households. Whether a
+  broker should also buy ordinary contraband is a content decision.
 - **fixed (v1.7.10)** — *No `/boss` or `/party`.* Both groups backed a Combat hub page and were never
   in `TREE_COMMANDS`, so the names a player types reached nothing (v1.7.4's `/stall`). Registered.
 - **deferred (design)** — *The other hub-only groups.* `_GROUP_ACTION_ROOTS` holds some fifty groups

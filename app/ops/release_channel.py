@@ -31,10 +31,13 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
+import weakref
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Iterable
 
+log = logging.getLogger(__name__)
 DEFAULT_REPOSITORY = "RhaZenZ0/Xianxia-bot"
 CHANNELS = ("stable", "beta")
 ASSET_PATTERN = re.compile(r"^xianxia_rp_v(\d+\.\d+\.\d+)\.zip$")
@@ -222,6 +225,25 @@ def release_check_is_stale(entry: Any, now: float, max_age: float = RELEASE_CARD
         return True
 
 
+# The refresh a stale card started, one per lock. A task nothing refers to may
+# be collected before it finishes (the loop holds a weak reference), so the
+# reference lives here for as long as the lock does (v1.12.3).
+_REFRESHES: "weakref.WeakKeyDictionary[asyncio.Lock, asyncio.Task]" = weakref.WeakKeyDictionary()
+
+
+def pending_release_refresh(lock: asyncio.Lock) -> "asyncio.Task | None":
+    """The refresh this lock started and that is still running, if any."""
+    task = _REFRESHES.get(lock)
+    return task if task is not None and not task.done() else None
+
+
+async def _refresh(check: Callable[[], Awaitable[Any]]) -> None:
+    try:
+        await check()
+    except Exception:  # the bot's check never raises; a stranger's must not leak
+        log.exception("release check refresh failed")
+
+
 async def read_release_check(
     read: Callable[[], Any],
     check: Callable[[], Awaitable[Any]],
@@ -230,18 +252,23 @@ async def read_release_check(
     *,
     enabled: bool = True,
 ) -> dict[str, Any]:
-    """What the card shows: the stored check, refreshed first when it is stale.
+    """What the card shows: the stored check, refreshed in the background when stale.
 
     `read` returns the stored entry and `check` runs one release check that
-    stores a new one (the bot's `check_for_release`, which never raises). The
-    lock makes any number of card loads at once cost one call to GitHub: the
-    staleness is asked again inside it, so whoever waited behind the first
-    caller reads that caller's answer. With the update check switched off
-    (`UPDATE_CHECK_ENABLED=false`) nothing is asked - the operator said not to.
+    stores a new one (the bot's `check_for_release`, which never raises). A
+    stale answer is returned AT ONCE and one refresh is started behind it
+    (v1.12.3): the check is an httpx call with a fifteen-second timeout, and
+    waiting for it stalled every Admin Console load, and every lever on that
+    page, behind GitHub. The lock makes any number of card loads at once start
+    one refresh - a refresh already running is not started twice - and the
+    next read after it sees the new answer. A failed check is stored with its
+    own `checked_at`, so GitHub is not asked again on every load. With the
+    update check switched off (`UPDATE_CHECK_ENABLED=false`) nothing is asked -
+    the operator said not to.
     """
     if enabled and release_check_is_stale(read(), now()):
         async with lock:
-            if release_check_is_stale(read(), now()):
-                await check()
+            if pending_release_refresh(lock) is None and release_check_is_stale(read(), now()):
+                _REFRESHES[lock] = asyncio.ensure_future(_refresh(check))
     entry = read()
     return dict(entry) if isinstance(entry, dict) else {}

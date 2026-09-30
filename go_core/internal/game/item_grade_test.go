@@ -190,9 +190,12 @@ func TestACraftStampsItsGradeAndTheRankHoldsItBack(t *testing.T) {
 		t.Fatalf("the bag holds %d Transcendent swords, want 1", n)
 	}
 	_, capped := craftSword(t, 2)
-	if capped["grade"] != "Mid" || capped["grade_reached"] != "Transcendent" || storage.ParseInt(capped["grade_reached_rank"]) != 7 {
-		t.Fatalf("the same roll at Tier 2 must be held to Mid and say Transcendent needs Tier 7: %v / %v / %v",
-			capped["grade"], capped["grade_reached"], capped["grade_reached_rank"])
+	// A trade stops rising at rank 6, so "Transcendent needs Tier 7" named a
+	// rank nobody reaches (v1.12.3). The road is rank 6 with something that
+	// opens the grade, and the reply says both.
+	if capped["grade"] != "Mid" || capped["grade_reached"] != "Transcendent" || storage.ParseInt(capped["grade_reached_rank"]) != 6 || capped["grade_reached_opener"] != "a fully refined flame" {
+		t.Fatalf("the same roll at Tier 2 must be held to Mid and say Transcendent needs Tier 6 and a fully refined flame: %v / %v / %v / %v",
+			capped["grade"], capped["grade_reached"], capped["grade_reached_rank"], capped["grade_reached_opener"])
 	}
 	if _, has := capped["output_multiplier"]; has {
 		t.Fatal("the result still reports a batch multiplier; quality is spent on grade now")

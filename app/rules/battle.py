@@ -67,6 +67,10 @@ def opponent_debuff_label(raw: Any) -> str:
         return ""
     parts = []
     for stat, value in sorted(mods.items()):
+        # The engine's record of which effects have landed rides the same object
+        # (``effect:<id>``, v1.12.3); it is a fact about the battle, not a stat.
+        if str(stat).startswith("effect:"):
+            continue
         try:
             number = int(round(float(value)))
         except (TypeError, ValueError):

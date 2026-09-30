@@ -113,19 +113,6 @@ func spiritSenseGainTx(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if !ok || stage >= rules.MaxStage {
 		return nil
 	}
-	if source == "scene" {
-		key := fmt.Sprintf("day:%d", gameMinute/1440)
-		counted, err := conn.Execute(`SELECT COUNT(*) FROM event_log WHERE user_id=? AND event_type=? AND json_extract(payload_json,'$.key')=?`,
-			[]any{userID, spiritSenseSceneLogType, key})
-		if err != nil || len(counted.Rows) == 0 || storage.ParseInt(counted.Rows[0][0]) >= rules.SceneGainsPerDay {
-			return nil
-		}
-		payload, _ := json.Marshal(map[string]any{"key": key})
-		if _, err := conn.Execute(`INSERT INTO event_log(user_id,event_type,payload_json,created_at) VALUES(?,?,?,?)`,
-			[]any{userID, spiritSenseSceneLogType, string(payload), now}); err != nil {
-			return nil
-		}
-	}
 	if rules.SpiritDivisor > 0 {
 		if c, err := loadMechanicsCharacter(conn, userID); err == nil {
 			gain += c.Attributes["spirit"] / rules.SpiritDivisor
@@ -140,12 +127,35 @@ func spiritSenseGainTx(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		// A full stage takes nothing more until it is settled, and says so:
 		// a practice that silently built nothing reads as a practice that
 		// does not build it (found by the engine playtest).
+		//
+		// It is checked before the scene cap is spent (v1.12.3). The day's
+		// slot was written first, so a scene action at a full stage used one
+		// of the day's few slots on a practice that built nothing, and the
+		// next day's scene actions - after the stage was settled - met a cap
+		// already partly gone.
 		return map[string]any{"source": source, "gain": int64(0), "progress": progress, "need": ceiling, "stage": stage, "ready": true, "full": true}
+	}
+	sceneKey := ""
+	if source == "scene" {
+		sceneKey = fmt.Sprintf("day:%d", gameMinute/1440)
+		counted, err := conn.Execute(`SELECT COUNT(*) FROM event_log WHERE user_id=? AND event_type=? AND json_extract(payload_json,'$.key')=?`,
+			[]any{userID, spiritSenseSceneLogType, sceneKey})
+		if err != nil || len(counted.Rows) == 0 || storage.ParseInt(counted.Rows[0][0]) >= rules.SceneGainsPerDay {
+			return nil
+		}
 	}
 	if _, err := conn.Execute(`INSERT INTO character_spirit_sense(user_id,stage,progress,updated_at) VALUES(?,0,?,?)
 		ON CONFLICT(user_id) DO UPDATE SET progress=excluded.progress,updated_at=excluded.updated_at`,
 		[]any{userID, next, now}); err != nil {
 		return nil
+	}
+	if sceneKey != "" {
+		// The slot is spent only by a gain that landed. A failed write here
+		// leaves the gain banked and the slot unspent, which errs towards the
+		// player and never costs the action it rides on.
+		payload, _ := json.Marshal(map[string]any{"key": sceneKey})
+		_, _ = conn.Execute(`INSERT INTO event_log(user_id,event_type,payload_json,created_at) VALUES(?,?,?,?)`,
+			[]any{userID, spiritSenseSceneLogType, string(payload), now})
 	}
 	return map[string]any{"source": source, "gain": next - progress, "progress": next, "need": ceiling, "stage": stage, "ready": next >= ceiling}
 }

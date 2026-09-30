@@ -229,7 +229,7 @@ func TestReachingARankOffersItsExamination(t *testing.T) {
 	if key == "" {
 		t.Fatal("content authors no Forging Apprentice examination")
 	}
-	batch4Exec(t, path, `INSERT INTO quest_definitions(quest_key,title,created_at,updated_at) VALUES(?,'The Apprentice''s Billet',0,0)`, key)
+	batch4Exec(t, path, `INSERT INTO quest_definitions(quest_key,title,status,created_at,updated_at) VALUES(?,'The Apprentice''s Billet','approved',0,0)`, key)
 
 	var offered string
 	if err := crossingApply(t, path, func(conn *storage.Conn) error {

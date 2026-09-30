@@ -415,5 +415,67 @@ class WhoIsHereRefusesTheDead(unittest.TestCase):
         )
 
 
+class _NobodyRegistered(_NoRegistry):
+    async def get_event_npc_definition(self, name):
+        return None
+
+
+class TheTwinAgreesWithTheEngineAtTheEdges(unittest.TestCase):
+    """v1.12.3: two edges where `current_npc_location` and the engine's
+    `npcWhereaboutsTx` answered differently. The engine is authoritative
+    (v1.3.1), so the twin follows it; `npc_whereabouts_edges_test.go` holds the
+    same two answers on the Go side, with the same synthetic NPC shape.
+
+    The NPC is synthetic on purpose: no shipped NPC is both at home and missing
+    a schedule entry for a period with a content location that differs from its
+    row, which is exactly why neither edge was ever seen.
+    """
+
+    NAME = "Edge Walker"
+    DEFINITION = {"location": "Content Town", "schedule": {"Morning": "Market Town"}}
+
+    def _ask(self, rows, period, *, where=None):
+        module = _locations_module()
+        with patch.dict(module.WORLD.npcs, {self.NAME: dict(self.DEFINITION)}), _wired(module) as sim:
+            module.DB = _NobodyRegistered()
+            sim.rows.pop(self.NAME, None)
+            if rows is not None:
+                sim.rows[self.NAME] = dict(rows)
+            here = asyncio.run(module.npcs_present(where, period)) if where else None
+            return asyncio.run(module.current_npc_location(self.NAME, period)), here
+
+    def test_at_home_with_no_schedule_entry_the_simulation_row_is_the_answer(self):
+        row = {"npc_name": self.NAME, "home_location": "Sim Town", "current_location": "Sim Town", "status": "alive"}
+        self.assertEqual(self._ask(row, "Morning")[0], "Market Town", "a scheduled period at home lost its schedule")
+        located, _ = self._ask(row, "Afternoon")
+        self.assertEqual(
+            located, "Sim Town",
+            "an unscheduled period answered the content file's location, not the simulation's row - "
+            "the engine answers the row",
+        )
+
+    def test_the_picker_agrees_on_the_same_edge(self):
+        row = {"npc_name": self.NAME, "home_location": "Sim Town", "current_location": "Sim Town", "status": "alive"}
+        _, at_sim = self._ask(row, "Afternoon", where="Sim Town")
+        _, at_content = self._ask(row, "Afternoon", where="Content Town")
+        self.assertIn(self.NAME, at_sim, "npcs_present dropped somebody the single lookup and the engine place here")
+        self.assertNotIn(self.NAME, at_content, "npcs_present offered somebody at the file's location the engine does not place there")
+
+    def test_a_catalogue_npc_with_no_row_stands_where_content_puts_them(self):
+        self.assertEqual(self._ask(None, "Morning")[0], "Market Town")
+        located, _ = self._ask(None, "Afternoon")
+        self.assertEqual(
+            located, "Content Town",
+            "a catalogue NPC with no simulation row answered None, which every caller reads as "
+            "'do not filter by location'; the engine places them where the file does",
+        )
+
+    def test_somebody_content_does_not_carry_is_still_unplaced(self):
+        module = _locations_module()
+        with _wired(module):
+            module.DB = _NobodyRegistered()
+            self.assertIsNone(asyncio.run(module.current_npc_location("Nobody At All Anywhere", "Morning")))
+
+
 if __name__ == "__main__":
     unittest.main()

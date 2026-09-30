@@ -2503,6 +2503,18 @@ async def run(url: str, token: str, db_path: str) -> Report:
                  gm("admin.server.update_status", {"nonce": nonce, "status": "failed"}), "no update is in progress")
     await step(report, "a heartbeat with no request open",
                gm("admin.server.update_status", {"status": "heartbeat"}))
+    # v1.12.3: a request nobody will ever finish can be closed by the GM, and
+    # the read answers the nonce and status as flat values for the watcher.
+    asked_again = await audited("admin.server.request_update",
+                                {"channel": "stable", "reason": "playtest {cancel}"}, name="the GM asks again")
+    again = str((asked_again or {}).get("nonce") or "")
+    flat = await step(report, "the read carries flat request values", query("admin.server.update_request", GM, {}))
+    report.add("PASS" if (flat or {}).get("request_nonce") == again and (flat or {}).get("request_status") == "requested" else "FAIL",
+               "the flat nonce and status match the open request", str({k: (flat or {}).get(k) for k in ("request_nonce", "request_status")}))
+    await audited("admin.server.cancel_update", {"reason": "playtest"}, name="the GM cancels the open request")
+    await either("a report against a cancelled request is refused",
+                 gm("admin.server.update_status", {"nonce": again, "status": "acked"}), "no update is in progress")
+    await either("there is nothing left to cancel", gm("admin.server.cancel_update", {"reason": "playtest"}), "no open update")
     await audited("admin.simulation.interval", {"system": "npc_life", "days": 7, "reason": "playtest"})
     await audited("admin.commission.review", {"quest_key": str(world["commissions"][0]["quest_key"]), "status": "approved", "reason": "playtest"})
     await either("admin.commission.retire", gm("admin.commission.retire", {"user_id": BUYER, "reason": "playtest"}), "holds no commission")
@@ -2553,8 +2565,15 @@ async def run(url: str, token: str, db_path: str) -> Report:
         gained = dict(meditated.get("spirit_sense_gain") or {})
         # Earlier sections craft and act in scenes, so the first stage may
         # already be full: then the meditation must say so rather than build.
-        report.add("PASS" if int(gained.get("gain") or 0) > 0 or gained.get("full") else "FAIL",
-                   "the meditation reported spirit-sense progress, or that the stage is full", str(gained))
+        # And a session that gathered nothing - the cultivation stage itself
+        # is full - builds nothing (v1.12.3, the rule the method's practice
+        # states), so it reports no gain at all and that is correct.
+        if int(meditated.get("gain") or 0) > 0:
+            report.add("PASS" if int(gained.get("gain") or 0) > 0 or gained.get("full") else "FAIL",
+                       "the meditation reported spirit-sense progress, or that the stage is full", str(gained))
+        else:
+            report.add("PASS" if not gained else "FAIL",
+                       "a meditation that gathered nothing built no spirit sense", str(gained))
     await audited("admin.player.set_spirit_sense", {"user_id": PLAYER, "stage": 0, "progress": 40, "reason": "playtest: a full first stage"})
     await audited("admin.player.revive", {"user_id": PLAYER, "reason": "playtest: a full qi pool to settle with"})
     settled = await step(report, "spirit_sense.settle a full stage", act("spirit_sense.settle", PLAYER, {}))

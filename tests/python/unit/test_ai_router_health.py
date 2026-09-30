@@ -534,6 +534,16 @@ class RouteLimitTests(unittest.TestCase):
         self.assertEqual(snapshot["refused_day"], 1)
         self.assertEqual(snapshot["refused_minute"], 0)
 
+    def test_has_room_asks_without_taking(self):
+        limiter = RouteLimiter("m", per_minute=1, per_day=100)
+        self.assertTrue(limiter.has_room())
+        self.assertTrue(limiter.has_room())
+        self.assertEqual(limiter.snapshot()["used_minute"], 0, "asking took a slot")
+        self.assertTrue(limiter.try_acquire())
+        self.assertFalse(limiter.has_room())
+        self.assertEqual(limiter.snapshot()["refused_minute"], 1)
+        self.assertEqual(limiter.snapshot()["used_minute"], 1)
+
     def test_the_snapshot_names_the_ceiling_that_is_closest(self):
         limiter = RouteLimiter("m", per_minute=100, per_day=4)
         for _ in range(3):
@@ -556,10 +566,20 @@ class RouteLimitTests(unittest.TestCase):
         # against both the provider cap and the daily budget.
         router = _router(["first", "second"], route_requests_per_minute=1)
         _generate(router)
+        used_before = router.limiter.snapshot()["used_today"]
         result = _generate(router)
         snapshot = router.health_snapshot()
         first = next(r for r in snapshot["models"] if r["skipped_route_limit"])
         self.assertEqual(first["attempts"], 1, "no second upstream attempt was spent")
+        # One upstream call was made by the second narration (the next route),
+        # so the shared budget moved by exactly one - not by two, which is what
+        # the skipped route cost while its slot was asked after the shared one.
+        self.assertEqual(
+            router.limiter.snapshot()["used_today"] - used_before,
+            1,
+            "a skipped route spent a shared OpenRouter slot on a call never made "
+            f"(used_today {router.limiter.snapshot()['used_today']})",
+        )
         self.assertEqual(first["skipped_route_limit"], 1)
         self.assertNotEqual(result.model, first["model"], "it moved to the next route")
 

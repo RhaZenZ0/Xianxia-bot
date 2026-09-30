@@ -18,7 +18,7 @@ from ..locations import _known_locations, _location_is_visible, _world_is_unlock
 from ...rules.advanced_runtime import describe_equipment, equipment_passive_line
 from ...rules.progression_systems import profession_rank
 from ...rules.trade_receipt import format_trade_receipt
-from ..auction_feed import announce_lot, refresh_lot
+from ..auction_feed import announce_lot, lot_identity, refresh_lot
 from ..stall_feed import refresh_stall
 from ..formatting import human_duration
 from ..pickers import auction_currency_autocomplete, usable_item_autocomplete
@@ -291,21 +291,6 @@ async def auction_leave(interaction:discord.Interaction)->None:
             lines.append(f"⚔️ A stronger pursuer ambushed you {where}. Battle **#{incident['battle_id']}** has begun.")
         else: lines.append("🌑 Someone took an interest in your auction purchase after you left the Pavilion.")
     await interaction.followup.send("\n".join(lines),ephemeral=False)
-
-
-def lot_identity(lot: dict, known: set[str]) -> tuple[str, str]:
-    """What a bidder is told a lot is, and the line explaining why (schema 45).
-
-    A lot the consignor could not read themselves goes under the hammer blind:
-    the house grades it by eye and says no more. It is blind only to people who
-    cannot read it either - anyone who has appraised one of these before names
-    it on sight, which is what the Appraisal profession buys.
-    """
-    item_id = str(lot.get("item_id") or "")
-    if int(lot.get("appraised") or 0) or item_id in known:
-        return WORLD.item_name(item_id), ""
-    band = str(lot.get("grade_band") or "of uncertain grade")
-    return "Unidentified Lot", f"\n❔ The house will only say it is **{band}**. Read it with **/economy → Auction House → Appraise**."
 
 
 @registered_group_command(auction_group, name="browse",description="Browse active lots in the current auction house")

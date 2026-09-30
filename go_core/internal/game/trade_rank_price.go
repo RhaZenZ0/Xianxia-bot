@@ -21,6 +21,34 @@ import (
 
 const tradeRankSellStep = int64(2)
 
+// tradeTopRank is the highest rank a trade reaches (advanceProfessionTx stops
+// raising a level here), and so the most any rank can add to a keeper's
+// price. It is stated once because two prices are computed against it: what
+// a Saint is paid, and what a market must never sell for less than.
+const tradeTopRank = int64(6)
+
+// highestNPCPays is the most any of the world's own people will hand a
+// cultivator for one of an item in one coin, whoever the cultivator is:
+// the plain third the best keeper pays; that keeper's price to a craftsman
+// at the top rank of the trade that makes the item (tradeRankSellPrice, which
+// climbs with the base, so the best keeper's counter is the best rank price);
+// and what the town pays at a stall (NPCStallCeiling). The market counter is
+// floored on it (v1.12.3): floored on the plain third alone, a market sold a
+// Hearth-Return Talisman for 6 that a Saint scribe sold back to a keeper for
+// 17, and an Azure Flying Sword for 91 that the town bought off a stall for
+// 258. A price a player can be paid is the floor under every price a player
+// can buy at, or the gap between them is a mint.
+func highestNPCPays(catalog worlddata.Catalog, itemID, currency string) (int64, bool) {
+	best, found := highestKeeperBuy(catalog, itemID, currency)
+	if found && itemTrade(catalog, itemID) != "" {
+		best = max64(best, tradeRankSellPrice(catalog, itemID, currency, best, tradeTopRank))
+	}
+	if town, ok := NPCStallCeiling(catalog, itemID, currency); ok && (!found || town > best) {
+		best, found = town, true
+	}
+	return best, found
+}
+
 // itemTrade is the profession whose recipe makes an item, or "" for anything
 // no recipe makes. Recipe ids are walked sorted so the answer cannot depend
 // on a map range; the shipped content has no item two trades both make.
