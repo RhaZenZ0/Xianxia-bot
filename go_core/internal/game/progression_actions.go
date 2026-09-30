@@ -60,7 +60,7 @@ type conditionTreatPayload struct {
 }
 
 // treatmentInBagTx is which of the player's items treats a condition whose
-// named treatment is `base`: that item at any grade (v1.12.1). Only a recipe's
+// named treatment is `base`: that item at any grade (v1.12.2). Only a recipe's
 // output is graded, and two of the four treatments are one - so a player who
 // crafted a Mid Heart Calming Pill, or was paid one, carried
 // `heart_calming_pill@mid` while the treatment asked for the bare id and

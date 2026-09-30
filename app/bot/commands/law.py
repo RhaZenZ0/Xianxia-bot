@@ -361,7 +361,7 @@ async def condition_treat(interaction: discord.Interaction, condition: str) -> N
     else:
         outcome = (f"Severity falls from {int(result.get('severity_before', 0))} "
                    f"to **{int(result.get('severity_after', 0))}/5**.")
-    # Which pill went (v1.12.1): any grade of the treatment treats, and the
+    # Which pill went (v1.12.2): any grade of the treatment treats, and the
     # plainest carried is spent first, so the line names the one the engine chose.
     used = str(result.get("treatment_item") or "")
     spent = f"\nSpent: **{WORLD.item_name(used)}**" if used else ""

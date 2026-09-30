@@ -5737,7 +5737,7 @@ the engine image is `golang:1.26` pinned by digest, and the official images set 
 so a `go` line naming a patch newer than the image's would fail the build; the `toolchain` line is
 what CI (setup-go reads it) and govulncheck run on, and a local build under `GOTOOLCHAIN=auto`.
 
-### The pill the bag carried at a grade (v1.12.1)
+### The pill the bag carried at a grade (v1.12.2)
 
 Reported from play as *"Can't treat Qi Deviation"*: four **Heart Calming Pills (Mid)** in the bag and
 Condition Treat refusing with *"treatment requires 1x heart_calming_pill"*. v1.7.0 made a grade a

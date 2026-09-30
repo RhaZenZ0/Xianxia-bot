@@ -176,7 +176,7 @@ func TestTheReductionIsNeverZero(t *testing.T) {
 	}
 }
 
-// A graded treatment treats (v1.12.1).
+// A graded treatment treats (v1.12.2).
 //
 // Reported from play as "Can't treat Qi Deviation": the bag held four Heart
 // Calming Pills (Mid) and the treatment refused with "treatment requires 1x
