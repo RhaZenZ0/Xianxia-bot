@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"xianxia/core/internal/storage"
 )
@@ -145,5 +146,126 @@ func TestTheReadAnswersAllThreeRowsAndABrokenBlobIsNoRequest(t *testing.T) {
 	}
 	if got := storage.ParseInt(scalar(t, path, `SELECT COUNT(*) FROM admin_audit_log WHERE action='admin.server.update_request'`)); got != 0 {
 		t.Fatalf("the read wrote %d audit row(s)", got)
+	}
+}
+
+// -- v1.12.3: an open request can be closed, and the read answers flat values --
+
+func heartbeatAt(t *testing.T, path string, secondsAgo float64) {
+	t.Helper()
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	now := float64(time.Now().UnixNano()) / 1e9
+	if err := writeWorldStateTx(conn, updateHeartbeatKey, map[string]any{"at": now - secondsAgo}, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Commit(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestARequestNobodyPickedUpCanBeCancelledAndAnotherAsked(t *testing.T) {
+	path := setupAdminDB(t)
+	nonce := requestAnUpdate(t, path)
+	out := applyAdminAs(t, path, "admin.server.cancel_update", 7, map[string]any{"reason": "asked by mistake"}).(map[string]any)
+	if out["status"] != "cancelled" || out["previous_status"] != "requested" || out["nonce"] != nonce {
+		t.Fatalf("cancel answered %#v", out)
+	}
+	row := storedUpdateRow(t, path, "update_request")
+	if row["status"] != "cancelled" || row["detail"] != "asked by mistake" {
+		t.Fatalf("stored request=%#v", row)
+	}
+	if got := storage.ParseInt(scalar(t, path,
+		`SELECT COUNT(*) FROM admin_audit_log WHERE action='admin.server.cancel_update' AND admin_user_id=7`)); got != 1 {
+		t.Fatalf("cancel audit rows=%d, want 1", got)
+	}
+	// Terminal: the Request button returns, and a late report from a watcher
+	// that still held the old nonce is refused.
+	if _, err := applyAdminRaw(t, path, "admin.server.update_status", 0, map[string]any{"nonce": nonce, "status": "acked"}); err == nil {
+		t.Fatal("a report was accepted against a cancelled request")
+	}
+	if nonce2 := requestAnUpdate(t, path); nonce2 == nonce {
+		t.Fatal("a fresh request reused the cancelled nonce")
+	}
+}
+
+func TestNothingOpenIsNothingToCancel(t *testing.T) {
+	path := setupAdminDB(t)
+	if _, err := applyAdminRaw(t, path, "admin.server.cancel_update", 7, map[string]any{}); err == nil {
+		t.Fatal("a cancel with no request was accepted")
+	}
+	nonce := requestAnUpdate(t, path)
+	applyAdmin(t, path, "admin.server.update_status", map[string]any{"nonce": nonce, "status": "done"})
+	if _, err := applyAdminRaw(t, path, "admin.server.cancel_update", 7, map[string]any{}); err == nil {
+		t.Fatal("a finished request was cancellable")
+	}
+	if got := storage.ParseInt(scalar(t, path, `SELECT COUNT(*) FROM admin_audit_log WHERE action='admin.server.cancel_update'`)); got != 0 {
+		t.Fatalf("a refused cancel wrote %d audit row(s)", got)
+	}
+}
+
+func TestAnInstallInProgressIsNotCancellableWhileTheWatcherLives(t *testing.T) {
+	path := setupAdminDB(t)
+	nonce := requestAnUpdate(t, path)
+	applyAdmin(t, path, "admin.server.update_status", map[string]any{"nonce": nonce, "status": "fetching"})
+	heartbeatAt(t, path, 30)
+	if _, err := applyAdminRaw(t, path, "admin.server.cancel_update", 7, map[string]any{}); err == nil {
+		t.Fatal("an install the watcher is running was cancelled under it")
+	}
+	if row := storedUpdateRow(t, path, "update_request"); row["status"] != "fetching" {
+		t.Fatalf("the refused cancel still changed the request: %#v", row)
+	}
+	// Just inside the window it is still running; just past it, it is not.
+	heartbeatAt(t, path, updateWatcherStaleSeconds-5)
+	if _, err := applyAdminRaw(t, path, "admin.server.cancel_update", 7, map[string]any{}); err == nil {
+		t.Fatal("a watcher heard from inside the window was treated as gone")
+	}
+	heartbeatAt(t, path, updateWatcherStaleSeconds+5)
+	out := applyAdminAs(t, path, "admin.server.cancel_update", 7, map[string]any{}).(map[string]any)
+	if out["previous_status"] != "fetching" {
+		t.Fatalf("cancel answered %#v", out)
+	}
+	if row := storedUpdateRow(t, path, "update_request"); row["detail"] != "cancelled by a GM" {
+		t.Fatalf("a cancel with no reason stored %#v", row)
+	}
+}
+
+func TestARequestPastRequestedWithNoHeartbeatAtAllIsCancellable(t *testing.T) {
+	path := setupAdminDB(t)
+	nonce := requestAnUpdate(t, path)
+	applyAdmin(t, path, "admin.server.update_status", map[string]any{"nonce": nonce, "status": "acked"})
+	// No heartbeat row: nobody has ever been heard from, which is "not
+	// running", never a watcher of age zero.
+	applyAdminAs(t, path, "admin.server.cancel_update", 7, map[string]any{})
+	if row := storedUpdateRow(t, path, "update_request"); row["status"] != "cancelled" {
+		t.Fatalf("stored request=%#v", row)
+	}
+}
+
+func TestTheReadCarriesFlatValuesSoTheWatcherNeverCutsJSON(t *testing.T) {
+	path := setupAdminDB(t)
+	read := applyAdmin(t, path, "admin.server.update_request", map[string]any{}).(map[string]any)
+	for _, key := range []string{"request_nonce", "request_status", "request_channel"} {
+		if v, ok := read[key]; !ok || v != "" {
+			t.Fatalf("with no request %s must be the empty string, got %#v (present=%v)", key, v, ok)
+		}
+	}
+	if read["maintenance_enabled"] != false {
+		t.Fatalf("maintenance_enabled=%#v", read["maintenance_enabled"])
+	}
+	result := applyAdminAs(t, path, "admin.server.request_update", 7, map[string]any{
+		"channel": "beta", "reason": `fix {bug} and "quote"`,
+	}).(map[string]any)
+	read = applyAdmin(t, path, "admin.server.update_request", map[string]any{}).(map[string]any)
+	if read["request_nonce"] != result["nonce"] || read["request_status"] != "requested" || read["request_channel"] != "beta" {
+		t.Fatalf("flat values do not match the request: %#v", read)
+	}
+	applyAdmin(t, path, "admin.server.maintenance_mode", map[string]any{"enabled": true, "reason": "GM closed it"})
+	read = applyAdmin(t, path, "admin.server.update_request", map[string]any{}).(map[string]any)
+	if read["maintenance_enabled"] != true {
+		t.Fatalf("a closed world must read as closed: %#v", read["maintenance_enabled"])
 	}
 }

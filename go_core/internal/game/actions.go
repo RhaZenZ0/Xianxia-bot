@@ -86,6 +86,8 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 		result, err = adminServerMaintenanceMode(conn, req.ActorID, req.Payload)
 	case "admin.server.request_update":
 		result, err = adminServerRequestUpdate(conn, req.ActorID, req.Payload)
+	case "admin.server.cancel_update":
+		result, err = adminServerCancelUpdate(conn, req.ActorID, req.Payload)
 	case "admin.server.update_status":
 		result, err = adminServerUpdateStatus(conn, req.Payload)
 	case "admin.server.update_request":
