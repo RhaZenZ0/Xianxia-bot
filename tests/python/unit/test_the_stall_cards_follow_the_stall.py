@@ -10,6 +10,7 @@ the command, or on the next tick when the stall went some other way.
 """
 from __future__ import annotations
 
+import asyncio
 import importlib
 import os
 import unittest
@@ -48,6 +49,7 @@ class FakeChannel:
         self._next = channel_id * 100
 
     async def send(self, *, view):
+        await asyncio.sleep(0)  # a real send yields; the race below needs it to
         embed = view.card
         self._next += 1
         message = FakeMessage(self, self._next, embed)
@@ -76,6 +78,7 @@ class FakeDB:
         return [dict(c) for c in self.cards.values()]
 
     async def remember_stall_card(self, *, guild_id, user_id, channel_id, message_id):
+        await asyncio.sleep(0)
         self.cards[int(user_id)] = {"guild_id": guild_id, "user_id": user_id, "channel_id": channel_id, "message_id": message_id}
 
     async def forget_stall_card(self, guild_id, user_id):
@@ -172,6 +175,30 @@ class StallCards(unittest.IsolatedAsyncioTestCase):
         await self._run(self.feed.refresh_stall, 5)
         self.assertEqual(self.db.cards, {})
         self.assertEqual(self.mortal.messages, {}, "a stall's card went into another world's market")
+
+    async def test_two_callers_with_no_card_post_one_card(self):
+        """v1.12.3: a command's refresh and the tick's sync each read "no card
+        yet" before either posted, and both posted - the upsert kept one id and
+        the other message was orphaned for good."""
+        self._open(listings=[{"listing_id": 12, "item_id": "qi_pill", "quantity": 2, "unit_price": 9}])
+        channels = self.channels
+
+        async def stall_channel(guild, world):
+            return channels.get(world)
+
+        async def resolve(guild, channel_id):
+            return next((c for c in channels.values() if c.id == int(channel_id)), None)
+
+        fake_discord_error = type("HTTPException", (Exception,), {})
+        with patch.object(self.feed, "DB", self.db), patch.object(self.feed, "stall_channel", stall_channel), \
+                patch.object(self.feed, "_resolve_text_channel", resolve), \
+                patch.object(self.feed.discord, "HTTPException", (fake_discord_error, NotFound)):
+            await asyncio.gather(self.feed.refresh_stall(FakeGuild(), 5), self.feed.sync_stalls(FakeGuild()))
+        self.assertEqual(len(self.mortal.messages), 1,
+                         "two callers posted two cards for one stall: %s" % sorted(self.mortal.messages))
+        self.assertEqual(len(self.db.cards), 1)
+        self.assertIn(self.db.cards[5]["message_id"], self.mortal.messages,
+                      "the remembered card is not the one that is on the channel")
 
 
 if __name__ == "__main__":

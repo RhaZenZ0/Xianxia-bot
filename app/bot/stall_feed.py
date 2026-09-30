@@ -15,6 +15,7 @@ the tick and tells Python only a count).
 """
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import discord
@@ -30,6 +31,13 @@ from .runtime import DB, WORLD, log
 # same as the last one posted is left alone. A restart forgets this, so the first
 # tick after one edits each card once.
 _LAST_SAID: dict[tuple[int, int], dict[str, Any]] = {}
+
+
+# One lock per keeper's card (v1.12.3). A command's refresh and the tick's sync
+# both read "no card yet" before either has posted one, and both then posted: the
+# upsert keeps one message id and the other message is orphaned, a second card no
+# later edit ever finds. The lock covers read-then-post-or-edit as one step.
+_CARD_LOCKS: dict[tuple[int, int], asyncio.Lock] = {}
 
 
 def _distance_percent() -> int:
@@ -75,7 +83,23 @@ async def _delete_card(guild: discord.Guild, record: dict[str, Any]) -> None:
 async def _keep_card(guild: discord.Guild, stall: dict[str, Any], record: dict[str, Any] | None, *, force: bool = False) -> None:
     """Edit the card in place, or post it when there is none (or it was
     deleted by hand, or the stall's world has a new channel). Unless
-    ``force``, a card that would say what it already says is left alone."""
+    ``force``, a card that would say what it already says is left alone.
+
+    One keeper's card is kept by one caller at a time. The record a caller
+    arrives with may have been read before somebody else posted, so a caller that
+    had to wait - or that saw no card - reads it again inside the lock."""
+    lock = _CARD_LOCKS.setdefault((guild.id, int(stall["user_id"])), asyncio.Lock())
+    waited = lock.locked()
+    async with lock:
+        if record is None or waited:
+            record = next(
+                (row for row in await DB.list_stall_cards(guild.id) if int(row["user_id"]) == int(stall["user_id"])),
+                None,
+            )
+        await _keep_card_locked(guild, stall, record, force=force)
+
+
+async def _keep_card_locked(guild: discord.Guild, stall: dict[str, Any], record: dict[str, Any] | None, *, force: bool = False) -> None:
     channel = await stall_channel(guild, world_of_location(str(stall.get("city") or "")))
     if channel is None:
         if record is not None:

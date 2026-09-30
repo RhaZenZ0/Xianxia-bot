@@ -102,11 +102,11 @@ async def _battle_available_options(user_id:int,c:dict)->tuple[list[tuple[str,st
         idef=WORLD.item_definition(iid)
         if qty>0 and idef.get('use',{}).get('instant'):
             instant=idef.get('use',{}).get('instant',{})
+            # What the pill restores at its grade, the amount the engine pays
+            # (v1.12.3): `item_definition` is the base entry's use, and a Mid
+            # pill printed its Low numbers while restoring a quarter more.
+            mult=effect_mult(WORLD.item_grades,str(iid))
             recovery=[]
-            # What the carried grade heals (v1.12.3): the engine scales a
-            # recovery item's restores by its grade, and the picker printed
-            # the base figures, so a High pill read as a Low one.
-            mult=effect_mult(WORLD.item_grades,iid)
             if int(instant.get('vitality_restore',0)): recovery.append(f"Vitality +{graded_amount(int(instant['vitality_restore']),mult)}")
             if int(instant.get('qi_restore',0)): recovery.append(f"Qi +{graded_amount(int(instant['qi_restore']),mult)}")
             usable.append((str(iid),f"{idef.get('name',iid)} x{qty}"," • ".join(recovery) or "Instant recovery"))
