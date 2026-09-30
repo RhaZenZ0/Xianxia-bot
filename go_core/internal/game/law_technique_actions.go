@@ -31,6 +31,75 @@ const lawTechniqueEffectMinutes = int64(120)
 // same field rather than keeping a list of ids beside this one.
 const lawControlCategory = "Law Control"
 
+// lawEffectIsControl is whether a technique's effect is cast at somebody else.
+// It is the one reading of `special_effects.<id>.category`: out of battle it
+// refuses a control technique (nobody to cast it at), and in battle it decides
+// whose row the effect goes onto - a control effect is the opponent's, anything
+// else (a Domain) is the caster's own ground (v1.12.3).
+func lawEffectIsControl(effect map[string]any) bool {
+	return strings.TrimSpace(fmt.Sprint(effect["category"])) == lawControlCategory
+}
+
+// writeLawEffectTx puts a non-control Law effect onto the caster for
+// lawTechniqueEffectMinutes and answers the name it was stored under. It is the
+// one writer of a law effect row: `lawTechniqueAction` calls it out of battle
+// and `combat.technique` calls it in one, so the two cannot drift (v1.12.3 -
+// the in-battle path used to put a Domain on the opponent instead).
+func writeLawEffectTx(conn *storage.Conn, userID int64, techniqueKey, techniqueName, effectID string, effect map[string]any, effectName string, gameMinute int64) (string, error) {
+	payload := map[string]any{}
+	for field, value := range effect {
+		payload[field] = value
+	}
+	payload["effect_key"] = effectID
+	payload["special"] = true
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+	name := strings.TrimSpace(effectName)
+	if name == "" {
+		name = techniqueName
+	}
+	if _, err = conn.Execute(
+		`INSERT INTO active_effects(
+			user_id,effect_key,name,source_type,source_id,effect_json,stacks,
+			starts_game_minute,ends_game_minute,created_at
+		 ) VALUES(?,?,?,'law',?,?,1,?,?,?)
+		 ON CONFLICT(user_id,effect_key,source_type,source_id) DO UPDATE SET
+			name=excluded.name,effect_json=excluded.effect_json,stacks=1,
+			starts_game_minute=excluded.starts_game_minute,
+			ends_game_minute=excluded.ends_game_minute,created_at=excluded.created_at`,
+		[]any{
+			userID, effectID, name, techniqueKey, string(encoded),
+			gameMinute, gameMinute + lawTechniqueEffectMinutes, nowSeconds(),
+		},
+	); err != nil {
+		return "", err
+	}
+	return name, nil
+}
+
+// requireLawTechniqueGroundTx is the ground a technique needs beyond its realm
+// and stage: World Collapse needs somewhere to collapse, a stabilized personal
+// world. One helper for every door that uses a Law technique - the
+// out-of-battle cast, the battle and the raid - because the raid checked stage
+// and realm only and let a cultivator with no world press the capstone
+// (v1.12.3). Keyed on the literal id for the reason the fixture note in
+// law_technique_actions_test.go gives.
+func requireLawTechniqueGroundTx(conn *storage.Conn, userID int64, techniqueKey string) error {
+	if strings.TrimSpace(techniqueKey) != "world_collapse" {
+		return nil
+	}
+	res, err := conn.Execute(`SELECT 1 FROM personal_worlds WHERE user_id=? LIMIT 1`, []any{userID})
+	if err != nil {
+		return err
+	}
+	if len(res.Rows) == 0 {
+		return errors.New("the World Collapse technique requires a stabilized personal world")
+	}
+	return nil
+}
+
 type lawTechniquePayload struct {
 	Technique  string `json:"technique"`
 	GameMinute int64  `json:"game_minute"`
@@ -77,14 +146,8 @@ func lawTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	}
 
 	// World Collapse needs somewhere to collapse.
-	if key == "world_collapse" {
-		res, err = conn.Execute(`SELECT 1 FROM personal_worlds WHERE user_id=?`, []any{userID})
-		if err != nil {
-			return authoritativeMutation{}, err
-		}
-		if len(res.Rows) == 0 {
-			return authoritativeMutation{}, errors.New("world collapse requires a stabilized personal world")
-		}
+	if err = requireLawTechniqueGroundTx(conn, userID, key); err != nil {
+		return authoritativeMutation{}, err
 	}
 
 	// A technique used with a battle open belongs to combat.technique, which
@@ -127,40 +190,14 @@ func lawTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		// the content rather than matched against a list of ids here, so the
 		// panel and the engine cannot disagree about which techniques those
 		// are (`World.law_technique_targets_another` asks the same question).
-		if strings.TrimSpace(fmt.Sprint(effect["category"])) == lawControlCategory {
+		if lawEffectIsControl(effect) {
 			return authoritativeMutation{}, fmt.Errorf(
 				"%s is a control technique and needs a target; use it through the battle panel",
 				technique.Name)
 		}
 
-		payload := map[string]any{}
-		for field, value := range effect {
-			payload[field] = value
-		}
-		payload["effect_key"] = technique.Effect
-		payload["special"] = true
-		encoded, err := json.Marshal(payload)
+		name, err := writeLawEffectTx(conn, userID, key, technique.Name, technique.Effect, effect, effectName, p.GameMinute)
 		if err != nil {
-			return authoritativeMutation{}, err
-		}
-		name := effectName
-		if name == "" {
-			name = technique.Name
-		}
-		if _, err = conn.Execute(
-			`INSERT INTO active_effects(
-				user_id,effect_key,name,source_type,source_id,effect_json,stacks,
-				starts_game_minute,ends_game_minute,created_at
-			 ) VALUES(?,?,?,'law',?,?,1,?,?,?)
-			 ON CONFLICT(user_id,effect_key,source_type,source_id) DO UPDATE SET
-				name=excluded.name,effect_json=excluded.effect_json,stacks=1,
-				starts_game_minute=excluded.starts_game_minute,
-				ends_game_minute=excluded.ends_game_minute,created_at=excluded.created_at`,
-			[]any{
-				userID, technique.Effect, name, key, string(encoded),
-				p.GameMinute, p.GameMinute + lawTechniqueEffectMinutes, nowSeconds(),
-			},
-		); err != nil {
 			return authoritativeMutation{}, err
 		}
 		result["effect_name"] = name

@@ -19,6 +19,7 @@ from discord import app_commands
 from ...rules.advanced_runtime import BOSS_TEMPLATES, boss_lair, deed_karma_line, spirit_gain_line
 from ...rules.alchemy import alchemy_purge_refusal, toxicity_band
 from ...rules.birthfamily import family_profession_bonus
+from ...rules.item_grades import grade_cap_note
 from ...ops.game_engine import GameEngineError
 from ...rules.progression_systems import profession_rank, profession_xp_needed
 from ...rules.realm_hubs import REALM_HUBS, realm_hub, realm_hub_by_location
@@ -911,9 +912,15 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
         if success and grade:
             quality_line += f" • grade **{grade}**"
             if reached and reached != grade:
+                # The engine says what making the rung really takes (v1.12.3):
+                # the top grade asks a rank no trade reaches on rank alone, so
+                # the road is the lower rank *with* an opener, named here.
                 needed = resolved.get("grade_reached_rank")
-                quality_line += (f"\n-# The roll reached **{reached}**; your rank caps it at {grade}."
-                                 + (f" {reached} needs **{profession_rank(int(needed), profession)}**." if needed is not None else ""))
+                quality_line += "\n-# " + grade_cap_note(
+                    reached, grade,
+                    profession_rank(int(needed), profession) if needed is not None else "",
+                    str(resolved.get("grade_reached_opener") or ""),
+                )
 
     # Built outside the f-string: a backslash inside an f-string expression is
     # only legal from Python 3.12 (PEP 701), and `python -m compileall app` is
@@ -1420,13 +1427,19 @@ def _city_inn(city: str) -> str:
     return next((name for name in _city_parts(city) if WORLD.locations[name].get("district") == "inn"), "")
 
 
+def _commission_giver_home(giver: str) -> str:
+    """Where a giver's work is posted: the giver's own `location` in the
+    commission roster, else the NPC's - the twin of `commissionGiverHome`."""
+    givers = WORLD.data.get("commission_givers", {}) or {}
+    return str((givers.get(giver) or {}).get("location") or (WORLD.npcs.get(giver) or {}).get("location") or "").strip()
+
+
 def _city_board(city: str) -> list[dict[str, Any]]:
     """The commissions whose givers live in this city or its parts."""
-    givers = WORLD.data.get("commission_givers", {}) or {}
     rows = []
     for c in WORLD.data.get("commissions", []) or []:
         giver = str(c.get("giver_npc") or "")
-        where = str((givers.get(giver) or {}).get("location") or (WORLD.npcs.get(giver) or {}).get("location") or "")
+        where = _commission_giver_home(giver)
         if where and _city_of(where) == city:
             rows.append(dict(c))
     return sorted(rows, key=lambda c: (int(c.get("tier") or 1), str(c.get("title"))))

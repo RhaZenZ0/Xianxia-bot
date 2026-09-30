@@ -1038,6 +1038,10 @@ async def _send_ephemeral_followup(
 async def _fallback_followup(source: discord.Interaction, content: Any, kwargs: Mapping[str, Any]) -> Any:
     """Send a fresh response when the original hub message is unavailable."""
     followup_kwargs = dict(kwargs)
+    # The text is the `content` argument; an edit's kwargs carry it too, and
+    # passing both is a TypeError for a classic result and, beside a card, a
+    # 400 from Discord (v1.12.3).
+    followup_kwargs.pop("content", None)
     ephemeral = bool(followup_kwargs.pop("ephemeral", False))
     view = followup_kwargs.get("view")
     card = is_layout(view) and not getattr(view, "is_layout_hub", False)
@@ -1175,10 +1179,13 @@ async def _layout_result_send(
             # A Components V2 message carries no content or embeds. Text sent
             # with a card goes into the card (v1.9.0); text sent with any
             # other layout is sent first, on its own, rather than lost.
-            wait = {"wait": followup_kwargs["wait"]} if "wait" in followup_kwargs else {}
+            # Everything else the result carries - an attached file the card's
+            # image points at, allowed mentions, `wait` - goes with it (v1.12.3);
+            # the embed is the one thing a V2 message cannot carry.
+            carried = {k: v for k, v in followup_kwargs.items() if k not in ("embed", "embeds")}
             if not fold_content(own_view, content):
                 await source.followup.send(content, ephemeral=False)
-            return await source.followup.send(view=own_view, ephemeral=False, **wait)
+            return await source.followup.send(view=own_view, ephemeral=False, **carried)
         followup_kwargs["view"] = own_view
     if content is None and not any(key in followup_kwargs for key in ("embed", "embeds")):
         content = "✅ Done."
@@ -1321,7 +1328,13 @@ class _HubResponseProxy:
                 await self.owner.source.response.defer()
             return await self.owner.source.edit_original_response(**edit_kwargs)
         except (discord.NotFound, discord.HTTPException):
-            content = edit_kwargs.get("content") or "The command completed, but the original hub message is no longer available."
+            # A card carries its own text (v1.9.0): the notice would be folded
+            # into it, where the result is what the player asked for.
+            content = kwargs.get("content")
+            fallback_view = kwargs.get("view")
+            is_card = is_layout(fallback_view) and not getattr(fallback_view, "is_layout_hub", False)
+            if content is None and not is_card:
+                content = "The command completed, but the original hub message is no longer available."
             return await _fallback_followup(self.owner.source, content, kwargs)
 
     async def send_modal(self, modal: discord.ui.Modal) -> Any:

@@ -38,10 +38,34 @@ async def _name(user_id: Any) -> str:
     return str(character["name"]) if character else "Unknown"
 
 
+def lot_identity(lot: dict, known: set[str]) -> tuple[str, str]:
+    """What a bidder is told a lot is, and the line explaining why (schema 45).
+
+    A lot the consignor could not read themselves goes under the hammer blind:
+    the house grades it by eye and says no more. It is blind only to people who
+    cannot read it either - anyone who has appraised one of these before names
+    it on sight, which is what the Appraisal profession buys.
+
+    Lives here (v1.12.3) because the public card reads it too, and this module
+    sits below the commands: a card is seen by everybody, so it asks with no one
+    known and names a lot only when the consignor could read it.
+    """
+    item_id = str(lot.get("item_id") or "")
+    if int(lot.get("appraised") or 0) or item_id in known:
+        return WORLD.item_name(item_id), ""
+    band = str(lot.get("grade_band") or "of uncertain grade")
+    return "Unidentified Lot", f"\n❔ The house will only say it is **{band}**. Read it with **/economy → Auction House → Appraise**."
+
+
 async def lot_card(house_id: str, lot: dict[str, Any], *, state: str = "open") -> Card:
-    """The card. ``state`` is open, sold or unsold."""
+    """The card. ``state`` is open, sold or unsold.
+
+    A card is public, so a lot the consignor could not read is titled as the
+    board titles it to somebody who cannot either (v1.12.3): an NPC's find is
+    consigned unappraised, and naming it on the channel handed every reader the
+    answer `/economy → Auction House → Appraise` exists to sell."""
     house = dict(WORLD.auction_houses.get(house_id) or {})
-    item = WORLD.item_name(str(lot.get("item_id") or ""))
+    item, blind = lot_identity(lot, set())
     quantity = int(lot.get("quantity") or 1)
     bid = int(lot.get("current_bid") or 0)
     bidder_id = lot.get("current_bidder_user_id")
@@ -74,6 +98,8 @@ async def lot_card(house_id: str, lot: dict[str, Any], *, state: str = "open") -
         colour = 0xA5863B
     embed = Card(title=title, colour=colour, description=str(house.get("name") or house_id))
     embed.add_field(name="Seller", value=seller, inline=True)
+    if blind:
+        embed.add_field(name="The house's word", value=blind.strip(), inline=False)
     if state == "sold":
         embed.add_field(name="Struck to", value=bidder, inline=True)
         embed.add_field(name="Hammer price", value=f"{bid} {_currency(lot)}", inline=True)

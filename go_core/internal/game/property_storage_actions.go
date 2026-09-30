@@ -649,6 +649,32 @@ var deployedArrayDefs = map[string]deployedArrayDef{
 	"starfall_bulwark_array":     {"Starfall Bulwark Array", 480, map[string]any{"description": "Starsteel graven with falling-star sigils - the bulwark a Celestial formation master signs their name to.", "modifiers": []any{map[string]any{"stat": "combat_bonus", "operation": "add", "value": 3}, map[string]any{"stat": "will", "operation": "add", "value": 2}, map[string]any{"stat": "cultivation_gain", "operation": "mul", "value": 1.15}}, "tags": []any{"formation", "location", "defense", "qi"}}},
 }
 
+// gradedArrayEffect is a deployed array's effect at a disk's grade: a copy of
+// the definition's own effect with its modifiers run through
+// gradedEffectPayload, the one rule item use scales an effect by. The copy is
+// the point - deployedArrayDefs is a package variable, and scaling its maps in
+// place would make every later Low disk as strong as the first High one.
+func gradedArrayEffect(effect map[string]any, mult float64) map[string]any {
+	out := make(map[string]any, len(effect))
+	for key, value := range effect {
+		out[key] = value
+	}
+	if list, ok := effect["modifiers"].([]any); ok {
+		copied := make([]map[string]any, 0, len(list))
+		for _, entry := range list {
+			if m, ok := entry.(map[string]any); ok {
+				clone := make(map[string]any, len(m))
+				for k, v := range m {
+					clone[k] = v
+				}
+				copied = append(copied, clone)
+			}
+		}
+		out["modifiers"] = copied
+	}
+	return gradedEffectPayload(out, mult)
+}
+
 func deployArrayActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p deployArrayPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
@@ -662,6 +688,16 @@ func deployArrayActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	if !ok {
 		return authoritativeMutation{}, errors.New("formation disk has no valid deployment definition")
 	}
+	// A grade does something for a disk (v1.12.3). A disk is a Formation
+	// recipe's output, so it carries a grade, and the deployment wrote the
+	// definition's own effect and duration whatever the grade - a High disk
+	// was a Low one with a higher price. What a grade does is scaled where the
+	// item is used, by the rule item use applies: a modifier's value and the
+	// duration, both by the grade's effect multiplier. The definition in
+	// deployedArrayDefs is shared, so the effect is copied before it is scaled.
+	grade := itemEffectMult(catalog, p.ItemID)
+	def.Effect = gradedArrayEffect(def.Effect, grade)
+	def.Duration = gradedAmount(def.Duration, grade)
 	r, e := conn.Execute(`SELECT location FROM characters WHERE user_id=?`, []any{userID})
 	if e != nil {
 		return authoritativeMutation{}, e

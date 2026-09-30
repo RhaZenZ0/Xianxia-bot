@@ -29,6 +29,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -89,9 +90,14 @@ func adminWorldSetTravelPace(conn *storage.Conn, adminUserID int64, raw json.Raw
 	if !ok {
 		return nil, errors.New("percent is required")
 	}
-	percent := storage.ParseInt(value)
-	if percent < 0 || percent > 100 {
-		return nil, errors.New("percent must be between 0 and 100")
+	// `storage.ParseInt` answers 0 for everything it cannot read - 50.5, a
+	// word, null - and 0 passes the range check and is the most generous pace
+	// there is, so a GM typing 50.5 got instant travel (v1.12.3). A fallback
+	// that looks like a value is not a sentinel: ask whether it is a whole
+	// number first.
+	percent, whole := wholePercent(value)
+	if !whole || percent < 0 || percent > 100 {
+		return nil, errors.New("percent must be a whole number between 0 and 100")
 	}
 	if err := begin(conn); err != nil {
 		return nil, err
@@ -114,6 +120,38 @@ func adminWorldSetTravelPace(conn *storage.Conn, adminUserID int64, raw json.Raw
 		return nil, err
 	}
 	return map[string]any{"percent": percent, "previous": before}, nil
+}
+
+// wholePercent reads a payload value as an integer and says whether it was
+// one. A number with a fractional part, a string, a bool and null are all
+// "no"; 50.0 is the whole number 50 and is accepted, because a JSON encoder
+// that writes every number as a float is not a mistake by the caller.
+func wholePercent(value any) (int64, bool) {
+	switch v := value.(type) {
+	case json.Number:
+		if n, err := v.Int64(); err == nil {
+			return n, true
+		}
+		f, err := v.Float64()
+		if err != nil {
+			return 0, false
+		}
+		return wholeFloat(f)
+	case float64:
+		return wholeFloat(v)
+	case int:
+		return int64(v), true
+	case int64:
+		return v, true
+	}
+	return 0, false
+}
+
+func wholeFloat(f float64) (int64, bool) {
+	if math.IsNaN(f) || math.IsInf(f, 0) || f != math.Trunc(f) || math.Abs(f) > 1e9 {
+		return 0, false
+	}
+	return int64(f), true
 }
 
 // scaledTravelWait is the wait a road of this length costs at the configured

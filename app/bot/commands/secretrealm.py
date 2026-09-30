@@ -195,7 +195,12 @@ async def secret_explore(interaction: discord.Interaction) -> None:
                 if inheritance.get("studied"):
                     text += f"\n📖 Your path is the one this legacy was written for: **{WORLD.item_names({str(inheritance.get('item')): 1})}** is studied and its first technique is yours at once."
                 elif inheritance.get("item"):
+                    # The engine says why the legacy was not studied at once
+                    # (v1.12.3: the manual's realm floor is manual.study's rule).
+                    why = str(inheritance.get("study_blocked") or "")
                     text += f"\n📦 {WORLD.item_names({str(inheritance.get('item')): 1})} is in your bags; study it from **/cultivation → Arts → Study**."
+                    if why:
+                        text += f"\n-# This legacy is written for your path, but {why}."
             else:
                 text += "\n\nThe inheritance recognizes that you already carry this legacy and grants no duplicate permanent bonus."
         else:

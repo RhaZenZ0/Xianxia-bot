@@ -30,8 +30,13 @@ class TheEngineReadsTheEchoOnBothRolls(unittest.TestCase):
     def test_the_record_is_written_before_the_wipe(self) -> None:
         lifecycle = (GO / "lifecycle_actions.go").read_text(encoding="utf-8")
         recorded = lifecycle.index("pastLifeProfessionsTx(conn, userID)")
-        wiped = lifecycle.index('"profession_progress", "faction_reputation"')
+        # The wipe is one call now (v1.12.3: `clearIncarnationStateTx`, the one
+        # door for the list of tables, which the flame and the spirit sense were
+        # missing from). The rule is the order of the two calls inside the
+        # rebirth, and that the trades are still among what the wipe clears.
+        wiped = lifecycle.index("clearIncarnationStateTx(conn, userID)")
         self.assertLess(recorded, wiped, "the trades must be read into the past-life record before samsara clears the rows")
+        self.assertIn('"profession_progress", "faction_reputation"', lifecycle, "samsara no longer clears the trades it just recorded")
         self.assertIn('"professions": professions', lifecycle)
         self.assertIn('"past_life_trades": professions', lifecycle)
 

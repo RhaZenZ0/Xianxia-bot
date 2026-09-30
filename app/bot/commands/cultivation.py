@@ -413,6 +413,17 @@ async def breakthrough(interaction: discord.Interaction, confirm: bool = False, 
     next_realm = str(result.get("to_realm") or "Unknown Realm")
     next_phase = int(result.get("to_stage", 1))
     success = bool(result.get("success"))
+    # A gate crossed (v1.2.0): the tutorial's last stage asks for the first
+    # breakthrough, and this is its one reporter - the qi ladder only, since
+    # the label names this command. Recorded the moment the engine has decided
+    # it (v1.12.3): everything below - the narrator's context, the narration,
+    # the RAG memory, the reply's assembly - runs after the engine committed and
+    # can raise, and a report written behind code that can raise is lost with
+    # it (v1.0.5). Told after the reply.
+    progressed = []
+    if success:
+        progressed = await record_quest_progress(
+            interaction.user.id, "breakthrough", amount=1, game_minute=wt.total_minutes)
     breakthrough_context = await NARRATOR_CONTEXT.build(c, scene_type="cultivation breakthrough", query_text=f"breakthrough {next_realm} stage {next_phase}")
     try:
         narration = await NARRATOR.narrate_breakthrough(c, next_realm, next_phase, roll_line(roll), success, scene_context=breakthrough_context.text)
@@ -470,14 +481,6 @@ async def breakthrough(interaction: discord.Interaction, confirm: bool = False, 
                 f"for **{int(result.get('reroll_cost', 0))} Insight XP** (you hold **{int(result.get('insight_xp', 0))}**), once at this stage, "
                 "and the essence is not asked for again."
             )
-    # A gate crossed (v1.2.0): the tutorial's last stage asks for the first
-    # breakthrough, and this is its one reporter - the qi ladder only, since
-    # the label names this command. Recorded after the engine decided it
-    # (rc.28) and before the reply; told after (v1.0.5).
-    progressed = []
-    if success:
-        progressed = await record_quest_progress(
-            interaction.user.id, "breakthrough", amount=1, game_minute=wt.total_minutes)
     await reply_long(interaction, f"{mechanical}\n\n{narration}")
     await announce_quest_progress(interaction, progressed)
 

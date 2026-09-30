@@ -621,7 +621,13 @@ func sectEconomyActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID i
 		if x := firstRowMap(r); x != nil {
 			resources = i64(x["resources"])
 		}
-		unit = max64(1, int64(math.Round(float64(unit)*sectRedeemPressureMult(resources))))
+		// What a donation of the unit could have earned is the least it costs
+		// to take back out (sectTreasuryUnitCost), and it comes off the
+		// lifetime count as well as the balance below.
+		unit = sectTreasuryUnitCost(catalog, p.ItemID, resources)
+		if unit > math.MaxInt64/p.Quantity {
+			return authoritativeMutation{}, errors.New("redeem total overflow")
+		}
 		cost := unit * p.Quantity
 		points := i64(mem["contribution_points"])
 		if points < cost {
@@ -635,7 +641,14 @@ func sectEconomyActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID i
 			return authoritativeMutation{}, errors.New("the sect treasury does not have enough of that item")
 		}
 		_, _ = conn.Execute(`UPDATE sect_treasury SET quantity=quantity-? WHERE sect_name=? AND item_id=?`, []any{p.Quantity, sect, p.ItemID})
-		_, _ = conn.Execute(`UPDATE sect_membership SET contribution_points=contribution_points-? WHERE user_id=?`, []any{cost, userID})
+		if sectEarnedColumn(conn) {
+			_, e = conn.Execute(`UPDATE sect_membership SET contribution_points=contribution_points-?,contribution_earned=MAX(0,contribution_earned-?) WHERE user_id=?`, []any{cost, cost, userID})
+		} else {
+			_, e = conn.Execute(`UPDATE sect_membership SET contribution_points=contribution_points-? WHERE user_id=?`, []any{cost, userID})
+		}
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
 		_, e = conn.Execute(`INSERT INTO inventory(user_id,item_id,quantity) VALUES(?,?,?) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=inventory.quantity+excluded.quantity`, []any{userID, p.ItemID, p.Quantity})
 		if e != nil {
 			return authoritativeMutation{}, e

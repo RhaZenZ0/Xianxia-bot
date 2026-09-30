@@ -14,19 +14,25 @@ package game
 // Four rules hold it.
 //
 //   - Issued stock is priced at points_per_sect_value times the item's sect
-//     value at its grade (itemDef), the number a donation of it earns, so an
-//     item is worth the same to a sect whichever way it moves and a redeem
-//     followed by a donation always loses points.
+//     value at its grade (itemDef) - three times what a donation of it earns
+//     (one times the sect value, more for a craftsman's own trade) - so a
+//     redeem followed by a donation always loses points.
 //   - creditSectContributionTx is the one door points come in by. It writes
-//     the balance and the lifetime count together, and promotes. Spending
-//     writes only the balance, so it can never cost a rank.
-//   - Promotion only raises, and only to a rank the content's ladder lists;
-//     a rank above the ladder's top (a GM's Elder) is never touched.
+//     the balance and the lifetime count together, and promotes. An issued
+//     redeem writes only the balance, so it can never cost a rank; a treasury
+//     redeem also takes its cost off the lifetime count (v1.12.3), because
+//     what comes back out of the treasury was not a contribution.
+//   - Promotion only raises, only to a rank the content's ladder lists, and
+//     only when the credit that has just been paid carried the count over a
+//     rung (v1.12.3): a rank a GM has taken away is not given back by the
+//     next donation. A rank above the ladder's top (a GM's Elder) is never
+//     touched.
 //   - A missing ratio pays nothing, never a zero read as a value, and a
-//     world where migration 68 has not run yet credits points and promotes
+//     world where migration 69 has not run yet credits points and promotes
 //     nobody rather than failing the action.
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -36,6 +42,12 @@ import (
 	"xianxia/core/internal/storage"
 	"xianxia/core/internal/worlddata"
 )
+
+// sectIssuedMaxQuantity is the most one issued redeem may ask for (v1.12.3).
+// It is the engine's bound and not the bot's: the cost is unit times quantity,
+// and a client sending 683212743470724134 of a two-point item paid two points
+// and was handed that many talismans when the product wrapped.
+const sectIssuedMaxQuantity = int64(99)
 
 // sectRedeemPressureMult is what a sect's own scarcity adds to a treasury
 // redeem: a sect short of resources charges more for what its members hand
@@ -52,7 +64,20 @@ func sectRedeemPressureMult(resources int64) float64 {
 	return 1.0
 }
 
-// sectEarnedColumn reports whether migration 68 has run.
+// sectTreasuryUnitCost is what one unit handed back out of a sect's treasury
+// costs in points (v1.12.3): the sect value times the greater of the sect's
+// scarcity multiplier and the crafted multiplier. The second is the floor
+// that matters - a donation of a craftsman's own trade earns that multiple, so
+// a redeem priced at the plain sect value paid 120 points for a Longevity
+// Pill that had been donated for 180, and the loop netted 60 a turn with the
+// pill kept. A redeem costs at least what any donation of the unit could have
+// earned, rounded the way the donation rounds, so the two can never part.
+func sectTreasuryUnitCost(catalog worlddata.Catalog, itemID string, resources int64) int64 {
+	mult := math.Max(sectRedeemPressureMult(resources), math.Max(1, catalog.SectExchange().Earning.CraftedMultiplier))
+	return max64(1, int64(math.Round(float64(max64(1, itemSectValue(catalog, itemID)))*mult)))
+}
+
+// sectEarnedColumn reports whether migration 69 has run.
 func sectEarnedColumn(conn *storage.Conn) bool {
 	ok, err := tableHasColumns(conn, "sect_membership", "contribution_earned")
 	return err == nil && ok
@@ -78,13 +103,17 @@ func creditSectContributionTx(conn *storage.Conn, catalog worlddata.Catalog, use
 	if !earned {
 		return "", nil
 	}
-	return promoteSectMemberTx(conn, catalog, userID)
+	return promoteSectMemberTx(conn, catalog, userID, points)
 }
 
 // promoteSectMemberTx raises a member to the highest rung of the content's
-// ladder their lifetime contribution has passed, if that is above where they
-// stand and the rank they hold is one the ladder reaches.
-func promoteSectMemberTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (string, error) {
+// ladder that the credit just paid carried their lifetime count over - the
+// count before it was under the rung and the count now is at or past it - if
+// that is above where they stand and the rank they hold is one the ladder
+// reaches. Crossing, not standing past, is the rule (v1.12.3): asked "is the
+// count past a rung" it promoted whenever anything was credited, so a GM who
+// demoted a Core Disciple to Outer had it undone by the next donation.
+func promoteSectMemberTx(conn *storage.Conn, catalog worlddata.Catalog, userID, credited int64) (string, error) {
 	ladder := catalog.SectExchange().Promotion
 	if len(ladder) == 0 {
 		return "", nil
@@ -98,10 +127,11 @@ func promoteSectMemberTx(conn *storage.Conn, catalog worlddata.Catalog, userID i
 		return "", nil
 	}
 	rank, total := i64(row["rank_level"]), i64(row["contribution_earned"])
+	before := total - credited
 	top, target := int64(0), rank
 	for _, rung := range ladder {
 		top = max64(top, rung.RankLevel)
-		if total >= rung.Earned && rung.RankLevel > target {
+		if before < rung.Earned && total >= rung.Earned && rung.RankLevel > target {
 			target = rung.RankLevel
 		}
 	}
@@ -145,7 +175,13 @@ func sectIssuedRedeemTx(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	if rank := i64(mem["rank_level"]); rank < lot.MinRankLevel {
 		return nil, fmt.Errorf("that is issued to a %s or above; you are a %s", sectRankName(catalog, lot.MinRankLevel), sectRankName(catalog, rank))
 	}
+	if quantity < 1 || quantity > sectIssuedMaxQuantity {
+		return nil, fmt.Errorf("a sect issues between 1 and %d of an item at a time", sectIssuedMaxQuantity)
+	}
 	unit := sectIssuedPrice(catalog, itemID)
+	if unit > math.MaxInt64/quantity {
+		return nil, errors.New("issue total overflow")
+	}
 	cost := unit * quantity
 	points := i64(mem["contribution_points"])
 	if points < cost {
@@ -209,8 +245,7 @@ func sectExchangeQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int
 			resources = i64(x["resources"])
 		}
 	}
-	mult := sectRedeemPressureMult(resources)
-	out["pressure_mult"] = mult
+	out["pressure_mult"] = sectRedeemPressureMult(resources)
 	treasury := []map[string]any{}
 	if r, e := conn.Execute(`SELECT item_id,quantity FROM sect_treasury WHERE sect_name=? AND quantity>0`, []any{sect}); e == nil {
 		rows := rowsToMaps(r)
@@ -218,7 +253,7 @@ func sectExchangeQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		for _, row := range rows {
 			id := fmt.Sprint(row["item_id"])
 			treasury = append(treasury, map[string]any{"item_id": id, "name": itemDisplayName(catalog, id), "quantity": i64(row["quantity"]),
-				"unit_cost": max64(1, int64(math.Round(float64(max64(1, itemSectValue(catalog, id)))*mult)))})
+				"unit_cost": sectTreasuryUnitCost(catalog, id, resources)})
 		}
 	}
 	out["treasury"] = treasury
@@ -287,16 +322,25 @@ func sectCommissionPointsTx(conn *storage.Conn, catalog worlddata.Catalog, userI
 	return out, nil
 }
 
+// sectEventPointsEventType is the event_log row that remembers what a member
+// has been paid for one world event.
+const sectEventPointsEventType = "sect_event_points"
+
 // sectEventPointsTx pays a member for a world event in their sect's own
 // world: what the action added to their event contribution, up to the cap
 // per event. newTotal is the contribution after the action.
+//
+// The cap is held against a monotonic record (v1.12.3), not against the
+// running contribution. Interfere takes a point off that total and has no
+// wait, so at the cap three interferes and one support paid the same three
+// points again, for ever. What has already been paid for this event is the
+// sum of the member's own sect_event_points rows, and the most an action can
+// pay is what it added, up to the room the cap still leaves under the highest
+// total the contribution has reached. A row is written for what was paid, and
+// a read that fails pays nothing: an exchange that cannot count does not pay.
 func sectEventPointsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, eventKey string, delta, newTotal int64) (map[string]any, error) {
 	limit := catalog.SectExchange().Earning.EventPointsCap
-	if limit <= 0 || delta <= 0 {
-		return nil, nil
-	}
-	points := min64(limit, newTotal) - min64(limit, max64(0, newTotal-delta))
-	if points <= 0 || !tableExistsTx(conn, "sect_membership") {
+	if limit <= 0 || delta <= 0 || !tableExistsTx(conn, "sect_membership") {
 		return nil, nil
 	}
 	mem, err := sectMembershipRow(conn, userID)
@@ -316,8 +360,22 @@ func sectEventPointsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if row == nil || EraWorldOf(catalog, fmt.Sprint(row["location"])) != EraWorldOf(catalog, gate) {
 		return nil, nil
 	}
+	paid, err := conn.Execute(`SELECT COALESCE(SUM(json_extract(payload_json,'$.points')),0) FROM event_log WHERE user_id=? AND event_type=? AND json_extract(payload_json,'$.key')=?`,
+		[]any{userID, sectEventPointsEventType, eventKey})
+	if err != nil || len(paid.Rows) == 0 {
+		return nil, nil
+	}
+	points := min64(delta, min64(limit, max64(0, newTotal))-storage.ParseInt(paid.Rows[0][0]))
+	if points <= 0 {
+		return nil, nil
+	}
 	promoted, err := creditSectContributionTx(conn, catalog, userID, points, max64(1, points/10))
 	if err != nil {
+		return nil, err
+	}
+	record, _ := json.Marshal(map[string]any{"key": eventKey, "points": points, "total": newTotal})
+	if _, err := conn.Execute(`INSERT INTO event_log(user_id,event_type,payload_json,created_at) VALUES(?,?,?,?)`,
+		[]any{userID, sectEventPointsEventType, string(record), nowSeconds()}); err != nil {
 		return nil, err
 	}
 	out := map[string]any{"sect": sect, "points": points}

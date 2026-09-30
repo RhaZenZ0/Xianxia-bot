@@ -19,6 +19,7 @@ import importlib.util
 import re
 import tempfile
 import unittest
+from html.parser import HTMLParser
 from pathlib import Path
 
 from app.rules.changelog import changelog_entries, page_path, pages_url, version_key
@@ -92,6 +93,54 @@ class AnEntryCannotInjectMarkup(unittest.TestCase):
     def test_only_http_links_become_anchors(self):
         html = _builder().render("a [trap](javascript:alert(1)) here")
         self.assertNotIn("<a ", html)
+
+
+class _Tags(HTMLParser):
+    """Every tag the page carries, with its attributes, as a browser parses it."""
+
+    def __init__(self):
+        super().__init__()
+        self.tags: list[tuple[str, dict]] = []
+
+    def handle_starttag(self, tag, attrs):
+        self.tags.append((tag, dict(attrs)))
+
+
+class NothingInAnEntryPutsMarkupOnTheSite(unittest.TestCase):
+    """v1.12.3: code spans kept a raw quote, and their placeholder was swapped
+    back after the link's URL was escaped, so a code span inside a link's
+    parentheses broke out of the href."""
+
+    ALLOWED_TAGS = {"p", "ul", "li", "strong", "em", "code", "a"}
+
+    def _tags(self, entry):
+        parser = _Tags()
+        parser.feed(_builder().render(entry))
+        return parser.tags
+
+    def test_a_code_span_inside_a_link_cannot_break_out_of_the_href(self):
+        tags = self._tags('[x](https://a/`" onmouseover="alert(1)`)')
+        for tag, attrs in tags:
+            self.assertNotIn("onmouseover", attrs, f"an attribute was injected on <{tag}>")
+        self.assertFalse([t for t, _ in tags if t == "a"], "a link was made out of a URL holding a code span")
+
+    def test_a_quote_in_a_link_or_a_span_stays_text(self):
+        for entry in ('[x](https://a/?q="onmouseover="alert(1))', 'see `a" onmouseover="b` here',
+                      'plain " onmouseover="x" text'):
+            tags = self._tags(entry)
+            self.assertEqual({t for t, _ in tags} - self.ALLOWED_TAGS, set())
+            for tag, attrs in tags:
+                self.assertEqual(set(attrs) - {"href"}, set(), f"{entry!r} put attributes on <{tag}>")
+
+    def test_only_the_tags_the_subset_makes_appear(self):
+        html = _builder().render("<img src=x onerror=alert(1)> and `<b>` and [a](https://e.com/<i>)")
+        self.assertEqual({t for t, _ in self._tags("<img src=x onerror=alert(1)> and `<b>`")} - self.ALLOWED_TAGS, set())
+        self.assertNotIn("<img", html)
+
+    def test_a_url_is_escaped_exactly_once(self):
+        html = _builder().render("[q](https://example.com/?a=1&b=2)")
+        self.assertIn('href="https://example.com/?a=1&amp;b=2"', html)
+        self.assertNotIn("&amp;amp;", html)
 
 
 class TheWorkflowPublishesWhatTheBuilderWrites(unittest.TestCase):

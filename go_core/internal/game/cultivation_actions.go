@@ -460,8 +460,11 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 			payload["manual_practice"] = practised
 		}
 	}
-	if !body {
-		// A meditation builds the spirit sense (v1.10.0).
+	if !body && gain > 0 {
+		// A meditation builds the spirit sense (v1.10.0) - and a session that
+		// gathered nothing builds nothing (v1.12.3), the rule the method's
+		// practice above already states: a full stage must not be a farm for
+		// a second system.
 		if gained := spiritSenseGainTx(conn, catalog, userID, "meditation", false, p.GameMinute, now); gained != nil {
 			payload["spirit_sense_gain"] = gained
 		}

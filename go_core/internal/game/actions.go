@@ -86,6 +86,8 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 		result, err = adminServerMaintenanceMode(conn, req.ActorID, req.Payload)
 	case "admin.server.request_update":
 		result, err = adminServerRequestUpdate(conn, req.ActorID, req.Payload)
+	case "admin.server.cancel_update":
+		result, err = adminServerCancelUpdate(conn, req.ActorID, req.Payload)
 	case "admin.server.update_status":
 		result, err = adminServerUpdateStatus(conn, req.Payload)
 	case "admin.server.update_request":
@@ -2044,7 +2046,20 @@ func adminSetSect(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (a
 	if charRow == nil {
 		return nil, errors.New("character not found")
 	}
-	beforeRes, err := conn.Execute(`SELECT sect_name,rank_name,rank_level FROM sect_membership WHERE user_id=?`, []any{uid})
+	// Both count columns are guarded, because in the compose stack the engine
+	// is healthy before db-init migrates: a placement made in that window
+	// moves the member and has nothing to reset.
+	pointsColumn, _ := tableHasColumns(conn, "sect_membership", "contribution_points")
+	earnedColumn := sectEarnedColumn(conn)
+	beforeSQL := `SELECT sect_name,rank_name,rank_level`
+	if pointsColumn {
+		beforeSQL += `,contribution_points`
+	}
+	if earnedColumn {
+		beforeSQL += `,contribution_earned`
+	}
+	beforeSQL += ` FROM sect_membership WHERE user_id=?`
+	beforeRes, err := conn.Execute(beforeSQL, []any{uid})
 	if err != nil {
 		return nil, err
 	}
@@ -2052,6 +2067,12 @@ func adminSetSect(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (a
 	var before map[string]any
 	if beforeRow != nil {
 		before = map[string]any{"sect_name": beforeRow["sect_name"], "rank_name": beforeRow["rank_name"], "rank_level": storage.ParseInt(beforeRow["rank_level"])}
+		if pointsColumn {
+			before["contribution_points"] = storage.ParseInt(beforeRow["contribution_points"])
+		}
+		if earnedColumn {
+			before["contribution_earned"] = storage.ParseInt(beforeRow["contribution_earned"])
+		}
 	} else {
 		before = map[string]any{"sect_name": nil}
 	}
@@ -2091,6 +2112,32 @@ func adminSetSect(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (a
 		return nil, err
 	}
 	after := map[string]any{"sect_name": sectName, "rank_name": rankName, "rank_level": rankLevel}
+	// A member moved to a different sect starts that sect's count from
+	// nothing (v1.12.3): points and rank are earned in the sect they are held
+	// in, and a GM's placement carried the old sect's balance and its lifetime
+	// count along - the count the next credit then promoted on. The same sect
+	// keeps both. The snapshot above holds both columns as they were.
+	if beforeRow != nil && fmt.Sprint(beforeRow["sect_name"]) != sectName {
+		if pointsColumn {
+			if _, err = conn.Execute(`UPDATE sect_membership SET contribution_points=0 WHERE user_id=?`, []any{uid}); err != nil {
+				return nil, err
+			}
+			after["contribution_points"] = int64(0)
+		}
+		if earnedColumn {
+			if _, err = conn.Execute(`UPDATE sect_membership SET contribution_earned=0 WHERE user_id=?`, []any{uid}); err != nil {
+				return nil, err
+			}
+			after["contribution_earned"] = int64(0)
+		}
+	} else if beforeRow != nil {
+		if pointsColumn {
+			after["contribution_points"] = before["contribution_points"]
+		}
+		if earnedColumn {
+			after["contribution_earned"] = before["contribution_earned"]
+		}
+	}
 	if err := auditAdmin(conn, adminUserID, "admin.player.set_sect", fmt.Sprintf("user:%d", uid), before, after, fmt.Sprint(p["reason"])); err != nil {
 		return nil, err
 	}

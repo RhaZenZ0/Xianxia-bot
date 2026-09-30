@@ -147,18 +147,32 @@ func grantBirthFamilySendoffTx(conn *storage.Conn, catalog worlddata.Catalog, us
 	if err != nil {
 		return nil, err
 	}
+	// The floor above is written before any of the returns below, so each of
+	// them reports it (v1.12.3): the backfill is the one door that reaches the
+	// guard, and it used to return nil after raising the standing, so the
+	// player's reputation moved and nothing said so. A raised floor is the
+	// only thing reported - a second ask raises nothing and says nothing.
+	standingOnly := func() map[string]any {
+		if len(standing) == 0 {
+			return nil
+		}
+		return map[string]any{"reputation": standing}
+	}
 	if strings.TrimSpace(sendoff.Item) == "" {
-		return nil, nil
+		return standingOnly(), nil
 	}
 	item, _, ok := itemDef(catalog, sendoff.Item)
 	if !ok {
-		return nil, nil
+		return standingOnly(), nil
 	}
 	already, err := boolRow(conn,
 		`SELECT 1 FROM item_provenance WHERE user_id=? AND source_type='birth_family_sendoff' AND source_key=?`,
 		[]any{userID, fmt.Sprint(familyID)})
-	if err != nil || already {
+	if err != nil {
 		return nil, err
+	}
+	if already {
+		return standingOnly(), nil
 	}
 	if _, err = conn.Execute(
 		`INSERT INTO inventory(user_id,item_id,quantity) VALUES(?,?,1) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=quantity+1`,

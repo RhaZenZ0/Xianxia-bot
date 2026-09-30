@@ -152,7 +152,7 @@ class CharacterModal(discord.ui.Modal):
         # child out with a flying artifact of its own, and no two give the
         # same object.
         sendoff = dict(creation.get("family_sendoff") or {})
-        if sendoff:
+        if sendoff.get("name"):
             embed.add_field(
                 name="🎁 Sent Out With",
                 value=(

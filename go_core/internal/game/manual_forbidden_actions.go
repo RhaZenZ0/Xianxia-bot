@@ -48,6 +48,39 @@ func techniqueForbidden(t worlddata.ManualTechniqueDefinition, m worlddata.Manua
 	return t.KarmaCost > 0 || containsFold(t.Tags, "forbidden", "demonic", "evil", "sacrificial", "soul_devouring") || manualForbidden(m)
 }
 
+// characterKarmaTx is the character's karma score, 0 for a row that is not there.
+func characterKarmaTx(conn *storage.Conn, userID int64) (int64, error) {
+	kr, e := conn.Execute(`SELECT karma_score FROM characters WHERE user_id=?`, []any{userID})
+	if e != nil {
+		return 0, e
+	}
+	if rr := firstRowMap(kr); rr != nil {
+		return i64(rr["karma_score"]), nil
+	}
+	return 0, nil
+}
+
+// chargeFirstStudyKarmaTx is what the first study of a forbidden manual costs:
+// one karma. It answers the karma score after the charge. It is the one door
+// for that price - `manual.study` calls it, and so does an inheritance that
+// studies its scripture at once - because an inheritance that wrote the study
+// row itself never charged it (v1.12.3). A manual that is not forbidden costs
+// nothing.
+func chargeFirstStudyKarmaTx(conn *storage.Conn, userID int64, m worlddata.ManualDefinition, now float64) (int64, error) {
+	karma, e := characterKarmaTx(conn, userID)
+	if e != nil {
+		return 0, e
+	}
+	if !manualForbidden(m) {
+		return karma, nil
+	}
+	karma--
+	if _, e = conn.Execute(`UPDATE characters SET karma_score=?,updated_at=? WHERE user_id=?`, []any{karma, now, userID}); e != nil {
+		return 0, e
+	}
+	return karma, nil
+}
+
 func manualRow(conn *storage.Conn, userID int64, manualID string) (map[string]any, error) {
 	r, e := conn.Execute(`SELECT * FROM character_manuals WHERE user_id=? AND manual_id=?`, []any{userID, manualID})
 	if e != nil {
@@ -133,19 +166,13 @@ func manualStudyAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		}
 	}
 	karma := int64(0)
-	kr, e := conn.Execute(`SELECT karma_score FROM characters WHERE user_id=?`, []any{userID})
+	if first {
+		karma, e = chargeFirstStudyKarmaTx(conn, userID, m, now)
+	} else {
+		karma, e = characterKarmaTx(conn, userID)
+	}
 	if e != nil {
 		return authoritativeMutation{}, e
-	}
-	if rr := firstRowMap(kr); rr != nil {
-		karma = i64(rr["karma_score"])
-	}
-	if first && manualForbidden(m) {
-		karma -= 1
-		_, e = conn.Execute(`UPDATE characters SET karma_score=?,updated_at=? WHERE user_id=?`, []any{karma, now, userID})
-		if e != nil {
-			return authoritativeMutation{}, e
-		}
 	}
 	if e = setCooldown(conn, userID, key, cooldownSecondsFor(cooldownForbidden), now); e != nil {
 		return authoritativeMutation{}, e

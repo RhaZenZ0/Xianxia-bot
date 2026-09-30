@@ -5758,6 +5758,60 @@ because whether `heart_calming_pill@mid` names anything is the recipe roster's t
 defeat-survival fixture has no recipes; each drill (the bare-id lookup, the highest grade first,
 the unscaled restore) fails on its own sentence.
 
+### What a second deep review found (v1.12.3)
+
+Eight reviewers, one subsystem each, over everything since v1.2.1, then the owner's *"fix all"* -
+seven fixers on the findings, one per area, merged into one release. Four things are worth keeping.
+
+**A floor written when it was the only counter.** `marketUnitPrice` floored what the market sells
+for at `highestKeeperBuy`, the plain third a keeper pays - right in v1.2.3, when that was the most
+any NPC paid. v1.0.17's rank price and v1.5.0's town-at-a-stall each raised that maximum and neither
+raised the floor, so a talisman bought at the market for 6 sold to a keeper for 17 at rank 6 and a
+sword bought for 91 sold to the town for 258. `highestNPCPays` is the one statement now - the
+keeper's third, the top-rank price for a recipe output, the stall ceiling - and its gate walks the
+whole catalogue at every world's coin against every counter, so the next counter added to the game
+fails it the day it pays more.
+
+**A treasury that paid out at a different rate than it took in.** A donation earned sect value,
+×1.5 for a certified crafter, capped by the Mortal shelf only where one existed; a treasury redeem
+cost sect value times a pressure multiplier that is 1.0 whenever a sect is doing well; and a redeem
+never lowered `contribution_earned`. So a Longevity Pill donated for 180 came back for 120 with the
+pill kept, and one herb donated and taken back four hundred times promoted its owner to Inner
+Disciple at zero points. A treasury redeem costs at least what any donation of that unit could have
+earned and debits the lifetime count, and promotion asks whether *this credit* crossed a rung rather
+than whether the count sits past one - which is also what lets a GM's demotion hold. The per-event
+cap on world-event points was measured against a running total that `interfere` decrements, so it
+is paid off a monotonic record in `event_log` now, the karma-deed shape.
+
+**The state machine with an entry and no exit.** A server-update request refused a second request
+beside an open one and only the watcher could close it - so any of five small watcher faults (a
+regex that cut the JSON object at the first `}`, a nonce remembered before its ack, a closing report
+abandoned after twenty tries, two control characters stripped where JSON needs them all gone, a
+signal trap that removed the lock and never exited) left the Request button dead until somebody
+edited SQLite. `admin.server.cancel_update` is the exit, allowed under the card's own fifteen-minute
+"not running" rule, held equal to the Python constant by a test that reads the Go. The parsing fault
+was cured by not parsing: the read answers its three scalars flat, and every call in the watcher's
+test conversation is checked by `json.loads`.
+
+**A rule stated at one door and not its sibling, nine times.** The in-battle technique path applied
+every effect to the opponent while the out-of-battle cast had asked the effect's category since
+rc.58; the raid skipped the personal-world check the battle made; the inheritance wrote a study row
+the manual action would have refused; every craft built the spirit sense the content says only two
+trades build; samsara's wipe list had missed two schemas; a treaty broken by a killing ended from
+the side the killing lowered; the panel's stall doors compared one ladder and one city where the
+engine compares the higher ladder and the stall's own city; `/talk` offered a commission where the
+giver stood rather than where it can be accepted; and the breakthrough's quest report sat behind the
+narrator context. Each is v1.0.5, rc.46 or rc.48 found at one more site, and each has its gate.
+
+**The gates that went red on correct code, again.** `test_craft_echo.py` pinned the source position
+of the samsara wipe list; `test_control_techniques_are_the_contents.py` pinned the spelling
+`lawControlCategory {`; `test_npc_consignments.py` pinned which file `lot_identity` lived in; and
+`test_no_two_households_share_a_tradition` forbade two houses one manual, which the thirty-three
+upper-world lessons deliberately do. Each was moved from the spelling to the rule (v1.0.8). And two
+fixers wrote the same display twin - `effect_mult` and `graded_amount` in `app/rules/item_grades.py`
+- in parallel, which the merge caught as a conflict rather than as two copies: a rule two people
+reach for at once is one that wanted a name before either started.
+
 ### Every path does something (`path_traits.go`, schema 72, v1.13.0)
 
 Asked as *"Update on the different cultivation types"*: two of seven paths (Beast Binder's hunt

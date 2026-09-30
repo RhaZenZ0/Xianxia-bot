@@ -216,31 +216,52 @@ func grantInheritanceTx(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		return nil, err
 	}
 	preferred := stringInList(inheritance.PreferredPaths, path)
-	studied := ""
+	studied, studiedBlocked := "", ""
 	if inheritance.Item != "" {
 		if _, err = conn.Execute(`INSERT INTO inventory(user_id,item_id,quantity) VALUES(?,?,1) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=quantity+1`, []any{userID, inheritance.Item}); err != nil {
 			return nil, err
 		}
 		if preferred {
 			if manualID := manualForItem(catalog, inheritance.Item); manualID != "" {
-				row, e := manualRow(conn, userID, manualID)
+				// Studying at once is manual.study's first study and is held to
+				// its rules (v1.12.3): the realm floor, and the karma a
+				// forbidden manual costs. The write went straight to the table,
+				// so a realm-1 Ghost Cultivator clearing the tomb (floor 1) had
+				// the realm-4 Heaven-grade scripture studied and its technique
+				// usable - the floor manual.study refuses - and the forbidden
+				// first-study karma was never charged. Below the floor the
+				// sealed copy is in the bag and is studied the ordinary way
+				// once the realm is reached.
+				manual := catalog.TechniqueSystem.Manuals[manualID]
+				c, e := loadMechanicsCharacter(conn, userID)
 				if e != nil {
 					return nil, e
 				}
-				if row == nil {
-					if _, e = conn.Execute(`INSERT INTO character_manuals(user_id,manual_id,mastery,practice,learned_at,updated_at) VALUES(?,?,0,0,?,?)`, []any{userID, manualID, now, now}); e != nil {
+				if c.RealmIndex < manual.MinRealmIndex {
+					studiedBlocked = fmt.Sprintf("the %s asks realm %d and you stand at realm %d; the sealed copy is yours to study when you reach it", manual.Name, manual.MinRealmIndex, c.RealmIndex)
+				} else {
+					row, e := manualRow(conn, userID, manualID)
+					if e != nil {
 						return nil, e
 					}
+					if row == nil {
+						if _, e = conn.Execute(`INSERT INTO character_manuals(user_id,manual_id,mastery,practice,learned_at,updated_at) VALUES(?,?,0,0,?,?)`, []any{userID, manualID, now, now}); e != nil {
+							return nil, e
+						}
+						if _, e = chargeFirstStudyKarmaTx(conn, userID, manual, now); e != nil {
+							return nil, e
+						}
+					}
+					studied = manualID
 				}
-				studied = manualID
 			}
 		}
 	}
-	payload, _ := json.Marshal(map[string]any{"inheritance_id": inheritanceID, "source_realm_id": realmID, "bonuses": inheritance.Bonuses, "item": inheritance.Item, "preferred_path": preferred, "studied": studied})
+	payload, _ := json.Marshal(map[string]any{"inheritance_id": inheritanceID, "source_realm_id": realmID, "bonuses": inheritance.Bonuses, "item": inheritance.Item, "preferred_path": preferred, "studied": studied, "study_blocked": studiedBlocked})
 	if _, err = conn.Execute(`INSERT INTO event_log(user_id,event_type,payload_json,created_at) VALUES(?,?,?,?)`, []any{userID, "inheritance_obtained", string(payload), now}); err != nil {
 		return nil, err
 	}
-	return map[string]any{"gained": true, "inheritance_id": inheritanceID, "name": inheritance.Name, "description": inheritance.Description, "bonuses": inheritance.Bonuses, "item": inheritance.Item, "preferred_path": preferred, "studied": studied}, nil
+	return map[string]any{"gained": true, "inheritance_id": inheritanceID, "name": inheritance.Name, "description": inheritance.Description, "bonuses": inheritance.Bonuses, "item": inheritance.Item, "preferred_path": preferred, "studied": studied, "study_blocked": studiedBlocked}, nil
 }
 
 // secretRealmRareIntn is the dice for a room's rare find, behind the seam the
