@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 
 	"xianxia/core/internal/eventledger"
@@ -695,14 +696,22 @@ func deployArrayActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	}
 	enc, _ := json.Marshal(def.Effect)
 	now := nowSeconds()
-	ends := p.GameMinute + def.Duration
-	if _, e = conn.Execute(`UPDATE inventory SET quantity=quantity-1 WHERE user_id=? AND item_id=?`, []any{userID, p.ItemID}); e != nil {
-		return authoritativeMutation{}, e
+	// A Formation Adept's arrays hold longer, and a deploy a world day costs
+	// them no disk (v1.13.0). They still have to carry one: the disk is the
+	// pattern, and the check above stands for everybody.
+	path := characterPathTx(conn, userID)
+	duration := int64(math.Round(float64(def.Duration) * arrayDurationMult(catalog, path)))
+	ends := p.GameMinute + duration
+	freeDeploy := formationFreeDeployTx(conn, catalog, userID, path, p.GameMinute, now)
+	if !freeDeploy {
+		if _, e = conn.Execute(`UPDATE inventory SET quantity=quantity-1 WHERE user_id=? AND item_id=?`, []any{userID, p.ItemID}); e != nil {
+			return authoritativeMutation{}, e
+		}
 	}
 	if _, e = conn.Execute(`INSERT INTO deployed_location_arrays(location,item_id,name,owner_user_id,sect_name,effect_json,starts_game_minute,ends_game_minute,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(location) DO UPDATE SET item_id=excluded.item_id,name=excluded.name,owner_user_id=excluded.owner_user_id,sect_name=excluded.sect_name,effect_json=excluded.effect_json,starts_game_minute=excluded.starts_game_minute,ends_game_minute=excluded.ends_game_minute,created_at=excluded.created_at,updated_at=excluded.updated_at`, []any{loc, p.ItemID, def.Name, userID, sect, string(enc), p.GameMinute, ends, now, now}); e != nil {
 		return authoritativeMutation{}, e
 	}
-	out := map[string]any{"location": loc, "item_id": p.ItemID, "name": def.Name, "owner_user_id": userID, "sect_name": sect, "effect": def.Effect, "starts_game_minute": p.GameMinute, "ends_game_minute": ends}
+	out := map[string]any{"location": loc, "item_id": p.ItemID, "name": def.Name, "owner_user_id": userID, "sect_name": sect, "effect": def.Effect, "starts_game_minute": p.GameMinute, "ends_game_minute": ends, "duration_game_minutes": duration, "free_deploy": freeDeploy}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "formation", EventType: "array.deploy", EntityType: "location", EntityID: loc, GameMinute: p.GameMinute, Payload: out}}, nil
 }
 

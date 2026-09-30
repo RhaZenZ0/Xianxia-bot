@@ -56,7 +56,7 @@ func settleVitalityRecoveryTx(conn *storage.Conn, catalog worlddata.Catalog, use
 		return 0, nil
 	}
 	res, err := conn.Execute(
-		`SELECT vitality,vitality_max,life_status,vitality_recovered_game_minute FROM characters WHERE user_id=?`,
+		`SELECT vitality,vitality_max,life_status,vitality_recovered_game_minute,path FROM characters WHERE user_id=?`,
 		[]any{userID})
 	if err != nil {
 		return 0, nil
@@ -111,6 +111,12 @@ func settleVitalityRecoveryTx(conn *storage.Conn, catalog worlddata.Catalog, use
 	// zero deletes the rule it modifies.
 	if rate := EraModifier(conn, characterEraWorld(conn, catalog, userID), "recovery_rate", 1); rate > 0 && rate != 1 {
 		percent = maxI64(1, int64(math.Round(float64(percent)*rate)))
+	}
+
+	// A Body Refiner mends faster (v1.13.0). Like the era it scales `percent`,
+	// so the anchor below stays consistent with the gain it paid for.
+	if mult := bodyRecoveryMult(catalog, fmt.Sprint(row["path"])); mult != 1 {
+		percent = maxI64(1, int64(math.Round(float64(percent)*mult)))
 	}
 
 	elapsed := gameMinute - anchor

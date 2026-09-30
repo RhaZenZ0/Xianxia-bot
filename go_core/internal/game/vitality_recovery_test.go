@@ -41,7 +41,7 @@ func setupVitalityRecoveryDB(t *testing.T, vitality, maxVitality int64, anchor a
 	// the settle asks it whether this cultivator is mid-fight.
 	if err := conn.ExecScript(`
 CREATE TABLE characters(
-	user_id INTEGER PRIMARY KEY, life_status TEXT DEFAULT 'alive',
+	user_id INTEGER PRIMARY KEY, life_status TEXT DEFAULT 'alive', path TEXT NOT NULL DEFAULT 'Sword Cultivator',
 	vitality INTEGER, vitality_max INTEGER, vitality_recovered_game_minute INTEGER
 );
 CREATE TABLE battles(

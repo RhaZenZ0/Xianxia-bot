@@ -125,27 +125,38 @@ func characterStagePace(catalog worlddata.Catalog, character map[string]any, mod
 	return stagePace(cost, index), worldQiMultiplier(catalog, realmWorld(realms, index))
 }
 
-// pathPrimaryAttribute is the attribute a path is built on - its highest
-// starting value, with a fixed order breaking ties so the same path always
-// grows the same way.
-func pathPrimaryAttribute(catalog worlddata.Catalog, path string) string {
+// pathGrowthAttributes is what a path is built on: every attribute tied for
+// its highest starting value (v1.13.0). It was pathPrimaryAttribute, which took
+// the first of a tie in a fixed order - so four paths grew spirit, will was
+// never picked although four paths start at will 3, and not one path grew the
+// second attribute its creation screen names. Every path now starts with a
+// pair at 3 (the Formation Adept's spread moved one point to make it so), and
+// both grow. An unknown path grows will, as before.
+func pathGrowthAttributes(catalog worlddata.Catalog, path string) []string {
 	definition, ok := catalog.Paths[path]
 	if !ok {
-		return "will"
+		return []string{"will"}
 	}
-	best, bestValue := "will", -1
-	for _, pair := range []struct {
+	pairs := []struct {
 		name  string
 		value int
 	}{
 		{"body", definition.Body}, {"agility", definition.Agility}, {"spirit", definition.Spirit},
 		{"insight", definition.Insight}, {"will", definition.Will}, {"presence", definition.Presence},
-	} {
-		if pair.value > bestValue {
-			best, bestValue = pair.name, pair.value
+	}
+	best := -1
+	for _, pair := range pairs {
+		if pair.value > best {
+			best = pair.value
 		}
 	}
-	return best
+	out := []string{}
+	for _, pair := range pairs {
+		if pair.value == best {
+			out = append(out, pair.name)
+		}
+	}
+	return out
 }
 
 // growAttributesOnRealmCrossing raises a cultivator's attributes when they
@@ -160,8 +171,8 @@ func growAttributesOnRealmCrossing(conn *storage.Conn, catalog worlddata.Catalog
 	} else {
 		gains["will"] = 1
 	}
-	if primary := pathPrimaryAttribute(catalog, c.Path); primary != "" {
-		gains[primary] += 1
+	for _, grown := range pathGrowthAttributes(catalog, c.Path) {
+		gains[grown] += 1
 	}
 	attributes := map[string]int64{}
 	for name, value := range c.Attributes {
