@@ -347,13 +347,16 @@ func secretRealmExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	modifier := attr + 2
+	// A room that favours your path or root has always added to the roll, and
+	// until v1.13.0 the reply never said so; the result carries each term.
+	pathBonus, rootBonus := int64(0), int64(0)
 	if stringInList(room.PreferredPaths, c.Path) {
-		modifier += 2
+		pathBonus = 2
 	}
 	if stringInList(room.PreferredRoots, c.SpiritualRoot) {
-		modifier += 1
+		rootBonus = 1
 	}
+	modifier := attr + 2 + pathBonus + rootBonus
 	roll, err := rollCheck(modifier, room.TN)
 	if err != nil {
 		return authoritativeMutation{}, err
@@ -361,7 +364,7 @@ func secretRealmExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if err = setCooldown(conn, userID, "secret_realm", cooldownSecondsFor(cooldownSecretRealm), now); err != nil {
 		return authoritativeMutation{}, err
 	}
-	result := map[string]any{"realm_id": rid, "realm_name": realm.Name, "room_index": idx, "room": room, "roll": roll, "success": roll["success"], "danger_before": danger}
+	result := map[string]any{"realm_id": rid, "realm_name": realm.Name, "room_index": idx, "room": room, "roll": roll, "success": roll["success"], "danger_before": danger, "path_bonus": pathBonus, "root_bonus": rootBonus}
 	if roll["success"].(bool) {
 		// Merged into the room's own payout rather than granted beside it, so
 		// the item lands by the one path and a rare find cannot be paid twice

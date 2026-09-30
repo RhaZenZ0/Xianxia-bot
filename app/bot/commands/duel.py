@@ -162,6 +162,7 @@ async def duel_act(interaction: discord.Interaction, style: app_commands.Choice[
     if style.value == "surrender":
         await interaction.response.send_message(
             f"🏳️ You surrender duel **#{match['match_id']}**. <@{opponent_id}> wins; no true-death or injury roll occurs. Martial Society reputation records the honorable result."
+            + (f" Their sword intent sharpens: **{int(resolved['winner_sword_intent'])}** held." if int(resolved.get("winner_sword_intent", 0)) else "")
         )
         return
     if style.value == "defend":
@@ -173,4 +174,6 @@ async def duel_act(interaction: discord.Interaction, style: app_commands.Choice[
     if bool(resolved.get("finished")):
         winner_id = int(resolved.get("winner_user_id", 0))
         result += f"\n🏆 <@{winner_id}> wins the **nonlethal** duel. Martial Society reputation records the result."
+        if int(resolved.get("winner_sword_intent", 0)):
+            result += f" Their sword intent sharpens: **{int(resolved['winner_sword_intent'])}** held."
     await interaction.response.send_message(f"⚔️ **Duel #{match['match_id']}**\n{roll_line(roll)}{result}")

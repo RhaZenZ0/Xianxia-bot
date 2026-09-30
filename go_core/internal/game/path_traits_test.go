@@ -191,8 +191,8 @@ func TestAnIntentStrikeSpendsIntentHitsHarderAndIsNotAnswered(t *testing.T) {
 	if got, want := rollModifier(t, strike, "player_roll")-rollModifier(t, plain, "player_roll"), trait.IntentStrikeBonus; got != want || want <= 0 {
 		t.Fatalf("an Intent Strike rolled %d above a plain attack, want the path's %d", got, want)
 	}
-	if strike["counter_suppressed"] != true || strike["npc_roll"] != nil {
-		t.Fatalf("an Intent Strike must not be answered: counter_suppressed=%v npc_roll=%v", strike["counter_suppressed"], strike["npc_roll"])
+	if strike["counter_suppressed"] != true || strike["counter_roll"] != nil {
+		t.Fatalf("an Intent Strike must not be answered: counter_suppressed=%v counter_roll=%v", strike["counter_suppressed"], strike["counter_roll"])
 	}
 	if got := i64(actionScalar(t, db, `SELECT path_resource FROM characters WHERE user_id=901`)); got != 1 {
 		t.Fatalf("an Intent Strike spent intent 2 -> %d, want 1", got)

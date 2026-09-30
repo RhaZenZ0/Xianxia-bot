@@ -890,6 +890,12 @@ async def run(url: str, token: str, db_path: str) -> Report:
         report.add("PASS" if {"stance", "cost", "insight_xp", "insight_cost", "realm_gate"} <= set(sheet) and 0 <= int(odds.get("probability", -1)) <= 100 else "FAIL",
                    "the sheet carries the stance, the cost, the insight and the odds", f"stance={sheet.get('stance')} odds={odds.get('probability')}% tn={odds.get('tn')}")
     await step(report, "an unknown stance is refused", act("cultivation.stance", PLAYER, {"stance": "meditate"}), expect_error="unknown stance")
+    # v1.13.0: the refined circulation is a Qi Refiner's alone, and the sheet
+    # offers a Sword Cultivator the three every path takes.
+    await step(report, "a Sword Cultivator is refused the Qi Refiner's stance", act("cultivation.stance", PLAYER, {"stance": "refined"}), expect_error="only a Qi Refiner")
+    if sheet is not None:
+        offered = [str(r.get("key")) for r in list(sheet.get("stances") or [])]
+        report.add("PASS" if offered == ["circulate", "refine", "force"] else "FAIL", "the sheet offers the stances this path may take", str(offered))
     # A stage with room in it: since v1.0.0-rc.5 a session at a full stage
     # banks nothing, which would make the Refine check below read as a failure.
     await step(report, "stand at a stage with room in it", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 0, "phase": 2, "reason": "playtest"}))
@@ -1410,9 +1416,22 @@ async def run(url: str, token: str, db_path: str) -> Report:
             except GameEngineError as exc:
                 report.add("FAIL", "combat.turn", str(exc))
             report.add("PASS" if won else "FAIL", "combat.turn: an overwhelming cultivator wins inside twenty-five rounds", f"won={won} rounds={rounds}")
-            await step(report, "combat.finalize spare", act("combat.finalize", PLAYER, {"battle_id": battle_id, "outcome": "spare"}))
+            spared = await step(report, "combat.finalize spare", act("combat.finalize", PLAYER, {"battle_id": battle_id, "outcome": "spare"}))
+            # v1.13.0: a win sharpens a Sword Cultivator's intent.
+            if spared is not None and won:
+                report.add("PASS" if int(spared.get("sword_intent") or 0) >= 1 else "FAIL",
+                           "a Sword Cultivator's win banks sword intent", f"sword_intent={spared.get('sword_intent')}")
         second = await step(report, "combat.start again for the GM's lever", act("combat.start", PLAYER, {"kind": "challenge", "npc_name": opponent, "source": "playtest"}))
         if second is not None:
+            second_id = int(second.get("battle_id") or 0)
+            if second_id and won:
+                # The Intent Strike spends the intent the win banked, and the
+                # opponent does not answer it (v1.13.0).
+                strike = await step(report, "combat.turn intent: an Intent Strike", act("combat.turn", PLAYER, {"battle_id": second_id, "style": "intent"}))
+                if strike is not None:
+                    report.add("PASS" if strike.get("intent_strike") and strike.get("counter_roll") is None else "FAIL",
+                               "the Intent Strike spends intent and is not answered",
+                               f"bonus=+{strike.get('intent_strike_bonus')} intent left={strike.get('sword_intent')} counter={strike.get('counter_roll')}")
             await audited("admin.player.clear_battle", {"user_id": PLAYER, "reason": "playtest"})
     await either("admin.player.clear_condition", gm("admin.player.clear_condition", {"user_id": PLAYER, "clear_all": True, "reason": "playtest"}), "no active conditions")
     await step(report, "condition.treat with nothing to treat", act("condition.treat", PLAYER, {"condition": "bruised"}), expect_error="active condition not found")

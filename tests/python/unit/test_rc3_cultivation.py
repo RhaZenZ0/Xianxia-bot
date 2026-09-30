@@ -168,12 +168,16 @@ class TheCultivationSheet(unittest.TestCase):
 class TheStanceTheOddsAndTheGate(unittest.TestCase):
     def test_the_stance_root_is_guided_and_the_engine_stores_it(self):
         self.assertIn('@registered_root_command(name="stance"', CULTIVATION_SOURCE)
-        self.assertIn("@app_commands.choices(stance=STANCE_CHOICES)", CULTIVATION_SOURCE)
+        # v1.13.0: the picker is an autocomplete over `stances_for`, because a
+        # Qi Refiner may take a fourth stance nobody else may.
+        self.assertIn("@app_commands.autocomplete(stance=stance_autocomplete)", CULTIVATION_SOURCE)
+        self.assertIn("stances_for(WORLD.paths", CULTIVATION_SOURCE)
+        from app.rules.path_traits import BASE_STANCES
         for value in ("circulate", "refine", "force"):
-            self.assertIn(f'value="{value}"', CULTIVATION_SOURCE)
+            self.assertIn(value, {key for key, _label in BASE_STANCES})
             self.assertIn(f'Key: stance{value.title()}', GO_STANCE)
         self.assertIn('"cultivation.stance"', GO_AUTHORITATIVE)
-        self.assertIn("stance, err := loadCultivationStance(conn, userID)", GO_ACTIONS)
+        self.assertIn("stance, err := loadCultivationStance(conn, catalog, userID, c.Path)", GO_ACTIONS)
         self.assertIn("* stance.GainMult", GO_ACTIONS)
         self.assertIn("applyStanceToTraining(conn, userID, stance, p.GameMinute, now)", GO_ACTIONS)
         # Since v1.0.0-rc.5 the severity deepens with each untreated deviation.

@@ -1434,14 +1434,38 @@ async def run(url: str, token: str, db_path: str) -> Report:
         live = {action.path for definition in hub_registry.REGISTERED_HUBS for page in definition.pages for action in hub_registry._leaf_actions(page)}
         pressed: dict[str, str] = {}
         locked: dict[str, str] = {}
+        # Another path's doors (v1.13.0) are left off with no padlock, and a
+        # page holding nothing else leaves the page list: a third designed
+        # state beside drawn and locked. Read off the bot's own provider, so
+        # the harness never restates which leaves belong to which path.
+        from app.bot import surface as bot_surface
+        path_locked: dict[int, set[str]] = {}
+        for who in (player, gm):
+            who_c = await DB.get_character(int(who.id)) or {}
+            path_locked[int(who.id)] = set(await bot_surface._path_hidden_actions(None, who_c)) if who_c else set()
         for definition in sorted(hub_registry.REGISTERED_HUBS, key=lambda d: d.name == "admin"):
             actor = gm if definition.name == "admin" else player
             for page in definition.pages:
-                leaves = [action for action in hub_registry._leaf_actions(page) if action.path not in DEFERRED_LEAVES]
+                theirs = path_locked.get(int(actor.id), set())
+                for action in hub_registry._leaf_actions(page):
+                    if action.path in theirs and action.path not in DEFERRED_LEAVES:
+                        report.add("PASS", f"{action.path}  ({definition.name} → {page.label})", "another path's door, left off")
+                        locked[action.path] = "another path's door"
+                leaves = [action for action in hub_registry._leaf_actions(page)
+                          if action.path not in DEFERRED_LEAVES and action.path not in theirs]
                 for action in hub_registry._leaf_actions(page):
                     if action.path in DEFERRED_LEAVES:
                         report.add("SKIP", action.path, DEFERRED_LEAVES[action.path])
                 if not leaves:
+                    if any(action.path in theirs for action in hub_registry._leaf_actions(page)):
+                        async def page_is_gone(definition=definition, page=page, actor=actor):
+                            opened = await open_hub(actor, channels["begin-here"], definition.name, env=env)
+                            try:
+                                await opened.goto(page.label, limit=len(definition.pages) + 1, env=env)
+                            except Failed:
+                                return f"{page.label} is not in the page list"
+                            raise Failed(f"{page.label} holds only another path's doors and is still drawn")
+                        await step(report, f"/{definition.name} → {page.label} leaves the panel for another path", page_is_gone())
                     continue
                 panel = None
                 for attempt in (1, 2):

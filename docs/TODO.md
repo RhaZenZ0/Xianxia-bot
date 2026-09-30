@@ -16,6 +16,27 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **deferred (v1.14.0, on the owner's call "ship paths first")** — *Attributes grow every stage.*
+  Asked for as "+1 on every attribute per level, and the types get +2 on some", then settled as: at
+  every **stage** a cultivator gains +1 to all six attributes and +2 instead on the two their path
+  grows (`pathGrowthAttributes`), with the rolls made harder to keep the odds where they are. The
+  plan: a `challengeDifficulty(realm, stage)` term added to a roll's TN, keyed on what the roll is
+  against - the opponent's realm and stage in a fight, the cultivator's own stage for a breakthrough
+  or a tribulation, a place's floor for its rooms and sites, a recipe's rank for a craft - so the
+  growth is felt against what you have outgrown and not against what matches you; a migration that
+  recomputes every existing character's attributes from their path, realm and stage; and the odds
+  of each family of roll measured before and after rather than argued. Deferred only so the path
+  abilities shipped first.
+- **fixed (v1.13.0)** — *Five paths did nothing of their own.* Each has an ability now (Sword
+  intent and the Intent Strike, the Qi Refiner's stance, the Body Refiner's mending, the Soul
+  Cultivator's Heart wave and sense, the Formation Adept's arrays), a manual of your own path
+  gathers and practises faster, every path has a Law affinity, both tied attributes grow a realm,
+  and six dark manuals that named paths that do not exist name real ones.
+- **fixed (v1.13.0)** — *Another path's doors were drawn.* The ghost road's leaves are left off the
+  panel for every other path with no padlock (`NOT_YOUR_PATH`), and a page of nothing else leaves
+  the page list; the Intent Strike and the refined stance are offered only to their own path.
+  `/ghost` itself still answers as a slash command, because Discord registers commands for the
+  whole guild and cannot hide one per member; the engine still refuses it.
 - **fixed (v1.7.10)** — *No `/boss` or `/party`.* Both groups backed a Combat hub page and were never
   in `TREE_COMMANDS`, so the names a player types reached nothing (v1.7.4's `/stall`). Registered.
 - **deferred (design)** — *The other hub-only groups.* `_GROUP_ACTION_ROOTS` holds some fifty groups

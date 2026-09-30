@@ -16,6 +16,7 @@ from discord import app_commands
 from ...ops.game_engine import GameEngineError
 from ...rules.progression_systems import ascension_gate
 from ...rules.advanced_runtime import manual_practice_line, spirit_gain_line
+from ...rules.path_traits import stances_for
 from ..character_state import record_quest_progress, announce_quest_progress, current_effect_modifiers
 from ..formatting import roll_line
 from ..status_cards import _ELEMENT_MARKS
@@ -87,6 +88,8 @@ async def cultivate(interaction: discord.Interaction) -> None:
     if float(result.get("manual_mult", 1)) != 1.0:
         chosen = "you practise" if result.get("manual_chosen") else "the best method you have learned"
         extra += f"\n📖 **{result.get('manual_name')}** ({result.get('manual_grade')} grade, {chosen}): **x{float(result['manual_mult']):.2f}**."
+        if result.get("manual_own_path"):
+            extra += f" Written for your path: **x{float((WORLD.data.get('path_system') or {}).get('own_manual_gathering_mult', 1)):g}** of that."
     # v1.11.0: the session practised the method it was cultivated by.
     practice_line = manual_practice_line(result.get("manual_practice"), WORLD.technique_system.get("mastery_levels") or ())
     if practice_line:
@@ -131,17 +134,27 @@ async def cultivate(interaction: discord.Interaction) -> None:
     )
 
 
-STANCE_CHOICES = [
-    app_commands.Choice(name="Circulate — the full gain, nothing risked", value="circulate"),
-    app_commands.Choice(name="Refine — a fifth slower, banks Insight XP", value="refine"),
-    app_commands.Choice(name="Force — a third faster, risks qi deviation", value="force"),
-]
+async def stance_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    """The stances this cultivator may take (v1.13.0): the three anybody takes,
+    and the refined circulation for a Qi Refiner - `stances_for`, the twin of
+    the engine's `stanceForPath`, so the picker never offers what the engine
+    refuses (rc.46). An unreadable character is offered the three."""
+    try:
+        c = await DB.get_character(interaction.user.id)
+    except Exception:
+        c = None
+    needle = current.casefold().strip()
+    return [
+        app_commands.Choice(name=label[:100], value=key)
+        for key, label in stances_for(WORLD.paths, (c or {}).get("path"))
+        if not needle or needle in label.casefold() or needle in key
+    ][:25]
 
 
 @registered_root_command(name="stance", description="Choose the meditation stance every cultivation session uses", guild=GUILD)
-@app_commands.choices(stance=STANCE_CHOICES)
+@app_commands.autocomplete(stance=stance_autocomplete)
 @serialized_user_action
-async def stance_command(interaction: discord.Interaction, stance: app_commands.Choice[str]) -> None:
+async def stance_command(interaction: discord.Interaction, stance: str) -> None:
     """A better cultivation system (v1.0.0-rc.3): the stance is engine state
     - Go stores it and applies it to every session - so this only chooses."""
     await interaction.response.defer(ephemeral=False)
@@ -150,14 +163,14 @@ async def stance_command(interaction: discord.Interaction, stance: app_commands.
         return
     try:
         envelope = await ENGINE.authoritative_action(
-            "cultivation.stance", interaction.user.id, {"stance": stance.value},
+            "cultivation.stance", interaction.user.id, {"stance": str(stance).strip().lower()},
             action_id=f"discord:{interaction.id}:cultivation.stance",
         )
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
-    label = str(result.get("label") or stance.name.split("—")[0].strip())
+    label = str(result.get("label") or str(stance).title())
     changed = bool(result.get("changed"))
     lines = [
         f"🧭 **{c['name']} settles into the {label} stance.**" if changed else f"🧭 **{c['name']} keeps the {label} stance.**",

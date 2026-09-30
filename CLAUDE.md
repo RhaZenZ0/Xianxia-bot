@@ -155,7 +155,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 71; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 72; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -5757,6 +5757,48 @@ use is, and a treatment's use is its instant restore. The tests drive the shippe
 because whether `heart_calming_pill@mid` names anything is the recipe roster's to say and the
 defeat-survival fixture has no recipes; each drill (the bare-id lookup, the highest grade first,
 the unscaled restore) fails on its own sentence.
+
+### Every path does something (`path_traits.go`, schema 72, v1.13.0)
+
+Asked as *"Update on the different cultivation types"*: two of seven paths (Beast Binder's hunt
+and taming, Ghost Cultivator's death qi) had rules of their own, and the other five differed only
+in their starting spread. A first plan gave them a flat number each and the owner turned it down -
+*a number nobody can feel is a number nobody picks a path for* - so each does something instead:
+Sword intent banked by wins and spent on an unanswered Intent Strike; the Qi Refiner's own stance;
+the Body Refiner's faster mending and lighter defeat wound; the Soul Cultivator's Heart wave and
+sense; the Formation Adept's longer arrays and one free deploy a day. Every number is content
+(`paths.<name>.trait`), read by one door in Go (`pathTrait`) and filled into the prose by one
+helper in Python (`app/rules/path_traits.py`), so the sheet cannot promise a number the engine
+does not use.
+
+**Every hook is held by AST as well as by behaviour** (`TestEveryPathAbilityIsAppliedWhereItHappens`),
+for `TestEveryGoodDeedIsPaidWhereItHappens`' reason: a helper's own test passes against a tree
+nothing calls it from. Two drills stayed green, both on content: dropping the Qi Refiner check
+from `refinedCirculationStance` or `stances_for` changes nothing because only the Qi Refiner's
+trait carries a `stance_gain_mult` (rc.53's `!ok`), so each side has a test that plants one on
+another path.
+
+**Two shared formulas became one each.** The method's gathering multiplier was written in
+`manualCultivationMultiplier` and again in `cultivationManualAction`; both call
+`manualGatheringMult` now, which applies `path_system.own_manual_gathering_mult` to a manual of
+your own path (`"Any"` is neutral). And `pathPrimaryAttribute` answered one attribute where six
+paths tie two at the top - `pathGrowthAttributes` grows every tied one, and the Formation Adept's
+spread moved (spirit 3, presence 1) so every path grows two; `TestEveryPathGrowsTwoAttributesARealm`
+holds that, and the creation screen's Focus is held to it in Python.
+
+**Another path's doors are left off with no padlock** (`NOT_YOUR_PATH`, `PATH_GATES`), on the
+owner's call: *"Hide command/buttons you can't use if you play the wrong type of cultivator."*
+It is deliberately the opposite of rc.32's limit - a road nobody can see is a road nobody learns
+exists - because a path is chosen at birth and changes only in a new life, so the ghost road is
+not a road a Sword Cultivator can walk to. A page holding nothing but another path's doors leaves
+the page list (`visible_pages`), which is why the ghost road's status read is in the gate too.
+Slash commands cannot be hidden per member - Discord registers them for the whole guild - so
+`/ghost` still answers, and the engine still refuses. The Discord sweep counts a path-locked leaf
+as a third designed state beside drawn and locked, read off the bot's own provider.
+
+Two readers the engine had rolled for releases now say so: the +3 a Law affinity adds
+(`affinity_bonus`) and a secret-realm room's +2 for its path (`path_bonus`, which the room result
+did not carry until now).
 
 ## Testing conventions
 
