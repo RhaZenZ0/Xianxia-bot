@@ -19,6 +19,7 @@ from tests.support import PROJECT_ROOT
 
 BOT = PROJECT_ROOT / "app" / "bot"
 ECONOMY = (BOT / "commands" / "economy.py").read_text(encoding="utf-8")
+FEED = (BOT / "auction_feed.py").read_text(encoding="utf-8")
 CORE = (PROJECT_ROOT / "app" / "database" / "core.py").read_text(encoding="utf-8")
 DASHBOARD = (PROJECT_ROOT / "app" / "dashboard" / "server.py").read_text(encoding="utf-8")
 GO = PROJECT_ROOT / "go_core" / "internal"
@@ -80,7 +81,11 @@ class TheEngineOwnsTheFinding(unittest.TestCase):
 
 class ABlindLotReadsAsBlind(unittest.TestCase):
     def test_the_board_hides_what_the_consignor_could_not_read(self):
-        line = _body(ECONOMY, "lot_identity")
+        # The rule lives in auction_feed since v1.12.3, below the commands, so
+        # the public card and the board read the one statement of it.
+        line = _body(FEED, "lot_identity")
+        self.assertIn("lot_identity", ECONOMY.split("from ..auction_feed import", 1)[1].split("\n", 1)[0],
+                      "the board no longer reads the one statement of what a lot is called")
         self.assertIn('lot.get("appraised")', line)
         self.assertIn('lot.get("grade_band")', line)
         self.assertIn("Unidentified Lot", line)
