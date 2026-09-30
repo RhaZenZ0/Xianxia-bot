@@ -82,7 +82,14 @@ class TheControlSetIsReadOffTheContent(unittest.TestCase):
         go = LAW_GO.read_text(encoding="utf-8")
         self.assertIn(f'lawControlCategory = "{CONTROL_EFFECT_CATEGORY}"', go,
                       "the engine no longer states the control category, or states a different one")
-        self.assertIn("lawControlCategory {", go,
+        # The category is read in one place, `lawEffectIsControl` (v1.12.3: the
+        # refusal out of battle and the choice of whose row a landed effect goes
+        # onto in one both ask it), and the out-of-battle cast still refuses on
+        # it. The spelling of the `if` is not the rule; that the refusal goes
+        # through the one reading is.
+        self.assertIn("== lawControlCategory", go,
+                      "the engine declares the category but no longer compares an effect with it")
+        self.assertIn("if lawEffectIsControl(effect) {", go,
                       "the engine declares the category but no longer refuses on it")
 
     def test_the_panel_asks_the_world_rather_than_a_literal(self):
