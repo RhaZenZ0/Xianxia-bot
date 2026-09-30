@@ -59,6 +59,42 @@ type conditionTreatPayload struct {
 	GameMinute int64  `json:"game_minute"`
 }
 
+// treatmentInBagTx is which of the player's items treats a condition whose
+// named treatment is `base`: that item at any grade (v1.12.1). Only a recipe's
+// output is graded, and two of the four treatments are one - so a player who
+// crafted a Mid Heart Calming Pill, or was paid one, carried
+// `heart_calming_pill@mid` while the treatment asked for the bare id and
+// refused them with four in the bag. The lowest grade held is spent first, so
+// a treatment never swallows the better pill while a plainer one will do. An
+// empty answer means none is carried; a graded id `itemDef` does not know is
+// not the treatment.
+func treatmentInBagTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, base string) (string, error) {
+	prefix := base + itemGradeSeparator
+	r, err := conn.Execute(
+		`SELECT item_id FROM inventory WHERE user_id=? AND quantity>0 AND (item_id=? OR substr(item_id,1,?)=?)`,
+		[]any{userID, base, len(prefix), prefix})
+	if err != nil {
+		return "", err
+	}
+	best, bestIndex := "", -1
+	for _, row := range r.Rows {
+		id := fmt.Sprint(row[0])
+		if itemBaseID(id) != base {
+			continue
+		}
+		if id != base {
+			if _, _, known := itemDef(catalog, id); !known {
+				continue
+			}
+		}
+		index := itemGradeIndex(catalog, id)
+		if bestIndex < 0 || index < bestIndex || (index == bestIndex && id < best) {
+			best, bestIndex = id, index
+		}
+	}
+	return best, nil
+}
+
 func conditionTreatAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p conditionTreatPayload
 	if err := json.Unmarshal(raw, &p); err != nil {
@@ -77,13 +113,13 @@ func conditionTreatAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 	if severity < 1 {
 		severity = 1
 	}
-	_, _, item := conditionDefinitionGo(p.Condition)
-	ir, err := conn.Execute(`SELECT quantity FROM inventory WHERE user_id=? AND item_id=?`, []any{userID, item})
+	_, _, treatment := conditionDefinitionGo(p.Condition)
+	item, err := treatmentInBagTx(conn, catalog, userID, treatment)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	if len(ir.Rows) == 0 || storage.ParseInt(ir.Rows[0][0]) < 1 {
-		return authoritativeMutation{}, fmt.Errorf("treatment requires 1x %s", item)
+	if item == "" {
+		return authoritativeMutation{}, fmt.Errorf("treatment requires 1x %s", itemDisplayName(catalog, treatment))
 	}
 	if _, err = conn.Execute(`UPDATE inventory SET quantity=quantity-1 WHERE user_id=? AND item_id=?`, []any{userID, item}); err != nil {
 		return authoritativeMutation{}, err
@@ -139,7 +175,9 @@ func conditionTreatAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 	// `purging_phoenix_pill` carry none and are untouched by construction.
 	restored := map[string]any{}
 	if def, _, ok := itemDef(catalog, item); ok {
-		vit, qi := def.Use.Instant.VitalityRestore, def.Use.Instant.QiRestore
+		grade := itemEffectMult(catalog, item)
+		vit := gradedAmount(def.Use.Instant.VitalityRestore, grade)
+		qi := gradedAmount(def.Use.Instant.QiRestore, grade)
 		if vit > 0 || qi > 0 {
 			if _, err = conn.Execute(
 				`UPDATE characters SET qi=MIN(qi_max,qi+?),vitality=MIN(vitality_max,vitality+?),updated_at=? WHERE user_id=?`,

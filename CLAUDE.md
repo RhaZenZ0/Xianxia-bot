@@ -5737,6 +5737,27 @@ the engine image is `golang:1.26` pinned by digest, and the official images set 
 so a `go` line naming a patch newer than the image's would fail the build; the `toolchain` line is
 what CI (setup-go reads it) and govulncheck run on, and a local build under `GOTOOLCHAIN=auto`.
 
+### The pill the bag carried at a grade (v1.12.1)
+
+Reported from play as *"Can't treat Qi Deviation"*: four **Heart Calming Pills (Mid)** in the bag and
+Condition Treat refusing with *"treatment requires 1x heart_calming_pill"*. v1.7.0 made a grade a
+suffix on the id and `itemDef` the one door from an id to its definition, and
+`TestTheCatalogueIsReadByOneDoor` holds production Go to that door - for the **catalogue**. The
+treatment's fault was one level down, in the **bag**: it asked `inventory` for the bare id its
+condition names, and two of the four treatments (`recovery_pill`, `heart_calming_pill`) are recipe
+outputs, so a crafted or graded pill was never found. Every other exact-id read of the bag is keyed
+on the id the player picked (`p.ItemID`), which already carries its grade, and no recipe consumes
+another recipe's output, so this was the one read of a gradeable item by a content-chosen id.
+
+`treatmentInBagTx` is that read: the named item at any grade `itemDef` knows, the plainest first so
+a treatment never swallows the better pill while a plain one will do. The pill spent is the one the
+result names, and a graded Recovery Pill restores at its grade through `gradedAmount`, as `/use`
+does - the mending itself is not graded, because what a grade does is scaled where the item's own
+use is, and a treatment's use is its instant restore. The tests drive the shipped catalogue,
+because whether `heart_calming_pill@mid` names anything is the recipe roster's to say and the
+defeat-survival fixture has no recipes; each drill (the bare-id lookup, the highest grade first,
+the unscaled restore) fails on its own sentence.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

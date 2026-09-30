@@ -1,7 +1,9 @@
 package game
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"xianxia/core/internal/gamerng"
@@ -171,5 +173,111 @@ func TestTheReductionIsNeverZero(t *testing.T) {
 		if got := conditionTreatReduction(c.success, c.margin); got != c.want {
 			t.Fatalf("success=%v margin=%d mends %d, want %d", c.success, c.margin, got, c.want)
 		}
+	}
+}
+
+// A graded treatment treats (v1.12.1).
+//
+// Reported from play as "Can't treat Qi Deviation": the bag held four Heart
+// Calming Pills (Mid) and the treatment refused with "treatment requires 1x
+// heart_calming_pill". A grade is a suffix on the id (v1.7.0) and the
+// treatment looked the bare id up. These drive the shipped catalogue, because
+// whether `heart_calming_pill@mid` names anything is the recipe roster's to
+// say, and a fixture with no recipes would refuse every grade.
+
+func treatWithCatalog(t *testing.T, path, condition string) (map[string]any, error) {
+	t.Helper()
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	raw, _ := json.Marshal(map[string]any{"condition": condition, "game_minute": 500})
+	mut, err := conditionTreatAction(conn, shippedCatalog(t), 77, raw)
+	if err != nil {
+		return nil, err
+	}
+	if conn.InTransaction() {
+		if err := conn.Commit(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return mut.Result.(map[string]any), nil
+}
+
+func bagCount(t *testing.T, path, item string) int64 {
+	t.Helper()
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	r, err := conn.Execute(`SELECT COALESCE(SUM(quantity),0) FROM inventory WHERE user_id=77 AND item_id=?`, []any{item})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return storage.ParseInt(r.Rows[0][0])
+}
+
+// TestAGradedPillTreats is the report. Drill: put back the bare-id lookup and
+// this fails with the player's own refusal.
+func TestAGradedPillTreats(t *testing.T) {
+	path := setupDefeatSurvivalDB(t, 10)
+	seedTreatableCondition(t, path, "qi_deviation", 3, "heart_calming_pill@mid", 4)
+	out, err := treatWithCatalog(t, path, "qi_deviation")
+	if err != nil {
+		t.Fatalf("four Mid Heart Calming Pills in the bag and the treatment refused: %v", err)
+	}
+	if got := bagCount(t, path, "heart_calming_pill@mid"); got != 3 {
+		t.Fatalf("the treatment must spend the pill it treated with: 4 -> %d", got)
+	}
+	if out["treatment_item"] != "heart_calming_pill@mid" {
+		t.Fatalf("the result must name the pill that was swallowed: %v", out["treatment_item"])
+	}
+	if got, _ := conditionSeverity(t, path, "qi_deviation"); got >= 3 {
+		t.Fatalf("the deviation did not mend: still %d", got)
+	}
+}
+
+// TestThePlainestPillIsSpentFirst: holding both, the Low pill goes and the Mid
+// one stays. Drill: pick the highest index instead and this names the Mid.
+func TestThePlainestPillIsSpentFirst(t *testing.T) {
+	path := setupDefeatSurvivalDB(t, 10)
+	seedTreatableCondition(t, path, "qi_deviation", 3, "heart_calming_pill@mid", 2)
+	seedTreatableCondition(t, path, "heart_demon", 2, "heart_calming_pill", 1)
+	out, err := treatWithCatalog(t, path, "qi_deviation")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out["treatment_item"] != "heart_calming_pill" || bagCount(t, path, "heart_calming_pill@mid") != 2 {
+		t.Fatalf("the treatment swallowed %v while a plain pill was in the bag", out["treatment_item"])
+	}
+}
+
+// TestAGradeTheCatalogueDoesNotKnowIsNotTheTreatment: a suffix that is no rung
+// (or the first rung written out) is not a second name for the pill.
+func TestAGradeTheCatalogueDoesNotKnowIsNotTheTreatment(t *testing.T) {
+	path := setupDefeatSurvivalDB(t, 10)
+	seedTreatableCondition(t, path, "qi_deviation", 3, "heart_calming_pill@nonsense", 1)
+	if _, err := treatWithCatalog(t, path, "qi_deviation"); err == nil || !strings.Contains(err.Error(), "Heart Calming Pill") {
+		t.Fatalf("an unknown grade treated, or the refusal did not name the pill: %v", err)
+	}
+}
+
+// TestAGradedRecoveryPillRestoresAtItsGrade: the treatment does what the item
+// does, and a grade scales what an item does (v1.7.0) - so a Mid Recovery Pill
+// restores what `item.use` would, never less than the Low one's 8.
+func TestAGradedRecoveryPillRestoresAtItsGrade(t *testing.T) {
+	path := setupDefeatSurvivalDB(t, 1)
+	seedTreatableCondition(t, path, "flesh_wound", 1, "recovery_pill@mid", 1)
+	out, err := treatWithCatalog(t, path, "flesh_wound")
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog := shippedCatalog(t)
+	want := gradedAmount(catalog.Items["recovery_pill"].Use.Instant.VitalityRestore, itemEffectMult(catalog, "recovery_pill@mid"))
+	restored, _ := out["restored"].(map[string]any)
+	if restored["vitality"] != want || want <= catalog.Items["recovery_pill"].Use.Instant.VitalityRestore {
+		t.Fatalf("a Mid Recovery Pill restored %v, want %d (graded above the Low pill's)", restored["vitality"], want)
 	}
 }
