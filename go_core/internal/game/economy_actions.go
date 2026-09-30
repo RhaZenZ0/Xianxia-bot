@@ -519,13 +519,16 @@ func blackMarketTradeAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 // nothing to do with the shelves: measured off the shipped content, a Wind
 // Gourd cost 9 at a market and a provisioner paid 45 for it, and a Stygian
 // Tomb Token was 420 on a shelf and 840 at the market's counter. Both loops
-// are mints, so a market never sells below the most any keeper pays in that
-// coin and never pays as much as the cheapest shelf asks - the rank ceiling's
-// rule (trade_rank_price.go), stated once more for the counter it forgot.
+// are mints, so a market never sells below the most any NPC pays in that
+// coin - a keeper's plain third, a keeper's price to the top rank of the
+// trade, or the town at a stall, which is highestNPCPays (v1.12.3: floored on
+// the plain third alone it undercut the other two) - and never pays as much
+// as the cheapest shelf asks - the rank ceiling's rule (trade_rank_price.go),
+// stated once more for the counter it forgot.
 func marketUnitPrice(catalog worlddata.Catalog, itemID, currency string, base int64, index float64, buy bool) int64 {
 	unit := max64(1, int64(math.Round(float64(base)*index)))
 	if buy {
-		if floor, ok := highestKeeperBuy(catalog, itemID, currency); ok && unit < floor {
+		if floor, ok := highestNPCPays(catalog, itemID, currency); ok && unit < floor {
 			unit = floor
 		}
 		return unit

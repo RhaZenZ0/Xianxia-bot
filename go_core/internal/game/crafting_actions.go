@@ -170,7 +170,7 @@ VALUES(?,?,0,?,?,?,?,?) ON CONFLICT(user_id,profession) DO UPDATE SET xp=profess
 		return nil, errors.New("profession progress missing after update")
 	}
 	level, xp := i64(row["level"]), i64(row["xp"])
-	for level < 6 && xp >= professionXPNeeded(level) {
+	for level < tradeTopRank && xp >= professionXPNeeded(level) {
 		xp -= professionXPNeeded(level)
 		level++
 	}
