@@ -994,6 +994,9 @@ register_menu_facts(_menu_facts)
 register_menu_shape(_menu_shape)
 # Presses counted, reordering nothing (v1.3.5).
 register_usage_recorder(lambda path: usage.note(DB, path))
+# A daily root is one door to a hub leaf: `/forage` counts as `/alchemy forage`
+# at every door, so the five are counted as the five leaves (v1.12.3).
+usage.register_aliases({f"/{root}": leaf for root, _hub, leaf in _DAILY_LEAVES})
 
 
 # The household's doors (v1.0.0-rc.32). Enter opens only from the family's

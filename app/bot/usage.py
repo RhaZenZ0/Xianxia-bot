@@ -49,9 +49,28 @@ def fire_and_forget(coro: Awaitable[Any]) -> None:
     task.add_done_callback(_inflight.discard)
 
 
+# A root command that is one door to a hub leaf under another name (`/forage`
+# is `/alchemy forage`) counts as the leaf, so a slash command and a hub press
+# are one thing (v1.12.3). The surface registers the map; this module sits in
+# the bottom tier and cannot read it from there.
+_ALIASES: dict[str, str] = {}
+
+
+def register_aliases(aliases: dict[str, str]) -> None:
+    """Replace the map of root command paths to the leaf path each one is."""
+    _ALIASES.clear()
+    _ALIASES.update({str(k).strip(): str(v).strip() for k, v in aliases.items() if k and v})
+
+
+def canonical(path: str) -> str:
+    """The one path a use is counted under."""
+    key = str(path or "").strip()
+    return _ALIASES.get(key, key)
+
+
 async def record(db: Any, path: str) -> None:
     """One more use of `path`. Never raises."""
-    key = str(path or "").strip()
+    key = canonical(path)
     if not key:
         return
     try:
