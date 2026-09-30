@@ -2503,6 +2503,18 @@ async def run(url: str, token: str, db_path: str) -> Report:
                  gm("admin.server.update_status", {"nonce": nonce, "status": "failed"}), "no update is in progress")
     await step(report, "a heartbeat with no request open",
                gm("admin.server.update_status", {"status": "heartbeat"}))
+    # v1.12.3: a request nobody will ever finish can be closed by the GM, and
+    # the read answers the nonce and status as flat values for the watcher.
+    asked_again = await audited("admin.server.request_update",
+                                {"channel": "stable", "reason": "playtest {cancel}"}, name="the GM asks again")
+    again = str((asked_again or {}).get("nonce") or "")
+    flat = await step(report, "the read carries flat request values", query("admin.server.update_request", GM, {}))
+    report.add("PASS" if (flat or {}).get("request_nonce") == again and (flat or {}).get("request_status") == "requested" else "FAIL",
+               "the flat nonce and status match the open request", str({k: (flat or {}).get(k) for k in ("request_nonce", "request_status")}))
+    await audited("admin.server.cancel_update", {"reason": "playtest"}, name="the GM cancels the open request")
+    await either("a report against a cancelled request is refused",
+                 gm("admin.server.update_status", {"nonce": again, "status": "acked"}), "no update is in progress")
+    await either("there is nothing left to cancel", gm("admin.server.cancel_update", {"reason": "playtest"}), "no open update")
     await audited("admin.simulation.interval", {"system": "npc_life", "days": 7, "reason": "playtest"})
     await audited("admin.commission.review", {"quest_key": str(world["commissions"][0]["quest_key"]), "status": "approved", "reason": "playtest"})
     await either("admin.commission.retire", gm("admin.commission.retire", {"user_id": BUYER, "reason": "playtest"}), "holds no commission")

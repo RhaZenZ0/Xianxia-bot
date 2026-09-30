@@ -13,6 +13,7 @@ from __future__ import annotations
 import ast
 import asyncio
 import os
+import re
 import unittest
 from unittest.mock import patch
 
@@ -21,6 +22,7 @@ from tests.support import PROJECT_ROOT, install_aiosqlite_shim
 install_aiosqlite_shim()
 
 from app.dashboard.server import (  # noqa: E402
+    UPDATE_TERMINAL_STATUSES,
     UPDATE_WATCHER_STALE_SECONDS,
     AdminDashboardController,
     update_card_state,
@@ -108,6 +110,90 @@ class TheButtonAndItsWire(unittest.TestCase):
         self.assertIn("update_card_state", calls)
         release_reads = [args for func, args in calls.items() if func.endswith("run_readonly") and args and args[0] == "'release'"]
         self.assertTrue(release_reads, "the GET handler never asks the bot for its release check")
+
+
+class AnOpenRequestCanBeClosed(unittest.TestCase):
+    """v1.12.3: a request stayed open for ever when the watcher died, because
+    the engine refuses a second request beside an open one and no lever closed
+    it. The card offers Cancel where the engine would allow it."""
+
+    def test_a_cancelled_request_is_closed_and_the_button_returns(self):
+        rows = {"update_request": {"status": "cancelled", "nonce": "n", "detail": "cancelled by a GM"},
+                "update_watcher_heartbeat": {"at": NOW - 10}}
+        state = update_card_state(rows, RELEASE_OK, NOW)
+        self.assertFalse(state["in_progress"], "a cancelled request blocked the Request button")
+        self.assertFalse(state["can_cancel"])
+        js = (PROJECT_ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("updCanAsk=!upd.in_progress&&upd.watcher_running", js)
+
+    def test_a_request_nobody_picked_up_can_be_cancelled_even_with_a_live_watcher(self):
+        rows = {"update_request": {"status": "requested", "nonce": "n"}, "update_watcher_heartbeat": {"at": NOW - 10}}
+        state = update_card_state(rows, RELEASE_OK, NOW)
+        self.assertTrue(state["in_progress"])
+        self.assertTrue(state["can_cancel"])
+
+    def test_an_install_under_a_live_watcher_cannot_be_cancelled(self):
+        for status in ("acked", "fetching", "installing"):
+            rows = {"update_request": {"status": status, "nonce": "n"}, "update_watcher_heartbeat": {"at": NOW - 10}}
+            self.assertFalse(update_card_state(rows, RELEASE_OK, NOW)["can_cancel"], status)
+
+    def test_an_install_whose_watcher_has_gone_quiet_can_be_cancelled(self):
+        stale = {"at": NOW - UPDATE_WATCHER_STALE_SECONDS - 1}
+        for heartbeat in (stale, None):
+            rows = {"update_request": {"status": "fetching", "nonce": "n"}, "update_watcher_heartbeat": heartbeat}
+            self.assertTrue(update_card_state(rows, RELEASE_OK, NOW)["can_cancel"], heartbeat)
+
+    def test_nothing_open_is_nothing_to_cancel(self):
+        self.assertFalse(update_card_state({}, RELEASE_OK, NOW)["can_cancel"])
+        rows = {"update_request": {"status": "done", "nonce": "n"}}
+        self.assertFalse(update_card_state(rows, RELEASE_OK, NOW)["can_cancel"])
+
+    def test_the_lever_and_the_button_are_wired(self):
+        self.assertEqual(AdminDashboardController.ACTION_MAP["server.cancel_update"], "admin.server.cancel_update")
+        js = (PROJECT_ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("server.cancel_update", js)
+        self.assertIn("upd.in_progress&&upd.can_cancel", js, "the button must be drawn only where the card says it can work")
+
+    def test_the_card_and_the_engine_agree_on_the_window_and_on_what_closes_a_request(self):
+        """One rule, two readers that cannot call each other: the watcher is
+        "not running" after the same fifteen minutes in the card and in the
+        engine's cancel rule, and the same statuses are terminal in both."""
+        go = (PROJECT_ROOT / "go_core" / "internal" / "game" / "update_request.go").read_text(encoding="utf-8")
+        match = re.search(r"updateWatcherStaleSeconds\s*=\s*(\d+)\s*\*\s*(\d+)", go)
+        self.assertIsNotNone(match, "the engine's stale window could not be read; this gate is broken, not the tree")
+        self.assertEqual(int(match.group(1)) * int(match.group(2)), UPDATE_WATCHER_STALE_SECONDS)
+        open_body = re.search(r"func \(s updateRequestState\) open\(\) bool \{(.*?)\n\}", go, re.S)
+        self.assertIsNotNone(open_body)
+        for status in UPDATE_TERMINAL_STATUSES:
+            if status:
+                self.assertIn(f'"{status}"', open_body.group(1), f"the engine does not treat {status} as closed")
+
+
+class WhenTheChannelHasNoRelease(unittest.TestCase):
+    """v1.12.3: GitHub answered and nothing is published on the channel. The
+    card said "the bot has not answered", blaming a bot that had."""
+
+    RELEASE_EMPTY = {"ok": True, "channel": "beta", "newest": None, "update_available": False, "installed": INSTALLED_VERSION}
+
+    def test_an_empty_channel_is_an_answer_not_a_silence(self):
+        state = update_card_state({}, self.RELEASE_EMPTY, NOW)
+        self.assertTrue(state["no_release_on_channel"])
+        self.assertIsNone(state["release_error"], "the bot answered; it must not be blamed")
+        self.assertIsNone(state["newest_on_channel"])
+
+    def test_a_silent_bot_is_still_unknown_and_not_an_empty_channel(self):
+        for release in ({"ok": False, "error": "bot down"}, None, {}):
+            state = update_card_state({}, release, NOW)
+            self.assertFalse(state["no_release_on_channel"], release)
+            self.assertIsNotNone(state["release_error"], release)
+
+    def test_a_channel_with_a_release_is_not_empty(self):
+        self.assertFalse(update_card_state({}, RELEASE_OK, NOW)["no_release_on_channel"])
+
+    def test_the_card_says_so_in_words(self):
+        js = (PROJECT_ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("upd.no_release_on_channel", js)
+        self.assertIn("no release on this channel", js)
 
 
 class TheBotAnswersItsReleaseCheck(unittest.TestCase):
