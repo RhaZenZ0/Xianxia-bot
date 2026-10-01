@@ -49,7 +49,7 @@ type hunterActionPayload struct {
 }
 
 func characterLocationPower(conn *storage.Conn, userID int64) (map[string]any, error) {
-	r, err := conn.Execute(`SELECT user_id,name,realm_index,phase,vitality,vitality_max,location,karma_score,attributes_json FROM characters WHERE user_id=? AND life_status='alive'`, []any{userID})
+	r, err := conn.Execute(`SELECT user_id,name,realm_index,phase,vitality,vitality_max,location,karma_score,attributes_json,path FROM characters WHERE user_id=? AND life_status='alive'`, []any{userID})
 	if err != nil {
 		return nil, err
 	}
@@ -697,7 +697,7 @@ func bountyHunterActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 				return authoritativeMutation{}, fmt.Errorf("violence is suppressed on the floor of %s; evade, surrender, or take it outside", house)
 			}
 		}
-		attrs := decodeJSONMap(c["attributes_json"])
+		attrs := rowAttributes(catalog, c)
 		equip, err := equipmentPowerGo(conn, userID)
 		if err != nil {
 			return authoritativeMutation{}, err

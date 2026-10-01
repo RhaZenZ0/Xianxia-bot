@@ -233,7 +233,7 @@ type ghostActionPayload struct {
 // requireGhostCultivator refuses every ghost action to a cultivator who was
 // not born to the road.
 func requireGhostCultivator(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (mechanicsCharacter, error) {
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return mechanicsCharacter{}, err
 	}
@@ -380,7 +380,7 @@ func ghostAppeaseAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 // what the ground and the hour are worth here and now, and what the residue
 // is costing.
 func ghostStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (map[string]any, error) {
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return nil, err
 	}

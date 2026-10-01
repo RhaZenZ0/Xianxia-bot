@@ -273,7 +273,7 @@ func settleQi(conn *storage.Conn, catalog worlddata.Catalog, userID int64, gameM
 	if row == nil {
 		return qiState{}, errors.New("create a cultivation character first")
 	}
-	attributes := decodeJSONMap(row["attributes_json"])
+	attributes := rowAttributes(catalog, row)
 	manualName, manualGrade, _, _, _, err := manualCultivationMultiplier(conn, catalog, userID)
 	if err != nil {
 		return qiState{}, err
@@ -374,7 +374,7 @@ func meridianOpenAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -526,7 +526,7 @@ func refineQiAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -613,7 +613,7 @@ func spiritualSenseReach(realm, purity int64) int64 {
 
 // qiBodyStatusQuery is the qi body as the sheet shows it.
 func qiBodyStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (map[string]any, error) {
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return nil, err
 	}

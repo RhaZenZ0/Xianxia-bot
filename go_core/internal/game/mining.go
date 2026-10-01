@@ -81,7 +81,7 @@ func explorationMineAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
 	}
-	cr, err := loadMechanicsCharacter(conn, userID)
+	cr, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

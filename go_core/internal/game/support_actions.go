@@ -225,7 +225,7 @@ func supportVoteClaimAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -286,7 +286,7 @@ func supportVoteStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if userID <= 0 {
 		return nil, errors.New("actor_id must be positive")
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return nil, err
 	}

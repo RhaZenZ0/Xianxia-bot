@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 func runDynastyInvestigation(t *testing.T, conn *storage.Conn, historyID int64) {
@@ -28,7 +29,7 @@ func completeDynastyQuest(t *testing.T, conn *storage.Conn, historyID, questID i
 			"quest_id":    questID,
 			"game_minute": 200 + attempt,
 		})
-		mutation, err := dynastyQuestAction(conn, 77, raw)
+		mutation, err := dynastyQuestAction(conn, worlddata.Catalog{}, 77, raw)
 		if err != nil {
 			t.Fatalf("quest %d: %v", questID, err)
 		}
@@ -161,7 +162,7 @@ func TestReplacementFamilyCannotBecomeBloodInheritanceButCanBeChallenged(t *test
 		raw, _ := json.Marshal(map[string]any{
 			"claim_id": claimID, "tactic": "expose", "game_minute": 310 + round,
 		})
-		action, actionErr := dynastyConflictAction(conn, 77, raw)
+		action, actionErr := dynastyConflictAction(conn, worlddata.Catalog{}, 77, raw)
 		if actionErr != nil {
 			t.Fatal(actionErr)
 		}
@@ -238,7 +239,7 @@ func TestFallenDynastyCanRestoreAndPursueEvidenceBasedRevenge(t *testing.T) {
 		raw, _ := json.Marshal(map[string]any{
 			"claim_id": restorationClaimID, "tactic": "rally", "game_minute": 410 + round,
 		})
-		action, actionErr := dynastyConflictAction(conn, 77, raw)
+		action, actionErr := dynastyConflictAction(conn, worlddata.Catalog{}, 77, raw)
 		if actionErr != nil {
 			t.Fatal(actionErr)
 		}
@@ -271,7 +272,7 @@ func TestFallenDynastyCanRestoreAndPursueEvidenceBasedRevenge(t *testing.T) {
 		raw, _ := json.Marshal(map[string]any{
 			"claim_id": revengeClaimID, "tactic": "duel", "game_minute": 420 + round,
 		})
-		action, actionErr := dynastyConflictAction(conn, 77, raw)
+		action, actionErr := dynastyConflictAction(conn, worlddata.Catalog{}, 77, raw)
 		if actionErr != nil {
 			t.Fatal(actionErr)
 		}
@@ -327,7 +328,7 @@ func TestDynastyQuestDangerDrivesDifficultyAndPhysicalFailureCost(t *testing.T) 
 	t.Cleanup(func() { dynastyRoll2d10 = oldRoller })
 
 	archiveRaw, _ := json.Marshal(map[string]any{"history_id": historyID, "quest_id": ids["archive_research"], "game_minute": 501})
-	archiveMutation, err := dynastyQuestAction(conn, 77, archiveRaw)
+	archiveMutation, err := dynastyQuestAction(conn, worlddata.Catalog{}, 77, archiveRaw)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -343,7 +344,7 @@ func TestDynastyQuestDangerDrivesDifficultyAndPhysicalFailureCost(t *testing.T) 
 	}
 
 	tombRaw, _ := json.Marshal(map[string]any{"history_id": historyID, "quest_id": ids["tomb_inquest"], "game_minute": 502})
-	tombMutation, err := dynastyQuestAction(conn, 77, tombRaw)
+	tombMutation, err := dynastyQuestAction(conn, worlddata.Catalog{}, 77, tombRaw)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -408,7 +409,7 @@ func TestDynastyConflictResolutionUsesOpposedRandomChecks(t *testing.T) {
 	t.Cleanup(func() { dynastyRoll2d10 = oldRoller })
 
 	conflictRaw, _ := json.Marshal(map[string]any{"claim_id": claimID, "tactic": "duel", "game_minute": 601})
-	conflictMutation, err := dynastyConflictAction(conn, 77, conflictRaw)
+	conflictMutation, err := dynastyConflictAction(conn, worlddata.Catalog{}, 77, conflictRaw)
 	if err != nil {
 		t.Fatal(err)
 	}

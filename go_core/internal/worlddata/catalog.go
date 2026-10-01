@@ -53,6 +53,16 @@ type PathSystem struct {
 	OwnManualPracticeBonus int64   `json:"own_manual_practice_bonus"`
 }
 
+// AttributeGrowth (v1.14.0) is what a qi stage adds to a cultivator's
+// attributes, and how much of their path's lead a single roll may count.
+type AttributeGrowth struct {
+	PerStage       int64 `json:"per_stage"`
+	PathPerStage   int64 `json:"path_per_stage"`
+	PathEdgeCap    int64 `json:"path_edge_cap"`
+	KeptPerRealm   int64 `json:"kept_per_realm"`
+	StagesPerRealm int64 `json:"stages_per_realm"`
+}
+
 type RootGrade struct {
 	Name              string  `json:"name"`
 	MinRoll           int     `json:"min_roll"`
@@ -986,6 +996,7 @@ type Catalog struct {
 	BodyRealms          []Realm                        `json:"body_realms"`
 	Paths               map[string]Path                `json:"paths"`
 	PathSystem          PathSystem                     `json:"path_system"`
+	AttributeGrowth     AttributeGrowth                `json:"attribute_growth"`
 	Roots               []string                       `json:"roots"`
 	SpiritualRootSystem RootSystem                     `json:"spiritual_root_system"`
 	Bloodlines          map[string]BloodlineDefinition `json:"bloodlines"`

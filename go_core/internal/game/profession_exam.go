@@ -298,7 +298,7 @@ func professionExamAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 	if trade == "" {
 		return authoritativeMutation{}, errors.New("which trade you are sitting for is required")
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

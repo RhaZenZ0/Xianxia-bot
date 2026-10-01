@@ -95,7 +95,7 @@ func sectRecommendationActionGo(conn *storage.Conn, catalog worlddata.Catalog, u
 	if p.NPCName == "" {
 		return authoritativeMutation{}, errors.New("npc_name is required")
 	}
-	c, e := loadMechanicsCharacter(conn, userID)
+	c, e := loadMechanicsCharacter(conn, catalog, userID)
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
@@ -381,7 +381,7 @@ func sectTrialActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
 	}
-	c, e := loadMechanicsCharacter(conn, userID)
+	c, e := loadMechanicsCharacter(conn, catalog, userID)
 	if e != nil {
 		return authoritativeMutation{}, e
 	}

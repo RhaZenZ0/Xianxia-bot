@@ -198,7 +198,7 @@ func multiplicativeEffectJSONStat(raw, stat string) float64 {
 // seclusionSessionsPerGameDay, which is why the rate is a share at last.
 func seclusionDailyGainGo(catalog worlddata.Catalog, character map[string]any, mode string, environmentMult, soulMult, carriedMult float64, scale int64) int64 {
 	pace, worldMult := characterStagePace(catalog, character, mode)
-	attrs := decodeJSONMap(character["attributes_json"])
+	attrs := rowAttributes(catalog, character)
 	attribute := i64(attrs["will"])
 	if mode == "body" {
 		attribute = i64(attrs["body"])

@@ -31,6 +31,7 @@ func dynastyTestConn(t *testing.T) *storage.Conn {
 		CREATE TABLE characters (
 			user_id INTEGER PRIMARY KEY,
 			life_status TEXT NOT NULL,
+			path TEXT NOT NULL DEFAULT 'Sword Cultivator', realm_index INTEGER NOT NULL DEFAULT 0, phase INTEGER NOT NULL DEFAULT 1,
 			attributes_json TEXT NOT NULL DEFAULT '{"body":10,"agility":10,"spirit":10,"insight":10,"will":10,"presence":10,"heart":10}',
 			vitality INTEGER NOT NULL DEFAULT 100,
 			updated_at REAL NOT NULL DEFAULT 0

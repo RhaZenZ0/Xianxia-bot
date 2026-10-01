@@ -415,7 +415,7 @@ func ascensionGateAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 			return authoritativeMutation{}, err
 		}
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

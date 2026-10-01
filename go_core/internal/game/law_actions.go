@@ -77,7 +77,7 @@ func lawComprehendAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	if !ok {
 		return authoritativeMutation{}, errors.New("unknown law")
 	}
-	cr, err := conn.Execute(`SELECT realm_index,spiritual_root,path FROM characters WHERE user_id=? AND life_status='alive'`, []any{userID})
+	cr, err := conn.Execute(`SELECT realm_index,spiritual_root,path,phase FROM characters WHERE user_id=? AND life_status='alive'`, []any{userID})
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -140,7 +140,11 @@ func lawComprehendAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 		}
 		insightBonus, insightSpent = lawInsightSpendBonus, lawInsightSpendCost
 	}
-	roll, err := rollCheck(insight+spirit+affinity+legacyBonus+insightBonus, tn)
+	// A Law's difficulty sits at its floor (v1.14.0). The roll is two
+	// attributes, each grown a stage at a time, so what the cultivator has
+	// grown past that floor counts twice.
+	lead := 2 * stageLead(catalog, realm, storage.ParseInt(cr.Rows[0][3]), minimum, 1)
+	roll, err := rollCheck(insight+spirit+affinity+legacyBonus+insightBonus+lead, tn)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

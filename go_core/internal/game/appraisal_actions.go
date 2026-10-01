@@ -130,7 +130,7 @@ func appraisalAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

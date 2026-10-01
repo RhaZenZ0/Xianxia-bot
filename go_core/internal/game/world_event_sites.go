@@ -350,7 +350,7 @@ func worldEventEngageAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if eventKey == "" || nodeKey == "" {
 		return authoritativeMutation{}, errors.New("event_key and node_key are required")
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

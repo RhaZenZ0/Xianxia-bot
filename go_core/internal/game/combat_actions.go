@@ -510,7 +510,7 @@ func combatStartAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	}
 	targetKey := strings.TrimSpace(p.TargetKey)
 
-	c, e := loadMechanicsCharacter(conn, userID)
+	c, e := loadMechanicsCharacter(conn, catalog, userID)
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
@@ -593,7 +593,7 @@ func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	if style != "attack" && style != "defend" && style != "flee" && style != "intent" {
 		return authoritativeMutation{}, errors.New("style must be attack, defend, flee, or intent")
 	}
-	c, e := loadMechanicsCharacter(conn, userID)
+	c, e := loadMechanicsCharacter(conn, catalog, userID)
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
@@ -632,6 +632,11 @@ func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		return authoritativeMutation{}, e
 	}
 	realm, stage := c.RealmIndex, c.Phase
+	// What the cultivator has outgrown in this opponent (v1.14.0): their
+	// attributes grew a stage at a time and the opponent's difficulty rose
+	// with its own stage, so the difference rides the player's rolls and
+	// comes off the counter.
+	lead := stageLead(catalog, realm, stage, b.NPCRealm, b.NPCStage)
 	php, nhp := b.PlayerHP, b.NPCHP
 	lines := []string{}
 	out := map[string]any{"battle_id": b.BattleID, "style": style, "npc_name": b.NPCName, "equipment_attack": atk, "equipment_defense": def, "companion_bonus": comp}
@@ -666,7 +671,7 @@ func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		// A Law control effect on the opponent (v1.3.3): their `escape_bonus`
 		// is how far they can follow, so a lockdown's -5 is +5 to get away.
 		mod := mods.value(c.Attributes["agility"], "agility") + realm*2 + stage/3 + resonance + lawBonus + comp + eag + escapeBonus - b.opponentDebuff("escape_bonus")
-		r, e := roll2d10(mod, 11+b.NPCRealm*2+b.NPCStage/3)
+		r, e := roll2d10(mod+lead, 11+b.NPCRealm*2+b.NPCStage/3)
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
@@ -691,7 +696,7 @@ func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		out["defending"] = true
 	} else if style == "attack" {
 		mod := maxI64(mods.value(c.Attributes["body"], "body"), mods.value(c.Attributes["spirit"], "spirit")) + realm*2 + stage/3 + resonance + lawBonus + comp + atk
-		r, e := roll2d10(mod, 10+b.NPCRealm*2+b.NPCStage/3)
+		r, e := roll2d10(mod+lead, 10+b.NPCRealm*2+b.NPCStage/3)
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
@@ -736,7 +741,7 @@ func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		b.Suppressed--
 		out["counter_suppressed"] = true
 	} else {
-		counter, e := roll2d10(4+b.NPCRealm*2+b.NPCStage/3+b.counterAttackDebuff(), counterDefenceTN(realm, stage, defenseBonus, lawBonus, comp, resonance))
+		counter, e := roll2d10(4+b.NPCRealm*2+b.NPCStage/3+b.counterAttackDebuff()-lead, counterDefenceTN(realm, stage, defenseBonus, lawBonus, comp, resonance))
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
@@ -852,7 +857,7 @@ func combatTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	if !ok {
 		return authoritativeMutation{}, errors.New("unknown Law technique")
 	}
-	c, e := loadMechanicsCharacter(conn, userID)
+	c, e := loadMechanicsCharacter(conn, catalog, userID)
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
@@ -877,7 +882,8 @@ func combatTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	if e := requireLawTechniqueGroundTx(conn, userID, p.Technique); e != nil {
 		return authoritativeMutation{}, e
 	}
-	mod := comp/10 + c.RealmIndex*2 + c.Phase/3 + c.Attributes["insight"]
+	lead := stageLead(catalog, c.RealmIndex, c.Phase, b.NPCRealm, b.NPCStage)
+	mod := comp/10 + c.RealmIndex*2 + c.Phase/3 + c.Attributes["insight"] + lead
 	tn := b.NPCRealm*2 + b.NPCStage/3 + 8
 	roll, e := roll2d10(mod, tn)
 	if e != nil {
@@ -997,7 +1003,7 @@ func combatTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 		b.Suppressed--
 		out["counter_suppressed"] = true
 	} else {
-		counter, e := roll2d10(4+b.NPCRealm*2+b.NPCStage/3+b.counterAttackDebuff(), counterDefenceTN(realm, stage, def, lawBonus, compBonus, resonance))
+		counter, e := roll2d10(4+b.NPCRealm*2+b.NPCStage/3+b.counterAttackDebuff()-lead, counterDefenceTN(realm, stage, def, lawBonus, compBonus, resonance))
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
@@ -1266,7 +1272,7 @@ func combatFinalizeAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 						reward.Items[node.ItemID] = node.ItemQty
 					}
 					if reward.Cultivation != 0 || reward.SpiritStones != 0 || len(reward.Items) > 0 {
-						c, loadErr := loadMechanicsCharacter(conn, userID)
+						c, loadErr := loadMechanicsCharacter(conn, catalog, userID)
 						if loadErr != nil {
 							return authoritativeMutation{}, loadErr
 						}

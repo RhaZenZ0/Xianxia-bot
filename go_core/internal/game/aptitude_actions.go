@@ -85,7 +85,7 @@ func (m resolvedModifiers) value(base int64, stat string) int64 {
 	return int64(math.Round(v))
 }
 
-func loadMechanicsCharacter(conn *storage.Conn, userID int64) (mechanicsCharacter, error) {
+func loadMechanicsCharacter(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (mechanicsCharacter, error) {
 	res, err := conn.Execute(`SELECT name,gender,path,spiritual_root,location,attributes_json,realm_index,phase,body_realm_index,body_phase,cultivation,body_cultivation,life_status FROM characters WHERE user_id=?`, []any{userID})
 	if err != nil {
 		return mechanicsCharacter{}, err
@@ -94,13 +94,9 @@ func loadMechanicsCharacter(conn *storage.Conn, userID int64) (mechanicsCharacte
 		return mechanicsCharacter{}, errors.New("create a cultivation character first")
 	}
 	r := res.Rows[0]
-	attrs := map[string]int64{}
-	var raw map[string]any
-	if err := json.Unmarshal([]byte(fmt.Sprint(r[5])), &raw); err == nil {
-		for k, v := range raw {
-			attrs[k] = storage.ParseInt(v)
-		}
-	}
+	// The attributes every rule reads: the base plus the path's capped edge at
+	// this stage (v1.14.0, attribute_growth.go).
+	attrs := characterAttributes(catalog, r[5], fmt.Sprint(r[2]), storage.ParseInt(r[6]), storage.ParseInt(r[7]))
 	return mechanicsCharacter{Name: fmt.Sprint(r[0]), Gender: fmt.Sprint(r[1]), Path: fmt.Sprint(r[2]), SpiritualRoot: fmt.Sprint(r[3]), Location: fmt.Sprint(r[4]), Attributes: attrs, RealmIndex: storage.ParseInt(r[6]), Phase: storage.ParseInt(r[7]), BodyRealmIndex: storage.ParseInt(r[8]), BodyPhase: storage.ParseInt(r[9]), Cultivation: storage.ParseInt(r[10]), BodyCultivation: storage.ParseInt(r[11]), LifeStatus: fmt.Sprint(r[12])}, nil
 }
 
@@ -311,7 +307,7 @@ func aptitudeTemper(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 	if p.Target != "root" && p.Target != "bloodline" && p.Target != "physique" {
 		return authoritativeMutation{}, errors.New("target must be root, bloodline, or physique")
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -422,7 +418,7 @@ func aptitudeHarmonize(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if p.Target != "root" && p.Target != "bloodline" && p.Target != "physique" {
 		return authoritativeMutation{}, errors.New("target must be root, bloodline, or physique")
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -656,7 +652,7 @@ func aptitudeAwaken(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 	if p.Target != "bloodline" && p.Target != "physique" {
 		return authoritativeMutation{}, errors.New("awakening target must be bloodline or physique")
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -749,7 +745,7 @@ func aptitudeEvolve(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 	if p.Target != "root" && p.Target != "bloodline" && p.Target != "physique" {
 		return authoritativeMutation{}, errors.New("target must be root, bloodline, or physique")
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

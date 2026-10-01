@@ -214,7 +214,7 @@ func shopBuysRows(conn *storage.Conn, catalog worlddata.Catalog, userID int64, s
 // shopHereQuery lists the shops of the city the player stands in (or whose
 // shop they are inside), and which of them they have found.
 func shopHereQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (map[string]any, error) {
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +253,7 @@ func shopHereQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int64) 
 // the next buy or sell - which runs the same refill first, so the shelf a
 // player was shown is the shelf they buy from.
 func shopBrowseQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (map[string]any, error) {
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -315,7 +315,7 @@ func shopTradeSetup(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 	if p.Quantity <= 0 {
 		p.Quantity = 1
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return p, "", worlddata.Shop{}, err
 	}

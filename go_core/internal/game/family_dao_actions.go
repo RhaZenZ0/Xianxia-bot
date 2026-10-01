@@ -539,7 +539,7 @@ func seclusionStartActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	// phase and body_phase are read because the projection is a share of the
 	// stage being filled since v1.0.0-rc.5; without them the start reported a
 	// stage-1 rate and the settle paid the real one.
-	r, e := conn.Execute(`SELECT life_status,location,realm_index,phase,body_realm_index,body_phase,attributes_json FROM characters WHERE user_id=?`, []any{userID})
+	r, e := conn.Execute(`SELECT life_status,location,realm_index,phase,body_realm_index,body_phase,attributes_json,path FROM characters WHERE user_id=?`, []any{userID})
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
@@ -636,7 +636,7 @@ func SettleSeclusionTx(conn *storage.Conn, catalog worlddata.Catalog, userID, ga
 	if s == nil {
 		return nil, false, nil
 	}
-	r, e = conn.Execute(`SELECT life_status,realm_index,phase,body_realm_index,body_phase,cultivation,body_cultivation,attributes_json FROM characters WHERE user_id=?`, []any{userID})
+	r, e = conn.Execute(`SELECT life_status,realm_index,phase,body_realm_index,body_phase,cultivation,body_cultivation,attributes_json,path FROM characters WHERE user_id=?`, []any{userID})
 	if e != nil {
 		return nil, false, e
 	}
@@ -872,7 +872,7 @@ func daoPartnershipActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 		if userID == b {
 			partner = a
 		}
-		r, e = conn.Execute(`SELECT user_id,name,location,life_status,cultivation,realm_index,phase,attributes_json FROM characters WHERE user_id IN (?,?)`, []any{a, b})
+		r, e = conn.Execute(`SELECT user_id,name,location,life_status,cultivation,realm_index,phase,attributes_json,path FROM characters WHERE user_id IN (?,?)`, []any{a, b})
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
@@ -897,7 +897,7 @@ func daoPartnershipActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 				return authoritativeMutation{}, errors.New("paired meridian cycle is still on cooldown")
 			}
 		}
-		aa, bb := decodeJSONMap(chars[a]["attributes_json"]), decodeJSONMap(chars[b]["attributes_json"])
+		aa, bb := rowAttributes(catalog, chars[a]), rowAttributes(catalog, chars[b])
 		base := int64(4) + min64(i64(aa["spirit"])+i64(aa["will"]), i64(bb["spirit"])+i64(bb["will"]))/4
 		oldRes := clamp(i64(bond["resonance"]), 0, 100)
 		gain := max64(3, base+oldRes/25)

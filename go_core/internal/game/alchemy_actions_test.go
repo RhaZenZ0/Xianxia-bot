@@ -123,8 +123,10 @@ func TestAPurgeThatOnlyPartlyClearsLeavesTheEffectRewritten(t *testing.T) {
 	// over the 40 threshold, so the effect row must survive and be rewritten
 	// to the milder band rather than left describing the old load.
 	path := setupAlchemyPurgeDB(t, 90)
+	// Realm 0, stage 1: no stage behind it, so the path's capped edge
+	// (v1.14.0) adds nothing to will or spirit and the arithmetic below holds.
 	batch4Exec(t, path,
-		`UPDATE characters SET attributes_json='{"body":10,"agility":10,"spirit":10,"insight":10,"will":10,"presence":10}' WHERE user_id=42`)
+		`UPDATE characters SET realm_index=0,phase=1,attributes_json='{"body":10,"agility":10,"spirit":10,"insight":10,"will":10,"presence":10}' WHERE user_id=42`)
 
 	result, err := alchemyPurgeApply(t, path, 42, "purge-partial")
 	if err != nil {

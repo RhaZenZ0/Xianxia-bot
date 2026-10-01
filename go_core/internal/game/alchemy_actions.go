@@ -103,7 +103,7 @@ func alchemyPurgeAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		return authoritativeMutation{}, err
 	}
 	cr, err := conn.Execute(
-		`SELECT attributes_json,qi,qi_max FROM characters WHERE user_id=? AND life_status='alive'`,
+		`SELECT attributes_json,qi,qi_max,path,realm_index,phase FROM characters WHERE user_id=? AND life_status='alive'`,
 		[]any{userID},
 	)
 	if err != nil {
@@ -144,7 +144,7 @@ func alchemyPurgeAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		return authoritativeMutation{}, fmt.Errorf("insufficient qi: %d required, %d available", qiCost, qi)
 	}
 
-	attrs := decodeJSONMap(character["attributes_json"])
+	attrs := rowAttributes(catalog, character)
 	detox, err := canonicalAdditiveEffectBonus(conn, catalog, userID, "", p.GameMinute, "detox_power")
 	if err != nil {
 		return authoritativeMutation{}, err

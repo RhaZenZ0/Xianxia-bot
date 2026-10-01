@@ -31,7 +31,7 @@ func defeatSurvivalSchema() string {
 	return `
 CREATE TABLE characters(
 	user_id INTEGER PRIMARY KEY, name TEXT, path TEXT, location TEXT, life_status TEXT DEFAULT 'alive',
-	attributes_json TEXT, qi INTEGER, qi_max INTEGER, vitality INTEGER, vitality_max INTEGER, updated_at REAL
+	realm_index INTEGER NOT NULL DEFAULT 0, phase INTEGER NOT NULL DEFAULT 1, attributes_json TEXT, qi INTEGER, qi_max INTEGER, vitality INTEGER, vitality_max INTEGER, updated_at REAL
 );
 CREATE TABLE character_conditions(
 	condition_id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES characters(user_id),

@@ -1,7 +1,6 @@
 package game
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 
@@ -165,34 +164,19 @@ func pathGrowthAttributes(catalog worlddata.Catalog, path string) []string {
 // touched it again: a Nascent Soul cultivator rolled the same will as the
 // beggar they started as. Crossing a realm is what makes them stronger.
 func growAttributesOnRealmCrossing(conn *storage.Conn, catalog worlddata.Catalog, userID int64, c mechanicsCharacter, body bool, now float64) (map[string]any, error) {
-	gains := map[string]int64{}
-	if body {
-		gains["body"] = 1
-	} else {
-		gains["will"] = 1
+	if !body {
+		// The qi ladder's growth is computed from the stage now (v1.14.0,
+		// attribute_growth.go): nothing is written, and the reply carries what
+		// every stage adds.
+		return stageAttributeGains(catalog, c.Path), nil
 	}
-	for _, grown := range pathGrowthAttributes(catalog, c.Path) {
-		gains[grown] += 1
-	}
-	attributes := map[string]int64{}
-	for name, value := range c.Attributes {
-		attributes[name] = value
-	}
-	for name, delta := range gains {
-		attributes[name] += delta
-	}
-	encoded, err := json.Marshal(attributes)
-	if err != nil {
+	// The body ladder keeps its stored +1 body a body realm. It is written
+	// onto the stored base in SQL, never from c.Attributes - those carry the
+	// path's computed edge, and writing them back would store it.
+	if _, err := conn.Execute(`UPDATE characters SET attributes_json=json_set(attributes_json,'$.body',COALESCE(json_extract(attributes_json,'$.body'),0)+1),updated_at=? WHERE user_id=?`, []any{now, userID}); err != nil {
 		return nil, err
 	}
-	if _, err := conn.Execute(`UPDATE characters SET attributes_json=?,updated_at=? WHERE user_id=?`, []any{string(encoded), now, userID}); err != nil {
-		return nil, err
-	}
-	out := map[string]any{}
-	for name, delta := range gains {
-		out[name] = delta
-	}
-	return out, nil
+	return map[string]any{"body": int64(1)}, nil
 }
 
 // currentConditionSeverity is the severity of a condition a character already

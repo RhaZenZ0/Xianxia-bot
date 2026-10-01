@@ -151,7 +151,7 @@ func pvpRespondAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		// every later act ask "are you both still here" instead of "are you
 		// both in the same place", which two people who have each walked to
 		// the same distant city would also satisfy.
-		here, e := loadMechanicsCharacter(conn, userID)
+		here, e := loadMechanicsCharacter(conn, catalog, userID)
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
@@ -288,11 +288,11 @@ func pvpActAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, r
 		result["finished"] = false
 		return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "pvp", EventType: "pvp.defend", EntityType: "pvp_match", EntityID: fmt.Sprint(p.MatchID), Payload: result}}, nil
 	}
-	actor, e := loadMechanicsCharacter(conn, userID)
+	actor, e := loadMechanicsCharacter(conn, catalog, userID)
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	opp, e := loadMechanicsCharacter(conn, opponentID)
+	opp, e := loadMechanicsCharacter(conn, catalog, opponentID)
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
@@ -300,7 +300,10 @@ func pvpActAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, r
 	if actor.Attributes["spirit"] > attackBase {
 		attackBase = actor.Attributes["spirit"]
 	}
-	attackMod := attackBase + actor.RealmIndex*2 + actor.Phase/3
+	// The attacker's attribute grew with their stage and the defender's with
+	// theirs (v1.14.0); both are read relative to the stage baseline, so the
+	// difference between the two stages is carried here.
+	attackMod := attackBase + actor.RealmIndex*2 + actor.Phase/3 + stageLead(catalog, actor.RealmIndex, actor.Phase, opp.RealmIndex, opp.Phase)
 	defBase := opp.Attributes["agility"]
 	if opp.Attributes["body"] > defBase {
 		defBase = opp.Attributes["body"]

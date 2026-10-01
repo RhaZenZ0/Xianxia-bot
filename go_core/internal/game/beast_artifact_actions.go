@@ -57,8 +57,8 @@ func validateCompanionPayload(raw json.RawMessage, allowedFields ...string) erro
 	return nil
 }
 
-func loadLivingCompanionActor(conn *storage.Conn, userID int64) (mechanicsCharacter, error) {
-	character, err := loadMechanicsCharacter(conn, userID)
+func loadLivingCompanionActor(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (mechanicsCharacter, error) {
+	character, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return mechanicsCharacter{}, err
 	}
@@ -164,7 +164,7 @@ func beastTameAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	character, err := loadLivingCompanionActor(conn, userID)
+	character, err := loadLivingCompanionActor(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -289,7 +289,7 @@ func beastFeedAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 		return authoritativeMutation{}, errors.New("beast_id must be positive")
 	}
 	p.Food = strings.TrimSpace(p.Food)
-	character, err := loadLivingCompanionActor(conn, userID)
+	character, err := loadLivingCompanionActor(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -368,7 +368,7 @@ func beastTrainAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	} else if rem > 0 {
 		return authoritativeMutation{}, fmt.Errorf("beast training cooldown: %d seconds", rem)
 	}
-	character, err := loadLivingCompanionActor(conn, userID)
+	character, err := loadLivingCompanionActor(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -431,7 +431,7 @@ func beastEvolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if p.BeastID <= 0 {
 		return authoritativeMutation{}, errors.New("beast_id must be positive")
 	}
-	character, err := loadLivingCompanionActor(conn, userID)
+	character, err := loadLivingCompanionActor(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -511,7 +511,7 @@ func beastActiveAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if p.BeastID <= 0 {
 		return authoritativeMutation{}, errors.New("beast_id must be positive")
 	}
-	character, err := loadLivingCompanionActor(conn, userID)
+	character, err := loadLivingCompanionActor(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -566,7 +566,7 @@ func artifactBondAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	if _, _, ok := itemDef(catalog, p.ItemID); !ok {
 		return authoritativeMutation{}, errors.New("unknown canonical item")
 	}
-	character, err := loadLivingCompanionActor(conn, userID)
+	character, err := loadLivingCompanionActor(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -645,7 +645,7 @@ func artifactAwakenAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 	if p.ItemID == "" || p.SpiritName == "" {
 		return authoritativeMutation{}, errors.New("item_id and spirit_name are required")
 	}
-	character, err := loadLivingCompanionActor(conn, userID)
+	character, err := loadLivingCompanionActor(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

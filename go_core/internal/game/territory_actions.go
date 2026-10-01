@@ -88,7 +88,7 @@ func territoryClaimActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	// A claim is made standing on the ground (v1.3.1): the bot only ever
 	// offered the territory whose region is the player's location, and the
 	// engine took any key from anywhere.
-	c, e := loadMechanicsCharacter(conn, userID)
+	c, e := loadMechanicsCharacter(conn, catalog, userID)
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
@@ -173,7 +173,7 @@ func territoryWarActActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 			return authoritativeMutation{}, errors.New("war contribution is still on cooldown")
 		}
 	}
-	cr, e := conn.Execute(`SELECT realm_index,phase,attributes_json FROM characters WHERE user_id=?`, []any{userID})
+	cr, e := conn.Execute(`SELECT realm_index,phase,attributes_json,path FROM characters WHERE user_id=?`, []any{userID})
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
@@ -181,7 +181,7 @@ func territoryWarActActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	if c == nil {
 		return authoritativeMutation{}, errors.New("character not found")
 	}
-	attrs := decodeJSONMap(c["attributes_json"])
+	attrs := rowAttributes(catalog, c)
 	equip, e := equipmentPowerGo(conn, userID)
 	if e != nil {
 		return authoritativeMutation{}, e
@@ -300,7 +300,7 @@ func caravanDispatchActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	if p.Escort < 0 || p.Escort > 20 {
 		return authoritativeMutation{}, errors.New("caravan escort must be between 0 and 20")
 	}
-	r, e := conn.Execute(`SELECT realm_index,location,attributes_json,life_status FROM characters WHERE user_id=?`, []any{userID})
+	r, e := conn.Execute(`SELECT realm_index,location,attributes_json,life_status,path,phase FROM characters WHERE user_id=?`, []any{userID})
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
@@ -373,7 +373,7 @@ func caravanDispatchActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	}
 	payout := max64(1, int64(float64(base*p.Quantity)*mult))
 	risk := clamp(plan.MaxDanger+10, 5, 85)
-	attrs := decodeJSONMap(c["attributes_json"])
+	attrs := rowAttributes(catalog, c)
 	conceal := max64(0, i64(attrs["agility"])/2)
 	cargo, _ := json.Marshal(map[string]any{
 		p.ItemID:          p.Quantity,

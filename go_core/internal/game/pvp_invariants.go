@@ -53,11 +53,11 @@ func checkPvpParticipants(conn *storage.Conn, catalog worlddata.Catalog, actorID
 	if actorID == opponentID {
 		return &pvpBreach{Reason: "a cultivator cannot duel themselves"}, nil
 	}
-	actor, err := loadMechanicsCharacter(conn, actorID)
+	actor, err := loadMechanicsCharacter(conn, catalog, actorID)
 	if err != nil {
 		return &pvpBreach{Reason: "a participant is unavailable", Forfeiter: actorID, Winner: opponentID}, nil
 	}
-	opponent, err := loadMechanicsCharacter(conn, opponentID)
+	opponent, err := loadMechanicsCharacter(conn, catalog, opponentID)
 	if err != nil {
 		return &pvpBreach{Reason: "a participant is unavailable", Forfeiter: opponentID, Winner: actorID}, nil
 	}

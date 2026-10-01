@@ -321,15 +321,15 @@ func setupBugslayerBossDB(t *testing.T, swordUser, plainUser int64) string {
 	defer conn.Close()
 	attrs := `{"body":40,"spirit":10,"agility":500}`
 	if err := conn.ExecScript(fmt.Sprintf(`
-CREATE TABLE characters(user_id INTEGER PRIMARY KEY, attributes_json TEXT, realm_index INTEGER);
+CREATE TABLE characters(user_id INTEGER PRIMARY KEY, attributes_json TEXT, realm_index INTEGER, path TEXT NOT NULL DEFAULT 'Sword Cultivator', phase INTEGER NOT NULL DEFAULT 1);
 CREATE TABLE boss_encounters(encounter_id INTEGER PRIMARY KEY AUTOINCREMENT, party_id INTEGER NOT NULL, template_key TEXT NOT NULL, location TEXT NOT NULL, boss_name TEXT NOT NULL, boss_hp INTEGER NOT NULL, boss_hp_max INTEGER NOT NULL, phase_index INTEGER NOT NULL DEFAULT 0, round_index INTEGER NOT NULL DEFAULT 1, status TEXT NOT NULL DEFAULT 'active', winner_party_id INTEGER, version INTEGER NOT NULL DEFAULT 0, started_game_minute INTEGER NOT NULL DEFAULT 0, finished_game_minute INTEGER, created_at REAL NOT NULL, updated_at REAL NOT NULL);
 CREATE TABLE boss_participants(encounter_id INTEGER NOT NULL, user_id INTEGER NOT NULL, vitality INTEGER NOT NULL, vitality_max INTEGER NOT NULL, acted_round INTEGER NOT NULL DEFAULT 0, total_damage INTEGER NOT NULL DEFAULT 0, guard INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'active', updated_at REAL NOT NULL, PRIMARY KEY(encounter_id,user_id));
 CREATE TABLE boss_reward_claims(encounter_id INTEGER NOT NULL, user_id INTEGER NOT NULL, currency_amount INTEGER NOT NULL DEFAULT 0, item_id TEXT NOT NULL DEFAULT '', item_quantity INTEGER NOT NULL DEFAULT 0, claimed INTEGER NOT NULL DEFAULT 0, created_at REAL NOT NULL, claimed_at REAL, PRIMARY KEY(encounter_id,user_id));
 CREATE TABLE party_formations(formation_id INTEGER PRIMARY KEY AUTOINCREMENT, party_id INTEGER NOT NULL, name TEXT NOT NULL, stance TEXT NOT NULL DEFAULT 'balanced', cohesion INTEGER NOT NULL DEFAULT 100, active INTEGER NOT NULL DEFAULT 0, created_at REAL NOT NULL, updated_at REAL NOT NULL);
 CREATE TABLE formation_positions(formation_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position TEXT NOT NULL, assigned_at REAL NOT NULL, PRIMARY KEY(formation_id,user_id));
 CREATE TABLE equipment_instances(equipment_id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,item_id TEXT NOT NULL,slot TEXT NOT NULL,durability INTEGER NOT NULL,max_durability INTEGER NOT NULL,quality INTEGER NOT NULL DEFAULT 100,equipped INTEGER NOT NULL DEFAULT 0,bound_at REAL NOT NULL,updated_at REAL NOT NULL);
-INSERT INTO characters VALUES(%[1]d,'%[3]s',2);
-INSERT INTO characters VALUES(%[2]d,'%[3]s',2);
+INSERT INTO characters(user_id,attributes_json,realm_index) VALUES(%[1]d,'%[3]s',2);
+INSERT INTO characters(user_id,attributes_json,realm_index) VALUES(%[2]d,'%[3]s',2);
 INSERT INTO boss_encounters(encounter_id,party_id,template_key,location,boss_name,boss_hp,boss_hp_max,phase_index,round_index,status,version,created_at,updated_at) VALUES(1,10,'%[4]s','Greenriver Town','Iron-Tusk Boar King',180,180,0,1,'active',0,0,0);
 INSERT INTO boss_participants(encounter_id,user_id,vitality,vitality_max,acted_round,total_damage,guard,status,updated_at) VALUES(1,%[1]d,20,20,0,0,0,'active',0);
 INSERT INTO boss_participants(encounter_id,user_id,vitality,vitality_max,acted_round,total_damage,guard,status,updated_at) VALUES(1,%[2]d,20,20,0,0,0,'active',0);

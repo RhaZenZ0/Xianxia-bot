@@ -9,6 +9,7 @@ import (
 
 	"xianxia/core/internal/eventledger"
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 var dynastyClaimTypes = map[string]bool{
@@ -288,24 +289,21 @@ func unlockDynastyLegacyContent(conn *storage.Conn, userID, historyID, investiga
 	return leads, quests, nil
 }
 
-func dynastyActionAttribute(conn *storage.Conn, userID int64, attr string) (int64, error) {
+func dynastyActionAttribute(conn *storage.Conn, catalog worlddata.Catalog, userID int64, attr string) (int64, error) {
 	attr = strings.TrimSpace(strings.ToLower(attr))
-	row, err := conn.Execute(`SELECT attributes_json FROM characters WHERE user_id=? AND life_status='alive'`, []any{userID})
+	row, err := conn.Execute(`SELECT attributes_json,path,realm_index,phase FROM characters WHERE user_id=? AND life_status='alive'`, []any{userID})
 	if err != nil {
 		return 0, err
 	}
 	if len(row.Rows) == 0 {
 		return 0, errors.New("living character not found")
 	}
-	attrs := map[string]any{}
-	if err := json.Unmarshal([]byte(fmt.Sprint(row.Rows[0][0])), &attrs); err != nil {
-		return 0, err
-	}
-	value, ok := attrs[attr]
+	r := row.Rows[0]
+	value, ok := characterAttributes(catalog, r[0], fmt.Sprint(r[1]), storage.ParseInt(r[2]), storage.ParseInt(r[3]))[attr]
 	if !ok {
 		return 0, fmt.Errorf("character attribute %s is unavailable", attr)
 	}
-	return storage.ParseInt(value), nil
+	return value, nil
 }
 
 func dynastyQuestTN(danger int64) int64 {
@@ -324,7 +322,7 @@ func dynastyPhysicalQuest(kind string) bool {
 	}
 }
 
-func dynastyQuestAction(conn *storage.Conn, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func dynastyQuestAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var payload dynastyQuestPayload
 	if len(raw) > 0 && string(raw) != "null" {
 		if err := json.Unmarshal(raw, &payload); err != nil {
@@ -379,7 +377,7 @@ func dynastyQuestAction(conn *storage.Conn, userID int64, raw json.RawMessage) (
 	if attribute == "" {
 		attribute = "will"
 	}
-	modifier, err := dynastyActionAttribute(conn, userID, attribute)
+	modifier, err := dynastyActionAttribute(conn, catalog, userID, attribute)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -675,7 +673,7 @@ func dynastyClaimAction(conn *storage.Conn, userID int64, raw json.RawMessage) (
 	}, nil
 }
 
-func dynastyConflictAction(conn *storage.Conn, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func dynastyConflictAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var payload dynastyConflictPayload
 	if len(raw) > 0 && string(raw) != "null" {
 		if err := json.Unmarshal(raw, &payload); err != nil {
@@ -718,7 +716,7 @@ func dynastyConflictAction(conn *storage.Conn, userID int64, raw json.RawMessage
 	if attribute == "" {
 		attribute = "will"
 	}
-	attributeValue, err := dynastyActionAttribute(conn, userID, attribute)
+	attributeValue, err := dynastyActionAttribute(conn, catalog, userID, attribute)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
