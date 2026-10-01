@@ -931,7 +931,7 @@ func discoverNextLocationTx(conn *storage.Conn, catalog worlddata.Catalog, userI
 		return "", err
 	}
 	// A city before a road site or a wild place, and seven finds in ten
-	// (v1.14.2): discovery_pace.go is the statement of both.
+	// (v1.15.0): discovery_pace.go is the statement of both.
 	candidates := citiesFirst(catalog, discoveryCandidates(catalog, known, currentWorld(c, catalog), c.accessRealmIndex()))
 	if len(candidates) == 0 {
 		return "", nil

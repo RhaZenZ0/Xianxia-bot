@@ -2,7 +2,7 @@ package game
 
 import "xianxia/core/internal/worlddata"
 
-// The pace at which /explore fills a map (v1.14.2).
+// The pace at which /explore fills a map (v1.15.0).
 //
 // Travel goes to any *known* city of the world in one command, plans the
 // road route itself and, at the shipped TRAVEL_TIME_PERCENT of 0, waits

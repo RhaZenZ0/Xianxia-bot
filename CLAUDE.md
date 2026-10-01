@@ -5946,7 +5946,7 @@ then asks the engine, harmless mid-section in a lone run and a five-second stall
 list names it, and the shard test walks `bot.py` for every task started outside an `if`, so the
 next one cannot be missed the same way.
 
-### A city before anything else (`discovery_pace.go`, v1.14.2)
+### A city before anything else (`discovery_pace.go`, v1.15.0)
 
 Asked as a world map, then as *"all city road can lead all city or something better"*. The roads
 were never the bar: `exploration.travel` plans the whole route to any **known** city of the world,

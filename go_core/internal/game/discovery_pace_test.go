@@ -8,7 +8,7 @@ import (
 	"xianxia/core/internal/worlddata"
 )
 
-// The pace at which /explore fills a map (v1.14.2): a city is found before a
+// The pace at which /explore fills a map (v1.15.0): a city is found before a
 // road site or a wild place, and a find is seven explores in ten. These drive
 // the shipped catalogue from Greenriver Town, because the count the rule was
 // chosen for is a fact about that content and a fixture ring would not carry
