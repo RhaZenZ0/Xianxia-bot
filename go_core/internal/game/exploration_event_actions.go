@@ -237,7 +237,7 @@ func explorationEventActAction(conn *storage.Conn, catalog worlddata.Catalog, us
 	if record.State != "active" || record.ParticipantStatus != "active" {
 		return authoritativeMutation{}, errors.New("exploration event is no longer active")
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

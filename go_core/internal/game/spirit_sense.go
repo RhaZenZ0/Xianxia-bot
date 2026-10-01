@@ -115,7 +115,7 @@ func spiritSenseGainTx(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		return nil
 	}
 	if rules.SpiritDivisor > 0 {
-		if c, err := loadMechanicsCharacter(conn, userID); err == nil {
+		if c, err := loadMechanicsCharacter(conn, catalog, userID); err == nil {
 			gain += c.Attributes["spirit"] / rules.SpiritDivisor
 		}
 	}

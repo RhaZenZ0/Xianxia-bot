@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 // Ascension (飞升) carries a cultivator up (v1.0.0-rc.15).
@@ -100,7 +101,7 @@ func TestEitherLadderOpensAWorld(t *testing.T) {
 	}
 	defer conn.Close()
 	batch4Exec(t, path, `UPDATE characters SET realm_index=0,body_realm_index=8 WHERE user_id=42`)
-	c, err := loadMechanicsCharacter(conn, 42)
+	c, err := loadMechanicsCharacter(conn, worlddata.Catalog{}, 42)
 	if err != nil {
 		t.Fatal(err)
 	}

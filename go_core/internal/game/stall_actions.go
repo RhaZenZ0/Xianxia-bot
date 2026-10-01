@@ -268,7 +268,7 @@ func stallOpenAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	if len([]rune(p.Name)) > 40 {
 		return authoritativeMutation{}, errors.New("a stall's name is at most 40 characters")
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -306,7 +306,7 @@ func stallOpenAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 // stallOwnerHereTx is the stall of the caller, refused unless they stand in
 // the city it is kept in: goods are laid on it and taken off it in person.
 func stallOwnerHereTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (map[string]any, mechanicsCharacter, error) {
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return nil, c, err
 	}
@@ -468,7 +468,7 @@ func stallBuyAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 		return authoritativeMutation{}, errStallsNotOpen
 	}
 	p.Quantity = clamp(p.Quantity, 1, 99)
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -740,7 +740,7 @@ func stallSurchargePerUnit(catalog worlddata.Catalog, unit, hops int64) int64 {
 // caller stands - its price plus the distance surcharge. It never refuses:
 // a world with no stalls is an empty board.
 func stallBoardQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (map[string]any, error) {
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -838,7 +838,7 @@ func stallSellableTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 // stallStatusQuery is the caller's own stall: its shape, its listings and the
 // last ten sales. It never refuses either; no stall is `stall: null`.
 func stallStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (map[string]any, error) {
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return nil, err
 	}

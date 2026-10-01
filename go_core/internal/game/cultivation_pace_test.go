@@ -2,6 +2,8 @@ package game
 
 import (
 	"encoding/json"
+	"fmt"
+	"math"
 	"strings"
 	"testing"
 
@@ -48,6 +50,13 @@ func TestASessionIsAShareOfTheStageSoEveryRealmTakesAboutTheSameWork(t *testing.
 		}
 		result := trainOnce(t, path, world, int(100+realm))
 		gain := storage.ParseInt(result["gain"])
+		// Since v1.14.0 the will a session reads grows a point a realm
+		// (keptGrowth), so a realm-6 cultivator works at will 9 where the
+		// stored base says 3 - as a real one did before, when a crossing
+		// stored the point. The pace is what is held here, so the
+		// cultivator's own quality is taken back out to the base's.
+		will := characterAttributes(catalog, `{"will":3}`, "", realm, 1)["will"]
+		gain = int64(math.Round(float64(gain) * attributeQuality(3) / attributeQuality(will)))
 		sessions := float64(cost) / float64(gain)
 		// The target rises with the realm (v1.0.0-rc.6); a cultivator's own
 		// multipliers pull the real number under it, and the floor under a
@@ -101,36 +110,39 @@ func TestTheHigherWorldsAreThickWithQi(t *testing.T) {
 	}
 }
 
-func TestCrossingARealmRaisesTheCultivatorsAttributes(t *testing.T) {
+// TestEveryQiStageGrowsTheAttributes (v1.14.0): a qi stage adds +1 to all
+// six and +2 to the path's pair, a realm crossing no more than any other stage,
+// and none of it is written - the stored base is the same afterwards, because
+// growth is computed from the stage (attribute_growth.go).
+func TestEveryQiStageGrowsTheAttributes(t *testing.T) {
 	path := setupCultivationDB(t)
 	world := batch4WorldPath(t)
 	// A will the dice cannot argue with: this test is about the growth, not
 	// about the roll, and a 94% breakthrough fails six times in a hundred.
 	batch4Exec(t, path, `UPDATE characters SET realm_index=0,phase=9,cultivation=100000,insight_xp=20,path='Sword Cultivator',attributes_json='{"body":2,"agility":3,"spirit":2,"insight":1,"will":100,"presence":1}' WHERE user_id=42`)
 	batch4Result(t, batch4Apply(t, path, world, "cultivation.insight", 1, map[string]any{}))
-	// A stage inside the realm changes nothing.
+	want := map[string]int64{"body": 1, "agility": 2, "spirit": 1, "insight": 1, "will": 2, "presence": 1}
+	before := attributesOf(t, path)
 	batch4Exec(t, path, `UPDATE characters SET phase=1 WHERE user_id=42`)
 	stage := batch4Result(t, batch4Apply(t, path, world, "cultivation.breakthrough", 2, map[string]any{"confirm": true}))
-	stageGains, _ := stage["attribute_gains"].(map[string]any)
-	if stage["success"] != true || len(stageGains) != 0 {
-		t.Fatalf("a stage is not a realm: %v", stage["attribute_gains"])
-	}
-	before := attributesOf(t, path)
 	batch4Exec(t, path, `UPDATE characters SET phase=9,cultivation=100000 WHERE user_id=42`)
 	crossed := batch4Result(t, batch4Apply(t, path, world, "cultivation.breakthrough", 3, map[string]any{"confirm": true}))
 	if crossed["success"] != true || crossed["realm_gate"] != true {
 		t.Fatalf("crossing: %v", crossed)
 	}
-	gains, _ := crossed["attribute_gains"].(map[string]any)
-	// v1.13.0: a path grows every attribute tied for its highest - a Sword
-	// Cultivator's agility and will, 3 and 3 - and the qi ladder adds its own
-	// will beside them, so will rises twice.
-	if storage.ParseInt(gains["will"]) != 2 || storage.ParseInt(gains["agility"]) != 1 {
-		t.Fatalf("a Sword Cultivator gains both tied attributes and the qi ladder's will: %v", gains)
+	for label, out := range map[string]map[string]any{"a stage": stage, "a realm crossing": crossed} {
+		if out["success"] != true {
+			t.Fatalf("%s did not succeed: %v", label, out)
+		}
+		gains, _ := out["attribute_gains"].(map[string]any)
+		for name, n := range want {
+			if storage.ParseInt(gains[name]) != n {
+				t.Fatalf("%s gave a Sword Cultivator %v, want +1 all and +2 on agility and will", label, gains)
+			}
+		}
 	}
-	after := attributesOf(t, path)
-	if after["will"] != before["will"]+2 || after["agility"] != before["agility"]+1 || after["spirit"] != before["spirit"] {
-		t.Fatalf("attributes %v -> %v", before, after)
+	if after := attributesOf(t, path); fmt.Sprint(after) != fmt.Sprint(before) {
+		t.Fatalf("a qi stage wrote the stored base %v -> %v; the growth is computed, never stored", before, after)
 	}
 }
 

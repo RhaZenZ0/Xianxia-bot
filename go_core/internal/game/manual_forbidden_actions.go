@@ -122,7 +122,7 @@ func manualStudyAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if !ok {
 		return authoritativeMutation{}, errors.New("unknown cultivation manual")
 	}
-	c, e := loadMechanicsCharacter(conn, userID)
+	c, e := loadMechanicsCharacter(conn, catalog, userID)
 	if e != nil {
 		return authoritativeMutation{}, e
 	}

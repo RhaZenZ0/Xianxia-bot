@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 72
+SCHEMA_VERSION = 73
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -2885,6 +2885,30 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             # Strike - and it is a column on the character rather than a row of
             # its own so a reset or an erasure takes it with the life.
             "ALTER TABLE characters ADD COLUMN path_resource INTEGER NOT NULL DEFAULT 0",
+        ),
+    ),
+    (
+        73,
+        "attributes_from_the_stage",
+        (
+            # v1.14.0: attributes grow every qi stage, computed from where a
+            # cultivator stands (go_core/internal/game/attribute_growth.go), so
+            # attributes_json holds only the base: the path's starting spread
+            # and the body ladder's +1 body a body realm. Before this it also
+            # carried +1 will and +1 on the path's pair for every qi realm
+            # crossed - growth the stage now supplies and far exceeds - and
+            # those are dropped here so no character carries them twice. The
+            # spreads are a frozen copy of content/world.json at v1.14.0, the
+            # migration-46 shape; a path this does not name is left as it is.
+            "UPDATE characters SET attributes_json=CASE path "
+            "WHEN 'Sword Cultivator' THEN json_object('body',2+COALESCE(body_realm_index,0),'agility',3,'spirit',2,'insight',1,'will',3,'presence',1) "
+            "WHEN 'Qi Refiner' THEN json_object('body',1+COALESCE(body_realm_index,0),'agility',2,'spirit',3,'insight',3,'will',2,'presence',1) "
+            "WHEN 'Body Refiner' THEN json_object('body',3+COALESCE(body_realm_index,0),'agility',2,'spirit',1,'insight',1,'will',3,'presence',2) "
+            "WHEN 'Soul Cultivator' THEN json_object('body',1+COALESCE(body_realm_index,0),'agility',1,'spirit',3,'insight',2,'will',3,'presence',2) "
+            "WHEN 'Beast Binder' THEN json_object('body',2+COALESCE(body_realm_index,0),'agility',2,'spirit',3,'insight',1,'will',1,'presence',3) "
+            "WHEN 'Formation Adept' THEN json_object('body',1+COALESCE(body_realm_index,0),'agility',2,'spirit',3,'insight',3,'will',2,'presence',1) "
+            "WHEN 'Ghost Cultivator' THEN json_object('body',1+COALESCE(body_realm_index,0),'agility',2,'spirit',3,'insight',2,'will',3,'presence',1) "
+            "ELSE attributes_json END",
         ),
     ),
 )

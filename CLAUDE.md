@@ -155,7 +155,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 72; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 73; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -5853,6 +5853,58 @@ as a third designed state beside drawn and locked, read off the bot's own provid
 Two readers the engine had rolled for releases now say so: the +3 a Law affinity adds
 (`affinity_bonus`) and a secret-realm room's +2 for its path (`path_bonus`, which the room result
 did not carry until now).
+
+### Attributes grow every stage (`attribute_growth.go`, schema 73, v1.14.0)
+
+On the owner's call: every qi stage adds +1 to all six attributes and +2 to the path's pair
+(`pathGrowthAttributes`), and the rolls rise to meet it. The scale is the whole design problem: the
+qi ladder is 288 stages, so close to +290 by the top, against 2d10 rolls whose TNs run 10 to 32.
+The numbers are content (`attribute_growth`), and the body ladder keeps the +1 body a body realm it
+always stored.
+
+**Growth is computed from the stage, never stored.** `attributes_json` holds the base - the path's
+spread plus the body ladder's crossings - so a GM's `set_realm`, a samsara and a reset are right by
+construction and the pair's lead can be capped without a second column. Migration 73 rewrote every
+stored value to that base with a frozen `CASE path` of all seven spreads (migration 46's shape), so
+a veteran is recalculated from where they stand rather than keeping the old per-realm gains on top.
+
+**It is carried as a difference, and that is what keeps the rolls on 2d10.** A roll against
+something at the cultivator's own stage would add the growth to both sides - the attribute grew by
+it and the TN rose by it - so the two cancel and that site needs no term. Every rule therefore reads
+the attribute *relative to the stage*: the base, `kept_per_realm` a realm, and the pair's lead
+capped at `path_edge_cap` (+5, the owner's "cap the edge on a roll"). Only a roll against an
+opponent or a content floor adds a number - `stageLead`, the cultivator's difficulty less the faced
+one - and `TestEveryFacedRollCarriesTheLead` holds the seven sites: a battle's attack, flee,
+technique and counters, a raid, PvP, a realm room, a flame and a Law. The same relative value is
+what every rate reads, because a cultivation quality fed +290 will would run fifteen times faster.
+A point a realm is roughly what a crossing stored before (+1 will, and the pair), so a session's
+pace stays where it was - which a pacing test found by going red one run in three: its fixture
+planted a realm-0 spread at realm 6, which no real cultivator ever had, so it takes the
+cultivator's own quality back out and holds the pace alone.
+The sheet and the narrator show the grown number (`characterSheetAttributes`, and
+`app/rules/attribute_growth.py` as its display twin), which is what a player sees climb.
+
+**`kept_per_realm` exists because the exact cancel closed the ladder.** The first version took
+back every stage, and its odds test said so: the content's breakthrough TNs were authored to climb
+a point a realm against attributes that grew a point or two a realm before this release, so a
+cultivator who kept nothing found realm 12 a tenth as likely as realm 0. One point a realm kept is
+what holds an off-path breakthrough at 94% from realm 0 to realm 12. `TestTheOddsHoldAsAttributesGrow`
+prints the table and asserts the full form (attribute grown, TN risen) equals the relative one -
+and its first drill, the kept term removed, **passed**, because both forms collapsed together and
+still agreed. It asserts the odds do not fall more than ten points below realm 0 now, and the drill
+fails.
+
+**PvP needed the lead, which the plan said it would not.** Each side's attributes are set against
+the other's, so it looked symmetric - but both are read relative to their *own* stage, so a realm-10
+cultivator and a realm-0 one would have dueled as equals. The lead is added to the attacker's
+modifier like every other faced roll.
+
+**One door, and three readers that only hand the row on.** Every function whose SELECT carries
+`attributes_json` must call `characterAttributes`, `rowAttributes` or a sibling
+(`TestAttributesHaveOneDoor`); a second decoder would hand a rule the bare base, or write a computed
+number back. `handsOn` names the three that select the row for another function to decode, each
+with the decoder, which the test holds to the door in turn. The spiritual sense is deliberately left
+on the relative value: its numbers are compared with an NPC's concealment, which does not grow.
 
 ## Testing conventions
 

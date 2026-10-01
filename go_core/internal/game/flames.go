@@ -172,7 +172,7 @@ func flameCaptureAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		return authoritativeMutation{}, err
 	}
 	rules := flameRules(catalog)
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -225,7 +225,10 @@ func flameCaptureAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	modifier := (spirit+will)/2 + fireResistance/flameResistScale + affinity
+	// Spirit and will each grew a stage at a time (v1.14.0); the flame's own
+	// floor is where its difficulty sits, so what the cultivator has grown past
+	// it counts at the same half weight the two attributes carry.
+	modifier := (spirit+will)/2 + fireResistance/flameResistScale + affinity + stageLead(catalog, c.RealmIndex, c.Phase, def.MinRealmIndex, 1)
 	roll, err := rollCheck(modifier, def.CaptureTN)
 	if err != nil {
 		return authoritativeMutation{}, err

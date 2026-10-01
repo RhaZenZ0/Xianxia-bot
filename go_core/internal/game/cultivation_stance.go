@@ -191,7 +191,7 @@ func cultivationStanceAction(conn *storage.Conn, catalog worlddata.Catalog, user
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -268,7 +268,7 @@ func cultivationInsightAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -382,7 +382,7 @@ func cultivationOddsResult(c mechanicsCharacter, catalog worlddata.Catalog, mods
 // paths, the essence bar, the stance, the cooldowns, the odds of the next
 // breakthrough and what moves them, today's multipliers, and the realm gate.
 func cultivationStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (map[string]any, error) {
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return nil, err
 	}

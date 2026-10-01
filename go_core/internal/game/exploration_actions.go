@@ -1312,7 +1312,7 @@ func explorationExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -1430,7 +1430,7 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 	if p.Destination == "" {
 		return authoritativeMutation{}, errors.New("destination is required")
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -1836,7 +1836,7 @@ func explorationHuntAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

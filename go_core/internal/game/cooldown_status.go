@@ -181,7 +181,7 @@ func cooldownStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	if userID <= 0 {
 		return nil, errors.New("actor_id must be positive")
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return nil, err
 	}

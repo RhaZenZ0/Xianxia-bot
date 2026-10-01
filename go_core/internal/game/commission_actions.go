@@ -267,7 +267,7 @@ func commissionAcceptAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if strings.TrimSpace(p.QuestKey) == "" {
 		return authoritativeMutation{}, errors.New("quest_key is required")
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

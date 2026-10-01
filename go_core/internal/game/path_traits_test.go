@@ -294,7 +294,9 @@ func TestASoulCultivatorsSenseBuildsFaster(t *testing.T) {
 		want int64
 	}{{pathSword, base}, {pathSoul, int64(math.Round(float64(base) * senseGainMult(catalog, pathSoul)))}} {
 		db := setupSpiritSenseDB(t)
-		batch4Exec(t, db, `UPDATE characters SET path=? WHERE user_id=42`, c.path)
+		// Realm 0, stage 1: no stage behind it, so a path's edge (v1.14.0)
+		// adds nothing to spirit and the gain is the trait's alone.
+		batch4Exec(t, db, `UPDATE characters SET path=?,realm_index=0,phase=1 WHERE user_id=42`, c.path)
 		if out := senseGain(t, db, "craft", false, 0); out == nil || i64(out["gain"]) != c.want {
 			t.Errorf("a %s's craft built %v, want %d", c.path, out, c.want)
 		}

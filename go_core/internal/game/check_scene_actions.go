@@ -68,18 +68,17 @@ func canonicalAttribute(conn *storage.Conn, catalog worlddata.Catalog, userID, g
 	if !allowed[attr] {
 		return 0, fmt.Errorf("unknown attribute: %s", attr)
 	}
-	cr, err := conn.Execute(`SELECT attributes_json,path,location FROM characters WHERE user_id=? AND life_status='alive'`, []any{userID})
+	cr, err := conn.Execute(`SELECT attributes_json,path,location,realm_index,phase FROM characters WHERE user_id=? AND life_status='alive'`, []any{userID})
 	if err != nil {
 		return 0, err
 	}
 	if len(cr.Rows) == 0 {
 		return 0, errors.New("living character not found")
 	}
-	attrs := map[string]float64{}
-	if err := json.Unmarshal([]byte(fmt.Sprint(cr.Rows[0][0])), &attrs); err != nil {
-		return 0, err
-	}
-	value := attrs[attr]
+	// Relative to the stage baseline (v1.14.0): the base plus the path's
+	// capped edge. A roll against the cultivator's own stage needs nothing
+	// more; one against an opponent or a floor adds `stageLead`.
+	value := float64(characterAttributes(catalog, cr.Rows[0][0], fmt.Sprint(cr.Rows[0][1]), storage.ParseInt(cr.Rows[0][3]), storage.ParseInt(cr.Rows[0][4]))[attr])
 	path := fmt.Sprint(cr.Rows[0][1])
 	location := fmt.Sprint(cr.Rows[0][2])
 	mods := []effectModifier{}

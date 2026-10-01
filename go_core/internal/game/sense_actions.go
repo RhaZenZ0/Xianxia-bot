@@ -29,19 +29,17 @@ type senseCharacter struct {
 	Location                                              string
 }
 
-func loadSenseCharacter(conn *storage.Conn, userID int64) (senseCharacter, error) {
-	r, err := conn.Execute(`SELECT realm_index,phase,attributes_json,sense_power_bonus,sense_precision_bonus,sense_range_bonus,concealment_bonus,concealment_active,location FROM characters WHERE user_id=? AND life_status='alive'`, []any{userID})
+func loadSenseCharacter(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (senseCharacter, error) {
+	r, err := conn.Execute(`SELECT realm_index,phase,attributes_json,path,sense_power_bonus,sense_precision_bonus,sense_range_bonus,concealment_bonus,concealment_active,location FROM characters WHERE user_id=? AND life_status='alive'`, []any{userID})
 	if err != nil {
 		return senseCharacter{}, err
 	}
 	if len(r.Rows) == 0 {
 		return senseCharacter{}, errors.New("living character not found")
 	}
-	attrs := map[string]float64{}
-	if err = json.Unmarshal([]byte(fmt.Sprint(r.Rows[0][2])), &attrs); err != nil {
-		return senseCharacter{}, err
-	}
-	return senseCharacter{Realm: storage.ParseInt(r.Rows[0][0]), Phase: storage.ParseInt(r.Rows[0][1]), Spirit: int64(math.Round(attrs["spirit"])), Insight: int64(math.Round(attrs["insight"])), Will: int64(math.Round(attrs["will"])), SensePowerBonus: storage.ParseInt(r.Rows[0][3]), SensePrecisionBonus: storage.ParseInt(r.Rows[0][4]), SenseRangeBonus: storage.ParseInt(r.Rows[0][5]), ConcealmentBonus: storage.ParseInt(r.Rows[0][6]), ConcealmentActive: storage.ParseInt(r.Rows[0][7]) != 0, Location: fmt.Sprint(r.Rows[0][8])}, nil
+	row := r.Rows[0]
+	attrs := characterAttributes(catalog, row[2], fmt.Sprint(row[3]), storage.ParseInt(row[0]), storage.ParseInt(row[1]))
+	return senseCharacter{Realm: storage.ParseInt(row[0]), Phase: storage.ParseInt(row[1]), Spirit: attrs["spirit"], Insight: attrs["insight"], Will: attrs["will"], SensePowerBonus: storage.ParseInt(row[4]), SensePrecisionBonus: storage.ParseInt(row[5]), SenseRangeBonus: storage.ParseInt(row[6]), ConcealmentBonus: storage.ParseInt(row[7]), ConcealmentActive: storage.ParseInt(row[8]) != 0, Location: fmt.Sprint(row[9])}, nil
 }
 
 func senseExtraModifier(conn *storage.Conn, catalog worlddata.Catalog, userID, gameMinute int64, stat string) (int64, error) {
@@ -135,7 +133,7 @@ func senseExtraModifier(conn *storage.Conn, catalog worlddata.Catalog, userID, g
 }
 
 func senseStatsGo(conn *storage.Conn, catalog worlddata.Catalog, userID, gameMinute int64) (senseCharacter, int64, int64, int64, error) {
-	c, err := loadSenseCharacter(conn, userID)
+	c, err := loadSenseCharacter(conn, catalog, userID)
 	if err != nil {
 		return c, 0, 0, 0, err
 	}
@@ -502,7 +500,7 @@ func senseInspectAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	result := map[string]any{"mode": p.Mode, "power": power, "precision_power": precision, "range_m": rng}
 	switch p.Mode {
 	case "player":
-		target, err := loadSenseCharacter(conn, p.TargetUserID)
+		target, err := loadSenseCharacter(conn, catalog, p.TargetUserID)
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
@@ -674,7 +672,7 @@ func senseConcealAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
 	}
-	c, err := loadSenseCharacter(conn, userID)
+	c, err := loadSenseCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

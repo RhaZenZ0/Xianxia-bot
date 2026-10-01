@@ -30,7 +30,7 @@ func normalizeSecretRealm(catalog worlddata.Catalog, raw string) (string, bool) 
 }
 
 func secretRealmStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (map[string]any, error) {
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func secretRealmEnterAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 		return authoritativeMutation{}, errors.New("unknown secret realm")
 	}
 	realm := catalog.SecretRealms[rid]
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -233,7 +233,7 @@ func grantInheritanceTx(conn *storage.Conn, catalog worlddata.Catalog, userID in
 				// sealed copy is in the bag and is studied the ordinary way
 				// once the realm is reached.
 				manual := catalog.TechniqueSystem.Manuals[manualID]
-				c, e := loadMechanicsCharacter(conn, userID)
+				c, e := loadMechanicsCharacter(conn, catalog, userID)
 				if e != nil {
 					return nil, e
 				}
@@ -324,7 +324,7 @@ func secretRealmExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -377,7 +377,9 @@ func secretRealmExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if stringInList(room.PreferredRoots, c.SpiritualRoot) {
 		rootBonus = 1
 	}
-	modifier := attr + 2 + pathBonus + rootBonus
+	// A room's difficulty sits at its realm's floor (v1.14.0): the stages a
+	// cultivator has grown past it ride the roll.
+	modifier := attr + 2 + pathBonus + rootBonus + stageLead(catalog, c.RealmIndex, c.Phase, realm.MinRealmIndex, 1)
 	roll, err := rollCheck(modifier, room.TN)
 	if err != nil {
 		return authoritativeMutation{}, err

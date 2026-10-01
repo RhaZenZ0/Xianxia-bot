@@ -325,7 +325,7 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		return authoritativeMutation{}, fmt.Errorf("unknown recipe: %s", p.Recipe)
 	}
 
-	cr, err := loadMechanicsCharacter(conn, userID)
+	cr, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -673,7 +673,7 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 			return authoritativeMutation{}, fmt.Errorf("client-supplied %s is forbidden", forbidden)
 		}
 	}
-	cr, err := loadMechanicsCharacter(conn, userID)
+	cr, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

@@ -77,8 +77,10 @@ func TestAFlameIsNotCapturedElsewhereOrTooEarly(t *testing.T) {
 
 func TestAFailedCaptureBurnsTheMeridians(t *testing.T) {
 	path := setupFlameDB(t)
-	// The fixture cultivator is strong enough that no roll could miss.
-	batch4Exec(t, path, `UPDATE characters SET attributes_json='{"spirit":1,"will":1,"body":1,"insight":1}' WHERE user_id=42`)
+	// Weak attributes, and standing at the flame's own floor (realm 2, stage
+	// 1): since v1.14.0 every stage grown past the floor rides the roll, so a
+	// cultivator above it could not be made to miss.
+	batch4Exec(t, path, `UPDATE characters SET realm_index=2,phase=1,attributes_json='{"spirit":1,"will":1,"body":1,"insight":1}' WHERE user_id=42`)
 	defer gamerng.UseRoller(func(int) int { return 0 })()
 	out, err := flameAct(t, path, "capture", "")
 	if err != nil {

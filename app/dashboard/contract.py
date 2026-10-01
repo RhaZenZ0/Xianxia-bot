@@ -43,7 +43,9 @@ DASHBOARD_API_VERSION = 2
 # builds for Formation and Inscription: read-only on Crafting & Assets too.
 # Schema 72 (v1.13.0) adds `characters.path_resource`, a Sword Cultivator's
 # banked intent: a column on a table the Player Editor already reads, no table.
-DASHBOARD_REVIEWED_SCHEMA_VERSION = 72
+# Schema 73 (v1.14.0) rewrites characters.attributes_json to the base the
+# engine grows from; no table, and no column the dashboard reads changes shape.
+DASHBOARD_REVIEWED_SCHEMA_VERSION = 73
 
 DASHBOARD_GET_API_PATHS = frozenset({
     "/api/overview", "/api/capabilities", "/api/timeline", "/api/npcs", "/api/npc",

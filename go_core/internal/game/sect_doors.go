@@ -178,7 +178,7 @@ func sectRecruitmentEnvoysActionGo(conn *storage.Conn, catalog worlddata.Catalog
 			return authoritativeMutation{}, e
 		}
 	}
-	c, e := loadMechanicsCharacter(conn, userID)
+	c, e := loadMechanicsCharacter(conn, catalog, userID)
 	if e != nil {
 		return authoritativeMutation{}, e
 	}

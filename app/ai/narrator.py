@@ -8,6 +8,7 @@ from typing import Any
 
 from .ai_router import AITaskRouter, NarrationTier
 from ..rules.narration_pool import exploration_kind, narration_tier, procedural_narration
+from ..rules.attribute_growth import sheet_attributes
 from ..rules.game import World
 from ..rules.sect import TERMINOLOGY_PROMPT
 from ..rules.npc_memory import format_memories
@@ -552,7 +553,7 @@ class Narrator:
         return snapshot
 
     def _character_summary(self, character: dict[str, Any], realm_name: str) -> str:
-        attrs = character["attributes"]
+        attrs = sheet_attributes(dict(getattr(self.world, "data", None) or {}), character)
         body_realm = self.world.body_realm_name(
             int(character.get("body_realm_index", 0)), character.get("gender")
         )

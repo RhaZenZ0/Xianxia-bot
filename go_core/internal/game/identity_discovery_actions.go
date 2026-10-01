@@ -86,7 +86,7 @@ func sectDiscoverAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	// still read - an older bot sends one - but only to narrow, never to
 	// widen: a name the gates do not justify is dropped, so a client cannot
 	// satisfy the trial's "discovered" check by asserting it.
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return nil, err
 	}

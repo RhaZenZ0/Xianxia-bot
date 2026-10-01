@@ -642,6 +642,13 @@
     "own_manual_gathering_mult": 1.15,
     "own_manual_practice_bonus": 1
   },
+  "attribute_growth": {
+    "per_stage": 1,
+    "path_per_stage": 2,
+    "path_edge_cap": 5,
+    "kept_per_realm": 1,
+    "stages_per_realm": 9
+  },
   "roots": [
     "Fire",
     "Water",

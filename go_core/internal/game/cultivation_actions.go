@@ -202,7 +202,7 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -645,7 +645,7 @@ func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, user
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
 	}
-	c, err := loadMechanicsCharacter(conn, userID)
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -775,7 +775,9 @@ func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, user
 		if err == nil && !body {
 			_, err = conn.Execute(`DELETE FROM world_state WHERE key IN (?,?)`, []any{cultivationLastFailKey(userID), cultivationRerollKey(userID)})
 		}
-		if err == nil && newRealm != realm {
+		// Every qi stage grows the attributes (v1.14.0); the body ladder still
+		// grows body on a realm crossing only.
+		if err == nil && (!body || newRealm != realm) {
 			attributeGains, err = growAttributesOnRealmCrossing(conn, catalog, userID, c, body, now)
 		}
 		// Every stage crossed widens the qi body by one channel.

@@ -743,12 +743,12 @@ func bossActActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	}
 	phase := t.Phases[phaseIdx]
 	now := nowSeconds()
-	r, e = conn.Execute(`SELECT attributes_json,realm_index FROM characters WHERE user_id=?`, []any{userID})
+	r, e = conn.Execute(`SELECT attributes_json,realm_index,path,phase FROM characters WHERE user_id=?`, []any{userID})
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
 	cr := firstRowMap(r)
-	attrs := decodeJSONMap(cr["attributes_json"])
+	attrs := rowAttributes(catalog, cr)
 	body := i64(attrs["body"])
 	spirit := i64(attrs["spirit"])
 	agi := i64(attrs["agility"])
@@ -832,7 +832,9 @@ func bossActActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 			bonus = 2 + comp/20
 		}
 		roll := stablePercentGo(p.EncounterID, round, userID, p.Style, i64(enc["version"]))
-		accuracy := 65 + agi*2 + equip["agility"] - phase.Defense*2
+		// Agility is worth two points of chance, so the stages this raider
+		// has outgrown the boss by are worth two as well (v1.14.0).
+		accuracy := 65 + agi*2 + equip["agility"] - phase.Defense*2 + 2*stageLead(catalog, i64(cr["realm_index"]), i64(cr["phase"]), t.RealmIndex, 1)
 		hitChance = clamp(accuracy, 15, 95)
 		bugslayerGuard := int64(0)
 		if roll < hitChance {
@@ -930,13 +932,13 @@ func bossActActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 			rr, _ = conn.Execute(`SELECT * FROM boss_participants WHERE encounter_id=? AND status='active'`, []any{p.EncounterID})
 			for _, tar := range rowsToMaps(rr) {
 				tid := i64(tar["user_id"])
-				crr, _ := conn.Execute(`SELECT attributes_json,realm_index FROM characters WHERE user_id=?`, []any{tid})
+				crr, _ := conn.Execute(`SELECT attributes_json,realm_index,path,phase FROM characters WHERE user_id=?`, []any{tid})
 				tc := firstRowMap(crr)
-				ta := decodeJSONMap(tc["attributes_json"])
+				ta := rowAttributes(catalog, tc)
 				trs, _ := equipmentRows(conn, tid, true)
 				te := equipmentPowerRows(trs)
 				tf, _ := formationBonusGo(conn, i64(enc["party_id"]), tid)
-				def := i64(ta["body"]) + i64(tc["realm_index"]) + te["defense"] + tf["defense"]
+				def := i64(ta["body"]) + i64(tc["realm_index"]) + te["defense"] + tf["defense"] + stageLead(catalog, i64(tc["realm_index"]), i64(tc["phase"]), t.RealmIndex, 1)
 				incoming := max64(1, phase.Attack+stablePercentGo(p.EncounterID, round, tid, "boss")/20-def/2)
 				if i64(tar["guard"]) != 0 {
 					incoming = max64(1, incoming/2)

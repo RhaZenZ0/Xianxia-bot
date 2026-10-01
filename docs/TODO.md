@@ -16,7 +16,7 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
-- **deferred (v1.14.0, on the owner's call "ship paths first")** — *Attributes grow every stage.*
+- **fixed (v1.14.0)** — *Attributes grow every stage.* (Deferred from v1.13.0 on the owner's call "ship paths first".)
   Asked for as "+1 on every attribute per level, and the types get +2 on some", then settled as: at
   every **stage** a cultivator gains +1 to all six attributes and +2 instead on the two their path
   grows (`pathGrowthAttributes`), with the rolls made harder to keep the odds where they are. The
