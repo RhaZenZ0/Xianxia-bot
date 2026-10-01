@@ -76,6 +76,7 @@ minutes of virtual time. CLAUDE.md says so: "It is a script, not CI".
 Run them locally, and only locally:
 
 ```bash
+python scripts/playtest_all.py                # both at once, the Discord sweep in 3 parts (about a third of the ~27 minutes run in turn)
 python scripts/playtest_engine.py --launch    # builds and starts a scratch engine, drives every operation
 python scripts/playtest_discord.py --launch   # the real bot under simulated Discord, every leaf pressed
 ```

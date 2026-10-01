@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v1.14.0
+# Xianxia RP Discord Bot v1.14.1
 
 *A cultivation RPG played entirely through Discord commands: deterministic rules in Go, an AI that
 narrates but never decides, self-hosted on your own hardware.*
@@ -693,6 +693,7 @@ make check              # lint + format-check + test-python + test-go, the pytho
 | `make tools` | installs `staticcheck` and `govulncheck` at the versions the Makefile pins (the only versions CI runs) |
 | `make audit` | `govulncheck ./...` — the one check that needs the network, which is why it is not in `lint` or `check` |
 | `python scripts/check_dashboard_implementation.py` | the dashboard drift and coverage gate |
+| `python scripts/playtest_all.py` | the release playtest in one command: the engine half and the Discord half at once, the Discord leaf sweep split into parts (`--shards N`, default 3), each on its own scratch engine and ports; prints each part's count, every failure, and that the parts swept every hub exactly once |
 | `python scripts/playtest_engine.py --launch` | the engine half of the playtest: every roadmap loop, then every operation the engine answers, driven through a scratch engine (the ones it defers are named in the script, each with its reason) |
 | `python scripts/playtest_discord.py --launch` | the Discord half: the real bot booted against a simulated Discord (SimCord, a dev dependency), driven through its slash commands, panels, pickers, modals and typed lines, then every leaf of every hub pressed once |
 | `python scripts/playtest_checklist.py` | regenerates `docs/playtest/v<version>.md` |

@@ -72,6 +72,7 @@ Other checks:
 
 ```bash
 python scripts/check_dashboard_implementation.py   # dashboard frontend/backend drift + coverage gate, part of the release gate
+python scripts/playtest_all.py                     # the release check: both halves at once, the Discord sweep in 3 parts
 python scripts/playtest_engine.py --launch         # the engine half of the playtest: every operation, against a scratch engine
 python scripts/playtest_discord.py --launch        # the Discord half: the real bot under a simulated Discord, every leaf pressed (see below)
 python -m compileall -q app                        # compile-check production Python
@@ -5506,9 +5507,10 @@ with its reason, and asserts they were *not* grandfathered.
 **The engine playtest had pinned the old beast rule (v1.8.1).** v1.7.7 made an evolution leave a
 beast at 15 loyalty, and updated the one assertion about it. The two steps after it still walked
 100, 80, 60, so one failed every run and the other passed only because 15 is also below 80. They
-hold the refusal at 15 against 70 and an evolution at exactly 70 now. **The two harnesses bind one
-fixed engine port (`127.0.0.1:18089`), so they cannot run at the same time**: run in parallel they
-share one engine, and the Discord half's maintenance lockdown fails the engine half's steps.
+hold the refusal at 15 against 70 and an evolution at exactly 70 now. **The two harnesses bound one
+fixed engine port (`127.0.0.1:18089`), so they could not run at the same time**: run in parallel they
+shared one engine, and the Discord half's maintenance lockdown failed the engine half's steps. Each
+run takes free ports since v1.14.1 - see "The playtest runs in parts" below.
 
 **`#updates` linked a page that exists only for tagged versions (v1.8.2).** `release_post` linked
 `releases/tag/v<version>`, and a GitHub Release is made only when somebody pushes a `v*` tag, which
@@ -5905,6 +5907,44 @@ modifier like every other faced roll.
 number back. `handsOn` names the three that select the row for another function to decode, each
 with the decoder, which the test holds to the door in turn. The spiritual sense is deliberately left
 on the relative value: its numbers are compared with an NPC's concealment, which does not grow.
+
+### The playtest runs in parts (`scripts/playtest_all.py`, v1.14.1)
+
+Asked for as *"could we do the playtest in stages, or more at the same time in different parts?"*.
+Both harnesses bound `127.0.0.1:18089`, so a release check was the engine half and then the Discord
+half, and the Discord half spent twenty of its twenty-five minutes in one place: the leaf sweep.
+Every run takes free ports now (`free_port`, for the engine and for the bot's health and control
+port), and `playtest_all.py` builds the engine once and starts the engine half beside the Discord
+half split into parts, `playtest_discord.py --shard I/N`.
+
+**Every part runs sections 1-7c in full**, so its player stands where the whole run's player stands
+when the sweep begins. Staging that state with GM levers instead was rejected: section 7 decides
+the location by travelling, and which doors the sweep finds hidden depends on where it stands - a
+staged part would sweep a different panel and still call it covered. The setup costs a minute or
+two per part, overlapped. Sections 9 and 9b run in part 1 only; section 10 runs in every part.
+
+**Splitting a sweep is how a sweep quietly stops covering something**, so the split is stated once
+(`shard_hubs`: heaviest hub first, each to the lightest part, ties by name) and each part prints
+`SHARD I/N hubs: … (of M)`. The runner's union check refuses a run in which a part never said what
+it swept, two parts disagree on M, a hub was swept twice, or the parts did not between them name M
+hubs - the runtime half of "every leaf was pressed", which the per-part coverage step can no
+longer hold alone. `test_playtest_shards.py` holds the split, the union check and that no
+harness binds a fixed address, reading code only because the docstring explaining the old address
+names it (rc.52). Run without `--shard`, the Discord half is the whole run it always was.
+
+**The first parallel run found a bug a whole run never had, and a worker the harness never stopped.**
+One part's player stood at a lair when the sweep pressed **/boss start** - a whole run's never does -
+and the raid started and then raised `edit_original_response() got an unexpected keyword argument
+'wait'`: a leaf answered from a picker is answered by *editing* the picker, the hub proxy turns the
+handler's `followup.send(...)` into that edit, and the raid card is sent `wait=True`.
+`_safe_edit_kwargs` had stripped two send-only keywords by name; it keeps only what
+`edit_original_response` takes now (a file becomes an attachment), and
+`test_a_hub_edit_takes_only_what_an_edit_accepts.py` holds that against discord.py's own
+signatures. And part 1 failed a settle on `weekend_gift_worker`, a third unconditional worker
+`PERIODIC_WORKERS` (written when there were two) never named: it sleeps forty-five real seconds and
+then asks the engine, harmless mid-section in a lone run and a five-second stall under four. The
+list names it, and the shard test walks `bot.py` for every task started outside an `if`, so the
+next one cannot be missed the same way.
 
 ## Testing conventions
 
