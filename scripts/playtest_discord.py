@@ -18,6 +18,7 @@ thread exists, a locked line is printed, a modal was shown, a quest line
 followed a reply. Rolls are reported, never bounded.
 
     python3 scripts/playtest_discord.py --launch     # build, start and bootstrap a scratch engine, run, stop
+    python3 scripts/playtest_discord.py --launch --shard 2/3   # one third of the sweep (see playtest_all.py)
     GAME_ENGINE_URL=http://127.0.0.1:8081 ENGINE_AUTH_TOKEN=... DATABASE_PATH=... python3 scripts/playtest_discord.py
 
 Never point it at the production database: it binds channels, creates a
@@ -41,10 +42,14 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from playtest_common import Report, bootstrap, launch_engine, step, stop_engine  # noqa: E402 - beside this file
+from playtest_common import (  # noqa: E402 - beside this file
+    Report, bootstrap, free_port, launch_engine, parse_shard, shard_hubs, step, stop_engine,
+)
 
 GUILD_ID = 900000000000000001
-HEALTH_PORT = 18182  # 1..65535 is enforced by the settings; the engine playtest's own port is 18089
+# The bot's health and control port. Each run takes a free one (v1.14.1), so
+# several runs - the parts `playtest_all.py` starts at once - never share it.
+HEALTH_PORT = int(os.environ.get("PLAYTEST_HEALTH_PORT") or 0) or free_port()
 # How long a hub panel stays open **under the harness** (v1.0.13). It is a
 # setting, so it belongs in the environment block below with every other thing
 # this run pins, and the one step that waits a panel out reads it back through
@@ -630,7 +635,11 @@ def _thread_named_for(channel: Any, viewer: Any) -> Any | None:
 # The run
 # ---------------------------------------------------------------------------
 
-async def run(url: str, token: str, db_path: str) -> Report:
+async def run(url: str, token: str, db_path: str, shard: tuple[int, int] | None = None) -> Report:
+    """The whole run, or with `shard` (I, N) one part of it: every part runs
+    sections 1-7c, so its player stands where the whole run's does when the
+    sweep starts; the sweep walks only that part's hubs; sections 9 and 9b run
+    in part 1 alone; section 10 runs in every part."""
     _configure(url, token, db_path)
     import logging
 
@@ -1431,7 +1440,16 @@ async def run(url: str, token: str, db_path: str) -> Report:
         # has no character, so nothing here mutes, bans or erases the player
         # the rest of the run walks. The panel is reopened per page so no
         # view times out under a long sweep.
-        live = {action.path for definition in hub_registry.REGISTERED_HUBS for page in definition.pages for action in hub_registry._leaf_actions(page)}
+        # A part of a split run sweeps only its own hubs (v1.14.1), and says
+        # which on a line `playtest_all.py` reads to hold the parts' union to
+        # every registered hub - the runtime half of "every leaf was pressed".
+        swept = list(hub_registry.REGISTERED_HUBS)
+        if shard is not None:
+            weights = [(d.name, sum(len(hub_registry._leaf_actions(page)) for page in d.pages)) for d in swept]
+            mine = set(shard_hubs(weights, shard[1])[shard[0] - 1])
+            swept = [d for d in swept if d.name in mine]
+            report.add("PASS", f"SHARD {shard[0]}/{shard[1]} hubs: {','.join(sorted(mine))} (of {len(weights)})")
+        live = {action.path for definition in swept for page in definition.pages for action in hub_registry._leaf_actions(page)}
         pressed: dict[str, str] = {}
         locked: dict[str, str] = {}
         # Another path's doors (v1.13.0) are left off with no padlock, and a
@@ -1443,7 +1461,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         for who in (player, gm):
             who_c = await DB.get_character(int(who.id)) or {}
             path_locked[int(who.id)] = set(await bot_surface._path_hidden_actions(None, who_c)) if who_c else set()
-        for definition in sorted(hub_registry.REGISTERED_HUBS, key=lambda d: d.name == "admin"):
+        for definition in sorted(swept, key=lambda d: d.name == "admin"):
             actor = gm if definition.name == "admin" else player
             for page in definition.pages:
                 theirs = path_locked.get(int(actor.id), set())
@@ -1549,7 +1567,8 @@ async def run(url: str, token: str, db_path: str) -> Report:
             except SetupError as exc:
                 return f"buttons disabled: {exc}"
             raise Failed("the panel still takes presses after its timeout:\n" + text[:400])
-        note = await step(report, "a panel left past its idle window goes quiet and can be reopened", quiet())
+        tail = shard is None or shard[0] == 1  # 9 and 9b run once, in the whole run or part 1
+        note = await step(report, "a panel left past its idle window goes quiet and can be reopened", quiet()) if tail else None
         if note:
             report.add("PASS", "how it went quiet", note)
 
@@ -1591,7 +1610,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
             if "is gone" in lowered and "/begin" in lowered:
                 return "reset: the cultivator was taken back and /begin was named"
             raise Failed("the reset leaf answered neither a result nor its designed refusal:\n" + out[:600])
-        note = await step(report, "the reset leaf answers a result or its designed refusal", begin_again())
+        note = await step(report, "the reset leaf answers a result or its designed refusal", begin_again()) if tail else None
         if note:
             report.add("PASS", "how beginning again went", note)
 
@@ -1608,7 +1627,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--launch", action="store_true", help="build, start and bootstrap a scratch engine for the run")
     parser.add_argument("--keep", action="store_true", help="with --launch, keep the scratch directory")
+    parser.add_argument("--shard", metavar="I/N", help="sweep only part I of N (sections 1-7c and 10 run in every part)")
     args = parser.parse_args()
+    shard = parse_shard(args.shard) if args.shard else None
     proc = None
     tmp = Path(tempfile.mkdtemp(prefix="xianxia-playtest-discord-"))
     try:
@@ -1622,7 +1643,7 @@ def main() -> int:
             db_path = os.environ.get("DATABASE_PATH", "")
             if not url or not token or not db_path:
                 raise SystemExit("set GAME_ENGINE_URL, ENGINE_AUTH_TOKEN and DATABASE_PATH, or pass --launch")
-        report = asyncio.run(run(url, token, db_path))
+        report = asyncio.run(run(url, token, db_path, shard))
         print(f"\n{len(report.rows)} steps, {report.failed} failed")
         return 1 if report.failed else 0
     finally:
