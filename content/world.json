@@ -12095,6 +12095,117 @@
         "The well carries a thread of earth qi; the road either side carries only dust."
       ],
       "shop": "yellow_gourd_waystation"
+    },
+    "Jade Crown Sutra Archive": {
+      "description": "The sutra archive of Jade Crown Spirit City: nine galleries of Law scripture on jade and bone, copyists at long tables, and a silence kept so carefully that a dropped brush is remembered for a week. The Laws are read here, and a cultivator who comprehends one under this roof comprehends it a little more clearly.",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "district": "archive",
+      "outside_location": "Jade Crown Spirit City",
+      "encounters": [
+        "A copyist finishes a line of the Space Law sutra and sits back as though it had cost something.",
+        "An archivist refuses a visiting elder a scroll, politely, three times, and wins.",
+        "Two readers argue in whispers over one character of the Fire Law and both are right.",
+        "A gallery lamp is trimmed and the whole hall breathes out at once."
+      ],
+      "sense_hints": [
+        "Every scroll carries a trace of the Law written on it; the galleries read as nine faint, steady pressures.",
+        "Ink, jade dust and the dry patience of a place where nothing is hurried."
+      ]
+    },
+    "Thousand Beast Steppe": {
+      "description": "An open steppe beyond Galevein's last road, grazed by spirit herds whose ancestors were here before the sects. Bone cairns mark the old migration lines, and the biggest of them is not a cairn.",
+      "wilds_of": "Galevein Spirit City",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": false,
+      "terrain": "open steppe",
+      "climate": "warm-breezy",
+      "encounters": [
+        "A herd of horned spirit deer crosses the grass in one long unhurried line and does not look at you.",
+        "A bone cairn hums when the wind comes off it from the north.",
+        "Tracks the width of a cart wheel cut across the trail and end at nothing.",
+        "A Thousand Beast Valley disciple sits very still on a rise, counting something with her fingers."
+      ],
+      "sense_hints": [
+        "Beast qi lies over the whole steppe like heat; one signature under the largest cairn is older than all the rest together.",
+        "Grass, dung, dry wind, and the slow pulse of something very large and very patient."
+      ]
+    },
+    "Ninefold Grandmasters' Court": {
+      "description": "The grandmasters' court of Ninefold Noble Immortal City: a square of nine halls, one per trade and two kept empty, where the Immortal World's best makers sit in judgement on each other's work. A thing made under their eyes is made better, because nobody wants to be the one they talk about.",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "district": "court",
+      "outside_location": "Ninefold Noble Immortal City",
+      "encounters": [
+        "A grandmaster turns a sword over once, hands it back, and the smith who made it leaves without a word.",
+        "An assessor weighs a pill on a scale that has not been wrong in four hundred years.",
+        "Two halls argue over whether a talisman is Inscription or Formation and settle it by burning it.",
+        "An apprentice is admitted to the square for the first time and forgets how to walk."
+      ],
+      "sense_hints": [
+        "Nine distinct craft-qi signatures hold the square like nine hands on one table.",
+        "Furnace heat from one hall, pill-steam from the next, and under both the cold attention of people who are never fooled."
+      ]
+    },
+    "Starfall Crater": {
+      "description": "The crater the fallen star left beyond the city's walls: a bowl of glassed stone a league across, still warm at the centre, where immortal gold runs in the cracks and something made of the star itself walks the rim.",
+      "wilds_of": "Fallen Star Immortal City",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": false,
+      "terrain": "glassed crater",
+      "climate": "cool-dry",
+      "encounters": [
+        "Immortal gold shines in a crack in the glass and is gone when you look straight at it.",
+        "The rim rings under a tread far heavier than yours, a long way off and coming no closer.",
+        "A prospector from Fallen Star sits on the lip of the crater and will not go down.",
+        "Heat rises off the centre in a column you can see from the road."
+      ],
+      "sense_hints": [
+        "Metal qi so dense it has a grain, running in lines to the centre; on the rim, a single signature that is not alive and is not still.",
+        "Hot glass, cold wind, and the smell of a forge that nobody built."
+      ]
+    },
+    "Mandate Crown Heaven-Reading Altar": {
+      "description": "The heaven-reading altar of Mandate Crown Celestial City: a bare stone terrace above the roofs where augurs read the mandate in the stars and the sky is nearer than it is anywhere else in the city. A cultivator who breaks through on this stone is heard a little sooner.",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "district": "altar",
+      "outside_location": "Mandate Crown Celestial City",
+      "encounters": [
+        "An augur reads the night's mandate aloud and the city below goes quiet to hear it.",
+        "A cultivator sits down on the bare stone to break through and the augurs clear the altar without being asked.",
+        "Starlight falls on the terrace in a line that was not there a moment ago.",
+        "The altar warden turns a petitioner away: the stars are not for asking small questions of."
+      ],
+      "sense_hints": [
+        "The sky's own qi comes down to the stone here with nothing in the way; a breakthrough would be heard from the terrace before it was seen.",
+        "Cold stone, thin air, and the slow turning pressure of the mandate overhead."
+      ]
+    },
+    "Shattered Firmament": {
+      "description": "A field beyond the ruined city where a piece of the sky came down: shards of firmament the size of halls lie in the grass, still faintly lit, and the constellation that fell with them is not dead.",
+      "wilds_of": "Ruined Constellation City",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": false,
+      "terrain": "fallen sky-field",
+      "climate": "cold-thin",
+      "encounters": [
+        "A shard of firmament lights from inside and shows, for a breath, the stars as they stood a thousand years ago.",
+        "Something very long moves between two shards and is gone before it finishes passing.",
+        "A star-reader from the ruined city copies the pattern on a shard with shaking hands.",
+        "The grass between the shards grows in the shape of a constellation nobody has named."
+      ],
+      "sense_hints": [
+        "The qi of the sky itself, broken into pieces and lying in the grass; among them one signature that was a constellation and is now something that hunts.",
+        "Cold, thin air with a taste of starlight, and a pressure overhead where the piece of sky used to be."
+      ]
     }
   },
   "npcs": {
@@ -23207,6 +23318,174 @@
           "dao insight"
         ]
       }
+    },
+    "Archivist Wen Shu": {
+      "role": "Jade Crown Spirit City keeper of the sutra archive",
+      "location": "Jade Crown Sutra Archive",
+      "realm": "Spirit Transformation",
+      "stage": 4,
+      "district": "Jade Crown Sutra Archive",
+      "speech": "Quotes a sutra for every occasion and never the one you expect.",
+      "want": "Recover the three galleries the pagoda took with it when it fell.",
+      "fear": "A reader who understands a Law better than the sutra that teaches it.",
+      "personality": "Dry, exact and quietly generous.",
+      "secret": "Keeps one scroll out of the catalogue because of who wrote it.",
+      "schedule": {
+        "Dawn": "Jade Crown Sutra Archive",
+        "Morning": "Jade Crown Sutra Archive",
+        "Afternoon": "Jade Crown Sutra Archive",
+        "Evening": "Jade Crown Sutra Archive",
+        "Night": "Jade Crown Sutra Archive"
+      }
+    },
+    "Copyist Lin Bai": {
+      "role": "Jade Crown Spirit City copyist of the sutra archive",
+      "location": "Jade Crown Sutra Archive",
+      "realm": "Soul Transformation",
+      "stage": 5,
+      "district": "Jade Crown Sutra Archive",
+      "speech": "Talks with the brush still moving.",
+      "want": "Copy the whole Water Law sutra without a single corrected stroke.",
+      "fear": "Ink on a jade original.",
+      "personality": "Patient, proud of small things, easily wounded.",
+      "secret": "Has comprehended more of the Water Law than the archivist knows, from copying it.",
+      "schedule": {
+        "Dawn": "Jade Crown Sutra Archive",
+        "Morning": "Jade Crown Sutra Archive",
+        "Afternoon": "Jade Crown Sutra Archive",
+        "Evening": "Jade Crown Sutra Archive",
+        "Night": "Jade Crown Sutra Archive"
+      }
+    },
+    "Herd-Reader Qu Lan": {
+      "role": "Thousand Beast Steppe reader of the herds",
+      "location": "Thousand Beast Steppe",
+      "realm": "Spirit Transformation",
+      "stage": 7,
+      "speech": "Counts before she answers.",
+      "want": "See the Ancestor Stag walk the old line once more before she dies.",
+      "fear": "A sect bringing a hunting party onto the steppe.",
+      "personality": "Still, watchful, slow to warm and loyal after.",
+      "secret": "Knows which cairn the bone hall opens under and has never told a sect.",
+      "schedule": {
+        "Dawn": "Thousand Beast Steppe",
+        "Morning": "Thousand Beast Steppe",
+        "Afternoon": "Thousand Beast Steppe",
+        "Evening": "Thousand Beast Steppe",
+        "Night": "Thousand Beast Steppe"
+      }
+    },
+    "Grandmaster Hou Jian": {
+      "role": "Ninefold Noble Immortal City presiding grandmaster of the court",
+      "location": "Ninefold Grandmasters' Court",
+      "realm": "Golden Immortal",
+      "stage": 3,
+      "district": "Ninefold Grandmasters' Court",
+      "speech": "Says one sentence and lets it stand.",
+      "want": "See one flawless thing made in the square before he retires from it.",
+      "fear": "Being wrong about a piece of work in front of the other eight.",
+      "personality": "Severe, fair, and kinder than his face.",
+      "secret": "Passed his own examination on a piece a rival made for him, and has judged harder ever since.",
+      "schedule": {
+        "Dawn": "Ninefold Grandmasters' Court",
+        "Morning": "Ninefold Grandmasters' Court",
+        "Afternoon": "Ninefold Grandmasters' Court",
+        "Evening": "Ninefold Grandmasters' Court",
+        "Night": "Ninefold Grandmasters' Court"
+      }
+    },
+    "Assessor Mei Rong": {
+      "role": "Ninefold Noble Immortal City assessor of the grandmasters' court",
+      "location": "Ninefold Grandmasters' Court",
+      "realm": "Star Immortal",
+      "stage": 6,
+      "district": "Ninefold Grandmasters' Court",
+      "speech": "Numbers first, then the verdict.",
+      "want": "Replace the court's four-hundred-year scale with one she made.",
+      "fear": "A grade she cannot measure.",
+      "personality": "Brisk, exact and privately delighted by good work.",
+      "secret": "Keeps a ledger of which grandmaster is wrong how often, and it is not flattering.",
+      "schedule": {
+        "Dawn": "Ninefold Grandmasters' Court",
+        "Morning": "Ninefold Grandmasters' Court",
+        "Afternoon": "Ninefold Grandmasters' Court",
+        "Evening": "Ninefold Grandmasters' Court",
+        "Night": "Ninefold Grandmasters' Court"
+      }
+    },
+    "Prospector Duan Yi": {
+      "role": "Starfall Crater prospector of the crater rim",
+      "location": "Starfall Crater",
+      "realm": "Sky Immortal",
+      "stage": 4,
+      "speech": "Measures everything in ounces of gold.",
+      "want": "Reach the centre of the crater and come back with what runs there.",
+      "fear": "The thing on the rim learning his name.",
+      "personality": "Greedy, brave in short bursts, honest about both.",
+      "secret": "Has been to the centre once, and what he brought back is not gold.",
+      "schedule": {
+        "Dawn": "Starfall Crater",
+        "Morning": "Starfall Crater",
+        "Afternoon": "Starfall Crater",
+        "Evening": "Starfall Crater",
+        "Night": "Starfall Crater"
+      }
+    },
+    "Augur Shen Yue": {
+      "role": "Mandate Crown Celestial City reader of the mandate",
+      "location": "Mandate Crown Heaven-Reading Altar",
+      "realm": "Celestial King",
+      "stage": 3,
+      "district": "Mandate Crown Heaven-Reading Altar",
+      "speech": "Speaks of the future in the past tense.",
+      "want": "Read one mandate the stars have never shown anybody.",
+      "fear": "A night with no stars.",
+      "personality": "Serene, oblique and more frightened than she sounds.",
+      "secret": "Has read her own ending in the stars and told nobody the date.",
+      "schedule": {
+        "Dawn": "Mandate Crown Heaven-Reading Altar",
+        "Morning": "Mandate Crown Heaven-Reading Altar",
+        "Afternoon": "Mandate Crown Heaven-Reading Altar",
+        "Evening": "Mandate Crown Heaven-Reading Altar",
+        "Night": "Mandate Crown Heaven-Reading Altar"
+      }
+    },
+    "Altar Warden Gu Fan": {
+      "role": "Mandate Crown Celestial City warden of the heaven-reading altar",
+      "location": "Mandate Crown Heaven-Reading Altar",
+      "realm": "Celestial Lord",
+      "stage": 6,
+      "district": "Mandate Crown Heaven-Reading Altar",
+      "speech": "Says no before you have finished asking.",
+      "want": "Keep the altar bare of everything but the sky.",
+      "fear": "A breakthrough on the altar going wrong in front of the whole city.",
+      "personality": "Gruff, proud of the stone, kinder to cultivators than to petitioners.",
+      "secret": "Failed his own breakthrough on this altar, twice, and never tried a third time.",
+      "schedule": {
+        "Dawn": "Mandate Crown Heaven-Reading Altar",
+        "Morning": "Mandate Crown Heaven-Reading Altar",
+        "Afternoon": "Mandate Crown Heaven-Reading Altar",
+        "Evening": "Mandate Crown Heaven-Reading Altar",
+        "Night": "Mandate Crown Heaven-Reading Altar"
+      }
+    },
+    "Star-Reader Pei Wan": {
+      "role": "Shattered Firmament reader of the fallen stars",
+      "location": "Shattered Firmament",
+      "realm": "Celestial Lord",
+      "stage": 2,
+      "speech": "Names every star before he names you.",
+      "want": "Put the fallen constellation back together on paper, since it cannot be put back in the sky.",
+      "fear": "The leviathan reading him back.",
+      "personality": "Scholarly, fearless about the sky and terrified of what is under it.",
+      "secret": "The constellation he is copying is the one that fell on his own clan's city.",
+      "schedule": {
+        "Dawn": "Shattered Firmament",
+        "Morning": "Shattered Firmament",
+        "Afternoon": "Shattered Firmament",
+        "Evening": "Shattered Firmament",
+        "Night": "Shattered Firmament"
+      }
     }
   },
   "items": {
@@ -27388,6 +27667,66 @@
           ]
         }
       }
+    },
+    "ancestor_stag_antler_slip": {
+      "name": "Ancestor Stag Antler Slip",
+      "description": "A slip cut from the Ancestor Stag's shed antler; the herd-readers' arts are grooved into it like growth rings.",
+      "sect_value": 480,
+      "auction_interest": "legendary",
+      "door_event_chance": 60,
+      "hunter_realm_bonus": 2,
+      "base_price": 3900
+    },
+    "steppe_bone_token": {
+      "name": "Steppe Bone Token",
+      "description": "A token of cairn-bone that pulls toward the Ancestor Stag's Bone Hall and opens it for a while.",
+      "sect_value": 900,
+      "spatial_key": {
+        "secret_realm_id": "ancestor_stag_bone_hall",
+        "open_hours": 2,
+        "consumed": true
+      },
+      "base_price": 544
+    },
+    "fallen_star_hammer_slip": {
+      "name": "Fallen Star Hammer Slip",
+      "description": "A slip of star-iron struck flat on the forge's own anvil; the smith's arts are in the hammer marks.",
+      "sect_value": 560,
+      "auction_interest": "legendary",
+      "door_event_chance": 60,
+      "hunter_realm_bonus": 2,
+      "base_price": 4400
+    },
+    "starfall_core_seal": {
+      "name": "Starfall Core Seal",
+      "description": "A seal of crater glass with a bead of immortal gold at its heart; it pulls toward the Fallen Star's Forge and opens it for a while.",
+      "sect_value": 1000,
+      "spatial_key": {
+        "secret_realm_id": "fallen_star_forge",
+        "open_hours": 2,
+        "consumed": true
+      },
+      "base_price": 640
+    },
+    "unmoored_star_chart": {
+      "name": "Unmoored Star Chart",
+      "description": "A chart of the heavens drawn from below them, with one star missing and its place still warm.",
+      "sect_value": 640,
+      "auction_interest": "legendary",
+      "door_event_chance": 60,
+      "hunter_realm_bonus": 2,
+      "base_price": 5200
+    },
+    "firmament_shard_key": {
+      "name": "Firmament Shard Key",
+      "description": "A sliver of the fallen sky that pulls toward the Unmoored Star's Hollow and opens it for a while.",
+      "sect_value": 1200,
+      "spatial_key": {
+        "secret_realm_id": "unmoored_star_hollow",
+        "open_hours": 2,
+        "consumed": true
+      },
+      "base_price": 768
     }
   },
   "recipes": {
@@ -28079,6 +28418,48 @@
         "insight_xp": 60
       },
       "item": "nine_pillar_cornerstone"
+    },
+    "ancestor_stag_legacy": {
+      "name": "Ancestor Stag Legacy",
+      "description": "A beast-binding inheritance of the steppe's first herd-readers, who learned the Laws from the stags that kept them.",
+      "preferred_paths": [
+        "Beast Binder",
+        "Body Refiner"
+      ],
+      "bonuses": {
+        "qi_max": 3,
+        "vitality_max": 2,
+        "insight_xp": 50
+      },
+      "item": "ancestor_stag_antler_slip"
+    },
+    "fallen_star_smith_legacy": {
+      "name": "Fallen Star Smith Legacy",
+      "description": "A forging inheritance of the smith who came down with the star and worked immortal gold under the crater until the fire went out of it.",
+      "preferred_paths": [
+        "Body Refiner",
+        "Formation Adept"
+      ],
+      "bonuses": {
+        "qi_max": 3,
+        "vitality_max": 3,
+        "insight_xp": 60
+      },
+      "item": "fallen_star_hammer_slip"
+    },
+    "unmoored_star_legacy": {
+      "name": "Unmoored Star Legacy",
+      "description": "A legacy of the star that fell out of the mandate and did not go out; what it knew of the heavens it knew from the other side.",
+      "preferred_paths": [
+        "Soul Cultivator",
+        "Formation Adept"
+      ],
+      "bonuses": {
+        "qi_max": 4,
+        "vitality_max": 2,
+        "insight_xp": 70
+      },
+      "item": "unmoored_star_chart"
     }
   },
   "secret_realms": {
@@ -29015,6 +29396,216 @@
               "max": 1
             }
           }
+        }
+      ]
+    },
+    "ancestor_stag_bone_hall": {
+      "name": "Ancestor Stag's Bone Hall",
+      "location": "Thousand Beast Steppe",
+      "min_realm_index": 9,
+      "open_hours": 8,
+      "inheritance_id": "ancestor_stag_legacy",
+      "description": "A hall under the largest cairn, built of the antlers of a thousand years of stags; it opens when the herds cross the old line, and the oldest of them is still inside.",
+      "rooms": [
+        {
+          "name": "The Antler Gate",
+          "description": "A gate of locked antlers that opens for a body that does not flinch from it.",
+          "attribute": "body",
+          "tn": 16,
+          "preferred_paths": [
+            "Beast Binder",
+            "Body Refiner"
+          ],
+          "cultivation": 16,
+          "spirit_stones": 8,
+          "insight_xp": 7,
+          "items": {
+            "moonveil_herb": 2
+          }
+        },
+        {
+          "name": "The Herd's Memory",
+          "description": "A thousand years of migration remembered on the walls; the trial is to be worth remembering.",
+          "attribute": "presence",
+          "tn": 18,
+          "preferred_paths": [
+            "Beast Binder"
+          ],
+          "cultivation": 20,
+          "spirit_stones": 10,
+          "insight_xp": 9,
+          "items": {
+            "spirit_crystal_ore": 2
+          }
+        },
+        {
+          "name": "The Running Line",
+          "description": "The old line runs through the hall and the herd runs on it; keep up or be trampled.",
+          "attribute": "agility",
+          "tn": 20,
+          "preferred_paths": [
+            "Beast Binder",
+            "Sword Cultivator"
+          ],
+          "cultivation": 24,
+          "spirit_stones": 12,
+          "insight_xp": 11,
+          "items": {
+            "moonveil_recovery_pill": 1
+          }
+        },
+        {
+          "name": "The Ancestor's Rest",
+          "description": "The first stag lies here and is not asleep; the trial is to stand in front of it and be allowed.",
+          "attribute": "will",
+          "tn": 22,
+          "preferred_paths": [
+            "Beast Binder"
+          ],
+          "cultivation": 30,
+          "spirit_stones": 16,
+          "insight_xp": 16,
+          "items": {}
+        }
+      ]
+    },
+    "fallen_star_forge": {
+      "name": "The Fallen Star's Forge",
+      "location": "Starfall Crater",
+      "min_realm_index": 17,
+      "open_hours": 10,
+      "inheritance_id": "fallen_star_smith_legacy",
+      "description": "The forge under the crater's centre, hammered out by whatever rode the star down; it opens when the glass at the centre runs again, and the work left on its anvil was never finished.",
+      "rooms": [
+        {
+          "name": "The Glass Stair",
+          "description": "Steps of star-glass that bear a body's weight or cut it.",
+          "attribute": "body",
+          "tn": 19,
+          "preferred_paths": [
+            "Body Refiner"
+          ],
+          "cultivation": 22,
+          "spirit_stones": 12,
+          "insight_xp": 10,
+          "items": {
+            "dawnlotus_herb": 2
+          }
+        },
+        {
+          "name": "The Bellows Hall",
+          "description": "A bellows that breathes on its own; the trial is to read the fire it feeds.",
+          "attribute": "insight",
+          "tn": 21,
+          "preferred_paths": [
+            "Qi Refiner",
+            "Formation Adept"
+          ],
+          "cultivation": 26,
+          "spirit_stones": 14,
+          "insight_xp": 12,
+          "items": {
+            "immortal_gold_ore": 2
+          }
+        },
+        {
+          "name": "The Quenching Pool",
+          "description": "A pool of liquid starlight that quenches metal and resolve alike.",
+          "attribute": "will",
+          "tn": 23,
+          "preferred_paths": [
+            "Body Refiner",
+            "Formation Adept"
+          ],
+          "cultivation": 30,
+          "spirit_stones": 16,
+          "insight_xp": 14,
+          "items": {
+            "dawnlotus_vitality_pill": 1
+          }
+        },
+        {
+          "name": "The Unfinished Work",
+          "description": "A blade half-made on the anvil; the trial is to understand what the smith meant and not to finish it.",
+          "attribute": "spirit",
+          "tn": 25,
+          "preferred_paths": [
+            "Formation Adept"
+          ],
+          "cultivation": 36,
+          "spirit_stones": 20,
+          "insight_xp": 20,
+          "items": {}
+        }
+      ]
+    },
+    "unmoored_star_hollow": {
+      "name": "The Unmoored Star's Hollow",
+      "location": "Shattered Firmament",
+      "min_realm_index": 25,
+      "open_hours": 12,
+      "inheritance_id": "unmoored_star_legacy",
+      "description": "The hollow under the largest shard of the fallen sky, where the star that came down with it went to ground; it opens when the shards light together, and the star is still burning at the bottom of it.",
+      "rooms": [
+        {
+          "name": "The Shard Descent",
+          "description": "A descent along the underside of the firmament, where the sky is a floor and does not hold.",
+          "attribute": "agility",
+          "tn": 22,
+          "preferred_paths": [
+            "Qi Refiner",
+            "Sword Cultivator"
+          ],
+          "cultivation": 28,
+          "spirit_stones": 16,
+          "insight_xp": 12,
+          "items": {
+            "heavenpetal_herb": 2
+          }
+        },
+        {
+          "name": "The Hall of Falling",
+          "description": "The star's fall, happening still; the trial is to keep your own mind while it does.",
+          "attribute": "will",
+          "tn": 24,
+          "preferred_paths": [
+            "Soul Cultivator"
+          ],
+          "cultivation": 32,
+          "spirit_stones": 18,
+          "insight_xp": 14,
+          "items": {
+            "starsteel_ore": 2
+          }
+        },
+        {
+          "name": "The Reading Below",
+          "description": "The mandate read from underneath, in a script that reads back.",
+          "attribute": "insight",
+          "tn": 26,
+          "preferred_paths": [
+            "Soul Cultivator",
+            "Formation Adept"
+          ],
+          "cultivation": 36,
+          "spirit_stones": 20,
+          "insight_xp": 16,
+          "items": {
+            "heavenpetal_elixir": 1
+          }
+        },
+        {
+          "name": "The Burning Star",
+          "description": "The star itself, at the bottom, still burning; the trial is to stand in its light and be seen.",
+          "attribute": "presence",
+          "tn": 28,
+          "preferred_paths": [
+            "Soul Cultivator"
+          ],
+          "cultivation": 44,
+          "spirit_stones": 26,
+          "insight_xp": 24,
+          "items": {}
         }
       ]
     }
@@ -30284,6 +30875,35 @@
       "weight": 3,
       "secret_realm_id": "nine_pillar_vault",
       "description": "The vault under the nine pillars opens when the river runs clear to the bed; eight pillars stand and the ninth has never been found."
+    },
+    {
+      "id": "secret_ancestor_stag_bone_hall",
+      "title": "The Bone Hall Opens",
+      "category": "Beast Tide",
+      "kind": "secret_realm",
+      "weight": 3,
+      "secret_realm_id": "ancestor_stag_bone_hall",
+      "description": "The herds cross the old line and the largest cairn on the steppe opens along the seam of its antlers.",
+      "max_realm_index": 15
+    },
+    {
+      "id": "secret_fallen_star_forge",
+      "title": "The Crater Runs Again",
+      "category": "Heavenly Treasure",
+      "kind": "secret_realm",
+      "weight": 3,
+      "secret_realm_id": "fallen_star_forge",
+      "description": "The glass at the centre of Starfall Crater runs molten for a night, and the forge beneath it opens along the seam.",
+      "max_realm_index": 23
+    },
+    {
+      "id": "secret_unmoored_star_hollow",
+      "title": "The Shards Light Together",
+      "category": "Heavenly Phenomenon",
+      "kind": "secret_realm",
+      "weight": 3,
+      "secret_realm_id": "unmoored_star_hollow",
+      "description": "Every shard of the Shattered Firmament lights at once, and the hollow under the largest opens along the seam of the sky."
     }
   ],
   "body_realms": [
@@ -58390,6 +59010,12 @@
           "quantity": 1,
           "price": 440,
           "made_here": false
+        },
+        {
+          "item_id": "starfall_core_seal",
+          "quantity": 1,
+          "price": 400,
+          "made_here": false
         }
       ],
       "buys": {
@@ -59053,6 +59679,12 @@
           "item_id": "moonveil_concealment_array_method",
           "quantity": 1,
           "price": 220,
+          "made_here": false
+        },
+        {
+          "item_id": "steppe_bone_token",
+          "quantity": 1,
+          "price": 340,
           "made_here": false
         }
       ],
@@ -60634,6 +61266,12 @@
           "item_id": "golden_bastion_array_method",
           "quantity": 1,
           "price": 440,
+          "made_here": false
+        },
+        {
+          "item_id": "starfall_core_seal",
+          "quantity": 1,
+          "price": 400,
           "made_here": false
         }
       ],
@@ -65404,6 +66042,12 @@
           "quantity": 1,
           "price": 880,
           "made_here": false
+        },
+        {
+          "item_id": "firmament_shard_key",
+          "quantity": 1,
+          "price": 480,
+          "made_here": false
         }
       ],
       "buys": {
@@ -67175,6 +67819,12 @@
           "quantity": 1,
           "price": 220,
           "made_here": false
+        },
+        {
+          "item_id": "steppe_bone_token",
+          "quantity": 1,
+          "price": 340,
+          "made_here": false
         }
       ],
       "buys": {
@@ -67514,6 +68164,12 @@
           "item_id": "starfall_bulwark_array_method",
           "quantity": 1,
           "price": 880,
+          "made_here": false
+        },
+        {
+          "item_id": "firmament_shard_key",
+          "quantity": 1,
+          "price": 480,
           "made_here": false
         }
       ],

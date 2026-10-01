@@ -6018,6 +6018,63 @@ than a picker. And the Stygian Lantern Tomb under Greenriver, the study's realm-
 road: it opens on the rotation or a 420-stone key, which is not a door a Qi Refining cultivator can
 count on.
 
+### Each world has a job (`world_jobs.go`, v1.17.0)
+
+The world-flow study's second recommendation, on the owner's call ("Give each world a job. Or
+more"). The three worlds above the Mortal were "the Mortal World again with less in it": the same
+eleven cities, the same shops and halls, and **nothing a rule read that the Mortal World did not
+also have** - the inventory counted two sects to its six, three realms to its four, no raid, no wild
+place, no key on sale. Each carries four things of its own now, and they are one place: a **wild
+place** in the wilds of one of its cities (v1.7.7's `wilds_of`, found by exploring from that city),
+which is the **lair** of the world's raid boss and the **entrance** of a **keyed realm** whose key
+the world's two array workshops shelve - the shape Moonfen Marsh and Cloudspine Foothills already
+had. And a **district kind that stands in that world and nowhere else, read by one rule**.
+
+- **Spiritual World, where the Laws are read** (`law_system.normal_min_realm_index` is its first
+  realm): the Jade Crown Sutra Archive (`archive`) adds `lawArchiveBonus` to `law.comprehend` under
+  its roof. The Thousand Beast Steppe, the Hundred-Horn Ancestor Stag (realm 11), the Ancestor
+  Stag's Bone Hall (floor 9), the Steppe Bone Token.
+- **Immortal World, where the crafts are judged** (its flame is the first that opens the top
+  grade): the Ninefold Grandmasters' Court (`court`) adds `craftCourtBonus` to every craft roll in
+  its square, whichever trade. Starfall Crater, the Starfall Iron Colossus (19), the Fallen Star's
+  Forge (17), the Starfall Core Seal.
+- **Celestial World, where the heavens are nearest**: the Mandate Crown Heaven-Reading Altar
+  (`altar`) adds `breakthroughAltarBonus` to a breakthrough on its stone. `breakthroughModifier`
+  took a `place` term for it, because that function is *"the one place the breakthrough bonus is
+  composed, so the odds shown before the roll and the roll itself cannot disagree"* - a term added
+  at the roll alone would have made the sheet lie. The Shattered Firmament, the Unmoored Star
+  Leviathan (27), the Unmoored Star's Hollow (25, no ceiling), the Firmament Shard Key.
+
+**The kind is content and the worth is code.** `jobDistrictAt` reads the district the cultivator
+stands in; the three bonuses are Go constants. A district kind unique to a world that no rule reads
+would be decoration, so `TestEachUpperWorldHasAJob` holds each world's own kind to a reader and each
+reader to one world, both read off the content rather than a list. The content gate that held every
+city to one signature district (`test_capitals_have_four_compass_districts_and_cities_one`) learned
+the rule the same way: a kind found in exactly one world is that world's job, and one city of that
+world may hold it beside its own.
+
+**A keyed realm holds no rare find**, which is rc.50's rule and is why each world got a *new* realm
+rather than a key to one it had: every upper-world realm but three carries one of rc.54's permanent
+treasures in its last room, and a key would make the find a purchase. The new rooms pay the world's
+tier materials and nothing rare. Each realm has its inheritance and the inheritance its item, because
+`test_project.py` holds both; each opens on one event of weight 3 fading at its world's ceiling
+(rc.53), and the Celestial one on none.
+
+**And the raid paid the Mortal stone in every world.** `bossClaimActionGo` wrote
+`walletDeltaTx(..., "low_spirit_stone", ...)`, right only while every raid was the Mortal World's -
+rc.43's caravan fare and rc.44's reward rule, found at a sixteenth site the day a raid stood
+anywhere else. It pays `characterBaseCurrencyTx`'s coin now, the result carries `currency`, the
+claim line reads it and the raid card names the lair's world's coin. `TestARaidIsPaidInTheMoneyOfItsWorld`
+stages a claim on the steppe and holds the purse to spirit crystals and no stones.
+
+**What each reply does** is print the place and the bonus the engine named - `place`, `place_bonus`
+on the law, craft and breakthrough results - and `test_every_world_has_a_job.py` holds that none of
+the four replies spells a district kind or a coin of its own.
+
+**Two things the inventory found are left as decisions**, in `docs/TODO.md`: the upper worlds'
+city commissions carry Mortal realm bands (stored, read nowhere), and
+`world_rules.physical_laws.local_time_flow` is parsed by nothing in Go.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

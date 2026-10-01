@@ -132,7 +132,8 @@ class TheRaidHasACard(unittest.TestCase):
         self.assertNotIn("No formation", party, "a raider alone has nobody to stand in formation with")
 
     def test_the_reward_is_the_templates_and_a_won_raid_counts_the_claims(self):
-        self.assertIn("**120** Low Spirit Stones + **Low Beast Core ×2**", _fields(raid_card(_encounter()))["Reward, each raider"])
+        # The coin is the lair's world's (v1.17.0): the boar is the Mortal World's.
+        self.assertIn("**120** Low-Grade Spirit Stone + **Low Beast Core ×2**", _fields(raid_card(_encounter()))["Reward, each raider"])
         won = _encounter(status="victory", boss_hp=0,
                          claims=[{"user_id": RAIDER, "claimed": 1}, {"user_id": OTHER, "claimed": 0}])
         fields = _fields(raid_card(won))

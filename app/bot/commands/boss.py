@@ -179,7 +179,12 @@ def raid_card(encounter: dict[str, Any], *, events: list[str] | None = None, not
     # What each raider is owed on a win: the template the engine pays from
     # (bossTemplatesGo), held equal to this one by the boss-table parity gate.
     if template.get("reward_currency") or template.get("reward_item"):
-        reward = [f"**{int(template.get('reward_currency') or 0)}** Low Spirit Stones"]
+        # In the money of the world the lair stands in (v1.17.0), which is what
+        # the claim pays; the card used to say the Mortal stone for every raid.
+        lair, _ = boss_lair(template, WORLD.secret_realms)
+        lair_world = str((WORLD.locations.get(lair) or {}).get("world") or "Mortal World")
+        coin = WORLD.currency_name(WORLD.world_base_currency(lair_world))
+        reward = [f"**{int(template.get('reward_currency') or 0)}** {coin}"]
         if template.get("reward_item") and int(template.get("reward_quantity") or 0) > 0:
             reward.append(f"**{WORLD.item_name(str(template['reward_item']))} ×{int(template['reward_quantity'])}**")
         taken = sum(1 for done in claimed.values() if done)
@@ -286,8 +291,12 @@ async def _raid_act(
 
 
 def _claim_line(result: dict[str, Any]) -> str:
+    # The coin is the engine's (v1.17.0): a raid is paid in the money of the
+    # world the raider stands in, so the line names what was paid rather than
+    # the Mortal stone it used to assume.
+    coin = WORLD.currency_name(str(result.get("currency") or "low_spirit_stone"))
     return (
-        f"🏆 Claimed **{result.get('currency_amount', 0)} Low Spirit Stones** and "
+        f"🏆 Claimed **{result.get('currency_amount', 0)} {coin}** and "
         f"**{WORLD.item_name(str(result.get('item_id', '')))} x{result.get('item_quantity', 0)}**."
     )
 

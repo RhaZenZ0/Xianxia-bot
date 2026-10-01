@@ -936,6 +936,9 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
             # The bound flame (v1.10.0): the engine's own figure and name.
             (f"🔥 {resolved.get('flame_name') or 'Bound flame'}", int(resolved.get("flame_bonus", 0))),
             ("🌀 Spirit sense", int(resolved.get("spirit_sense_bonus", 0))),
+            # The Immortal World's job (v1.17.0): the grandmasters' court, named
+            # by the engine with its bonus.
+            (f"🏛️ {resolved.get('place') or 'The ground'}", int(resolved.get("place_bonus", 0))),
         )
         if value
     ]

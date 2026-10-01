@@ -729,7 +729,10 @@ func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, user
 		return authoritativeMutation{}, err
 	}
 	innate := int64(math.Round(mods.Add["breakthrough_bonus"]))
-	modifier := breakthroughModifier(c, mods, body, perfectBonus, resonance, innate)
+	// The Celestial World's job (v1.17.0): the heavens are nearer on the
+	// heaven-reading altar's stone, in the odds shown and in the roll alike.
+	placeName, placeBonus := breakthroughPlaceBonus(catalog, c.Location)
+	modifier := breakthroughModifier(c, mods, body, perfectBonus, resonance, innate, placeBonus)
 	// The qi body (v1.0.0-rc.7): an attempt is fuelled from the dantian, win
 	// or lose, so a dry cultivator prepares before they try.
 	now := float64(time.Now().UnixNano()) / 1e9
@@ -814,7 +817,7 @@ func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, user
 		}
 		insightSpent = true
 	}
-	result := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "roll": roll, "success": success, "tn": tn, "modifier": modifier, "probability": probability, "realm_gate": newRealm != realm, "gate_via_insight": viaInsight, "insight_spent": insightSpent, "qi_spent": qiCost, "reroll": reroll, "reroll_cost": rerollCost, "reroll_available": rerollAvailable, "insight_xp": xpLeft, "cost": cost, "failure_loss": failureLoss, "from_realm": realmName(realms, realm), "from_stage": phase, "to_realm": realmName(realms, newRealm), "to_stage": newPhase, "from_world": oldWorld, "to_world": newWorld, "perfect_bonus": perfectBonus, "resonance_bonus": resonance, "innate_breakthrough_bonus": innate, "vitality_gain": vitalityGain, "ascended": oldWorld != newWorld, "attribute_gains": attributeGains, "world_mult": worldQiMultiplier(catalog, newWorld)}
+	result := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "roll": roll, "success": success, "tn": tn, "modifier": modifier, "probability": probability, "realm_gate": newRealm != realm, "gate_via_insight": viaInsight, "insight_spent": insightSpent, "qi_spent": qiCost, "reroll": reroll, "reroll_cost": rerollCost, "reroll_available": rerollAvailable, "insight_xp": xpLeft, "cost": cost, "failure_loss": failureLoss, "from_realm": realmName(realms, realm), "from_stage": phase, "to_realm": realmName(realms, newRealm), "to_stage": newPhase, "from_world": oldWorld, "to_world": newWorld, "perfect_bonus": perfectBonus, "resonance_bonus": resonance, "innate_breakthrough_bonus": innate, "place": placeName, "place_bonus": placeBonus, "vitality_gain": vitalityGain, "ascended": oldWorld != newWorld, "attribute_gains": attributeGains, "world_mult": worldQiMultiplier(catalog, newWorld)}
 	if success {
 		legacy, err := awakenSoulMemoryGo(conn, userID, map[bool]int64{true: 4, false: 5}[body], now)
 		if err != nil {
