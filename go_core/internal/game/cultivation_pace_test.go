@@ -3,6 +3,7 @@ package game
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 
@@ -49,6 +50,13 @@ func TestASessionIsAShareOfTheStageSoEveryRealmTakesAboutTheSameWork(t *testing.
 		}
 		result := trainOnce(t, path, world, int(100+realm))
 		gain := storage.ParseInt(result["gain"])
+		// Since v1.14.0 the will a session reads grows a point a realm
+		// (keptGrowth), so a realm-6 cultivator works at will 9 where the
+		// stored base says 3 - as a real one did before, when a crossing
+		// stored the point. The pace is what is held here, so the
+		// cultivator's own quality is taken back out to the base's.
+		will := characterAttributes(catalog, `{"will":3}`, "", realm, 1)["will"]
+		gain = int64(math.Round(float64(gain) * attributeQuality(3) / attributeQuality(will)))
 		sessions := float64(cost) / float64(gain)
 		// The target rises with the realm (v1.0.0-rc.6); a cultivator's own
 		// multipliers pull the real number under it, and the floor under a

@@ -15,6 +15,7 @@ from discord import app_commands
 
 from ...rules import commissions as commission_rules
 from ...rules.advanced_runtime import describe_equipment, describe_era, equipment_passive_line
+from ...rules.attribute_growth import growth_line, sheet_attributes
 from ...rules.path_traits import sword_intent_cap, trait_line
 from ...rules.birthfamily import family_tier_name, karma_description, karma_label
 from ...rules.fate import fate_label
@@ -119,7 +120,9 @@ async def sheet(interaction: discord.Interaction) -> None:
     abode = await DB.get_abode(interaction.user.id)
     soul_legacy = await DB.get_soul_legacy(interaction.user.id)
     aptitudes = await DB.get_aptitudes(interaction.user.id)
-    a = c["attributes"]
+    # The grown attributes (v1.14.0): attributes_json holds the base, and the
+    # engine computes a qi stage's growth from where the cultivator stands.
+    a = sheet_attributes(WORLD.data, c)
     wt = await current_world_time()
     life = await authoritative_lifespan(interaction.user.id)
     embed = Card(title=f"{c['name']} — {realm}", description=c["concept"][:4096])
@@ -299,11 +302,13 @@ async def sheet(interaction: discord.Interaction) -> None:
             body_perfect_text = "Body Stage 9 choice unlocked: **/ascend → Perfection → Start** or **/cultivation → Body → Breakthrough**."
         embed.add_field(name="Body Perfection", value=body_perfect_text, inline=False)
 
+    grown = growth_line(WORLD.data, c)
     embed.add_field(
         name="Attributes",
         value=(
             f"Body {a['body']} • Agility {a['agility']} • Spirit {a['spirit']}\n"
             f"Insight {a['insight']} • Will {a['will']} • Presence {a['presence']}"
+            + (f"\n-# {grown}" if grown else "")
         ),
         inline=False,
     )

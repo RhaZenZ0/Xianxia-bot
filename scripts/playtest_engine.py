@@ -1013,8 +1013,9 @@ async def run(url: str, token: str, db_path: str) -> Report:
                    "a full stage banks nothing", f"gain={full.get('gain')} xp {before_xp} -> {after_xp}")
     await step(report, "cultivation.stance back to circulate (again)", act("cultivation.stance", PLAYER, {"stance": "circulate"}))
 
-    # Crossing a realm raises the cultivator - the one thing that never moved
-    # before this release.
+    # Crossing a realm raises the cultivator. Since v1.14.0 every qi stage does,
+    # and the growth is computed from the stage rather than stored: the stored
+    # base holds still and the engine reports what the stage added.
     gate = dict(await engine.action("cultivation.status", PLAYER, {}) or {})
     if int(gate.get("insight_xp") or 0) < int(gate.get("insight_cost") or 0):
         await step(report, "earn the last of the gate insight", act_free("exploration.explore", PLAYER, {"unexpected_event_chance_percent": 0, "event_key": aid("exploration:gate")}))
@@ -1032,12 +1033,16 @@ async def run(url: str, token: str, db_path: str) -> Report:
         after_attr = dict(await db.get_character(PLAYER) or {})
         before_will = will_of(before_attr)
         after_will = will_of(after_attr)
-        # The gain is the engine's own report, not a number restated here:
-        # since v1.13.0 a Sword Cultivator grows both tied attributes (agility
-        # and will) and the qi ladder adds its will, so will rises by two.
-        gains = dict(crossed.get("attribute_gains") or {})
-        report.add("PASS" if gains and after_will == before_will + int(gains.get("will") or 0) and int(gains.get("agility") or 0) >= 1 else "FAIL",
-                   "crossing a realm raises the cultivator", f"will {before_will} -> {after_will}, gains {crossed.get('attribute_gains')}")
+        # The gain is the engine's own report, not a number restated here: a
+        # stage adds to all six, and more to the path's tied pair (a Sword
+        # Cultivator's agility and will) than to the rest.
+        gains = {k: int(v or 0) for k, v in dict(crossed.get("attribute_gains") or {}).items()}
+        every = {"body", "agility", "spirit", "insight", "will", "presence"}
+        report.add("PASS" if set(gains) == every and min(gains.values()) >= 1
+                   and gains["will"] > gains["body"] and gains["agility"] > gains["body"] else "FAIL",
+                   "a qi stage grows every attribute and the path's pair more", f"gains {gains}")
+        report.add("PASS" if after_will == before_will else "FAIL",
+                   "the stored base holds still; the stage is the growth", f"stored will {before_will} -> {after_will}")
     elif crossed is not None:
         report.add("PASS", "crossing a realm raises the cultivator", "the roll failed; attributes unchanged by design")
 

@@ -96,9 +96,13 @@ class TheStageSetsThePace(unittest.TestCase):
 
 
 class CultivatorsGrow(unittest.TestCase):
-    def test_crossing_a_realm_writes_the_attributes(self):
+    def test_a_breakthrough_reports_what_it_grew(self):
+        # v1.14.0: every qi stage grows the attributes, computed from the stage
+        # (attribute_growth.go) rather than written; the body ladder still
+        # writes its +1 body on a realm crossing. The breakthrough carries
+        # what it grew, and the reply prints it.
         self.assertIn("func growAttributesOnRealmCrossing(", GO_PACE)
-        self.assertIn("UPDATE characters SET attributes_json=?", GO_PACE)
+        self.assertIn("stageAttributeGains(catalog, c.Path)", GO_PACE)
         self.assertIn("attributeGains, err = growAttributesOnRealmCrossing(conn, catalog, userID, c, body, now)", GO_ACTIONS)
         self.assertIn("func pathGrowthAttributes(", GO_PACE)
         self.assertIn("attribute_gains", CULTIVATION_SOURCE)
@@ -162,9 +166,9 @@ class TheSheetAndTheReplies(unittest.TestCase):
         self.assertIn("Qi deviation **3/5**", text)
         self.assertLess(len(text), 900)
 
-    def test_the_breakthrough_reply_names_what_the_crossing_made_of_you(self):
-        self.assertIn("Crossing into a new realm remade your foundation", CULTIVATION_SOURCE)
-        self.assertIn("Every session from here gathers more", CULTIVATION_SOURCE)
+    def test_the_breakthrough_reply_names_what_it_grew(self):
+        self.assertIn('result.get("attribute_gains")', CULTIVATION_SOURCE)
+        self.assertIn("Your foundation grows", CULTIVATION_SOURCE)
 
 
 if __name__ == "__main__":

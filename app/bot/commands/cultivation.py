@@ -456,7 +456,9 @@ async def breakthrough(interaction: discord.Interaction, confirm: bool = False, 
         gains = dict(result.get("attribute_gains") or {})
         if gains:
             grown = ", ".join(f"**+{int(v)} {k.replace('_', ' ')}**" for k, v in sorted(gains.items()))
-            mechanical += f"\n💪 Crossing into a new realm remade your foundation: {grown}. Every session from here gathers more."
+            # Every qi stage grows the attributes since v1.14.0; the body
+            # ladder still grows only on a realm crossing.
+            mechanical += f"\n💪 Your foundation grows: {grown}."
         if float(result.get("world_mult", 1)) != 1.0 and result.get("ascended"):
             mechanical += f"\n🌏 The qi of **{result.get('to_world')}** is **x{float(result['world_mult']):.2f}** what you knew."
         # Ascension carries you (v1.0.0-rc.15). Until now the crossing was
