@@ -767,7 +767,9 @@ async def _menu_shape(interaction: discord.Interaction) -> dict[str, Any]:
     tutorial = ""
     for row in await DB.list_character_quests(interaction.user.id, status="active"):
         definition = await QUESTS.definition(str(row.get("quest_key") or "")) or {}
-        if str(definition.get("source_key") or "") != "beginner_path":
+        # The tutorial, and the realm road that carries on from it (v1.16.0):
+        # the line names what to do next from the first hour to the heavens.
+        if str(definition.get("source_key") or "") not in ("beginner_path", "realm_road"):
             continue
         pinned = dict(row.get("terms") or {})
         objectives = list(pinned.get("objectives") or definition.get("objectives") or [])

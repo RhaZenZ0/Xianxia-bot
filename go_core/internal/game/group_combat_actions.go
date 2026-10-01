@@ -1035,6 +1035,13 @@ func bossClaimActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	result := map[string]any{"encounter_id": p.ID, "currency_amount": amt, "item_id": item, "item_quantity": qty}
+	// The boss the claim is for (v1.16.0), read off the encounter rather than
+	// the template so a renamed template still names the boss that was
+	// fought; the realm road's `raid_win` objective is keyed on it.
+	bossName := ""
+	if named, nerr := conn.Execute(`SELECT boss_name FROM boss_encounters WHERE encounter_id=?`, []any{p.ID}); nerr == nil && len(named.Rows) > 0 {
+		bossName = fmt.Sprint(named.Rows[0][0])
+	}
+	result := map[string]any{"encounter_id": p.ID, "currency_amount": amt, "item_id": item, "item_quantity": qty, "boss_name": bossName}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "boss", EventType: "boss.claim", EntityType: "boss_encounter", EntityID: fmt.Sprint(p.ID), Payload: result}}, nil
 }

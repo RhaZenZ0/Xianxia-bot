@@ -164,7 +164,11 @@ class ValidatorTests(unittest.TestCase):
             set(OBJECTIVE_TYPES),
             {"explore", "talk", "scene_action", "sect_discovery", "sect_trial",
              "cultivate", "travel", "combat_win", "craft", "trade", "gather", "return_home", "family_lesson",
-             "ascension_gate", "world_cross", "profession_exam", "breakthrough"},
+             "ascension_gate", "world_cross", "profession_exam", "breakthrough",
+             # The realm road's six (v1.16.0): a flame, a raid, a hidden post,
+             # a Perfect Path, a secret realm's door, the heavens survived.
+             "flame_capture", "raid_win", "black_market", "perfection_start", "realm_enter",
+             "tribulation_cleared"},
         )
 
     def test_the_procedural_draft_always_validates(self):

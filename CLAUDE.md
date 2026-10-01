@@ -5966,6 +5966,58 @@ holds the order, the count and the odds; its drills print *"explore 5 found "Gre
 while a city was still unknown"* and *"the chance is 45, no better than the 45 the pace was measured
 at"*.
 
+### A road for every realm (`realm_road`, `realm_road.go`, v1.16.0)
+
+The world-flow study behind v1.15.0 found the shape: the beginner path carries a cultivator to the
+first gate with a place in every label and then stops at the sect road, and from realm 1 to realm 7
+the places that matter in the Mortal World were found by reading the panel or not at all. On the
+owner's call ("A road for every realm") `realm_road` in `content/world.json` is **the same
+mechanism one realm further, seven times**: an ordinary giver-less quest per Mortal realm, seeded
+by `realm_road_seed_rows` the way the beginner path is, chained by `follow_on`, each opening with a
+`breakthrough` objective naming its own realm so a stage held one realm early still says where it
+starts. The capital at 1, the Earth-Heart Fire at 2, the Boar King and a hidden post at 3, the
+Drowned Serpent at 4, the Perfect Path at 5, the Sword Grave at 6, the Wraith and the heavens at 7.
+
+**Two doors hand a stage over, and the second is why the engine changed.** The chain reaches a
+player who walks it from the start; it reaches nobody who stands at Core Formation today, because
+the catch-up follows chains only from quests somebody completed. So the qi breakthrough that crosses
+into a realm hands over the stage written for it (`grantRealmRoadTx`, `RealmRoadStage.RealmIndex`),
+the way a cleared tribulation hands over the ascension quest. Both doors are `grantOrdinaryQuestTx`,
+and `(user_id, quest_key)` is the memory, so a stage reached by both is handed over once. The body
+ladder hands nothing over: the road's labels name `/breakthrough`.
+
+**Six things a quest could not ask for.** A flame capture, a raid boss, a black-market trade, a
+Perfect Path begun, a secret realm entered and a tribulation survived had no objective type, so no
+quest in the game could name them. Each is a vocabulary entry, a target kind in the validator (the
+flame roster, the boss table's display twin, the secret realms), and one `record_quest_progress`
+line after the engine agreed and before the command answers. **The raid's report is the claim**, not
+the killing blow: a raid is won by the party and claimed by each raider, so every raider's own quest
+advances when they take their share, and `boss.claim` now carries the boss's name for it.
+
+**A city's gate is that city, for a quest too.** A road arrives at the gate facing where you came
+from and an explore at a gate reports the gate, so "walk to the capital" would never have been met
+by walking there. `questTargetCity` reads a `travel`/`explore` report as the city when no objective
+of that type names the place itself and one names its city; a quest naming the gate still can.
+`TestWalkingToACitysGateAdvancesAQuestNamingTheCity` drives it through `quest.progress` on the
+shipped catalogue.
+
+**The gates.** `realm_road_test.go` holds the crossing (its drill prints *"the crossing into Qi
+Refining handed nothing over"*), a stage within a realm and a body crossing handing nothing, and a
+realm with no stage still crossing. `test_realm_road.py` holds the content to one stage per Mortal
+realm in order, the chain to the seam, every stage to the Forge's validator, and **every door a label
+names to being drawn at the stage's own realm** (v1.0.9's floor one quest further, read off
+`feature_unlocks` through the live registry: lowering a stage's realm under its door names
+`flame capture` at realm 2). `test_quest_forge.py`'s exact vocabulary set and
+`test_quests_reach_a_player.py`'s roster set each made the new roster a decision rather than a
+default, which is what they are for.
+
+**What is deliberately not built.** The realm road stops at the Mortal World: the three worlds above
+have the content the study called "the Mortal World again with less in it", and a road through them
+is content first. The dashboard's quest editor offers free text for the four new target kinds rather
+than a picker. And the Stygian Lantern Tomb under Greenriver, the study's realm-1 pick, is not on the
+road: it opens on the rotation or a 420-stone key, which is not a door a Qi Refining cultivator can
+count on.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

@@ -821,6 +821,20 @@ func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, user
 			return authoritativeMutation{}, err
 		}
 		result["soul_legacy"] = legacy
+		// The realm road (v1.16.0): the crossing into a realm hands over the
+		// quest written for it, the qi ladder only - the road's labels name
+		// this command. A stage within a realm hands nothing over, and a
+		// realm with no stage, or one already held, is "no" rather than an
+		// error: a breakthrough never fails over a quest.
+		if !body && newRealm != realm {
+			roadQuest, err := grantRealmRoadTx(conn, catalog, userID, newRealm, p.GameMinute)
+			if err != nil {
+				return authoritativeMutation{}, err
+			}
+			if roadQuest != "" {
+				result["realm_road_quest"] = roadQuest
+			}
+		}
 		master, err := rewardMasterGo(conn, catalog, userID, newRealm != realm, now)
 		if err != nil {
 			return authoritativeMutation{}, err

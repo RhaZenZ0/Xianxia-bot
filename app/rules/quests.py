@@ -146,6 +146,47 @@ def beginner_path_seed_rows(world: Any) -> list[dict[str, Any]]:
     return rows
 
 
+def realm_road_seed_rows(world: Any) -> list[dict[str, Any]]:
+    """The realm road from `content/world.json` (v1.16.0), shaped for the seeder.
+
+    One quest per Mortal realm after the first, each naming a real place and
+    the thing done there. The beginner path carries a cultivator to their
+    first gate with a place in every label and then stops; from realm 1 to
+    realm 7 the places that matter - the capital, the Forge Terraces, the Boar
+    King, the marsh, the ninth stage, the Sword Grave, the heavens - were found
+    by reading the panel or not at all. This is the same mechanism one realm
+    further, seven times: an ordinary giver-less row, chained by `follow_on`,
+    handed over by the engine on the crossing into its realm
+    (`grantRealmRoadTx`) and by the stage before it as that completes.
+
+    `seed.realm_index` is the realm the stage is written for, which is what
+    the crossing reads to choose it; `seed.follow_on` is the chain, read off
+    `seed_json` at runtime so a GM who re-points it is obeyed.
+    """
+    rows: list[dict[str, Any]] = []
+    for stage in list(getattr(world, "data", {}).get("realm_road") or []):
+        key = str(stage.get("quest_key") or "").strip()
+        if not key:
+            continue
+        rows.append({
+            "quest_key": key,
+            "title": str(stage.get("title", "")),
+            "description": str(stage.get("description", "")),
+            "source_type": "system",
+            "source_key": "realm_road",
+            "objectives": list(stage.get("objectives", [])),
+            "rewards": dict(stage.get("rewards", {})),
+            "giver_npc": "",
+            "realm_band": "",
+            "tier": 1,
+            "deadline_game_minutes": 0,
+            "variants": [],
+            "seed": {"follow_on": str(stage.get("follow_on") or ""),
+                     "realm_index": int(stage.get("realm_index") or 0)},
+        })
+    return rows
+
+
 def ascension_quest_seed_rows(world: Any) -> list[dict[str, Any]]:
     """The ascension quests from `content/world.json`, shaped for the same seeder.
 
@@ -304,7 +345,27 @@ OBJECTIVE_TYPES: dict[str, dict[str, Any]] = {
     # Reported by `/breakthrough` on a success (v1.2.0), the qi ladder only: the
     # first gate is the tutorial's last stage, and one reporter keeps the label
     # honest - a body breakthrough is a different command with a different name.
-    "breakthrough": {"target": None, "label": "", "untargeted": "Break through to the next stage"},
+    # It names the realm the breakthrough landed in (v1.16.0), so a realm road
+    # stage can ask for Qi Refining itself rather than for any stage at all;
+    # an untargeted objective still accepts every success, as the tutorial's
+    # last stage always has.
+    "breakthrough": {"target": "realm", "label": "Break through into {target}", "untargeted": "Break through to the next stage"},
+    # The realm road (v1.16.0): one quest per Mortal realm, each naming a place
+    # and the thing done there. Five of those things had no objective type at
+    # all - a flame, a raid, a hidden post, a Perfect Path, a secret realm's
+    # door - so no quest could ask for them. Each is reported after the engine
+    # agreed and before the command answers, the rule every reporter follows.
+    "flame_capture": {"target": "flame", "label": "Capture the {target}", "untargeted": "Capture a flame at a forge terrace"},
+    # A raid is won by the party and claimed by each raider, so the claim is
+    # the report: every raider's own quest advances when they take their share.
+    "raid_win": {"target": "boss", "label": "Bring down the {target} and claim your share", "untargeted": "Bring down a raid boss and claim your share"},
+    "black_market": {"target": None, "label": "", "untargeted": "Buy or fence something at a hidden post"},
+    "perfection_start": {"target": None, "label": "", "untargeted": "Begin a Perfect Path at the ninth stage"},
+    "realm_enter": {"target": "secret_realm", "label": "Enter the {target}", "untargeted": "Enter an open secret realm"},
+    # Reported by `/ascend → Tribulation / Ascension → Attempt` only when the
+    # three waves are survived; the ascension quest the engine then hands over
+    # asks for the seam, so this stops where that one starts.
+    "tribulation_cleared": {"target": None, "label": "", "untargeted": "Survive a world-crossing tribulation"},
     # Reported by `/family → Enter` and by a Hearth-Return Talisman
     # (v1.0.0-rc.32). Untargeted by construction: the household is the
     # player's own, and `birth_family:<id>` is not a catalogue location.
@@ -469,6 +530,44 @@ def validate_quest_definition(draft: dict[str, Any], world: Any, budget: dict[st
                     errors.append(f"objective {index + 1}: unknown item {target_text!r}")
                     continue
                 target_label = str(all_items[target].get("name") or target)
+            elif spec["target"] == "realm":
+                # The qi ladder's own names, so a stage asks for "Qi Refining"
+                # and never for a rung the ladder does not carry.
+                realm_lookup = {str(r.get("name") or "").lower(): str(r.get("name") or "")
+                                for r in list(getattr(world, "realms", []) or [])}
+                target = realm_lookup.get(target_text.lower())
+                if target is None:
+                    errors.append(f"objective {index + 1}: unknown realm {target_text!r}")
+                    continue
+            elif spec["target"] == "flame":
+                # `flame_system.flames` is keyed by the flame's id, which is
+                # what `flame.capture` reports.
+                flames = dict(dict(getattr(world, "data", {}).get("flame_system") or {}).get("flames") or {})
+                flame_ids = {str(key).lower(): str(key) for key in flames}
+                target = flame_ids.get(target_text.lower().replace(" ", "_"))
+                if target is None:
+                    errors.append(f"objective {index + 1}: unknown flame {target_text!r}")
+                    continue
+                target_label = str(dict(flames[target] or {}).get("name") or target)
+            elif spec["target"] == "boss":
+                # The raid roster is Go's (`bossTemplatesGo`) and
+                # `BOSS_TEMPLATES` is its display twin, held equal by
+                # test_boss_tables; a draft is validated against the twin.
+                from .advanced_runtime import BOSS_TEMPLATES
+
+                bosses = {str(t.get("name") or "").lower(): str(t.get("name") or "") for t in BOSS_TEMPLATES.values()}
+                target = bosses.get(target_text.lower())
+                if target is None:
+                    errors.append(f"objective {index + 1}: unknown raid boss {target_text!r}")
+                    continue
+            elif spec["target"] == "secret_realm":
+                realms = dict(getattr(world, "secret_realms", {}) or {})
+                realm_ids = {str(key).lower(): str(key) for key in realms}
+                target = realm_ids.get(target_text.lower().replace(" ", "_"))
+                if target is None:
+                    errors.append(f"objective {index + 1}: unknown secret realm {target_text!r}")
+                    continue
+                target_label = str(dict(realms[target] or {}).get("name") or target)
         objective_id = re.sub(r"[^a-z0-9_]+", "_", str(raw.get("id") or f"{kind}_{index + 1}").lower()).strip("_") or f"{kind}_{index + 1}"
         if objective_id in seen_ids:
             objective_id = f"{objective_id}_{index + 1}"

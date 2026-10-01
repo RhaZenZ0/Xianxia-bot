@@ -650,6 +650,18 @@ type BeginnerStage struct {
 	FollowOn string `json:"follow_on"`
 }
 
+// RealmRoadStage is one stage of the realm road (v1.16.0): the quest written
+// for a realm, handed over by the breakthrough that crosses into it. Like a
+// beginner stage it is an ordinary quest definition seeded from the content;
+// FollowOn is carried for the document and read by nothing, the chain being
+// `seed_json`'s.
+type RealmRoadStage struct {
+	QuestKey   string `json:"quest_key"`
+	Title      string `json:"title"`
+	RealmIndex int64  `json:"realm_index"`
+	FollowOn   string `json:"follow_on"`
+}
+
 // HouseholdErrand is one thing a birth household asks of its own child
 // (v1.0.0-rc.32), keyed by the trade the house teaches. Like a beginner
 // stage it is an ordinary quest definition seeded from the content; the
@@ -1027,6 +1039,11 @@ type Catalog struct {
 	// of the people who live here - rather than the bot.
 	CommissionGivers map[string]CommissionGiver `json:"commission_givers"`
 	BeginnerPath     []BeginnerStage            `json:"beginner_path"`
+	// RealmRoad (v1.16.0): one quest per Mortal realm after the first, the
+	// beginner path's mechanism carried on to the heavens. The engine reads
+	// the key and the realm it is written for; the crossing into that realm
+	// hands it over (grantRealmRoadTx), and the chain is `seed_json` as ever.
+	RealmRoad []RealmRoadStage `json:"realm_road"`
 	// WorldEraCycles (v1.0.7): one ordered cycle of eras per world, each
 	// summing to exactly one world year. It lived as a single four-entry Go
 	// literal (`eraCycle`) covering all four worlds at once until now - the
