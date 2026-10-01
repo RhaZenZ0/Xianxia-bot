@@ -971,10 +971,18 @@ async def _resolve_input(interaction: discord.Interaction, spec: HubInput, raw: 
     return value
 
 
+# What `Interaction.edit_original_response` takes. A hub proxy turns a
+# `followup.send` into that edit, and a send carries keywords an edit refuses:
+# `wait=True` on the raid card made `/boss start` from a picker raise after the
+# engine had already started the raid (v1.14.1). A file is an attachment there.
+_EDIT_KEYWORDS = frozenset({"content", "embeds", "embed", "attachments", "view", "allowed_mentions", "poll"})
+
+
 def _safe_edit_kwargs(kwargs: dict[str, Any], *, fallback_view: discord.ui.View | None) -> dict[str, Any]:
-    clean = dict(kwargs)
-    clean.pop("ephemeral", None)
-    clean.pop("silent", None)
+    clean = {key: value for key, value in kwargs.items() if key in _EDIT_KEYWORDS}
+    files = ([kwargs["file"]] if kwargs.get("file") is not None else []) + list(kwargs.get("files") or [])
+    if files and "attachments" not in clean:
+        clean["attachments"] = files
     if is_layout(clean.get("view")) and fold_content(clean["view"], clean.get("content")):
         # A card (v1.9.0) is a Components V2 message: any text sent with it
         # goes into the card, and the message it replaces loses its content

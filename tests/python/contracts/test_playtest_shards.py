@@ -10,6 +10,7 @@ no harness binds a fixed port any more.
 """
 from __future__ import annotations
 
+import ast
 import re
 import sys
 import unittest
@@ -97,6 +98,41 @@ class NoHarnessBindsAFixedPort(unittest.TestCase):
                 self.assertIsNone(re.search(r"^\s*(?:HEALTH_PORT|ENGINE_ADDR)\s*=\s*\d", text, re.M))
         common = (SCRIPTS / "playtest_common.py").read_text(encoding="utf-8")
         self.assertIn("free_port()", common.split("def launch_engine", 1)[1])
+
+
+class EveryUnconditionalWorkerIsStopped(unittest.TestCase):
+    """A bot worker that wakes on its own and asks the engine can hold a
+    press past its five-second settle. Under the parallel runner's load the
+    weekend-gift worker did exactly that (v1.14.1) - it was never in
+    `PERIODIC_WORKERS`, because the list was written when there were two.
+    Every task `bot.py` starts unconditionally must be one the harness stops;
+    the ones behind a setting are switched off in `_configure` instead."""
+
+    def test_the_harness_stops_every_worker_no_setting_switches_off(self):
+        tree = ast.parse((PROJECT_ROOT / "app" / "bot" / "bot.py").read_text(encoding="utf-8"))
+        unconditional: set[str] = set()
+
+        def walk(node: ast.AST, guarded: bool) -> None:
+            for child in ast.iter_child_nodes(node):
+                if isinstance(child, ast.Assign) and not guarded:
+                    call = child.value
+                    if (isinstance(call, ast.Call) and isinstance(call.func, ast.Attribute)
+                            and call.func.attr == "create_task" and call.args
+                            and isinstance(call.args[0], ast.Call)
+                            and isinstance(call.args[0].func, ast.Attribute)
+                            and call.args[0].func.attr.endswith("_worker")):
+                        for target in child.targets:
+                            if isinstance(target, ast.Attribute):
+                                unconditional.add(target.attr)
+                walk(child, guarded or isinstance(child, ast.If))
+
+        walk(tree, False)
+        self.assertIn("event_expiry_task", unconditional, "the walk found no worker; the reader is broken, not the tree")
+        harness = ast.parse((SCRIPTS / "playtest_discord.py").read_text(encoding="utf-8"))
+        stopped = next(ast.literal_eval(n.value) for n in harness.body if isinstance(n, ast.Assign)
+                       and any(isinstance(t, ast.Name) and t.id == "PERIODIC_WORKERS" for t in n.targets))
+        self.assertEqual(sorted(unconditional - set(stopped)), [],
+                         "a worker the bot always starts is one the harness never stops")
 
 
 if __name__ == "__main__":

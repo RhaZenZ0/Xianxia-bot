@@ -5932,6 +5932,20 @@ longer hold alone. `test_playtest_shards.py` holds the split, the union check an
 harness binds a fixed address, reading code only because the docstring explaining the old address
 names it (rc.52). Run without `--shard`, the Discord half is the whole run it always was.
 
+**The first parallel run found a bug a whole run never had, and a worker the harness never stopped.**
+One part's player stood at a lair when the sweep pressed **/boss start** - a whole run's never does -
+and the raid started and then raised `edit_original_response() got an unexpected keyword argument
+'wait'`: a leaf answered from a picker is answered by *editing* the picker, the hub proxy turns the
+handler's `followup.send(...)` into that edit, and the raid card is sent `wait=True`.
+`_safe_edit_kwargs` had stripped two send-only keywords by name; it keeps only what
+`edit_original_response` takes now (a file becomes an attachment), and
+`test_a_hub_edit_takes_only_what_an_edit_accepts.py` holds that against discord.py's own
+signatures. And part 1 failed a settle on `weekend_gift_worker`, a third unconditional worker
+`PERIODIC_WORKERS` (written when there were two) never named: it sleeps forty-five real seconds and
+then asks the engine, harmless mid-section in a lone run and a five-second stall under four. The
+list names it, and the shard test walks `bot.py` for every task started outside an `if`, so the
+next one cannot be missed the same way.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

@@ -497,9 +497,13 @@ async def answer_generically(hubs: Any, actor: Any, action: Any, result: Any, *,
     return result, "+".join(how) or "ran"
 
 
-# The bot's two unconditional periodic workers, by the attribute `setup_hook`
-# stores each task under.
-PERIODIC_WORKERS = ("event_expiry_task", "operational_health_task")
+# The bot's unconditional periodic workers, by the attribute `setup_hook`
+# stores each task under. `weekend_gift_task` joined in v1.14.1: it sleeps
+# forty-five real seconds and then asks the engine, so in a whole run it woke
+# mid-section-5 harmlessly and under the parallel runner's load it held a press
+# past its settle. `test_playtest_shards.py` reads `bot.py` so the next
+# unconditional worker cannot be missed the same way.
+PERIODIC_WORKERS = ("event_expiry_task", "operational_health_task", "weekend_gift_task")
 
 
 async def quiet_the_periodic_workers(bot: Any, env: Any) -> list[str]:
