@@ -1335,7 +1335,11 @@ async def blackmarket_buy(interaction:discord.Interaction,item:str,quantity:app_
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    # The realm road's third stage asks for a hidden post (v1.16.0): recorded
+    # once the engine has traded, told after the receipt.
+    progressed=await record_quest_progress(interaction.user.id,"black_market",game_minute=wt.total_minutes)
     await interaction.followup.send(format_trade_receipt(icon="🌑",verb="Bought",item_label=WORLD.item_name(item),quantity=int(quantity),result=result,currency_name=WORLD.currency_name),ephemeral=False)
+    await announce_quest_progress(interaction,progressed)
 
 
 @blackmarket_buy.autocomplete("item")
@@ -1355,8 +1359,10 @@ async def blackmarket_sell(interaction:discord.Interaction,item:str,quantity:app
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    progressed=await record_quest_progress(interaction.user.id,"black_market",game_minute=wt.total_minutes)
     receipt=format_trade_receipt(icon="🌑",verb="Sold",item_label=WORLD.item_name(item),quantity=int(quantity),result=result,currency_name=WORLD.currency_name)
     await interaction.followup.send(receipt+underworld_trust_line(result),ephemeral=False)
+    await announce_quest_progress(interaction,progressed)
 
 
 @blackmarket_sell.autocomplete("item")

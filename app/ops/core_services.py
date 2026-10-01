@@ -213,6 +213,7 @@ HANDED_OVER_BY_A_ROSTER = frozenset({
     "world_crossing",    # handed over by a cleared world-crossing tribulation
     "profession_exam",   # offered by the craft that reached the rank
     "sect_recruitment",  # `beginner_lesson`'s follow_on, where the trial's odds are worth taking
+    "realm_road",        # handed over by the crossing into its realm, and by the stage before it
 })
 
 

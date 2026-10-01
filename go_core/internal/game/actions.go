@@ -548,7 +548,7 @@ func questProgressTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	var transition map[string]any
 	if forceComplete {
 		transition = forcedQuestTransition(terms.Objectives)
-	} else if transition, err = matchQuestEvent(userID, p, progress, terms.Objectives); err != nil {
+	} else if transition, err = matchQuestEvent(catalog, userID, p, progress, terms.Objectives); err != nil {
 		return nil, true, err
 	}
 	if touched, _ := transition["touched"].(bool); !touched {
@@ -649,12 +649,24 @@ func questProgressTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 
 // matchQuestEvent asks the core contract whether one reported event advances
 // the quest's objectives.
-func matchQuestEvent(userID int64, p questPayload, progress map[string]int64, objectives []map[string]any) (map[string]any, error) {
+func matchQuestEvent(catalog worlddata.Catalog, userID int64, p questPayload, progress map[string]int64, objectives []map[string]any) (map[string]any, error) {
 	// A target naming a graded item counts as its base (v1.7.0): an objective
 	// to sell a Spirit-Iron Sword is met by a High one as much as a Low one.
 	if p.Target != nil {
 		base := itemBaseID(*p.Target)
 		p.Target = &base
+	}
+	// A city's gate is that city (v1.0.9), for a quest too (v1.16.0). A road
+	// arrives at the gate that faces where you came from, and an explore at a
+	// gate reports the gate - so an objective naming the city would never be
+	// met by walking there. When no objective of the event's type names the
+	// place reported and one names the city it is part of, the report is
+	// read as the city. Only for the two place-reporting types, and only when
+	// nothing matched the place itself, so a quest naming the gate still can.
+	if p.Target != nil && (p.ObjectiveType == "travel" || p.ObjectiveType == "explore") {
+		if city := questTargetCity(catalog, *p.Target, p.ObjectiveType, objectives); city != "" {
+			p.Target = &city
+		}
 	}
 	payloadMap := map[string]any{"progress": progress, "objectives": objectives, "objective_type": p.ObjectiveType, "target": p.Target}
 	if p.Amount != nil {

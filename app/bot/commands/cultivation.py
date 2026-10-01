@@ -422,8 +422,11 @@ async def breakthrough(interaction: discord.Interaction, confirm: bool = False, 
     # it (v1.0.5). Told after the reply.
     progressed = []
     if success:
+        # The report names the realm landed in (v1.16.0), so a realm road
+        # stage asking for "Qi Refining" counts only a breakthrough into or
+        # within it; the untargeted tutorial objective still counts every one.
         progressed = await record_quest_progress(
-            interaction.user.id, "breakthrough", amount=1, game_minute=wt.total_minutes)
+            interaction.user.id, "breakthrough", amount=1, target=next_realm, game_minute=wt.total_minutes)
     breakthrough_context = await NARRATOR_CONTEXT.build(c, scene_type="cultivation breakthrough", query_text=f"breakthrough {next_realm} stage {next_phase}")
     try:
         narration = await NARRATOR.narrate_breakthrough(c, next_realm, next_phase, roll_line(roll), success, scene_context=breakthrough_context.text)
@@ -706,6 +709,10 @@ async def perfect_start(interaction: discord.Interaction, path: app_commands.Cho
     except GameEngineError as exc:
         await interaction.followup.send(f"{spec.path_name} could not begin: {exc}", ephemeral=False)
         return
+    # The realm road's fifth stage asks for this (v1.16.0): recorded once the
+    # engine has begun the path, told after the reply.
+    progressed = await record_quest_progress(
+        interaction.user.id, "perfection_start", game_minute=(await current_world_time()).total_minutes)
     realm_index = spec.realm_index(c)
     quest = spec.quest(realm_index, 0, c)
     await interaction.followup.send(
@@ -716,6 +723,7 @@ async def perfect_start(interaction: discord.Interaction, path: app_commands.Cho
         f"Preparation: 0/{quest['preparation_required']}\nUse **/ascend → Perfection → Quest**.",
         ephemeral=False,
     )
+    await announce_quest_progress(interaction, progressed)
 
 
 @registered_group_command(perfect_group, name="info", description="View your Realm or Body Perfection progress")
@@ -969,6 +977,12 @@ async def tribulation_attempt(interaction: discord.Interaction, path: app_comman
         await interaction.followup.send(f"Tribulation attempt could not resolve: {exc}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
+    # The realm road's last stage asks for the heavens survived (v1.16.0):
+    # recorded the moment the engine has decided it, told after the reply.
+    progressed = []
+    if bool(result.get("success")):
+        progressed = await record_quest_progress(
+            interaction.user.id, "tribulation_cleared", game_minute=wt.total_minutes)
     lines = [f"⚡ **{result.get('gate_name','Heavenly Tribulation')}** • Preparation **{int(result.get('preparation_used',0))}/5**"]
     # The Heart Calming Pill's own number, finally visible (v1.0.0-rc.58). It
     # rode the Heart Tribulation wave's modifier and was read by nothing until
@@ -1000,6 +1014,7 @@ async def tribulation_attempt(interaction: discord.Interaction, path: app_comman
     else:
         lines.append("\n💥 **Tribulation failed.** Preparation is consumed. Heal persistent injuries and prepare before trying again.")
     await reply_long(interaction, "\n".join(lines), ephemeral=False)
+    await announce_quest_progress(interaction, progressed)
 
 
 @registered_group_command(tribulation_group, name="gate", description="Anchor the seam a survived tribulation left into a permanent crossing here")

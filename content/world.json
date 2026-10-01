@@ -70950,6 +70950,243 @@
       "follow_on": "road_to_a_sect"
     }
   ],
+  "realm_road": [
+    {
+      "quest_key": "realm_road_1",
+      "realm_index": 1,
+      "title": "The Capital Road",
+      "description": "Qi Refining opens the roads. The capital of this world is Azure Crown Imperial City; chart a road to it with **/world → Act → Explore** from the cities you know, walk there, and look around once you arrive. The sect envoys keep a hall in its temple quarter, and the array to Greenriver Town stands in its streets.",
+      "opening": "The first gate is behind you and the qi moves differently now - thinner, faster, further. Every road out of this town goes somewhere you have not been, and one of them goes to the capital.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Qi Refining",
+          "count": 1,
+          "label": "Break through into Qi Refining - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "walk",
+          "type": "travel",
+          "target": "Azure Crown Imperial City",
+          "count": 1,
+          "label": "Walk the roads to Azure Crown Imperial City - **/travel → Destinations → Go**"
+        },
+        {
+          "id": "look",
+          "type": "explore",
+          "target": "Azure Crown Imperial City",
+          "count": 1,
+          "label": "Look around the capital - **/world → Act → Explore**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 60,
+        "spirit_stones": 80
+      },
+      "follow_on": "realm_road_2"
+    },
+    {
+      "quest_key": "realm_road_2",
+      "realm_index": 2,
+      "title": "Fire from the Terraces",
+      "description": "Foundation Establishment is deep enough to hold a flame. The Earth-Heart Fire burns at the Forge Terraces of Emberforge City - walk to the city, step into the Terraces with **/world → City → Enter**, and take the flame. A capture is a roll against the fire; a miss scorches your meridians and a Jade Life Herb mends them.",
+      "opening": "Smiths talk about Emberforge the way farmers talk about rain. Somewhere under its terraces a fire has burned since before the city had a name, and a cultivator with a foundation can carry a piece of it away.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Foundation Establishment",
+          "count": 1,
+          "label": "Break through into Foundation Establishment - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "walk",
+          "type": "travel",
+          "target": "Emberforge City",
+          "count": 1,
+          "label": "Walk to Emberforge City - **/travel → Destinations → Go**"
+        },
+        {
+          "id": "flame",
+          "type": "flame_capture",
+          "target": "earth_heart_fire",
+          "count": 1,
+          "label": "Capture the Earth-Heart Fire at the Forge Terraces - **/craft → Flames → Capture**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 90,
+        "spirit_stones": 120
+      },
+      "follow_on": "realm_road_3"
+    },
+    {
+      "quest_key": "realm_road_3",
+      "realm_index": 3,
+      "title": "The Boar King and the Dark Counter",
+      "description": "Core Formation is the realm things start to be worth stealing. The Iron-Tusk Boar King holds Greenriver Town's hills - raid it alone or with a party from **/combat → Boss Raids → Start** and claim your share when it falls. Then find the hidden post this world's rumours point at (**/economy → Black Market → Rumors**) and fence one thing through it.",
+      "opening": "A core forms where the qi used to swirl, and the world notices. Hunters ask for your name at the gates now, and the people who trade in things nobody should own have started asking too.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Core Formation",
+          "count": 1,
+          "label": "Break through into Core Formation - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "boar",
+          "type": "raid_win",
+          "target": "Iron-Tusk Boar King",
+          "count": 1,
+          "label": "Bring down the Iron-Tusk Boar King and claim your share - **/combat → Boss Raids → Claim**"
+        },
+        {
+          "id": "fence",
+          "type": "black_market",
+          "count": 1,
+          "label": "Buy or fence one thing at a hidden post - **/economy → Black Market → Sell**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 120,
+        "spirit_stones": 160
+      },
+      "follow_on": "realm_road_4"
+    },
+    {
+      "quest_key": "realm_road_4",
+      "realm_index": 4,
+      "title": "The Drowned Serpent",
+      "description": "A Nascent Soul can stand where the marsh takes everybody else. Moonfen Marsh lies in the wilds of Moonfen City - explore from the city until the marsh is on your map, walk out to it, and bring down the Drowned Serpent that coils under its blackwater.",
+      "opening": "The soul that formed inside you is small and bright and does not like the smell of the marsh. Moonfen's fishermen do not go past the last stilt-house. Something out there has been drowning them for a hundred years.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Nascent Soul",
+          "count": 1,
+          "label": "Break through into Nascent Soul - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "marsh",
+          "type": "travel",
+          "target": "Moonfen Marsh",
+          "count": 1,
+          "label": "Reach Moonfen Marsh, in the wilds of Moonfen City - **/travel → Destinations → Go**"
+        },
+        {
+          "id": "serpent",
+          "type": "raid_win",
+          "target": "Moonfen Drowned Serpent",
+          "count": 1,
+          "label": "Bring down the Moonfen Drowned Serpent and claim your share - **/combat → Boss Raids → Claim**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 160,
+        "spirit_stones": 220
+      },
+      "follow_on": "realm_road_5"
+    },
+    {
+      "quest_key": "realm_road_5",
+      "realm_index": 5,
+      "title": "The Ninth Stage",
+      "description": "Soul Formation is where a cultivator decides what kind of cultivator they are. Fill the realm to its ninth stage, and instead of forcing the next gate, begin the Perfect Path: seven quests and a trial that leave the realm perfected under you. It is slower than the gate, and it is the only thing that makes the gate easier.",
+      "opening": "At the ninth stage the qi has nowhere to go but through, and most cultivators go through. The ones who are remembered stopped first.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Soul Formation",
+          "count": 1,
+          "label": "Break through into Soul Formation - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "perfect",
+          "type": "perfection_start",
+          "count": 1,
+          "label": "Begin the Perfect Path at the ninth stage - **/ascend → Perfection → Start**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 200,
+        "spirit_stones": 260
+      },
+      "follow_on": "realm_road_6"
+    },
+    {
+      "quest_key": "realm_road_6",
+      "realm_index": 6,
+      "title": "The Sword Grave",
+      "description": "Divine Transformation is deep enough to walk a grave. The Sword Grave of Nine Echoes opens in Cloudspine Foothills, in the wilds of Cloudblade City. It opens on the world's rotation, or at once with a Nine-Echo spatial token from the array workshops of Ashenwall or Stoneback - enter it, and walk it to its last room, where the inheritance the Wraith's floor demands is kept.",
+      "opening": "Nine swords were buried in the foothills with their masters, and the masters did not stay buried. The grave opens when it wants to, or when somebody holds the right token.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Divine Transformation",
+          "count": 1,
+          "label": "Break through into Divine Transformation - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "foothills",
+          "type": "travel",
+          "target": "Cloudspine Foothills",
+          "count": 1,
+          "label": "Reach Cloudspine Foothills, in the wilds of Cloudblade City - **/travel → Destinations → Go**"
+        },
+        {
+          "id": "grave",
+          "type": "realm_enter",
+          "target": "sword_grave_nine_echoes",
+          "count": 1,
+          "label": "Enter the Sword Grave of Nine Echoes - **/realm → Secret Realms → Enter**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 240,
+        "spirit_stones": 320
+      },
+      "follow_on": "realm_road_7"
+    },
+    {
+      "quest_key": "realm_road_7",
+      "realm_index": 7,
+      "title": "The Ninth Echo and the Seam",
+      "description": "The Ascension Realm is the last of this world. The Nine-Echo Sword Wraith waits on a floor beneath its grave for whoever carries the grave's inheritance - bring it down and claim what it leaves. Then face the heavens: prepare at the gate with **/ascend → Tribulation / Ascension → Prepare** and survive the three waves. What survives them is told where the seam is.",
+      "opening": "Nothing in the Mortal World is above you now except the sky, and the sky has noticed. Before it comes for you there is one echo left in the foothills that has never been answered.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Ascension Realm",
+          "count": 1,
+          "label": "Break through into the Ascension Realm - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "wraith",
+          "type": "raid_win",
+          "target": "Nine-Echo Sword Wraith",
+          "count": 1,
+          "label": "Bring down the Nine-Echo Sword Wraith and claim your share - **/combat → Boss Raids → Claim**"
+        },
+        {
+          "id": "heaven",
+          "type": "tribulation_cleared",
+          "count": 1,
+          "label": "Survive the Mortal Ascension Tribulation - **/ascend → Tribulation / Ascension → Attempt**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 320,
+        "spirit_stones": 400
+      },
+      "follow_on": ""
+    }
+  ],
   "household_errands": {
     "Forging": [
       {

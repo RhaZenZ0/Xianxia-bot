@@ -12,6 +12,7 @@ import discord
 from discord import app_commands
 
 from ...ops.game_engine import GameEngineError
+from ..character_state import announce_quest_progress, record_quest_progress
 from ..formatting import human_duration, roll_line
 from ..hubs import register_hub_option_hint
 from ..registry import registered_group_command
@@ -97,6 +98,11 @@ async def secret_enter(interaction: discord.Interaction, realm: str) -> None:
         await interaction.followup.send(f"You cannot enter that secret realm: {exc}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
+    # The realm road's sixth stage asks for the Sword Grave (v1.16.0):
+    # recorded once the engine has let the player in, told after the reply.
+    progressed = await record_quest_progress(
+        interaction.user.id, "realm_enter", target=str(result.get("realm_id") or realm),
+        game_minute=wt.total_minutes)
     info = dict(result.get("realm") or {})
     first = dict(result.get("first_room") or {})
     thread_ref = f"\n\n💬 Shared expedition thread: <#{result['thread_id']}>" if result.get("thread_id") else ""
@@ -106,6 +112,7 @@ async def secret_enter(interaction: discord.Interaction, realm: str) -> None:
         f"{first.get('description', '')}\nUse **/realm → Secret Realms → Explore**.{thread_ref}",
         ephemeral=False,
     )
+    await announce_quest_progress(interaction, progressed)
 
 
 @secret_enter.autocomplete("realm")

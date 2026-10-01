@@ -13,6 +13,7 @@ from ...rules.advanced_runtime import BOSS_TEMPLATES, boss_encounter_phase, boss
 from ...rules.battle import vitality_bar
 from ...ops.game_engine import GameEngineError
 from ..channels import _report_game_ui_error
+from ..character_state import announce_quest_progress, record_quest_progress
 from .battle import MANUAL_TECHNIQUE_PREFIX
 from ..hubs import panel_timeout, register_hub_option_hint
 from ..registry import registered_group_command
@@ -298,7 +299,17 @@ async def _raid_claim(user_id: int, action_id: str, encounter_id: int) -> tuple[
         )
     except GameEngineError as exc:
         return None, f"❌ {_explain_engine_error(exc)}"
-    return dict(envelope.get("result") or {}), ""
+    result = dict(envelope.get("result") or {})
+    # A raid is won by the party and claimed by each raider, so the claim is
+    # where every raider's own quest advances (v1.16.0): the realm road names
+    # the Boar King, the Drowned Serpent and the Wraith. Recorded here, behind
+    # both doors - the slash command and the card's Claim button - once the
+    # engine has paid; the callers tell it after their reply, through
+    # `quest_progress` on the result.
+    result["quest_progress"] = await record_quest_progress(
+        int(user_id), "raid_win", target=str(result.get("boss_name") or ""),
+        game_minute=(await current_world_time()).total_minutes)
+    return result, ""
 
 
 class RaidTechniqueSelect(discord.ui.Select):
@@ -448,6 +459,7 @@ class RaidView(discord.ui.LayoutView):
                 await interaction.followup.send(error or _claim_line(result or {}), ephemeral=bool(error))
                 fresh = await DB.get_boss_encounter(encounter_id=self.encounter_id) or encounter
                 await self._redraw(interaction, fresh, card_message=card_message)
+                await announce_quest_progress(interaction, list((result or {}).get("quest_progress") or []))
                 return
             if raid_style == "technique" and not technique:
                 techniques = await _raid_techniques(uid, await DB.get_character(uid))
@@ -629,6 +641,7 @@ async def boss_claim(interaction: discord.Interaction, encounter_id: int) -> Non
         return
     result, error = await _raid_claim(interaction.user.id, f"discord:{interaction.id}:boss.claim", encounter_id)
     await interaction.followup.send(error or _claim_line(result or {}), ephemeral=False)
+    await announce_quest_progress(interaction, list((result or {}).get("quest_progress") or []))
 
 
 @registered_group_command(hunter_group, name="status", description="View the autonomous bounty hunter currently tracking this incarnation")

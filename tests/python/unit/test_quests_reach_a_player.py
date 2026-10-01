@@ -20,6 +20,8 @@ reachable by one of the paths that can put it in a player's hands:
   - a commission, which an NPC offers in person (it carries a `giver_npc`);
   - a `beginner_path` stage, granted at creation or as the previous stage's
     `follow_on`;
+  - a `realm_road` stage (v1.16.0), handed over by the crossing into its realm
+    or as the previous stage's `follow_on`;
   - a household errand, handed over one at a time by `family.errand`;
   - an ascension quest, handed over by a cleared world-crossing tribulation;
   - a profession examination, offered when a trade's rank is reached;
@@ -41,6 +43,7 @@ from app.rules.quests import (
     beginner_path_seed_rows,
     household_errand_seed_rows,
     profession_exam_seed_rows,
+    realm_road_seed_rows,
     static_quest_seed_rows,
 )
 from tests.support import PROJECT_ROOT
@@ -72,6 +75,7 @@ def _seeded_keys() -> dict[str, str]:
         ("commission", list(world.get("commissions") or [])),
         ("static", static_quest_seed_rows(QUEST_DEFINITIONS)),
         ("beginner_path", beginner_path_seed_rows(shim)),
+        ("realm_road", realm_road_seed_rows(shim)),
         ("household_errand", household_errand_seed_rows(shim)),
         ("ascension", ascension_quest_seed_rows(shim)),
         ("profession_exam", profession_exam_seed_rows(shim)),
@@ -93,14 +97,14 @@ def _grantable_keys() -> set[str]:
         if str(row.get("giver_npc") or "").strip():
             grantable.add(str(row.get("quest_key") or ""))
     # The rosters whose whole purpose is to be handed over.
-    for rows in (beginner_path_seed_rows(shim), household_errand_seed_rows(shim),
+    for rows in (beginner_path_seed_rows(shim), realm_road_seed_rows(shim), household_errand_seed_rows(shim),
                  ascension_quest_seed_rows(shim), profession_exam_seed_rows(shim)):
         for row in rows:
             grantable.add(str(row.get("quest_key") or ""))
     # And anything a chain points at, wherever the chain lives. `follow_on` is
     # read off `seed_json` at runtime, so a stage pointing at a static quest
     # gives that quest a door.
-    for rows in (beginner_path_seed_rows(shim), household_errand_seed_rows(shim),
+    for rows in (beginner_path_seed_rows(shim), realm_road_seed_rows(shim), household_errand_seed_rows(shim),
                  ascension_quest_seed_rows(shim), profession_exam_seed_rows(shim)):
         for row in rows:
             follow_on = str(dict(row.get("seed") or {}).get("follow_on") or "").strip()
@@ -119,7 +123,7 @@ def _roster_rows() -> list[dict]:
     """
     world = _world()
     shim = type("W", (), {"data": world})()
-    rows = [*beginner_path_seed_rows(shim), *household_errand_seed_rows(shim),
+    rows = [*beginner_path_seed_rows(shim), *realm_road_seed_rows(shim), *household_errand_seed_rows(shim),
             *ascension_quest_seed_rows(shim), *profession_exam_seed_rows(shim)]
     chained = {str(dict(r.get("seed") or {}).get("follow_on") or "").strip() for r in rows}
     rows.extend(r for r in static_quest_seed_rows(QUEST_DEFINITIONS)
@@ -199,8 +203,8 @@ class EverySeededQuestHasADoor(unittest.TestCase):
         self.assertIn("road_to_a_sect", seeded)
         bot = BOT.read_text(encoding="utf-8")
         for call in ("static_quest_seed_rows(QUEST_DEFINITIONS)", "beginner_path_seed_rows(WORLD)",
-                     "household_errand_seed_rows(WORLD)", "ascension_quest_seed_rows(WORLD)",
-                     "profession_exam_seed_rows(WORLD)"):
+                     "realm_road_seed_rows(WORLD)", "household_errand_seed_rows(WORLD)",
+                     "ascension_quest_seed_rows(WORLD)", "profession_exam_seed_rows(WORLD)"):
             with self.subTest(call=call):
                 self.assertIn(call, bot, "a seeder nothing calls seeds nothing")
 

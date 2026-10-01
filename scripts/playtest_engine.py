@@ -83,7 +83,8 @@ async def run(url: str, token: str, db_path: str) -> Report:
     from app.database.remote import GoDatabaseTransport
     from app.ops.game_engine import GameEngineClient, GameEngineError
     from app.rules.quests import (QUEST_DEFINITIONS, ascension_quest_seed_rows, beginner_path_seed_rows,
-                                  household_errand_seed_rows, profession_exam_seed_rows, static_quest_seed_rows)
+                                  household_errand_seed_rows, profession_exam_seed_rows, realm_road_seed_rows,
+                                  static_quest_seed_rows)
     from app.rules.game import World
 
     world = json.loads((ROOT / "content" / "world.json").read_text(encoding="utf-8"))
@@ -156,7 +157,8 @@ async def run(url: str, token: str, db_path: str) -> Report:
     content = World(ROOT / "content" / "world.json")
     await step(report, "seed the commission pool, static quests, the beginner path and the household errands",
                db.sync_commission_pool(list(world.get("commissions") or []) + static_quest_seed_rows(QUEST_DEFINITIONS)
-                                       + beginner_path_seed_rows(content) + household_errand_seed_rows(content)
+                                       + beginner_path_seed_rows(content) + realm_road_seed_rows(content)
+                                       + household_errand_seed_rows(content)
                                        + ascension_quest_seed_rows(content)
                                        + profession_exam_seed_rows(content)))
     gm0 = await step(report, "world clock", clock())

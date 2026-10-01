@@ -715,6 +715,13 @@ async def flame_capture(interaction: discord.Interaction) -> None:
         return
     result = dict(envelope.get("result") or {})
     name = str(result.get("name") or "the flame")
+    # The realm road's second stage asks for the Earth-Heart Fire (v1.16.0):
+    # recorded on a capture the engine agreed to, told after the reply.
+    progressed = []
+    if result.get("success"):
+        progressed = await record_quest_progress(
+            interaction.user.id, "flame_capture", target=str(result.get("flame_id") or ""),
+            game_minute=(await current_world_time()).total_minutes)
     lines = [f"🔥 **Capturing the {name}** — {int(result.get('qi_cost') or 0)} qi spent",
              roll_line(SimpleNamespace(**dict(result.get("roll") or {})))]
     if result.get("success"):
@@ -725,6 +732,7 @@ async def flame_capture(interaction: discord.Interaction) -> None:
         lines.append(f"🩸 The flame gets away and burns your meridians — **{scorched.get('name', 'Meridian Damage')}** "
                      f"(severity {int(scorched.get('severity', 1))}). `/condition treat` with a **Jade Life Herb** mends it.")
     await interaction.followup.send("\n".join(lines), ephemeral=False)
+    await announce_quest_progress(interaction, progressed)
 
 
 @registered_group_command(flame_group, name="refine", description="Refine a flame you hold with beast cores, ore and qi")
