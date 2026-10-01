@@ -5946,6 +5946,26 @@ then asks the engine, harmless mid-section in a lone run and a five-second stall
 list names it, and the shard test walks `bot.py` for every task started outside an `if`, so the
 next one cannot be missed the same way.
 
+### A city before anything else (`discovery_pace.go`, v1.15.0)
+
+Asked as a world map, then as *"all city road can lead all city or something better"*. The roads
+were never the bar: `exploration.travel` plans the whole route to any **known** city of the world,
+waits nothing at the shipped `TRAVEL_TIME_PERCENT` of 0, and `realmhub go` is a free jump to the
+capital. What kept the far side of a world out of reach was knowing it. An explore found one place
+in 45 at random from a pool where every frontier city competed with the two road sites on each of
+its roads and the wilds beside it; measured off the shipped content, the twelve Mortal cities took
+a median 45 explores from Greenriver Town (57 at p90) on a twenty-minute cooldown, about fifteen
+hours of play. Roading every city to every city was offered and refused: it leaves that pool alone
+and six systems read the road graph as a shape (one site per road, gates per side,
+`stallDistanceHops`, `WhereAnNPCCanWalk`, `npcSectClaims`, the map). The owner chose the smaller
+change, and it is one file: `citiesFirst` narrows a discovery pool to its cities while it has any,
+and `discoveryChancePercent` (70) is the roll, stated once. The ring is nine finds away now. A hunt
+works anywhere and is only richer on a hunting ground, and walking a road still finds its sites, so
+the order costs nothing. `discovery_pace_test.go` drives the shipped catalogue from Greenriver and
+holds the order, the count and the odds; its drills print *"explore 5 found "Grey Mule Waystation"
+while a city was still unknown"* and *"the chance is 45, no better than the 45 the pace was measured
+at"*.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

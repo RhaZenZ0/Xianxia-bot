@@ -930,7 +930,9 @@ func discoverNextLocationTx(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if err != nil {
 		return "", err
 	}
-	candidates := discoveryCandidates(catalog, known, currentWorld(c, catalog), c.accessRealmIndex())
+	// A city before a road site or a wild place, and seven finds in ten
+	// (v1.15.0): discovery_pace.go is the statement of both.
+	candidates := citiesFirst(catalog, discoveryCandidates(catalog, known, currentWorld(c, catalog), c.accessRealmIndex()))
 	if len(candidates) == 0 {
 		return "", nil
 	}
@@ -938,7 +940,7 @@ func discoverNextLocationTx(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if err != nil {
 		return "", err
 	}
-	if roll >= 45 {
+	if roll >= discoveryChancePercent {
 		return "", nil
 	}
 	sort.Strings(candidates)
