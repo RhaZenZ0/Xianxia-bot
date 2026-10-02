@@ -47,11 +47,15 @@ deferred half and not the half that says what was done about it.
   curriculum's second band landed at Foundation Establishment. On the owner's call ("the next open
   todo") the band is Qi Refining: every page `scripts/author_feature_unlocks.py` held to realm 2
   opens at realm 1, the deeper floors stay where they were, and the first gate opens the game.
-- **deferred (content)** — *The Celestial ring is a line.* Both world-flow studies: the Celestial
-  World's gates face east ten times and west nine, north and south twice each, where the Spiritual
-  and Immortal rings are near even. Re-authoring its compass - directions on gates and new gate rows
-  where a city lacks a side, no row removed - is additive layout work nothing depends on, and which
-  cities gain a side is a decision; nothing is changed.
+- **fixed (v1.19.1)** — *The Celestial ring is a line.* Both world-flow studies: the Celestial
+  World's gates faced east ten times and west nine, north and south twice each. The roads were
+  always a ring; the compass folded at Starroad and Lunar Shadow, each facing both of its roads by
+  one gate. The entry's own plan - new gate rows, none removed - could not be done, because turning
+  a road moves its gate at both ends and the far end's gate faced nothing else. On the owner's call
+  the two folds turn north and south (`scripts/author_celestial_compass.py`), six gates are renamed
+  to the side their road leaves by (Celestial River City's west gate folds into its south gate), two
+  new gates have a captain each, and migration 75 carries a running world onto the new names. The
+  compass reads 7/6/6/5 now.
 - **fixed (v1.17.1)** — *Two doors on the panel opened for nobody.* The world-flow study's finding,
   on the owner's call: the homestead asked sect rank 40 and the promotion ladder stopped at 30, the
   manor asked rank 70 as a Go literal, and the Personal World page opened at realm 5 for a world the
