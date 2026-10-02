@@ -19,7 +19,7 @@ shaped the same way.
 """
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 
 # A leaf whose path ends here is a page's own status read, and a status read
 # never waits for a realm (v1.0.13). Stated once, here, and imported by the
@@ -40,8 +40,18 @@ def is_status_read(leaf: str) -> bool:
     return str(leaf).split()[-1:] == [STATUS_LEAF]
 
 
-def locked_leaves(roster: Mapping[str, object] | None, realm_index: int) -> dict[str, int]:
+def locked_leaves(
+    roster: Mapping[str, object] | None,
+    realm_index: int,
+    *,
+    opened: Iterable[str] = (),
+) -> dict[str, int]:
     """`leaf path -> the realm that opens it`, for what this realm has not reached.
+
+    `opened` is what this player's own standing opens whatever their realm
+    (v1.19.4): a sect member is shown every door of the sect hub, because the
+    curriculum paces what the game has not introduced yet and a member has
+    already been introduced to their sect. It only ever opens, never locks.
 
     A roster that is absent, empty or unreadable locks **nothing**. That
     direction is deliberate and is the same call `maintenance.py` makes about
@@ -56,8 +66,11 @@ def locked_leaves(roster: Mapping[str, object] | None, realm_index: int) -> dict
     if not isinstance(leaves, Mapping):
         return {}
     realm = int(realm_index)
+    exempt = {str(path).lstrip("/") for path in opened}
     out: dict[str, int] = {}
     for path, opens_at in leaves.items():
+        if str(path) in exempt:
+            continue
         try:
             needs = int(opens_at)  # type: ignore[arg-type]
         except (TypeError, ValueError):
@@ -71,6 +84,8 @@ def hidden_hubs(
     roster: Mapping[str, object] | None,
     realm_index: int,
     pages: Mapping[str, Mapping[str, Sequence[str]]],
+    *,
+    opened: Iterable[str] = (),
 ) -> dict[str, int]:
     """`hub -> the realm that first opens a lever on it`, for the hubs a
     player at this realm has nothing to *do* in yet (v1.2.0).
@@ -88,7 +103,7 @@ def hidden_hubs(
     nothing is hidden. And it is advertising, never a bound - the hub's own
     slash command still opens it, and the menu names what it left off.
     """
-    locked = locked_leaves(roster, realm_index)
+    locked = locked_leaves(roster, realm_index, opened=opened)
     if not locked:
         return {}
     out: dict[str, int] = {}

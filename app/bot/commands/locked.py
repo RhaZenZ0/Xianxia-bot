@@ -17,11 +17,10 @@ from __future__ import annotations
 
 import discord
 
-from ..hubs import REGISTERED_HUBS, _leaf_actions
+from ..hubs import REGISTERED_HUBS, _leaf_actions, not_yet_unlocked
 from ..registry import registered_root_command
 from ..runtime import DB, WORLD, require_character
 from ..services import GUILD
-from ...rules import feature_unlocks as unlocks
 
 # Discord's message limit is 2000; a realm-0 cultivator has 139 doors waiting,
 # so the card names every band and prints the doors of the nearest few.
@@ -55,8 +54,9 @@ async def locked(interaction: discord.Interaction) -> None:
     if not character:
         return
     realm = int(character.get("realm_index") or 0)
-    roster = WORLD.data.get("feature_unlocks") or {}
-    waiting = unlocks.locked_leaves(roster, realm)
+    # The panels' own answer (v1.19.4), so what this card lists as waiting is
+    # exactly what the panels hold back - a sect member's sect doors included.
+    waiting = {path.lstrip("/"): opens_at for path, opens_at in (await not_yet_unlocked(interaction)).items()}
     labels = _labels()
 
     if not waiting:

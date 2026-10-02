@@ -261,16 +261,26 @@ class TheRoadStaysVisible(unittest.TestCase):
 
     def test_locked_reads_the_same_roster_the_panels_read(self):
         """One statement of what is shut. Two would be free to disagree, and a
-        card that disagrees with the panel is worse than either alone."""
+        card that disagrees with the panel is worse than either alone.
+
+        Since v1.19.4 the card asks the panels' own registered provider rather
+        than the pure helper, because what is shut depends on more than the
+        realm (a sect member's sect doors are open) and the provider is where
+        that is decided. It must not compute its own answer beside it."""
         source = (APP / "bot" / "commands" / "locked.py").read_text(encoding="utf-8")
         called = {
             node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, "id", "")
             for node in ast.walk(_function(source, "locked")) if isinstance(node, ast.Call)
         }
         self.assertIn(
-            "locked_leaves", called,
-            "/locked no longer asks feature_unlocks.locked_leaves, so it is a second statement of "
+            "not_yet_unlocked", called,
+            "/locked no longer asks the panels' provider, so it is a second statement of "
             "what is shut and free to drift from the panels",
+        )
+        self.assertNotIn(
+            "locked_leaves", called,
+            "/locked computes its own answer beside the panels' provider, so a sect member's "
+            "open sect doors would be listed as waiting",
         )
 
     def test_the_two_kinds_of_hiding_are_kept_apart(self):

@@ -6373,6 +6373,25 @@ class body and leaves Python that does not parse - so it parses the original sou
 docstrings itself. `UNREAD_RULES` is not empty on the day it was written: `faction_attitudes` is
 per-alignment numbers nothing reads, and whether a rule should is a decision (`docs/TODO.md`).
 
+### A sect member sees their sect (`_curriculum_opened`, v1.19.4)
+
+Asked for from play: *"if you in a sect if your not at the needed stage open all the commands for
+it."* The trial opens at realm 0 (v1.1.0) and the curriculum held `sect / Sect`, `Holdings` and
+`Discipleship` to realm 1 and `Territory` and `War` to 4, so a new member met their sect as one
+collapsed line. `locked_leaves` and `hidden_hubs` take `opened`, which only ever drops a leaf from
+what is held back, and `_curriculum_opened` answers every leaf of the sect hub for anybody with a
+`sect_membership` row - nothing for a failed read, because the curriculum as it was is the safe
+side. The engine sets no realm floor on any sect action, so nothing opened is a button that only
+refuses; `PROGRESSION_GATES` still hides the manor below its ranks.
+
+**`/locked` asks the panels' provider now**, not the pure helper: what is shut depends on more than
+the realm, and the provider is where that is decided. `test_the_curriculum_opens_as_you_cultivate`
+had held `/locked` to calling `locked_leaves` - the spelling of "one statement of what is shut" -
+and went red on the change that kept that rule (v1.0.8); it holds the provider now and forbids the
+helper beside it. **The menu half is read, not driven**, and its drill is why: at realm 0 the sect
+hub is never left off the menu, because Recruitment's two doors are open there, so a behavioural
+test passed with the menu's exemption taken out.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —
