@@ -304,6 +304,35 @@ BOSS_TEMPLATES: dict[str, dict[str, Any]] = {
             {"name": "Ninth Echo: Severing", "threshold": 0.0, "attack": 25, "defense": 4, "cohesion_damage": 15},
         ],
     },
+    # Each upper world's raid (v1.17.0), the display twin of `bossTemplatesGo`;
+    # `test_a_button_is_drawn_where_it_works` holds the lairs equal.
+    "hundred_horn_ancestor_stag": {
+        "name": "Hundred-Horn Ancestor Stag", "location": "Thousand Beast Steppe", "realm_index": 11,
+        "max_hp": 640, "reward_currency": 300, "reward_item": "spirit_crystal_ore", "reward_quantity": 4,
+        "phases": [
+            {"name": "The Herd Turns", "threshold": 0.70, "attack": 16, "defense": 8, "cohesion_damage": 6},
+            {"name": "Hundred-Horn Charge", "threshold": 0.35, "attack": 21, "defense": 7, "cohesion_damage": 10},
+            {"name": "The Old Line", "threshold": 0.0, "attack": 27, "defense": 5, "cohesion_damage": 15},
+        ],
+    },
+    "starfall_iron_colossus": {
+        "name": "Starfall Iron Colossus", "location": "Starfall Crater", "realm_index": 19,
+        "max_hp": 900, "reward_currency": 400, "reward_item": "immortal_gold_ore", "reward_quantity": 3,
+        "phases": [
+            {"name": "The Rim Walk", "threshold": 0.70, "attack": 20, "defense": 11, "cohesion_damage": 7},
+            {"name": "Molten Core", "threshold": 0.35, "attack": 26, "defense": 9, "cohesion_damage": 11},
+            {"name": "Star-Iron Collapse", "threshold": 0.0, "attack": 33, "defense": 6, "cohesion_damage": 16},
+        ],
+    },
+    "unmoored_star_leviathan": {
+        "name": "Unmoored Star Leviathan", "location": "Shattered Firmament", "realm_index": 27,
+        "max_hp": 1200, "reward_currency": 500, "reward_item": "starsteel_ore", "reward_quantity": 3,
+        "phases": [
+            {"name": "The Constellation Stirs", "threshold": 0.70, "attack": 24, "defense": 13, "cohesion_damage": 8},
+            {"name": "Starfall Coils", "threshold": 0.35, "attack": 31, "defense": 11, "cohesion_damage": 12},
+            {"name": "The Last Star Goes Out", "threshold": 0.0, "attack": 39, "defense": 7, "cohesion_damage": 18},
+        ],
+    },
 }
 
 # `ERA_CYCLE` stood here until v1.0.7: a third copy of the era roster, beside

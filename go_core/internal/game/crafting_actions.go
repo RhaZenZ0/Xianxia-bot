@@ -423,7 +423,10 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	flameBonus, flameOpens, flameName := craftFlameTx(conn, catalog, userID, profession)
 	// And the spirit sense, for the two trades drawn with spirit rather than fire.
 	senseBonus, senseOpens := craftSpiritSenseTx(conn, catalog, userID, profession)
-	contextBonus := effectBonus + facilityBonus + manorFacilityBonus + familyBonus + craftEcho + flameBonus + senseBonus
+	// And the Immortal World's job (v1.17.0): work made in the grandmasters'
+	// court is made better, whichever trade it is.
+	placeName, placeBonus := craftPlaceBonus(catalog, location)
+	contextBonus := effectBonus + facilityBonus + manorFacilityBonus + familyBonus + craftEcho + flameBonus + senseBonus + placeBonus
 	mod := base + level + contextBonus
 
 	roll, err := roll2d10(mod, recipe.TN)
@@ -625,6 +628,8 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		"craft_echo_life":      craftEchoLife,
 		"craft_echo_level":     craftEchoLevel,
 		"context_bonus":        contextBonus,
+		"place":                placeName,
+		"place_bonus":          placeBonus,
 		"flame_bonus":          flameBonus,
 		"flame_name":           flameName,
 		"flame_opens_top":      flameOpens,

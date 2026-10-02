@@ -958,6 +958,15 @@ class CityDistrictContentTests(unittest.TestCase):
     def test_capitals_have_four_compass_districts_and_cities_one(self):
         locations = WORLD["locations"]
         cities = {h["entrance_location"] for h in WORLD["auction_houses"].values()}
+        # A world's job district (v1.17.0) is the one kind of district that
+        # stands in one world and nowhere else, and it is a second district in
+        # one city of that world. Read off the content rather than listed: a
+        # kind found in exactly one world is that world's job.
+        worlds_by_kind: dict[str, set[str]] = {}
+        for loc in locations.values():
+            if loc.get("district") not in (None, "", "gate", "inn"):
+                worlds_by_kind.setdefault(str(loc["district"]), set()).add(str(loc.get("world")))
+        job_kinds = {kind for kind, worlds in worlds_by_kind.items() if len(worlds) == 1}
         for city in sorted(cities):
             districts = [n for n, l in locations.items() if l.get("district") not in (None, "", "gate", "inn") and l.get("outside_location") == city]
             with self.subTest(city=city):
@@ -967,7 +976,9 @@ class CityDistrictContentTests(unittest.TestCase):
                 elif city == "Greenriver Town":
                     self.assertEqual(districts, [], "a town is one place")
                 else:
-                    self.assertEqual(len(districts), 1, districts)
+                    own = [n for n in districts if locations[n]["district"] not in job_kinds]
+                    self.assertEqual(len(own), 1, districts)
+                    self.assertLessEqual(len(districts) - len(own), 1, f"{city} holds two worlds' jobs: {districts}")
 
     def test_every_district_has_its_own_people(self):
         homes = {}

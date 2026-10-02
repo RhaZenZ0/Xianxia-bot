@@ -1016,7 +1016,8 @@ async def sect_manor_status(interaction: discord.Interaction) -> None:
     if not manor:
         lines = [
             f"🏯 **{sect_name} — No Sect Manor Yet**",
-            "A Sect Master or Ancestor can establish one at a normal world location once the shared treasury holds the foundation materials.",
+            # The rank is the content's (v1.17.1), the same key the engine refuses by.
+            f"A {WORLD.sect_rank_name(int((WORLD.data.get('sect_abode_system') or {}).get('manor_founding_rank_level') or 0))} or higher can establish one at a normal world location once the shared treasury holds the foundation materials.",
             f"Foundation cost: **{WORLD.item_names(SECT_MANOR_ESTABLISHMENT_COST)}**",
             f"Current treasury toward foundation: **{WORLD.item_names({k: min(v, treasury.get(k,0)) for k,v in SECT_MANOR_ESTABLISHMENT_COST.items()})}**",
         ]

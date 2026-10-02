@@ -48,6 +48,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 CONTENT = ROOT / "content" / "world.json"
 
+# The Personal World page opens where the engine lets a world be made
+# (v1.17.1): `personal_world_system.min_realm_index`, read off the content
+# rather than written here, so the page cannot show the door twenty-five
+# realms before the engine opens it - which is what a floor of 5 did for a
+# world that needs 30.
+PERSONAL_WORLD_FLOOR = int(
+    (json.loads(CONTENT.read_text(encoding="utf-8")).get("personal_world_system") or {}).get("min_realm_index") or 0
+)
+
 # realm index -> what a page opened here is about. Names come from the ladder
 # in `realms`; the gate holds these against it rather than trusting the comment.
 #   0 Body Tempering      the first hour: cultivate, break through, explore, buy,
@@ -127,7 +136,7 @@ PAGES: dict[str, int] = {
     "family / Legacy": 5,
     "abode / Property": 3,
     "abode / Access": 3,
-    "innerworld / Personal World": 5,
+    "innerworld / Personal World": PERSONAL_WORLD_FLOOR,
     "realm / Secret Realms": 2,
     "realm / Spatial Keys": 2,
 }

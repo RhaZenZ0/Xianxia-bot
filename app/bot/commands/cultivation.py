@@ -454,6 +454,10 @@ async def breakthrough(interaction: discord.Interaction, confirm: bool = False, 
         mechanical += "\n☯ Dual Cultivation Resonance: **+1** to this breakthrough."
     if int(result.get("innate_breakthrough_bonus", 0)):
         mechanical += f"\n🌿 Innate aptitude modifier: **{int(result['innate_breakthrough_bonus']):+d}** to this breakthrough."
+    # The Celestial World's job (v1.17.0): the heaven-reading altar, named by
+    # the engine with its bonus.
+    if int(result.get("place_bonus", 0)):
+        mechanical += f"\n🌠 {result.get('place')}: **{int(result['place_bonus']):+d}** to this breakthrough."
     if success:
         mechanical += f"\n✨ Advanced to **{next_realm}, Stage {next_phase}**."
         gains = dict(result.get("attribute_gains") or {})
@@ -593,6 +597,8 @@ async def body_breakthrough(interaction: discord.Interaction, confirm: bool = Fa
         text += "\n☯ Dual Cultivation Resonance: **+1**."
     if int(result.get("innate_breakthrough_bonus", 0)):
         text += f"\n🌿 Innate aptitude modifier: **{int(result['innate_breakthrough_bonus']):+d}**."
+    if int(result.get("place_bonus", 0)):
+        text += f"\n🌠 {result.get('place')}: **{int(result['place_bonus']):+d}**."
     if success:
         text += f"\n✨ Advanced to **{result.get('to_realm','Unknown Realm')}, Stage {int(result.get('to_stage',1))}**."
         if int(result.get("vitality_gain", 0)):

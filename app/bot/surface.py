@@ -1050,6 +1050,16 @@ LAW_MIN_REALM_INDEX = int((WORLD.data.get("law_system") or {}).get("normal_min_r
 # The realm a stall asks for (v1.5.0), read off the same roster the engine
 # reads (`stall_system`), with the engine's own default for a file without one.
 STALL_MIN_REALM_INDEX = int((WORLD.data.get("stall_system") or {}).get("min_realm_index") or 2)
+# Two doors on the panel opened for nobody (v1.17.1): the homestead asked a sect
+# rank the promotion ladder did not reach and the manor a rank that was a Go
+# literal, and the Personal World page showed at realm 5 for a world that
+# needs realm 30 and Space Law at 100. Each floor is read off the content the
+# engine reads, so the panel anticipates the engine's refusal and names it.
+HOMESTEAD_FOUNDING_RANK = int((WORLD.data.get("abode_system") or {}).get("founding_rank_level") or 0)
+MANOR_FOUNDING_RANK = int((WORLD.data.get("sect_abode_system") or {}).get("manor_founding_rank_level") or 0)
+MANOR_CONSTRUCTION_RANK = int((WORLD.data.get("sect_abode_system") or {}).get("manor_construction_rank_level") or 0)
+PERSONAL_WORLD_FLOOR = int((WORLD.data.get("personal_world_system") or {}).get("min_realm_index") or 0)
+PERSONAL_WORLD_LAW = int((WORLD.data.get("personal_world_system") or {}).get("space_law_comprehension") or 0)
 PROGRESSION_GATES: dict[str, tuple[str, ...]] = {
     # gate -> the leaves hidden while the gate is shut
     "law": ("law comprehend", "law technique"),
@@ -1074,8 +1084,15 @@ PROGRESSION_GATES: dict[str, tuple[str, ...]] = {
     # and `LOCATION_GATES` asks that instead.
     "abode": ("abode enter", "abode upgrade", "abode invite", "abode revoke", "abode guests", "abode thread"),
     "abode_owner": ("abode establish",),
+    # The standing each door asks (v1.17.1), read off the content the engine
+    # refuses by: a homestead's founding rank, the manor's founding and
+    # construction ranks, and a personal world's realm and Space Law.
+    "homestead_rank": ("abode establish",),
+    "manor_founder": ("sect manor establish",),
+    "manor_builder": ("sect manor upgrade",),
     "innerworld": ("innerworld enter", "innerworld leave", "innerworld setrule"),
     "innerworld_owner": ("innerworld create",),
+    "personal_world_floor": ("innerworld create",),
     "beast": ("beast feed", "beast train", "beast evolve", "beast active"),
     "house_member": ("family house invite", "family house leave", "family house child"),
     "house_outsider": ("family house found",),
@@ -1123,10 +1140,20 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
             under_way = True
     if not under_way:
         shut["perfection_path"] = "no Perfection path is under way — Start one at stage 9"
-    if not await DB.get_sect_membership(uid):
+    membership = await DB.get_sect_membership(uid)
+    if not membership:
         shut["sect_member"] = "you are in no sect — see Recruitment"
     else:
         shut["sect_outsider"] = "you already belong to a sect"
+    # The standing each door asks (v1.17.1), named the way the engine refuses.
+    rank_level = int((membership or {}).get("rank_level") or 0)
+    held = f"you hold {membership.get('rank_name')}" if membership else "you are in no sect"
+    if HOMESTEAD_FOUNDING_RANK > 0 and rank_level < HOMESTEAD_FOUNDING_RANK:
+        shut["homestead_rank"] = f"founding a homestead asks sect standing of {WORLD.sect_rank_name(HOMESTEAD_FOUNDING_RANK)}; {held}"
+    if membership and MANOR_FOUNDING_RANK > 0 and rank_level < MANOR_FOUNDING_RANK:
+        shut["manor_founder"] = f"establishing the sect manor asks for {WORLD.sect_rank_name(MANOR_FOUNDING_RANK)}; {held}"
+    if membership and MANOR_CONSTRUCTION_RANK > 0 and rank_level < MANOR_CONSTRUCTION_RANK:
+        shut["manor_builder"] = f"directing manor construction asks for {WORLD.sect_rank_name(MANOR_CONSTRUCTION_RANK)}; {held}"
     abode = await DB.get_abode(uid)
     if not abode:
         shut["abode"] = "you have no property yet — Establish one"
@@ -1136,6 +1163,13 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
         shut["innerworld"] = "you have no personal world yet — Create one"
     else:
         shut["innerworld_owner"] = "your personal world already exists"
+    if PERSONAL_WORLD_FLOOR > 0 or PERSONAL_WORLD_LAW > 0:
+        rows = await DB.get_law_progress(uid, "space") or []
+        comprehension = int((rows[0] if rows else {}).get("comprehension") or 0)
+        if realm < PERSONAL_WORLD_FLOOR or comprehension < PERSONAL_WORLD_LAW:
+            shut["personal_world_floor"] = (
+                f"a personal world asks for {WORLD.realm_name(PERSONAL_WORLD_FLOOR)} and Space Law at {PERSONAL_WORLD_LAW}%; "
+                f"you stand at {WORLD.realm_name(realm)} with Space Law at {comprehension}%")
     if not await DB.get_spirit_beasts(uid):
         shut["beast"] = "no beast is contracted yet — Tame one"
     if not await DB.get_player_family_membership(uid):

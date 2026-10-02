@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 import os
+import re
 import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -184,8 +185,13 @@ class TheStanceTheOddsAndTheGate(unittest.TestCase):
         self.assertIn('applyCombatCondition(conn, userID, "qi_deviation", minI64(5, held+1), "cultivation", "force_stance", gameMinute)', GO_STANCE)
 
     def test_the_odds_and_the_roll_share_one_modifier(self):
-        self.assertEqual(GO_ACTIONS.count("breakthroughModifier(c, mods, body, perfectBonus, resonance, innate)"), 1)
-        self.assertEqual(GO_STANCE.count("breakthroughModifier(c, mods, body, perfectBonus, resonance, innate)"), 1)
+        # The roll (actions) and the odds shown before it (stance) each call the
+        # one function, whatever terms it takes: v1.17.0 added the altar's
+        # `place`, and a gate pinned to the argument list goes red exactly when
+        # a term is added, which is the one time it should stay green (v1.0.8).
+        self.assertEqual(GO_STANCE.count("func breakthroughModifier("), 1, "the modifier is defined once, in the stance file")
+        self.assertEqual(len(re.findall(r"\bbreakthroughModifier\(", GO_ACTIONS)), 1, "the roll calls the one modifier exactly once")
+        self.assertEqual(len(re.findall(r"\bbreakthroughModifier\(", GO_STANCE)) - 1, 1, "the odds call the one modifier exactly once")
         self.assertNotIn('mods.value(c.Attributes["will"], "will") + 2 + perfectBonus', GO_ACTIONS)
         self.assertIn("probability := breakthroughOdds(modifier, tn)", GO_ACTIONS)
         formatting = (BOT / "formatting.py").read_text(encoding="utf-8")

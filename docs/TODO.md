@@ -16,6 +16,26 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.17.1)** — *Two doors on the panel opened for nobody.* The world-flow study's finding,
+  on the owner's call: the homestead asked sect rank 40 and the promotion ladder stopped at 30, the
+  manor asked rank 70 as a Go literal, and the Personal World page opened at realm 5 for a world the
+  engine refuses below 30 and Space Law 100. The ladder reaches Deacon (9,000 earned); the manor's
+  two ranks (`sect_abode_system.manor_founding_rank_level`, `manor_construction_rank_level`) and the
+  world's floors (`personal_world_system`) are content the engine and the panel both read; each door
+  is hidden below its floor with a lock line naming it; the page opens at the content's realm.
+- **fixed (v1.17.0)** — *Each upper world has a job.* The world-flow study's second recommendation,
+  on the owner's call ("Give each world a job. Or more"): each world above the Mortal carries a
+  district kind of its own read by one rule (`world_jobs.go`), a raid boss in the wilds of one of
+  its cities, a secret realm at that wild place, and a key to it on its array workshops' shelves;
+  and a raid's reward is paid in the money of the world it is fought in, where `boss.claim` paid
+  the Mortal stone everywhere (rc.44's class, found at a sixteenth site).
+- **deferred (content)** — *Commission realm bands above the Mortal World.* The twenty-six city
+  commissions of each upper world carry a `realm_band` of "2-4" (Spiritual) or "4-8" (Immortal and
+  Celestial), which are Mortal ranges; the engine stores the band and reads it nowhere, so nothing
+  breaks today. Found by the v1.17.0 inventory; whether a band should mean anything is a decision.
+- **deferred (content)** — *`world_rules.physical_laws.local_time_flow` is read by nothing in Go.*
+  1 / 3 / 9 / 27 per world, mentioned only in `app/rules/advanced_catalog.py`. Either a rule reads
+  it or it goes; found by the v1.17.0 inventory.
 - **fixed (v1.14.0)** — *Attributes grow every stage.* (Deferred from v1.13.0 on the owner's call "ship paths first".)
   Asked for as "+1 on every attribute per level, and the types get +2 on some", then settled as: at
   every **stage** a cultivator gains +1 to all six attributes and +2 instead on the two their path

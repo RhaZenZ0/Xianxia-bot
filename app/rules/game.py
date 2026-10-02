@@ -322,6 +322,15 @@ class World:
                 return dict(rank)
         return None
 
+    def sect_rank_name(self, level: int) -> str:
+        """The name of the rank at `level` on `sect_system.ranks` (v1.17.1),
+        the display twin of the engine's `sectRankName`; a level the ladder
+        does not carry is named by its number, never by a neighbouring rung."""
+        for rank in self.sect_system.get("ranks", []):
+            if int(rank.get("level") or -1) == int(level):
+                return str(rank.get("name") or f"rank {level}")
+        return f"rank {level}"
+
     def npc_location_at(self, npc_name: str, period: str) -> str | None:
         npc = self.npcs.get(npc_name)
         if not npc:

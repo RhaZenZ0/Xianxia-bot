@@ -84,6 +84,10 @@ async def law_comprehend(interaction:discord.Interaction,law:str,spend_insight:b
         legacy_note+=f"\n🜂 Your root or path has an affinity for this Law: **+{int(result['affinity_bonus'])}** to the check."
     if int(result.get('insight_spent',0)):
         legacy_note+=f"\n💡 You put **{int(result['insight_spent'])} Insight XP** into it: **+{int(result.get('insight_bonus',0))}** to the check."
+    # v1.17.0: the Spiritual World's job. The engine names the ground and its
+    # bonus; a Law is read more clearly under the sutra archive's roof.
+    if int(result.get('place_bonus',0)):
+        legacy_note+=f"\n📜 {result.get('place')}: **+{int(result['place_bonus'])}** to the check."
     await interaction.response.send_message(
         f"⚖️ **{result.get('name',definition['name'])}**\n{roll_line(roll)}{legacy_note}\n"
         f"Comprehension **+{int(result.get('gain',0))}%** → **{int(result.get('comprehension',0))}%**\n"

@@ -309,11 +309,13 @@ func cultivationInsightAction(conn *storage.Conn, catalog worlddata.Catalog, use
 
 // breakthroughModifier is the one place the breakthrough bonus is composed,
 // so the odds shown before the roll and the roll itself cannot disagree.
-func breakthroughModifier(c mechanicsCharacter, mods resolvedModifiers, body bool, perfectBonus, resonance, innate int64) int64 {
+// `place` is the ground's own term (v1.17.0): the heaven-reading altar's
+// bonus on its stone, nothing anywhere else.
+func breakthroughModifier(c mechanicsCharacter, mods resolvedModifiers, body bool, perfectBonus, resonance, innate, place int64) int64 {
 	if body {
-		return mods.value(c.Attributes["body"], "body") + maxI64(1, mods.value(c.Attributes["will"], "will")/2) + 2 + perfectBonus + resonance + innate
+		return mods.value(c.Attributes["body"], "body") + maxI64(1, mods.value(c.Attributes["will"], "will")/2) + 2 + perfectBonus + resonance + innate + place
 	}
-	return mods.value(c.Attributes["will"], "will") + 2 + perfectBonus + resonance + innate
+	return mods.value(c.Attributes["will"], "will") + 2 + perfectBonus + resonance + innate + place
 }
 
 // breakthroughOdds is the chance in a hundred that 2d10 plus the modifier
@@ -356,7 +358,8 @@ func cultivationOddsResult(c mechanicsCharacter, catalog worlddata.Catalog, mods
 	}
 	resonance := dualCheckBonus(c)
 	innate := int64(math.Round(mods.Add["breakthrough_bonus"]))
-	modifier := breakthroughModifier(c, mods, body, perfectBonus, resonance, innate)
+	placeName, place := breakthroughPlaceBonus(catalog, c.Location)
+	modifier := breakthroughModifier(c, mods, body, perfectBonus, resonance, innate, place)
 	tn := breakthroughTN(realms, realm, phase)
 	movers := []map[string]any{}
 	if body {
@@ -375,7 +378,10 @@ func cultivationOddsResult(c mechanicsCharacter, catalog worlddata.Catalog, mods
 	if innate != 0 {
 		movers = append(movers, map[string]any{"label": "Aptitudes & effects", "value": innate})
 	}
-	return map[string]any{"tn": tn, "modifier": modifier, "probability": breakthroughOdds(modifier, tn), "movers": movers, "stage_nine": phase == 9}
+	if place != 0 {
+		movers = append(movers, map[string]any{"label": placeName, "value": place})
+	}
+	return map[string]any{"tn": tn, "modifier": modifier, "probability": breakthroughOdds(modifier, tn), "movers": movers, "stage_nine": phase == 9, "place": placeName, "place_bonus": place}
 }
 
 // cultivationStatusQuery is the cultivation sheet: realm and stage on both

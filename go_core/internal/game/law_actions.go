@@ -77,7 +77,7 @@ func lawComprehendAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	if !ok {
 		return authoritativeMutation{}, errors.New("unknown law")
 	}
-	cr, err := conn.Execute(`SELECT realm_index,spiritual_root,path,phase FROM characters WHERE user_id=? AND life_status='alive'`, []any{userID})
+	cr, err := conn.Execute(`SELECT realm_index,spiritual_root,path,phase,location FROM characters WHERE user_id=? AND life_status='alive'`, []any{userID})
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -86,6 +86,9 @@ func lawComprehendAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	}
 	realm := storage.ParseInt(cr.Rows[0][0])
 	root, path := fmt.Sprint(cr.Rows[0][1]), fmt.Sprint(cr.Rows[0][2])
+	// The Spiritual World's job (v1.17.0): a Law is comprehended more clearly
+	// under the sutra archive's roof.
+	placeName, placeBonus := lawPlaceBonus(catalog, fmt.Sprint(cr.Rows[0][4]))
 	minimum := catalog.LawSystem.NormalMinRealmIndex
 	if def.Supreme {
 		minimum = catalog.LawSystem.SupremeMinRealmIndex
@@ -144,7 +147,7 @@ func lawComprehendAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	// attributes, each grown a stage at a time, so what the cultivator has
 	// grown past that floor counts twice.
 	lead := 2 * stageLead(catalog, realm, storage.ParseInt(cr.Rows[0][3]), minimum, 1)
-	roll, err := rollCheck(insight+spirit+affinity+legacyBonus+insightBonus+lead, tn)
+	roll, err := rollCheck(insight+spirit+affinity+legacyBonus+insightBonus+lead+placeBonus, tn)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -187,6 +190,6 @@ func lawComprehendAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 		return authoritativeMutation{}, err
 	}
 	stage := lawStage(catalog, comp)
-	result := map[string]any{"law": p.Law, "name": def.Name, "dao": dao, "roll": roll, "gain": gain, "comprehension": comp, "insights": insights, "dao_gain": daoGain, "stage_index": stage.Index, "stage_name": stage.Name, "affinity_bonus": affinity, "legacy_bonus": legacyBonus, "memory_awakened": awakened, "insight_bonus": insightBonus, "insight_spent": insightSpent}
+	result := map[string]any{"law": p.Law, "name": def.Name, "dao": dao, "roll": roll, "gain": gain, "comprehension": comp, "insights": insights, "dao_gain": daoGain, "stage_index": stage.Index, "stage_name": stage.Name, "affinity_bonus": affinity, "legacy_bonus": legacyBonus, "memory_awakened": awakened, "insight_bonus": insightBonus, "insight_spent": insightSpent, "place": placeName, "place_bonus": placeBonus}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "law", EventType: "law_comprehended", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 }

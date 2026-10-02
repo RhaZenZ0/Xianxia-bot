@@ -234,3 +234,25 @@ func sectResidenceFacilityLevel(conn *storage.Conn, userID int64, locationKey, c
 func homesteadFoundingRankGo(c worlddata.Catalog) int64 {
 	return maxI64(0, i64(c.AbodeSystem["founding_rank_level"]))
 }
+
+// manorFoundingRankGo is the standing a member needs to establish the sect
+// manor (sect_abode_system.manor_founding_rank_level), and
+// manorConstructionRankGo the standing to direct its construction
+// (manor_construction_rank_level). Both were Go literals until v1.17.1 - 70
+// and 50 - beside a promotion ladder that is content, so the one door a
+// player reaches and never opens could not be seen from the file that names
+// every other rank. Zero means no gate, the homestead's own rule.
+func manorFoundingRankGo(c worlddata.Catalog) int64 {
+	return maxI64(0, i64(c.SectAbodeSystem["manor_founding_rank_level"]))
+}
+
+func manorConstructionRankGo(c worlddata.Catalog) int64 {
+	return maxI64(0, i64(c.SectAbodeSystem["manor_construction_rank_level"]))
+}
+
+// personalWorldFloorGo is what stabilizing a personal world asks
+// (personal_world_system): the realm to stand at and the Space Law
+// comprehension to hold. Zero means no gate on that half.
+func personalWorldFloorGo(c worlddata.Catalog) (realm, comprehension int64) {
+	return maxI64(0, i64(c.PersonalWorldSystem["min_realm_index"])), maxI64(0, i64(c.PersonalWorldSystem["space_law_comprehension"]))
+}
