@@ -370,26 +370,7 @@ def augment_advanced_catalog(data: dict[str, Any]) -> None:
         ),
     }
 
-    # Advanced branch world-law/social-law contract and hidden demonic lineage.
-    rules = data.setdefault("world_rules", {})
-    rules.setdefault("physical_laws", {
-        "qi_density": "world_and_region_scaled",
-        "law_strength": "higher_worlds_are_stricter",
-        "realm_suppression": True,
-        "realm_ceiling": "location_and_world_bound",
-        "ascension_pressure": True,
-        "allowed_energies": ["qi", "body", "soul", "blood", "law"],
-        "local_time_flow": {"Mortal World": 1, "Spiritual World": 3, "Immortal World": 9, "Celestial World": 27},
-    })
-    rules.setdefault("social_laws", {
-        "npc_ambition": True,
-        "hierarchy_pressure": True,
-        "lineage_pressure": True,
-        "righteous_enforcement": True,
-        "demonic_visibility": "witness_and_concealment_based",
-        "succession_pressure": True,
-        "conflict_multiplier": "world_state_driven",
-    })
+    # The hidden demonic lineage.
     sects = data.setdefault("sects", {})
     sects.setdefault("Heaven-Devouring Demon Sect", {
         "alignment": "Demonic",

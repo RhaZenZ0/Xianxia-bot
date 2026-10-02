@@ -34604,36 +34604,7 @@
       "Orthodox sects punish exposed forbidden arts unless leadership chooses secrecy or expediency.",
       "Demonic sects reward effective forbidden cultivation but punish weakness and resource waste.",
       "Sect policy, cohesion, resources and internal factions continue changing during player seclusion."
-    ],
-    "physical_laws": {
-      "qi_density": "world_and_region_scaled",
-      "law_strength": "higher_worlds_are_stricter",
-      "realm_suppression": true,
-      "realm_ceiling": "location_and_world_bound",
-      "ascension_pressure": true,
-      "allowed_energies": [
-        "qi",
-        "body",
-        "soul",
-        "blood",
-        "law"
-      ],
-      "local_time_flow": {
-        "Mortal World": 1,
-        "Spiritual World": 3,
-        "Immortal World": 9,
-        "Celestial World": 27
-      }
-    },
-    "social_laws": {
-      "npc_ambition": true,
-      "hierarchy_pressure": true,
-      "lineage_pressure": true,
-      "righteous_enforcement": true,
-      "demonic_visibility": "witness_and_concealment_based",
-      "succession_pressure": true,
-      "conflict_multiplier": "world_state_driven"
-    }
+    ]
   },
   "technique_system": {
     "mastery_levels": [

@@ -6354,6 +6354,25 @@ the old bands name `commission_city_adamant_body_immortal_city_1` *"posted in th
 (realms 16-23) and banded 4-8"*; a board that reads no band hands a realm-5 cultivator Celestial
 work; a migration without the guard overwrites the GM's `17-20`.
 
+### Rules the world does not have (`test_every_world_rule_has_a_reader.py`, v1.19.3)
+
+`world_rules` carried two blocks that read like physics and sociology and that nothing read:
+`physical_laws` (a time flow of 1/3/9/27 per world, "higher worlds are stricter") and `social_laws`
+("npc ambition", a "world state driven" conflict multiplier). The engine indexes `WorldRules` for
+`forbidden_arts` alone and `/worldrules` prints the principle lists, and the one test naming the two
+blocks held only that they existed - a test of decoration's presence. Wiring the time flow was
+refused on the owner's call: faster higher worlds is already `world_qi_density`, read in every
+session, and a second number on that axis would price it twice, while a per-world clock would end
+the one canonical clock rc.39 and rc.48 built. Both blocks went, with their defaults in
+`augment_advanced_catalog`, which would otherwise have put them back in memory on every load.
+
+The gate holds every top-level `world_rules` key to a reader: an index on `catalog.WorldRules` in
+production Go, or a string named in a Python function that touches `world_rules`. It is a floor, and
+says so. Its own first run failed on `ai_router.py`, because `code_only` blanks a docstring-only
+class body and leaves Python that does not parse - so it parses the original source and skips
+docstrings itself. `UNREAD_RULES` is not empty on the day it was written: `faction_attitudes` is
+per-alignment numbers nothing reads, and whether a rule should is a decision (`docs/TODO.md`).
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

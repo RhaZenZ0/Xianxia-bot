@@ -77,9 +77,18 @@ deferred half and not the half that says what was done about it.
   (Spiritual 9-14, Immortal 18-23, Celestial 26-31, `scripts/author_commission_bands.py`), the board
   and its accept picker read the band too, and migration 76 moves a running world's pool, leaving a
   GM's own edit alone.
-- **deferred (content)** — *`world_rules.physical_laws.local_time_flow` is read by nothing in Go.*
-  1 / 3 / 9 / 27 per world, mentioned only in `app/rules/advanced_catalog.py`. Either a rule reads
-  it or it goes; found by the v1.17.0 inventory.
+- **fixed (v1.19.3)** — *`world_rules.physical_laws.local_time_flow` is read by nothing in Go.*
+  Nor was anything else in `physical_laws` or `social_laws`, in Go or Python: `/worldrules` printed
+  neither block. The faster-higher-worlds idea is already `world_qi_density`, so on the owner's call
+  both blocks went, with their defaults in `app/rules/advanced_catalog.py`, and
+  `test_every_world_rule_has_a_reader.py` holds every top-level world rule to a reader.
+- **deferred (design)** — *`world_rules.faction_attitudes` is read by nothing.* Per-alignment
+  numbers (Orthodox -35 for a forbidden art, +15 for mercy; Demonic +20 and -5) that look like
+  reputation deltas and move nothing. `forbiddenPolicy` reads `forbidden_arts`, and mercy pays fate.
+  Either a rule reads them (a sect's standing moved by a deed, by the deed-doer's alignment) or they
+  go; named in `UNREAD_RULES` until decided. Found by the v1.19.3 gate. So is
+  `forbidden_arts.concealed_use_reduces_exposure`, a boolean stating a rule the engine already
+  hardcodes (an unwitnessed use is a third as severe) - the gate looks at top-level keys only.
 - **fixed (v1.14.0)** — *Attributes grow every stage.* (Deferred from v1.13.0 on the owner's call "ship paths first".)
   Asked for as "+1 on every attribute per level, and the types get +2 on some", then settled as: at
   every **stage** a cultivator gains +1 to all six attributes and +2 instead on the two their path

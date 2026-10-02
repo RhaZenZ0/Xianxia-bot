@@ -37,7 +37,7 @@ class TechniqueCatalogTests(unittest.IsolatedAsyncioTestCase):
         hidden = self.world.sects.get("Heaven-Devouring Demon Sect")
         self.assertTrue(hidden and hidden.get("hidden"))
         self.assertEqual(hidden.get("karma_initiation"), -200)
-        for key in ("physical_laws", "social_laws", "npc_principles"):
+        for key in ("npc_principles", "sect_principles", "family_principles"):
             self.assertTrue(self.world.world_rules[key], key)
 
     async def test_technique_executability_matrix_uses_39_subtests(self):
