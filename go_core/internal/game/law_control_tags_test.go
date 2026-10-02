@@ -2,6 +2,8 @@ package game
 
 import (
 	"testing"
+
+	"xianxia/core/internal/gamerng"
 )
 
 // What a control technique does in a fight is read off its effect's tags
@@ -19,7 +21,13 @@ func taggedControlDB(t *testing.T, law string, realm int64) string {
 	return path
 }
 
+// Both technique tests lend the dice (every die its highest face) rather
+// than trusting the fixture's attributes of 500 to make the check certain:
+// `TestATestThatAssertsARollLandedLendsTheDice` holds a test that drives a
+// roll and then asserts it landed to that rule, and the rule is right - a
+// stacked fixture is a probability, not a proof.
 func TestAControlEffectTaggedDamageCrushesLikeTheStrangulation(t *testing.T) {
+	defer gamerng.UseRoller(func(n int) int { return n - 1 })()
 	catalog := crossingCatalog(t)
 	technique := catalog.LawSystem.Techniques["ember_brand"]
 	effect, _, err := specialEffectPayload(catalog, technique.Effect)
@@ -46,6 +54,7 @@ func TestAControlEffectTaggedDamageCrushesLikeTheStrangulation(t *testing.T) {
 }
 
 func TestAControlEffectWithoutDamageHoldsLikeTheLockdown(t *testing.T) {
+	defer gamerng.UseRoller(func(n int) int { return n - 1 })()
 	catalog := crossingCatalog(t)
 	technique := catalog.LawSystem.Techniques["tide_bind"]
 	effect, _, err := specialEffectPayload(catalog, technique.Effect)

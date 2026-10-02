@@ -511,16 +511,21 @@ async def sect_recruitment_ascend(interaction: discord.Interaction) -> None:
     c = await require_character(interaction)
     if not c:
         return
+    # The letter is the first thing this handler does, so the interaction is
+    # acknowledged before the engine is asked (`test_ack_before_mutation`): a
+    # token that expired mid-call would otherwise retry a mutation that landed.
+    if not interaction.response.is_done():
+        await interaction.response.defer(thinking=True)
     try:
         e = await ENGINE.authoritative_action("sect.ascend", interaction.user.id, {}, action_id=f"discord:{interaction.id}:sect.ascend")
         r = dict(e.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        await respond(interaction, f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     text = (f"📜 **The way up.** The letter of the **{r.get('from')}** is read at **{r.get('gate')}**, and the "
             f"**{r.get('to')}** takes you in as **{r.get('rank_name')}**. Your standing begins again here: "
             f"rank, contribution and the disciple bond were your old sect's.")
-    await interaction.response.send_message(text, ephemeral=False)
+    await respond(interaction, text, ephemeral=False)
 
 
 @registered_group_command(sect_recruitment_group, name="history", description="Review your recent sect recommendation and entrance-trial history")
