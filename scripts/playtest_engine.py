@@ -2220,6 +2220,26 @@ async def run(url: str, token: str, db_path: str) -> Report:
         report.add("PASS" if str(left.get("location")) == town else "FAIL", "leaving lands at Greenriver Town", str(left.get("location")))
     await step(report, "a second world is refused", act("personal_world.create", PLAYER, {"name": "Another Pocket"}), expect_error="already stabilized")
 
+    # ---- the way up into an allied sect (v1.18.0) --------------------------
+    # The player joined the Azure Cloud Sect in section 3 and stands at Dao
+    # Saint, far past the Spiritual World's floor; its content names the Jade
+    # Meridian Sect above it. The letter is refused from the street and read at
+    # the gate, and the membership after it is the engine's own answer.
+    above = str(world["sects"]["Azure Cloud Sect"].get("ascends_to") or "")
+    above_gate = str((world["sects"].get(above) or {}).get("recruitment", {}).get("location") or "")
+    report.add("PASS" if above and above_gate else "FAIL", "the Azure Cloud Sect names a sect above it with a gate", f"{above or '-'} at {above_gate or '-'}")
+    await step(report, "sect.ascend from the street is refused", act("sect.ascend", PLAYER, {}), expect_error="is taken at")
+    await step(report, "teleport to the allied gate", gm("admin.player.teleport", {"user_id": PLAYER, "location": above_gate, "reason": "playtest: the way up"}))
+    climbed = await step(report, "sect.ascend", act("sect.ascend", PLAYER, {}))
+    if climbed is not None:
+        after = await db.get_sect_membership(PLAYER) or {}
+        report.add("PASS" if str(after.get("sect_name")) == above and int(after.get("rank_level") or 0) == 10 else "FAIL",
+                   "the member is taken in above as an Outer Disciple and standing begins again",
+                   f"from={climbed.get('from')} to={climbed.get('to')} membership={after.get('sect_name')}/{after.get('rank_name')}")
+        await step(report, "a second letter from the same gate is refused: the next way up is taken one gate higher",
+                   act("sect.ascend", PLAYER, {}), expect_error="is taken at")
+    await step(report, "back to the town", gm("admin.player.teleport", {"user_id": PLAYER, "location": town, "reason": "playtest"}))
+
     # The Law capstone, driven to a *success* (v1.0.0-rc.58). This is the one
     # point in the run where all three of its requirements stand at once -
     # realm 30, Space Law at Essence/Origin, and a stabilized personal world -

@@ -40,6 +40,20 @@ func lawEffectIsControl(effect map[string]any) bool {
 	return strings.TrimSpace(fmt.Sprint(effect["category"])) == lawControlCategory
 }
 
+// effectHasTag is whether a special effect's `tags` carry the word. It is how
+// a battle tells what a control technique does (v1.18.0): `damage` crushes,
+// anything else holds. Read off the content so the twenty techniques the ten
+// other Laws gained needed no switch on their ids.
+func effectHasTag(effect map[string]any, tag string) bool {
+	tags, _ := effect["tags"].([]any)
+	for _, raw := range tags {
+		if strings.EqualFold(strings.TrimSpace(fmt.Sprint(raw)), tag) {
+			return true
+		}
+	}
+	return false
+}
+
 // writeLawEffectTx puts a non-control Law effect onto the caster for
 // lawTechniqueEffectMinutes and answers the name it was stored under. It is the
 // one writer of a law effect row: `lawTechniqueAction` calls it out of battle

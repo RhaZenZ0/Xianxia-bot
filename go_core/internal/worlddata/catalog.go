@@ -917,6 +917,13 @@ type SectDefinition struct {
 	// Recruitment (v1.0.0-rc.4) names the sect gate - where the trial is
 	// held - so the engine knows a gate when a cultivator meditates at one.
 	Recruitment SectRecruitment `json:"recruitment"`
+	// AscendsTo (v1.18.0) names the allied sect one world above, whose gate
+	// reads a member's letter from their own elders as the way in
+	// (`sect.ascend`). A sect is for life otherwise - nothing lets a member
+	// leave one - so without this the six sects above the Mortal World
+	// admitted only somebody who had never joined. Empty on the top world's
+	// sects and the hidden one.
+	AscendsTo string `json:"ascends_to"`
 	// Karma gates and cell names for a hidden sect (v0.23.0). Only the
 	// Heaven-Devouring Demon Sect carries these today; a public sect leaves
 	// them zero and Branches empty.

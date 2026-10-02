@@ -387,6 +387,16 @@ OBJECTIVE_TYPES: dict[str, dict[str, Any]] = {
     # in on, one of a hundred and twenty, so there is no name a draft could
     # fix in advance and be right about.
     "profession_exam": {"target": None, "label": "", "untargeted": "Pass a hall's examination in your trade"},
+    # The road through the upper worlds (v1.18.0). A Law is read under the
+    # Spiritual World's archive and wielded from Law Manifestation on, and
+    # until now no quest could ask for either; a personal world is the last
+    # door on the ladder. `law_comprehend` is reported by `/cultivation → Laws
+    # → Comprehend` on any gain, `law_technique` by Technique when one
+    # manifests (out of a battle) or lands (in one), `personal_world` by
+    # `/innerworld → Create` once the engine has made it.
+    "law_comprehend": {"target": "law", "label": "Comprehend the Law of {target}", "untargeted": "Comprehend a Law"},
+    "law_technique": {"target": "law_technique", "label": "Manifest {target}", "untargeted": "Manifest a Law technique"},
+    "personal_world": {"target": None, "label": "", "untargeted": "Stabilize a personal world"},
 }
 SCENE_ACTION_KEYS = ("observe", "investigate", "influence", "stealth", "physical", "qi", "resolve", "aid")
 REWARD_KEYS = ("insight_xp", "spirit_stones", "items")
@@ -568,6 +578,24 @@ def validate_quest_definition(draft: dict[str, Any], world: Any, budget: dict[st
                     errors.append(f"objective {index + 1}: unknown secret realm {target_text!r}")
                     continue
                 target_label = str(dict(realms[target] or {}).get("name") or target)
+            elif spec["target"] == "law":
+                # `law_system.laws` is keyed by the Law's id, which is what
+                # `law.comprehend` reports.
+                laws = dict(dict(getattr(world, "data", {}).get("law_system") or {}).get("laws") or {})
+                law_ids = {str(key).lower(): str(key) for key in laws}
+                target = law_ids.get(target_text.lower())
+                if target is None:
+                    errors.append(f"objective {index + 1}: unknown Law {target_text!r}")
+                    continue
+                target_label = str(dict(laws[target] or {}).get("name") or target)
+            elif spec["target"] == "law_technique":
+                techniques = dict(dict(getattr(world, "data", {}).get("law_system") or {}).get("techniques") or {})
+                technique_ids = {str(key).lower(): str(key) for key in techniques}
+                target = technique_ids.get(target_text.lower().replace(" ", "_"))
+                if target is None:
+                    errors.append(f"objective {index + 1}: unknown Law technique {target_text!r}")
+                    continue
+                target_label = str(dict(techniques[target] or {}).get("name") or target)
         objective_id = re.sub(r"[^a-z0-9_]+", "_", str(raw.get("id") or f"{kind}_{index + 1}").lower()).strip("_") or f"{kind}_{index + 1}"
         if objective_id in seen_ids:
             objective_id = f"{objective_id}_{index + 1}"

@@ -40,14 +40,27 @@ def _technique_ids() -> set[str]:
     return set(WORLD_DATA["law_system"]["techniques"])
 
 
+def _control_ids_off_the_raw_file() -> set[str]:
+    """The control set computed a second way, off the raw JSON rather than the
+    `World` reader: a technique whose effect's `category` is the control word.
+    Pinning the two Space Law ids here was right while they were the only two
+    (v1.0.0-rc.58); every Law has a control technique now (v1.18.0), and a
+    list of twelve ids would be the second statement this file forbids."""
+    effects = WORLD_DATA["special_effects"]
+    return {key for key, technique in WORLD_DATA["law_system"]["techniques"].items()
+            if str(effects.get(str(technique.get("effect") or ""), {}).get("category")) == "Law Control"}
+
+
 class TheControlSetIsReadOffTheContent(unittest.TestCase):
     def test_the_question_answers_exactly_the_control_techniques(self):
         control = {key for key in _technique_ids() if WORLD.law_technique_targets_another(key)}
-        self.assertEqual(control, {"spatial_lockdown", "spatial_strangulation"},
-                         "the shipped content's control set changed; the engine reads the same field")
+        expected = _control_ids_off_the_raw_file()
+        self.assertTrue({"spatial_lockdown", "spatial_strangulation"} <= expected, "the two Space Law control techniques are gone; the reader is broken, not the tree")
+        self.assertGreaterEqual(len(expected), 11, "every Law carries a control technique since v1.18.0")
+        self.assertEqual(control, expected, "the shipped content's control set and the reader disagree; the engine reads the same field")
 
     def test_every_other_technique_is_not_one(self):
-        for key in sorted(_technique_ids() - {"spatial_lockdown", "spatial_strangulation"}):
+        for key in sorted(_technique_ids() - _control_ids_off_the_raw_file()):
             with self.subTest(technique=key):
                 self.assertFalse(WORLD.law_technique_targets_another(key))
 

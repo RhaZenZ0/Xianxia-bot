@@ -90,11 +90,13 @@ class TheRoadIsWhole(unittest.TestCase):
         self.assertGreaterEqual(len(STAGES), 7, "content/world.json carries no realm road; the gate is broken, not the tree")
         self.assertGreater(len(LEAVES), 50, "no feature_unlocks roster; the gate is broken, not the tree")
 
-    def test_one_stage_per_mortal_realm_in_order(self):
-        """Realm 0 is the beginner path's and the ascension quest takes over
-        at the seam, so the road runs from the first crossing to the last
-        Mortal realm - every rung once, in the ladder's own order."""
-        ladder = [str(r.get("name")) for r in CONTENT.get("realms") or [] if str(r.get("world")) == "Mortal World"]
+    def test_one_stage_per_realm_in_order(self):
+        """Realm 0 is the beginner path's, so the road runs from the first
+        crossing to the top of the ladder - every rung once, in the ladder's
+        own order. v1.16.0 stopped it at the Mortal seam; v1.18.0 carries it
+        through the three upper worlds, which the world-flow study found were
+        the Mortal World again with nothing saying where to go."""
+        ladder = [str(r.get("name")) for r in CONTENT.get("realms") or []]
         realms = [int(s.get("realm_index") or 0) for s in STAGES]
         self.assertEqual(realms, list(range(1, len(ladder))),
                          f"the road should cover realms 1..{len(ladder) - 1} once each in order, got {realms}")
@@ -112,15 +114,41 @@ class TheRoadIsWhole(unittest.TestCase):
                 self.assertEqual(first.get("target"), WORLD.realm_name(int(stage["realm_index"])),
                                  "the first objective names a realm other than the stage's own")
 
-    def test_the_chain_runs_the_road_and_stops_at_the_seam(self):
+    def test_the_chain_runs_the_whole_road_and_stops_at_the_top(self):
+        """One chain from the first crossing to the top rung, every seam
+        included: the ascension quest at each seam is handed over beside the
+        road by the cleared tribulation, never instead of it, so a stage at
+        the seam still names the stage in the world above."""
         for index, stage in enumerate(STAGES):
             with self.subTest(stage=stage["quest_key"]):
                 follow_on = str(stage.get("follow_on") or "")
                 if index == len(STAGES) - 1:
-                    self.assertEqual(follow_on, "", "the last stage chains on; the seam is the ascension quest's, "
-                                                    "which the cleared tribulation hands over")
+                    self.assertEqual(follow_on, "", "the last stage chains on; nothing stands above the top rung")
                 else:
                     self.assertEqual(follow_on, str(STAGES[index + 1]["quest_key"]), "a stage chains past its successor")
+
+    def test_every_world_above_the_mortal_has_a_road(self):
+        """The study's finding: the three upper worlds had the content and
+        nothing pointing at it. Each world's stages must between them name its
+        capital, its flame, its raid boss and a secret realm standing in it."""
+        by_world: dict[str, list[dict]] = {}
+        for stage in STAGES:
+            world = str(CONTENT["realms"][int(stage["realm_index"])]["world"])
+            by_world.setdefault(world, []).append(stage)
+        self.assertEqual(sorted(by_world), sorted({str(r["world"]) for r in CONTENT["realms"]}))
+        flames = {str(f["world"]): key for key, f in CONTENT["flame_system"]["flames"].items()}
+        capitals = {str(d["world"]): name for name, d in CONTENT["locations"].items() if d.get("realm_hub")}
+        realms_in = {world: {key for key, r in CONTENT["secret_realms"].items()
+                             if str((CONTENT["locations"].get(str(r.get("location"))) or {}).get("world")) == world}
+                     for world in by_world}
+        for world, stages in by_world.items():
+            with self.subTest(world=world):
+                targets = {(str(o["type"]), str(o.get("target") or "")) for s in stages for o in s["objectives"]}
+                self.assertIn(("travel", capitals[world]), targets, f"no stage walks to {world}'s capital")
+                self.assertIn(("flame_capture", flames[world]), targets, f"no stage captures {world}'s flame")
+                self.assertTrue(any(t == "raid_win" for t, _ in targets), f"no stage raids in {world}")
+                self.assertTrue(any(t == "realm_enter" and target in realms_in[world] for t, target in targets),
+                                f"no stage enters a secret realm standing in {world}")
 
     def test_every_stage_passes_the_validator_the_forge_is_held_to(self):
         for stage in STAGES:

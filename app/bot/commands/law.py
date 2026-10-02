@@ -88,15 +88,31 @@ async def law_comprehend(interaction:discord.Interaction,law:str,spend_insight:b
     # bonus; a Law is read more clearly under the sutra archive's roof.
     if int(result.get('place_bonus',0)):
         legacy_note+=f"\n📜 {result.get('place')}: **+{int(result['place_bonus'])}** to the check."
+    # The upper worlds' road asks for a Law read (v1.18.0): recorded once the
+    # engine has granted the gain and before the reply, told after (v1.0.5).
+    progressed=await record_quest_progress(interaction.user.id,"law_comprehend",target=law,amount=1,game_minute=wt.total_minutes)
     await interaction.response.send_message(
         f"⚖️ **{result.get('name',definition['name'])}**\n{roll_line(roll)}{legacy_note}\n"
         f"Comprehension **+{int(result.get('gain',0))}%** → **{int(result.get('comprehension',0))}%**\n"
         f"Stage: **{result.get('stage_name','Unawakened')}**\nDao reconstruction +{int(result.get('dao_gain',0))}%."
     )
+    await announce_quest_progress(interaction,progressed)
 
 async def law_technique_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[str]]:
+    """The techniques of the Laws this cultivator has begun to comprehend
+    (v1.18.0). Every Law carries techniques now - twenty-five across eleven
+    Laws, which is the picker's whole width - so a list of all of them offered
+    what the engine refuses (rc.46) and cut off at Discord's twenty-five. A
+    cultivator who has begun no Law is shown every technique, because a
+    picker that empties is a road nobody learns exists (rc.32)."""
     needle=current.casefold().strip();out=[]
+    begun:set[str]=set()
+    try:
+        begun={str(r.get("law_id")) for r in (await DB.get_law_progress(interaction.user.id) or []) if int(r.get("comprehension") or 0)>0}
+    except Exception:  # an unavailable read offers everything, never nothing
+        begun=set()
     for tid,d in WORLD.law_system.get('techniques',{}).items():
+        if begun and str(d.get('law'))not in begun:continue
         name=str(d.get('name',tid))
         if not needle or needle in name.casefold() or needle in tid.casefold():out.append(app_commands.Choice(name=name[:100],value=tid[:100]))
     return out[:25]
@@ -140,7 +156,13 @@ async def law_technique_command(interaction:discord.Interaction,technique:str)->
     except GameEngineError as exc:
         await respond(interaction, f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
+    # A technique that manifested is what the road asks for (v1.18.0): recorded
+    # after the engine agreed and before the reply, told after (v1.0.5). The
+    # in-battle cast records in `_execute_battle_law_technique`, once the roll
+    # has landed.
+    progressed=await record_quest_progress(interaction.user.id,"law_technique",target=technique,amount=1,game_minute=(await current_world_time()).total_minutes)
     await respond(interaction, f"🌌 **{t['name']}** manifests.\n{t.get('description','')}")
+    await announce_quest_progress(interaction,progressed)
 
 # ---------- Manuals / forbidden cultivation ----------
 manual_group = app_commands.Group(name="manual", description="Study cultivation manuals and use learned techniques")
