@@ -813,7 +813,7 @@ func spatialKeyActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "secret_realm", EventType: "spatial_key.use", EntityType: "world_event", EntityID: key, GameMinute: p.GameMinute, Payload: out}}, nil
 }
 
-func personalWorldCreateActionGo(conn *storage.Conn, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func personalWorldCreateActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p personalWorldCreatePayload
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
@@ -842,8 +842,12 @@ func personalWorldCreateActionGo(conn *storage.Conn, userID int64, raw json.RawM
 	if lp := firstRowMap(r); lp != nil {
 		comp = i64(lp["comprehension"])
 	}
-	if comp < 100 || i64(ch["realm_index"]) < 30 {
-		return authoritativeMutation{}, errors.New("world creation requires Space Law — Essence/Origin (100%) and at least Dao Saint realm")
+	// What a world asks is content (v1.17.1): `personal_world_system`, which
+	// the curriculum reads for the page's floor too, so the page and the
+	// refusal cannot disagree about when this door opens.
+	floorRealm, floorLaw := personalWorldFloorGo(catalog)
+	if comp < floorLaw || i64(ch["realm_index"]) < floorRealm {
+		return authoritativeMutation{}, fmt.Errorf("world creation requires Space Law at %d%% and at least %s", floorLaw, realmNameGo(catalog, floorRealm))
 	}
 	r, e = conn.Execute(`SELECT 1 AS ok FROM personal_worlds WHERE user_id=?`, []any{userID})
 	if e != nil {

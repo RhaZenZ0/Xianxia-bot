@@ -16,6 +16,13 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.17.1)** — *Two doors on the panel opened for nobody.* The world-flow study's finding,
+  on the owner's call: the homestead asked sect rank 40 and the promotion ladder stopped at 30, the
+  manor asked rank 70 as a Go literal, and the Personal World page opened at realm 5 for a world the
+  engine refuses below 30 and Space Law 100. The ladder reaches Deacon (9,000 earned); the manor's
+  two ranks (`sect_abode_system.manor_founding_rank_level`, `manor_construction_rank_level`) and the
+  world's floors (`personal_world_system`) are content the engine and the panel both read; each door
+  is hidden below its floor with a lock line naming it; the page opens at the content's realm.
 - **fixed (v1.17.0)** — *Each upper world has a job.* The world-flow study's second recommendation,
   on the owner's call ("Give each world a job. Or more"): each world above the Mortal carries a
   district kind of its own read by one rule (`world_jobs.go`), a raid boss in the wilds of one of

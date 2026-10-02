@@ -828,8 +828,9 @@ func sectManorActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	now := nowSeconds()
 	out := map[string]any{"sect_name": sect}
 	if op == "sect.manor.establish" {
-		if i64(mem["rank_level"]) < 70 {
-			return authoritativeMutation{}, errors.New("only a Sect Master or Ancestor can establish the sect manor")
+		// The rank is content (v1.17.1): sect_abode_system.manor_founding_rank_level.
+		if floor := manorFoundingRankGo(catalog); floor > 0 && i64(mem["rank_level"]) < floor {
+			return authoritativeMutation{}, fmt.Errorf("establishing the sect manor asks for %s (rank %d) or higher; you hold %s", sectRankName(catalog, floor), floor, mem["rank_name"])
 		}
 		r, e := conn.Execute(`SELECT location FROM characters WHERE user_id=?`, []any{userID})
 		if e != nil {
@@ -867,8 +868,8 @@ func sectManorActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		if !ok {
 			return authoritativeMutation{}, errors.New("unknown sect-manor facility")
 		}
-		if i64(mem["rank_level"]) < 50 {
-			return authoritativeMutation{}, errors.New("only an Elder or higher-ranked sect member can direct manor construction")
+		if floor := manorConstructionRankGo(catalog); floor > 0 && i64(mem["rank_level"]) < floor {
+			return authoritativeMutation{}, fmt.Errorf("directing manor construction asks for %s (rank %d) or higher; you hold %s", sectRankName(catalog, floor), floor, mem["rank_name"])
 		}
 		r, e := conn.Execute(`SELECT * FROM sect_manors WHERE sect_name=?`, []any{sect})
 		if e != nil {

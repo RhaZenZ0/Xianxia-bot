@@ -6075,6 +6075,53 @@ the four replies spells a district kind or a coin of its own.
 city commissions carry Mortal realm bands (stored, read nowhere), and
 `world_rules.physical_laws.local_time_flow` is parsed by nothing in Go.
 
+### Two doors that opened for nobody (v1.17.1)
+
+The world-flow study's third finding, on the owner's call. Three pages a player reaches and finds
+locked for good, and each is a rule this file already states, met at one more site.
+
+**The homestead asked a rank nobody could earn.** `abode_system.founding_rank_level` is 40, Deacon,
+and `sect_system.exchange.promotion` stopped at Core Disciple (30): v1.8.0 built promotion by
+earned contribution for the stock the exchange locks by rank and never asked what else a rank
+opened. So `abode establish` was drawn for every member and opened for none but a GM's lever. The
+ladder reaches Deacon at 9,000 earned now - a sect's tier-2 commission pays 85 to 340 points, a
+donation at most its shelf price, so it is a long road and a real one - and
+`TestTheHomesteadsRankIsOnThePromotionLadder` holds the two content keys to meeting, because a floor
+on one roster and a ceiling on another are free to part company again.
+
+**The manor's rank was a Go literal beside a ladder that is content.** `sect_actions.go` compared
+`rank_level < 70` to establish and `< 50` to direct construction, while the homestead's floor is
+`abode_system.founding_rank_level` and the ranks themselves are `sect_system.ranks`. A number the
+content file cannot see is one the content file cannot explain, which is why the study could read
+"Deacon" off the homestead and only "70" off the manor. `manorFoundingRankGo` and
+`manorConstructionRankGo` read `sect_abode_system` now, zero meaning no gate (the homestead's own
+rule), and the refusal names the rank the way the homestead's does. `personalWorldCreateActionGo`
+had the same two literals - realm 30 and Space Law 100 - and reads `personal_world_system` through
+`personalWorldFloorGo`; it took the catalogue for the first time to do it.
+
+**And the page showed the door twenty-five realms early.** `innerworld / Personal World` was 5 in
+the curriculum roster, written by hand, for a world the engine refuses below 30. The authoring
+script reads the floor off `personal_world_system.min_realm_index` now rather than writing one, so
+the page and the refusal cannot disagree about when the door opens - the rc.39 rule, one rule
+stated once, applied to a floor the roster and the engine had each stated for themselves.
+
+**Each door is hidden below its floor with a line naming it**, which is rc.32's shape rather than
+v1.0.9's: the engine would refuse these outright, so the panel anticipates the refusal and says what
+it asks and what the player holds ("founding a homestead asks sect standing of Deacon; you hold Core
+Disciple"; "a personal world asks for Dao Saint and Space Law at 100%; you stand at Soul Formation
+with Space Law at 40%"). Four gates in `PROGRESSION_GATES` - `homestead_rank`, `manor_founder`,
+`manor_builder`, `personal_world_floor` - each read off the content key the engine reads, and
+`test_two_doors_open_for_somebody.py` holds that the panel compares against no literal of its own.
+`World.sect_rank_name` is the display twin of `sectRankName`.
+
+**The drills.** `two_doors_test.go` drives each floor with the content moved - an Elder refused by
+the shipped 70 and let through by a copy at 50, a Deacon the same at the construction rank, a
+realm-5 cultivator refused by Dao Saint and let through by a copy at 5 - because a test against the
+shipped numbers alone passes identically against the literals it replaced (rc.47). The Python gate
+drives `_progression_hidden_actions` with a fake database at each rank, and its first run found the
+new gate raising: a read that answered nothing was iterated, which is the v1.0.10 rule that a
+provider drawn beside everything else on a panel must never raise.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

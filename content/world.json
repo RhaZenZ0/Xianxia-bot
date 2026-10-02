@@ -31662,7 +31662,7 @@
       "cap": 60
     },
     "exchange": {
-      "description": "Every sect issues its own stock to members for contribution points, at a fixed multiple of each item's sect value. Better stock unlocks with sect rank, and each sect keeps one item of its own for its members alone. A member rises to Inner and then Core Disciple on the contribution they have earned over their time in the sect; spending points never lowers it.",
+      "description": "Every sect issues its own stock to members for contribution points, at a fixed multiple of each item's sect value. Better stock unlocks with sect rank, and each sect keeps one item of its own for its members alone. A member rises to Inner Disciple, Core Disciple and Deacon on the contribution they have earned over their time in the sect; spending points never lowers it. Deacon is the standing a homestead of one's own asks (abode_system.founding_rank_level), so the ladder reaches it; the sect's own offices above it are not earned by donating.",
       "points_per_sect_value": 3,
       "stock": [
         {
@@ -31805,6 +31805,10 @@
         {
           "rank_level": 30,
           "earned": 3000
+        },
+        {
+          "rank_level": 40,
+          "earned": 9000
         }
       ]
     }
@@ -33615,7 +33619,9 @@
         "max_level": 9
       }
     ],
-    "realm_floor_per_level": 1
+    "realm_floor_per_level": 1,
+    "manor_founding_rank_level": 70,
+    "manor_construction_rank_level": 50
   },
   "abode_system": {
     "facilities": [
@@ -33710,6 +33716,11 @@
         }
       }
     }
+  },
+  "personal_world_system": {
+    "description": "What stabilizing a personal world asks (v1.17.1): the realm a cultivator must stand at and the Space Law comprehension they must hold. The engine reads both here, and the curriculum opens the Personal World page at the same realm, so the page cannot show a door twenty-five realms before it opens.",
+    "min_realm_index": 30,
+    "space_law_comprehension": 100
   },
   "world_rules": {
     "forbidden_arts": {
@@ -72529,10 +72540,10 @@
       "grudges": 3,
       "hunter act": 3,
       "inheritances": 5,
-      "innerworld create": 5,
-      "innerworld enter": 5,
-      "innerworld leave": 5,
-      "innerworld setrule": 5,
+      "innerworld create": 30,
+      "innerworld enter": 30,
+      "innerworld leave": 30,
+      "innerworld setrule": 30,
       "karma": 2,
       "manual cultivate_by": 2,
       "manual study": 2,
@@ -72616,7 +72627,7 @@
       "family / Family": 2,
       "family / House": 4,
       "family / Legacy": 5,
-      "innerworld / Personal World": 5,
+      "innerworld / Personal World": 30,
       "items / Artifacts": 2,
       "items / Provenance": 2,
       "items / Storage": 2,

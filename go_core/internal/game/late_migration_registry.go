@@ -121,7 +121,7 @@ func applyLateMigrationAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	case "spatial_key.use":
 		return spatialKeyActionGo(conn, catalog, userID, raw)
 	case "personal_world.create":
-		return personalWorldCreateActionGo(conn, userID, raw)
+		return personalWorldCreateActionGo(conn, catalog, userID, raw)
 	case "personal_world.set_rule":
 		return personalWorldRuleActionGo(conn, userID, raw)
 	case "personal_world.enter":

@@ -1023,17 +1023,21 @@ type Catalog struct {
 	ProfessionExams     map[string][]ProfessionExam    `json:"profession_exams"`
 	AbodeSystem         map[string]any                 `json:"abode_system"`
 	SectAbodeSystem     map[string]any                 `json:"sect_abode_system"`
-	SectSystem          map[string]any                 `json:"sect_system"`
-	SpecialEffects      map[string]map[string]any      `json:"special_effects"`
-	Recipes             map[string]Recipe              `json:"recipes"`
-	LawSystem           LawSystem                      `json:"law_system"`
-	Locations           map[string]LocationDefinition  `json:"locations"`
-	UnexpectedEvents    []UnexpectedEvent              `json:"unexpected_events"`
-	EventSites          EventSites                     `json:"event_sites"`
-	PatronGift          PatronGift                     `json:"patron_gift"`
-	SecretRealms        map[string]SecretRealm         `json:"secret_realms"`
-	Inheritances        map[string]Inheritance         `json:"inheritances"`
-	BirthFamilySendoff  map[string]BirthFamilySendoff  `json:"birth_family_sendoff"`
+	// PersonalWorldSystem (v1.17.1) is what stabilizing a personal world asks:
+	// `min_realm_index` and `space_law_comprehension`. Read through
+	// personalWorldFloorGo, and by the curriculum for the page's floor.
+	PersonalWorldSystem map[string]any                `json:"personal_world_system"`
+	SectSystem          map[string]any                `json:"sect_system"`
+	SpecialEffects      map[string]map[string]any     `json:"special_effects"`
+	Recipes             map[string]Recipe             `json:"recipes"`
+	LawSystem           LawSystem                     `json:"law_system"`
+	Locations           map[string]LocationDefinition `json:"locations"`
+	UnexpectedEvents    []UnexpectedEvent             `json:"unexpected_events"`
+	EventSites          EventSites                    `json:"event_sites"`
+	PatronGift          PatronGift                    `json:"patron_gift"`
+	SecretRealms        map[string]SecretRealm        `json:"secret_realms"`
+	Inheritances        map[string]Inheritance        `json:"inheritances"`
+	BirthFamilySendoff  map[string]BirthFamilySendoff `json:"birth_family_sendoff"`
 	// CommissionGivers (v1.3.1): where each commission's giver stands, so the
 	// engine can hold a city board's rule - the work posted here is the work
 	// of the people who live here - rather than the bot.
