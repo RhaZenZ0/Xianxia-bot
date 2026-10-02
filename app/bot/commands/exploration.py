@@ -1380,7 +1380,21 @@ def _city_of(location: str) -> str:
 
 
 def _city_parts(city: str) -> list[str]:
-    return sorted(name for name, data in WORLD.locations.items() if data.get("district") and str(data.get("outside_location")) == city)
+    """A city's gates and districts in plain sight - never a private part. A
+    demonic sect's gate is a `private` district of its seat (v1.19.0), which a
+    sponsor reveals and the street does not show, the engine's
+    `knownLocationsTx` rule."""
+    return sorted(name for name, data in WORLD.locations.items()
+                  if data.get("district") and str(data.get("outside_location")) == city and not data.get("private"))
+
+
+def _sect_at_gate(gate: str) -> str:
+    """The sect whose entrance trial is sat at `gate`, or "" - the content's
+    `recruitment.location`, which is `sectGate`'s one statement."""
+    for name, sect in WORLD.sects.items():
+        if not sect.get("hidden") and str((sect.get("recruitment") or {}).get("location") or "") == gate:
+            return name
+    return ""
 
 
 def _places_to_enter(here: str) -> list[tuple[str, str, str]]:
@@ -1401,7 +1415,9 @@ def _places_to_enter(here: str) -> list[tuple[str, str, str]]:
         return []
     parts = _city_parts(city)
     rows: list[tuple[str, str, str]] = [(city, "🏙️", "the streets of the city")]
-    rows += [(p, "🏘️", "a district") for p in parts if not WORLD.locations[p].get("gate")]
+    rows += [(p, "🏘️", "a district") for p in parts if not WORLD.locations[p].get("gate") and WORLD.locations[p].get("district") != "sect_gate"]
+    # A sect's gate (v1.19.0) is a district of its seat, entered like one.
+    rows += [(p, "⛩️", f"the gate of the {_sect_at_gate(p)}") for p in parts if WORLD.locations[p].get("district") == "sect_gate"]
     rows += [(p, "🏯", "a gate") for p in parts if WORLD.locations[p].get("gate")]
     return [row for row in rows if row[0] != here and door_allows(here, row[0])]
 
@@ -1456,6 +1472,51 @@ def _prosperity_line(data: dict[str, Any]) -> str:
     return f"The city is **{mood}** — prosperity {prosperity}/100, security {int(data.get('security') or 0)}/100."
 
 
+async def _seat_lines(city: str) -> list[str]:
+    """What a city's politics are (v1.19.0): the sect seated here, whose banner
+    hangs over the city, and where that sect stands with the others - allies,
+    rivals, the wars it is fighting. Read, never decided: the seat is the
+    catalogue's, the banner is `territory_state`, the standing is
+    `sect_relations` and `territory_wars`, all written by the engine's
+    politics tick. It never raises, because it is drawn beside everything
+    else on the city page and one failed read must not cost the page
+    (v1.0.10)."""
+    lines: list[str] = []
+    try:
+        seated = WORLD.seated_sect(city)
+        territory = await DB.get_territory(city)
+        banner = str((territory or {}).get("controller_key") or "") if str((territory or {}).get("controller_type") or "") == "sect" else ""
+        if seated:
+            gate = str((WORLD.sects[seated].get("recruitment") or {}).get("location") or "")
+            lines.append(f"**Seat:** the **{seated}** keeps its gate here" + (f", at **{gate}**" if gate else "") + ".")
+        if banner and banner != seated:
+            lines.append(f"**Banner:** the **{banner}** holds this city.")
+        elif banner:
+            lines.append(f"**Banner:** the {banner}'s own.")
+        if seated:
+            relations = await DB.get_sect_relations(seated) or []
+            # `sect_relations.relation_type` is `neutral` or `marriage_pact`
+            # (bootstrap, npc_romance) and the score is what the politics
+            # tick moves, so the score alone says friend from foe.
+            friends = sorted({str(r["sect_b"] if r["sect_a"] == seated else r["sect_a"]) for r in relations
+                              if int(r.get("relation_score") or 0) > 0})
+            foes = sorted({str(r["sect_b"] if r["sect_a"] == seated else r["sect_a"]) for r in relations
+                           if int(r.get("relation_score") or 0) < 0})
+            wars = [w for w in (await DB.get_territory_wars() or []) if seated in (str(w.get("attacker_key") or ""), str(w.get("defender_key") or ""))]
+            standing = []
+            if friends:
+                standing.append("allied with " + ", ".join(friends))
+            if foes:
+                standing.append("at odds with " + ", ".join(foes))
+            if wars:
+                standing.append("at war over " + ", ".join(sorted({str(w.get("territory_key") or "") for w in wars})))
+            if standing:
+                lines.append(f"**Standing:** {'; '.join(standing)}.")
+    except Exception:  # noqa: BLE001 - one unavailable read must not cost the city page
+        return lines
+    return lines
+
+
 @registered_group_command(city_group, name="look", description="See the gates and districts of this city, where you stand, and who is here")
 async def city_look(interaction: discord.Interaction) -> None:
     c = await require_character(interaction)
@@ -1463,7 +1524,7 @@ async def city_look(interaction: discord.Interaction) -> None:
         return
     here = str(c.get("location") or "")
     city = _city_of(here)
-    parts = sorted(name for name, data in WORLD.locations.items() if data.get("district") and str(data.get("outside_location")) == city)
+    parts = _city_parts(city)
     here_data = WORLD.locations.get(here) or {}
     if here_data.get("road_site"):
         leg = [str(x) for x in list(here_data.get("road_leg") or [])]
@@ -1484,6 +1545,7 @@ async def city_look(interaction: discord.Interaction) -> None:
         lines.append("**Gates:** " + "; ".join(f"{g} → {', '.join(faces.get(str(WORLD.locations[g].get('gate')), []))}" for g in gates))
     if districts:
         lines.append("**Districts:** " + ", ".join(districts))
+    lines.extend(await _seat_lines(city))
     people = await npcs_present(here)
     if people:
         lines.append(f"**Here:** {', '.join(people[:12])}" + (" …" if len(people) > 12 else ""))
@@ -1655,12 +1717,16 @@ async def city_envoys(interaction: discord.Interaction) -> None:
         name = str(row.get("sect_name") or "")
         rec = recruitment_definition(WORLD.sects, name) or {}
         fresh = " 🆕" if row.get("new_route") else ""
+        seat = str(row.get("seat") or "")
+        where = f"at **{row.get('gate')}**" + (f" in **{seat}**" if seat else "")
         lines.append(
-            f"• **{name}** — the {rec.get('trial_name') or 'entrance trial'} at **{row.get('gate')}**, "
+            f"• **{name}** — the {rec.get('trial_name') or 'entrance trial'} {where}, "
             f"before {rec.get('examiner') or 'the examiner'}.{fresh}")
+    # A sect keeps its seat in a city (v1.19.0): the city is on the travel
+    # list and the gate is a district of it, entered from the city page.
     lines.append(
-        "Their gates are on your travel list now — **/travel** reaches any of them, and the trial is sat there "
-        "with **/sect → Recruitment → Trial**.")
+        "Their seats are on your travel list now — **/travel** to the city, **/world → City → Enter** the gate, "
+        "and the trial is sat there with **/sect → Recruitment → Trial**.")
     progressed = []
     if any(row.get("new_sect") for row in sects):
         wt = await current_world_time()

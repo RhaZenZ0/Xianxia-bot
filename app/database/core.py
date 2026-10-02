@@ -7517,6 +7517,17 @@ class Database:
             db.row_factory=aiosqlite.Row; cur=await db.execute(sql,tuple(params)); return [dict(r) for r in await cur.fetchall()]
 
 
+    async def get_territory(self, territory_key: str) -> dict[str, Any] | None:
+        """One place's banner (v1.19.0): who holds it, read for the city page."""
+        async with self._connect() as db:
+            db.row_factory=aiosqlite.Row; cur=await db.execute("SELECT * FROM territory_state WHERE territory_key=?",(str(territory_key),)); row=await cur.fetchone(); return dict(row) if row else None
+
+    async def get_sect_relations(self, sect_name: str) -> list[dict[str, Any]]:
+        """Every relation a sect is a party to (v1.19.0), as the politics tick
+        wrote them; the city page reads a seat's standing off these."""
+        async with self._connect() as db:
+            db.row_factory=aiosqlite.Row; cur=await db.execute("SELECT * FROM sect_relations WHERE sect_a=? OR sect_b=? ORDER BY ABS(relation_score) DESC,sect_a,sect_b",(str(sect_name),str(sect_name))); return [dict(r) for r in await cur.fetchall()]
+
     async def get_territories(self, region: str | None=None) -> list[dict[str, Any]]:
         sql="SELECT * FROM territory_state"; params:list[Any]=[]
         if region: sql+=" WHERE region=?"; params.append(str(region))

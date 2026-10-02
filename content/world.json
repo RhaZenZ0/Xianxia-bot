@@ -2612,7 +2612,9 @@
         "Higher up the mountain, disciplined qi moves in ordered lines, out of reach of sense."
       ],
       "terrain": "mountain stair",
-      "climate": "cool-windy"
+      "climate": "cool-windy",
+      "outside_location": "Cloudblade City",
+      "district": "sect_gate"
     },
     "Crimson Furnace Valley": {
       "description": "Red cliffs surround a furnace valley veined with fire-aspected qi. Herb terraces, pill halls and bronze examination furnaces mark the Crimson Furnace Sect recruitment grounds.",
@@ -2633,7 +2635,9 @@
         "Heat-shimmer around the pill halls makes every life-sign there hard to count."
       ],
       "terrain": "volcanic valley",
-      "climate": "hot"
+      "climate": "hot",
+      "outside_location": "Emberforge City",
+      "district": "sect_gate"
     },
     "Frozen Moon Terrace": {
       "description": "A high terrace above a cold mirror-lake where frost formations glow beneath moonstone tiles. Frozen Moon Palace tests patience, control and formation sense here.",
@@ -2654,7 +2658,9 @@
         "Whatever watches from the palace above keeps its presence perfectly level."
       ],
       "terrain": "frozen highland",
-      "climate": "cold"
+      "climate": "cold",
+      "outside_location": "Frostwatch City",
+      "district": "sect_gate"
     },
     "Black Serpent Ravine": {
       "description": "A humid ravine of black bamboo, beast pens and poison gardens. The Black Serpent Clan judges recruits by fieldcraft, nerve and their respect for dangerous creatures.",
@@ -2675,7 +2681,9 @@
         "The clan's own cultivators are hard to place; they keep their presence low the way their beasts do."
       ],
       "terrain": "humid ravine",
-      "climate": "warm-humid"
+      "climate": "warm-humid",
+      "outside_location": "Moonfen City",
+      "district": "sect_gate"
     },
     "Blood River Gorge": {
       "description": "A hidden gorge where iron-red water cuts through dark stone. Blood River banners appear only to those who have been shown the correct trail or survived long enough to be noticed.",
@@ -2697,7 +2705,9 @@
         "Something old has been fed here, and the stone remembers it."
       ],
       "terrain": "river gorge",
-      "climate": "warm-humid"
+      "climate": "warm-humid",
+      "outside_location": "Riverguard City",
+      "district": "sect_gate"
     },
     "Corpse Lantern Necropolis": {
       "description": "A concealed funerary complex lit by blue soul-lanterns. Names of the dead are carved into black tablets while quiet archivists test whether visitors can face death without losing themselves.",
@@ -2719,7 +2729,9 @@
         "No living heat reads from the archivists; their signatures are thin and steady as lamp flames."
       ],
       "terrain": "mist necropolis",
-      "climate": "cold-damp"
+      "climate": "cold-damp",
+      "outside_location": "Ashenwall City",
+      "district": "sect_gate"
     },
     "Riverguard City": {
       "description": "A public temperate cultivation city shaped by temperate river martial district. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
@@ -8897,7 +8909,9 @@
         "Ordered, patient qi; the sect above is a place of long practice."
       ],
       "terrain": "jade cliff",
-      "climate": "cool-dry"
+      "climate": "cool-dry",
+      "outside_location": "Jade Crown Spirit City",
+      "district": "sect_gate"
     },
     "Thousand Beast Valley Mouth": {
       "description": "The mouth of a wide valley in the Spiritual World, closed by a fence of bone and a gate that a beast, not a man, opens. Cages, kennels and roosts climb the slopes beyond it.",
@@ -8915,7 +8929,9 @@
         "Something old and very large sleeps under the far ridge and the valley arranges itself around it."
       ],
       "terrain": "forest valley",
-      "climate": "warm-humid"
+      "climate": "warm-humid",
+      "outside_location": "Galevein Spirit City",
+      "district": "sect_gate"
     },
     "Heavenblade Sword Terrace": {
       "description": "A terrace of immortal gold cut into the mountain above the Immortal Court, where a single sword stands point-down in the stone and has for ten thousand years. Applicants are asked to draw it and are judged by how they fail.",
@@ -8933,7 +8949,9 @@
         "The mountain above is disciplined qi in rows; a sword sect at practice."
       ],
       "terrain": "mountain peak",
-      "climate": "cool-windy"
+      "climate": "cool-windy",
+      "outside_location": "Heavenblade Immortal City",
+      "district": "sect_gate"
     },
     "Ashen Lotus Shrine Gate": {
       "description": "A shrine gate of grey stone in a burnt lotus field below the Immortal Court, where the ash never settles. The pavilion recruits openly here, which the Court tolerates because it cannot stop it.",
@@ -8951,7 +8969,9 @@
         "Cold fire and colder intent; the shrine is a door, not a wall."
       ],
       "terrain": "dry ash field",
-      "climate": "dry-temperate"
+      "climate": "dry-temperate",
+      "outside_location": "Lunar Veil Immortal City",
+      "district": "sect_gate"
     },
     "Mandate Academy Star Steps": {
       "description": "Nine hundred steps of starlight rise from the Palace grounds to the Academy's first hall. Each step asks a question; applicants who reach the top have answered them.",
@@ -8969,7 +8989,9 @@
         "The Academy above is ordered qi arranged by argument rather than rank."
       ],
       "terrain": "mountain stair",
-      "climate": "cool-highland"
+      "climate": "cool-highland",
+      "outside_location": "Mandate Crown Celestial City",
+      "district": "sect_gate"
     },
     "Void Serpent Pit": {
       "description": "A pit in the Celestial World whose bottom nobody has seen, ringed by serpent-carved stones. The cult recruits at the rim, and the Palace lets it, because the pit was here before the Palace.",
@@ -8987,7 +9009,9 @@
         "Something vast turns over far below and the whole rim breathes with it."
       ],
       "terrain": "broken peak",
-      "climate": "cold"
+      "climate": "cold",
+      "outside_location": "Lunar Shadow Celestial City",
+      "district": "sect_gate"
     },
     "Adamant Body Forge": {
       "description": "Adamant Body's smithy: a stone-cold forge hall where Smith Guo Tie hammers spirit iron into blades and lamellar at the anvil, and sells the ore beside them. Tier 3 work - immortal-grade goods few can afford. The forge sits off Adamant Body Immortal City's main street and closes only when the coals do.",
@@ -12680,7 +12704,8 @@
         "Afternoon": "Azure Cloud Mountain Gate",
         "Evening": "Azure Cloud Mountain Gate",
         "Night": "Azure Cloud Mountain Gate"
-      }
+      },
+      "district": "Azure Cloud Mountain Gate"
     },
     "Furnace Examiner Huo Ren": {
       "role": "Crimson Furnace Sect entrance examiner and furnace master",
@@ -12701,7 +12726,8 @@
         "Afternoon": "Crimson Furnace Valley",
         "Evening": "Crimson Furnace Valley",
         "Night": "Crimson Furnace Valley"
-      }
+      },
+      "district": "Crimson Furnace Valley"
     },
     "Moon Warden Lin Yue": {
       "role": "Frozen Moon Palace entrance warden and formation examiner",
@@ -12722,7 +12748,8 @@
         "Afternoon": "Frozen Moon Terrace",
         "Evening": "Frozen Moon Terrace",
         "Night": "Frozen Moon Terrace"
-      }
+      },
+      "district": "Frozen Moon Terrace"
     },
     "Handler She Ruo": {
       "role": "Black Serpent Clan entrance handler and field examiner",
@@ -12743,7 +12770,8 @@
         "Afternoon": "Black Serpent Ravine",
         "Evening": "Black Serpent Ravine",
         "Night": "Black Serpent Ravine"
-      }
+      },
+      "district": "Black Serpent Ravine"
     },
     "Blood Gatekeeper Yan Luo": {
       "role": "Blood River Sect hidden-gate examiner",
@@ -12764,7 +12792,8 @@
         "Afternoon": "Blood River Gorge",
         "Evening": "Blood River Gorge",
         "Night": "Blood River Gorge"
-      }
+      },
+      "district": "Blood River Gorge"
     },
     "Lantern Registrar Wu Ming": {
       "role": "Corpse Lantern Pavilion entrance registrar and vigil examiner",
@@ -12785,7 +12814,8 @@
         "Afternoon": "Corpse Lantern Necropolis",
         "Evening": "Corpse Lantern Necropolis",
         "Night": "Corpse Lantern Necropolis"
-      }
+      },
+      "district": "Corpse Lantern Necropolis"
     },
     "Adamant Body Immortal City Family Steward": {
       "role": "Local family liaison, shop broker and problem-board steward",
@@ -19713,7 +19743,8 @@
       },
       "alignment": "Orthodox",
       "sect_affiliation": "Jade Meridian Sect",
-      "can_recommend": true
+      "can_recommend": true,
+      "district": "Jade Meridian Stone Gate"
     },
     "Outer Disciple Lin Ruo": {
       "role": "Jade Meridian Sect gate disciple",
@@ -19731,7 +19762,8 @@
         "Afternoon": "Jade Meridian Stone Gate",
         "Evening": "Jade Meridian Stone Gate",
         "Night": "Jade Meridian Stone Gate"
-      }
+      },
+      "district": "Jade Meridian Stone Gate"
     },
     "Valley Warden Hao Zhen": {
       "role": "Thousand Beast Valley gate examiner",
@@ -19752,7 +19784,8 @@
       },
       "alignment": "Neutral",
       "sect_affiliation": "Thousand Beast Valley",
-      "can_recommend": true
+      "can_recommend": true,
+      "district": "Thousand Beast Valley Mouth"
     },
     "Valley Hand Xia Wen": {
       "role": "Thousand Beast Valley gate disciple",
@@ -19770,7 +19803,8 @@
         "Afternoon": "Thousand Beast Valley Mouth",
         "Evening": "Thousand Beast Valley Mouth",
         "Night": "Thousand Beast Valley Mouth"
-      }
+      },
+      "district": "Thousand Beast Valley Mouth"
     },
     "Terrace Elder Xue Tianfeng": {
       "role": "Heavenblade Immortal Sect gate examiner",
@@ -19791,7 +19825,8 @@
       },
       "alignment": "Orthodox",
       "sect_affiliation": "Heavenblade Immortal Sect",
-      "can_recommend": true
+      "can_recommend": true,
+      "district": "Heavenblade Sword Terrace"
     },
     "Outer Disciple Tao Ming": {
       "role": "Heavenblade Immortal Sect gate disciple",
@@ -19809,7 +19844,8 @@
         "Afternoon": "Heavenblade Sword Terrace",
         "Evening": "Heavenblade Sword Terrace",
         "Night": "Heavenblade Sword Terrace"
-      }
+      },
+      "district": "Heavenblade Sword Terrace"
     },
     "Ash Keeper Mo Ruyan": {
       "role": "Ashen Lotus Pavilion gate examiner",
@@ -19830,7 +19866,8 @@
       },
       "alignment": "Demonic",
       "sect_affiliation": "Ashen Lotus Pavilion",
-      "can_recommend": true
+      "can_recommend": true,
+      "district": "Ashen Lotus Shrine Gate"
     },
     "Initiate Ning Fei": {
       "role": "Ashen Lotus Pavilion gate disciple",
@@ -19848,7 +19885,8 @@
         "Afternoon": "Ashen Lotus Shrine Gate",
         "Evening": "Ashen Lotus Shrine Gate",
         "Night": "Ashen Lotus Shrine Gate"
-      }
+      },
+      "district": "Ashen Lotus Shrine Gate"
     },
     "Star Lecturer Wen Qianyu": {
       "role": "Celestial Mandate Academy gate examiner",
@@ -19869,7 +19907,8 @@
       },
       "alignment": "Orthodox",
       "sect_affiliation": "Celestial Mandate Academy",
-      "can_recommend": true
+      "can_recommend": true,
+      "district": "Mandate Academy Star Steps"
     },
     "Outer Disciple Shen Yue": {
       "role": "Celestial Mandate Academy gate disciple",
@@ -19887,7 +19926,8 @@
         "Afternoon": "Mandate Academy Star Steps",
         "Evening": "Mandate Academy Star Steps",
         "Night": "Mandate Academy Star Steps"
-      }
+      },
+      "district": "Mandate Academy Star Steps"
     },
     "Pit Speaker Gu Heilong": {
       "role": "Void Serpent Cult gate examiner",
@@ -19908,7 +19948,8 @@
       },
       "alignment": "Demonic",
       "sect_affiliation": "Void Serpent Cult",
-      "can_recommend": true
+      "can_recommend": true,
+      "district": "Void Serpent Pit"
     },
     "Initiate Kang Bo": {
       "role": "Void Serpent Cult gate disciple",
@@ -19926,7 +19967,8 @@
         "Afternoon": "Void Serpent Pit",
         "Evening": "Void Serpent Pit",
         "Night": "Void Serpent Pit"
-      }
+      },
+      "district": "Void Serpent Pit"
     },
     "Smith Guo Tie": {
       "role": "Adamant Body Forge smith",
@@ -22972,7 +23014,8 @@
         "Afternoon": "Mandate Academy Star Steps",
         "Evening": "Mandate Academy Star Steps",
         "Night": "Mandate Academy Star Steps"
-      }
+      },
+      "district": "Mandate Academy Star Steps"
     },
     "Valley Hand Kang Bo": {
       "role": "Thousand Beast Valley gate disciple",
@@ -22990,7 +23033,8 @@
         "Afternoon": "Thousand Beast Valley Mouth",
         "Evening": "Thousand Beast Valley Mouth",
         "Night": "Thousand Beast Valley Mouth"
-      }
+      },
+      "district": "Thousand Beast Valley Mouth"
     },
     "The Barefoot Pilgrim": {
       "role": "barefoot pilgrim walking the Spiritual World's shrine road, never staying a season",

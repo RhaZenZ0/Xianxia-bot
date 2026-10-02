@@ -16,6 +16,12 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.19.0)** — *More capitals, with rivals.* Asked for as *"more capital cities with rivals,
+  maybe move the sects that fit"*; three shapes were offered and the owner took the smallest: one
+  capital per world stays, every public sect's gate becomes a `sect_gate` district of a seat city of
+  its world (`scripts/author_sect_seats.py`), the politics tick grows a sect out of its seat by road,
+  a delegation in a seat city recruits for the sect seated there, and the city card and panel header
+  name the seat, its banner and its standing. The seat is `cityOf(gate)`, never a field of the sect.
 - **fixed (v1.18.0)** — *The road stopped at the Mortal seam.* The second world-flow study's first
   recommendation, on the owner's call ("Do the recommendations"): `realm_road` runs from realm 1 to
   realm 31 now, twenty-four stages through the three upper worlds naming each world's capital,

@@ -46,8 +46,10 @@ func recruitingSectFor(catalog worlddata.Catalog, eventKey, location string) str
 		names = append(names, name)
 	}
 	sort.Strings(names)
+	// A delegation on a sect's own ground speaks for that sect - at its gate,
+	// or anywhere in the city the gate is a district of (its seat, v1.19.0).
 	for _, name := range names {
-		if catalog.Sects[name].Recruitment.Location == location {
+		if cityOf(catalog, catalog.Sects[name].Recruitment.Location) == cityOf(catalog, location) {
 			return name
 		}
 	}
@@ -103,8 +105,19 @@ func revealSectRouteTx(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if err != nil {
 		return nil, err
 	}
+	// A seated sect's gate is a district of its city (v1.19.0), and a
+	// district is walked to from inside its city alone - so the route a
+	// sponsor or an envoy puts on the map is the city, and the gate is a
+	// step inside it. A wilderness gate has no seat and is the route itself.
+	seat := sectSeat(catalog, sect)
+	if seat != "" {
+		if _, err := conn.Execute(`INSERT OR IGNORE INTO character_location_discoveries(user_id,location,discovery_kind,discovered_game_minute,created_at) VALUES(?,?,?,?,?)`,
+			[]any{userID, seat, kind, gameMinute, now}); err != nil {
+			return nil, err
+		}
+	}
 	return map[string]any{
-		"sect_name": sect, "gate": gate,
+		"sect_name": sect, "gate": gate, "seat": seat,
 		"new_sect": known.RowsAffected > 0, "new_route": route.RowsAffected > 0,
 	}, nil
 }
@@ -242,11 +255,45 @@ func SectGate(catalog worlddata.Catalog, sect string) string {
 	return sectGate(catalog, sect)
 }
 
+// sectSeat is the city a public sect keeps its gate in (v1.19.0), or "" for
+// a sect whose gate stands in the wilderness or that keeps no gate. The seat
+// is read off the catalogue - the gate is a district of the city - and is not
+// a field of the sect, so the two cannot disagree: `cityOf` is the one rule.
+//
+// On the owner's call the capital of a world stays one place and the sects
+// sit in the other great cities; the claims, wars and relations the sects
+// already have are what make two cities rivals.
+func sectSeat(catalog worlddata.Catalog, sect string) string {
+	gate := sectGate(catalog, sect)
+	if gate == "" {
+		return ""
+	}
+	if city := cityOf(catalog, gate); city != gate {
+		return city
+	}
+	return ""
+}
+
+// SectSeat is sectSeat for the simulation package.
+func SectSeat(catalog worlddata.Catalog, sect string) string { return sectSeat(catalog, sect) }
+
+// SectHome is the whole place a sect's ground begins at: its seat city when
+// the gate is a district of one, else the gate itself. It is what
+// `npcSectClaims` claims first and what no rival may take while it lies
+// neutral.
+func SectHome(catalog worlddata.Catalog, sect string) string {
+	if seat := sectSeat(catalog, sect); seat != "" {
+		return seat
+	}
+	return sectGate(catalog, sect)
+}
+
 // TerritoryIsWholePlace says whether a location is a place in its own right
-// - a city, a road site, a stretch of wilds, a sect's gate - rather than a
-// part of a city (a gate, a district, a shop, an auction hall) or somebody's
-// private room (v1.12.0). A sect claims a city, not one of its streets; the
-// rule is cityOf's, so a city's parts answer the city.
+// - a city, a road site, a stretch of wilds, a sect's gate in the wilderness -
+// rather than a part of a city (a gate, a district, a shop, an auction hall, a
+// sect's gate inside its seat city) or somebody's private room (v1.12.0). A
+// sect claims a city, not one of its streets; the rule is cityOf's, so a
+// city's parts answer the city.
 func TerritoryIsWholePlace(catalog worlddata.Catalog, location string) bool {
 	loc, ok := catalog.Locations[location]
 	return ok && !loc.Private && cityOf(catalog, location) == location

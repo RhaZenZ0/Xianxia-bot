@@ -964,11 +964,13 @@ class CityDistrictContentTests(unittest.TestCase):
         # kind found in exactly one world is that world's job.
         worlds_by_kind: dict[str, set[str]] = {}
         for loc in locations.values():
-            if loc.get("district") not in (None, "", "gate", "inn"):
+            if loc.get("district") not in (None, "", "gate", "inn", "sect_gate"):
                 worlds_by_kind.setdefault(str(loc["district"]), set()).add(str(loc.get("world")))
         job_kinds = {kind for kind, worlds in worlds_by_kind.items() if len(worlds) == 1}
+        # A sect's gate (v1.19.0) is a district of its seat beside the city's
+        # own: the seat rule is held in test_a_sect_keeps_its_seat_in_a_city.py.
         for city in sorted(cities):
-            districts = [n for n, l in locations.items() if l.get("district") not in (None, "", "gate", "inn") and l.get("outside_location") == city]
+            districts = [n for n, l in locations.items() if l.get("district") not in (None, "", "gate", "inn", "sect_gate") and l.get("outside_location") == city]
             with self.subTest(city=city):
                 if locations[city].get("realm_hub"):
                     self.assertEqual(len(districts), 4, districts)
@@ -988,7 +990,7 @@ class CityDistrictContentTests(unittest.TestCase):
             if not loc.get("district"):
                 continue
             with self.subTest(district=name):
-                want = 1 if loc["district"] in ("gate", "inn") else 2
+                want = 1 if loc["district"] in ("gate", "inn", "sect_gate") else 2
                 self.assertGreaterEqual(len(homes.get(name, [])), want, f"{name} is empty")
                 for npc in homes.get(name, []):
                     self.assertEqual(WORLD["npcs"][npc].get("district"), name)

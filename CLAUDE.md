@@ -6192,6 +6192,64 @@ string constants now.
 the Qi Refining pages at realm 1, and the Celestial capital's compass. Each is a decision the owner
 has not taken.
 
+### A sect keeps its seat in a city (`sect_seats`, v1.19.0)
+
+Asked for as *"more capital cities with rivals, maybe move the sects that fit with that"*, and three
+shapes were offered: more capitals with the realm-hub machinery behind each, a rival-city layer of
+its own, or the smallest - keep one capital per world and give every public sect a **seat**, a city
+of its world whose district its gate becomes, so the rivalry the sects already run between them
+(`npcSectClaims`, the war step, `sect_relations`) is a city's politics. The owner took the smallest.
+
+**No new sect field, and that is the design.** The seat is `cityOf(gate)` - the engine's one
+statement of which city a place is part of, read for a gate, a district and a shop since rc.28 - so
+`sectSeat` is a lookup and not a second fact that can drift from the gate. `SectHome` is the seat
+where there is one and the gate where there is not, and both halves are honest: a sect somebody
+authors with a wilderness gate tomorrow is seated nowhere and grows from its gate, as every sect did
+before. `World.sect_seat` and `World.seated_sect` are the Python twins, held to a third computation
+off the raw content over every sect (v1.0.9's rule: two wrong halves agreeing is exactly what a test
+against the twin alone would pass). `scripts/author_sect_seats.py` is how the twelve were seated,
+one per city, a walled non-capital city of the gate's own world; it refuses a capital, a shared
+seat, and a sect left out.
+
+**Everything a gate already did, it still does.** The gate keeps its name, its people (each given the
+`district` field the people-gate wants), its `private` flag and its trial. What changed is that it is
+a `sect_gate` district of its city, and five readers had to learn what a district already means:
+
+- **A district is entered from its city.** `exploration.travel` opens a district only from inside its
+  city, so the envoys' hall and a sponsor's recommendation put the **seat** on the travel list -
+  `revealSectRouteTx` writes both - and the reply says so: travel to the city, City → Enter the gate,
+  sit the trial. The engine playtest's envoys step walked straight to a gate and had to learn the two
+  steps, which is how a harness says a rule changed.
+- **The street does not show a private part.** `knownLocationsTx` marks a city's parts known from its
+  street, and it skips `Private` ones, so the two demonic sects' gates (`public_route: false`) are
+  still a sponsor's to reveal; `_city_parts` and `_places_to_enter` carry the same rule, and the gate
+  holds that City → Enter never offers a private gate and offers every public one.
+- **A seated sect grows from its seat.** `claimTarget` reads `game.SectHome`, so the first claim is
+  the city and the next are one road step from a holding; the beachhead rule is kept for a sect
+  whose home has no roads, which is now only a wilderness gate. The claims tests that expected the
+  gate first were rewritten for the seat, and the leap test had to exclude road steps from the home
+  as well - a home with roads is what the change is.
+- **A delegation in a seat city speaks for its sect.** `recruitingSectFor` compares `cityOf` on both
+  sides, so a Major Sect Recruitment landing anywhere in Cloudblade City recruits for the Azure Cloud
+  Sect, not for a hash over the world's sects.
+- **The city says so.** `here_summary` appends "seat of the …" to a seat city's line and names the
+  seat on the gate's; City → Look draws `_seat_lines` - the seat, the banner (`territory_state`,
+  when another sect holds the city) and the standing (`sect_relations` by score, `territory_wars`)
+  - which never raises, because it is drawn beside everything else on the page (v1.0.10). The two
+  readers it needed (`get_territory`, `get_sect_relations`) are plain reads with a production caller.
+
+**The content gates had the sect gate as a second district.** `test_capitals_have_four_compass_districts_and_cities_one`
+counts a city's own districts and the people gate wants two per district; a `sect_gate` is excluded
+from the first and wants one in the second, like a gate or an inn, because its people are the sect's
+examiner and doorkeeper and the city's own district is still the one the rule is about.
+
+**The drills.** The twin returning "" fails four tests at once; the street showing private parts
+names the private gate it offered; the header dropping the seat names the city line; and
+`TestEveryPublicSectKeepsASeatInACityOfItsWorld` fails on any public sect whose gate is not a
+`sect_gate` district of a non-capital city of its world. `sect_relations.relation_type` is `neutral`
+or `marriage_pact` and the score is what the tick moves, so the standing line reads the score alone
+rather than a vocabulary the table does not carry.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

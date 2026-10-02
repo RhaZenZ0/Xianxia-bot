@@ -841,7 +841,11 @@ func knownLocationsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 			}
 		}
 		for _, part := range cityPartsOf(catalog, city) {
-			known[part] = true
+			// A private district (a demonic sect's gate, v1.19.0) is not in
+			// plain sight: a sponsor reveals it, as a sponsor always has.
+			if !catalog.Locations[part].Private {
+				known[part] = true
+			}
 		}
 		// At a road-side site (v0.39.0) the road runs both ways: both ends
 		// of the leg are known, and so is every other site on it.
