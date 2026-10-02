@@ -43,7 +43,10 @@ class TheEngineOwnsProsperity(unittest.TestCase):
 class TheBoard(unittest.TestCase):
     def test_the_board_lists_the_citys_givers_and_accept_stays_in_the_city(self):
         board = _body(EXPLORATION, "_city_board")
-        self.assertIn('_city_of(where) == city', board)
+        # The city filter and, since v1.19.2, the realm band the conversation
+        # offer reads; the behaviour is held in test_a_world_offers_its_own_work.
+        self.assertIn('_city_of(where)', board)
+        self.assertIn('realm_band_allows(', board)
         self.assertIn("The Quest Pavilion of", _body(EXPLORATION, "city_board"))
         self.assertIn("DB.list_active_bounties(limit=8)", _body(EXPLORATION, "city_board"))
         accept = _body(EXPLORATION, "city_accept")

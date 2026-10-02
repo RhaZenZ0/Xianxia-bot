@@ -52744,7 +52744,7 @@
       "description": "The east gate of Adamant Body Immortal City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Ma Rong",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "walk",
@@ -52796,7 +52796,7 @@
       "description": "Assayer Zhao Zhen of Adamant Body Ore Terraces needs something looked into quietly and someone talked to who will not talk to Assayer. Look around Adamant Body Ore Terraces, have a word with Mine Foreman Yang Shu, and come back.",
       "giver_npc": "Assayer Zhao Zhen",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "look",
@@ -53195,7 +53195,7 @@
       "description": "The north gate of Broken Halo Spirit City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Tu Ai",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "walk",
@@ -53247,7 +53247,7 @@
       "description": "Old Sentry Yu Qi of Broken Halo Ruin Quarter needs something looked into quietly and someone talked to who will not talk to Old. Look around Broken Halo Ruin Quarter, have a word with Relic Digger Xiong Lei, and come back.",
       "giver_npc": "Old Sentry Yu Qi",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "look",
@@ -53306,7 +53306,7 @@
       "description": "The north gate of Celestial Mandate Palace has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Zhan Xi",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "walk",
@@ -53358,7 +53358,7 @@
       "description": "Steward Chai Ning of Celestial Mandate North District needs something looked into quietly and someone talked to who will not talk to Steward. Look around Celestial Mandate North District, have a word with Young Mistress Dai Wei, and come back.",
       "giver_npc": "Steward Chai Ning",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "look",
@@ -53417,7 +53417,7 @@
       "description": "Abbot Fu Cheng of Celestial Mandate East District needs something looked into quietly and someone talked to who will not talk to Abbot. Look around Celestial Mandate East District, have a word with Incense Seller Gu Jin, and come back.",
       "giver_npc": "Abbot Fu Cheng",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "look",
@@ -53476,7 +53476,7 @@
       "description": "Beggar King Jiang Wan of Celestial Mandate South District needs something looked into quietly and someone talked to who will not talk to Beggar. Look around Celestial Mandate South District, have a word with Innkeeper Huang Pei, and come back.",
       "giver_npc": "Beggar King Jiang Wan",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "look",
@@ -53535,7 +53535,7 @@
       "description": "The east gate of Celestial River City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Ouyang Mu",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "walk",
@@ -53587,7 +53587,7 @@
       "description": "Barge Master Teng Zhi of Celestial River River Landings needs something looked into quietly and someone talked to who will not talk to Barge. Look around Celestial River River Landings, have a word with Net Mender Wen Ping, and come back.",
       "giver_npc": "Barge Master Teng Zhi",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "look",
@@ -53757,7 +53757,7 @@
       "description": "The east gate of Cloudedge Spirit City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Cen Xue",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "walk",
@@ -53809,7 +53809,7 @@
       "description": "Drillmaster Ge Han of Cloudedge Blade Yards needs something looked into quietly and someone talked to who will not talk to Drillmaster. Look around Cloudedge Blade Yards, have a word with Sword Polisher Hong Ni, and come back.",
       "giver_npc": "Drillmaster Ge Han",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "look",
@@ -53868,7 +53868,7 @@
       "description": "The east gate of Divine Herb Celestial City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Jing Su",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "walk",
@@ -53920,7 +53920,7 @@
       "description": "Gardener Lian Hua of Divine Herb Herb Gardens needs something looked into quietly and someone talked to who will not talk to Gardener. Look around Divine Herb Herb Gardens, have a word with Herb Girl Min Rui, and come back.",
       "giver_npc": "Gardener Lian Hua",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "look",
@@ -54090,7 +54090,7 @@
       "description": "The east gate of Fallen Star Immortal City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Tai Yan",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "walk",
@@ -54142,7 +54142,7 @@
       "description": "Old Sentry Yi Ou of Fallen Star Ruin Quarter needs something looked into quietly and someone talked to who will not talk to Old. Look around Fallen Star Ruin Quarter, have a word with Relic Digger Xiao Jia, and come back.",
       "giver_npc": "Old Sentry Yi Ou",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "look",
@@ -54201,7 +54201,7 @@
       "description": "The east gate of Firmament Blade City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Zhuge Ting",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "walk",
@@ -54253,7 +54253,7 @@
       "description": "Drillmaster Bu Kun of Firmament Blade Blade Yards needs something looked into quietly and someone talked to who will not talk to Drillmaster. Look around Firmament Blade Blade Yards, have a word with Sword Polisher Chi Shu, and come back.",
       "giver_npc": "Drillmaster Bu Kun",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "look",
@@ -54423,7 +54423,7 @@
       "description": "The north gate of Froststar Border City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Ju Ze",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "walk",
@@ -54475,7 +54475,7 @@
       "description": "Fire Keeper Ma Qi of Froststar Frost Market needs something looked into quietly and someone talked to who will not talk to Fire. Look around Froststar Frost Market, have a word with Fur Trader Mi Kai, and come back.",
       "giver_npc": "Fire Keeper Ma Qi",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "look",
@@ -54645,7 +54645,7 @@
       "description": "The north gate of Galevein Spirit City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Xie Cheng",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "walk",
@@ -54697,7 +54697,7 @@
       "description": "Caravan Master Fan Pei of Galevein Caravan Yards needs something looked into quietly and someone talked to who will not talk to Caravan. Look around Galevein Caravan Yards, have a word with Ostler Qian Wan, and come back.",
       "giver_npc": "Caravan Master Fan Pei",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "look",
@@ -54756,7 +54756,7 @@
       "description": "The east gate of Golden Spear Immortal City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Shi Bei",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "walk",
@@ -54808,7 +54808,7 @@
       "description": "Quartermaster He Ru of Golden Spear Garrison Ward needs something looked into quietly and someone talked to who will not talk to Quartermaster. Look around Golden Spear Garrison Ward, have a word with Sergeant Du Mu, and come back.",
       "giver_npc": "Quartermaster He Ru",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "look",
@@ -54919,7 +54919,7 @@
       "description": "The east gate of Heavenblade Immortal City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Mei Ping",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "walk",
@@ -54971,7 +54971,7 @@
       "description": "Drillmaster Qu Dong of Heavenblade Blade Yards needs something looked into quietly and someone talked to who will not talk to Drillmaster. Look around Heavenblade Blade Yards, have a word with Sword Polisher Sima Kang, and come back.",
       "giver_npc": "Drillmaster Qu Dong",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "look",
@@ -55030,7 +55030,7 @@
       "description": "The north gate of Hundred Herb Spirit City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Tu Qing",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "walk",
@@ -55082,7 +55082,7 @@
       "description": "Gardener Xiong Chan of Hundred Herb Herb Gardens needs something looked into quietly and someone talked to who will not talk to Gardener. Look around Hundred Herb Herb Gardens, have a word with Herb Girl Yu Han, and come back.",
       "giver_npc": "Gardener Xiong Chan",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "look",
@@ -55141,7 +55141,7 @@
       "description": "The north gate of Immortal River City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Zhan Ni",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "walk",
@@ -55193,7 +55193,7 @@
       "description": "Barge Master Dai Hua of Immortal River River Landings needs something looked into quietly and someone talked to who will not talk to Barge. Look around Immortal River River Landings, have a word with Net Mender Fu Rui, and come back.",
       "giver_npc": "Barge Master Dai Hua",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "look",
@@ -55363,7 +55363,7 @@
       "description": "The east gate of Jade Cauldron Immortal City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Mao Yan",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "walk",
@@ -55415,7 +55415,7 @@
       "description": "Gardener Ran Jia of Jade Cauldron Herb Gardens needs something looked into quietly and someone talked to who will not talk to Gardener. Look around Jade Cauldron Herb Gardens, have a word with Herb Girl Shao Ou, and come back.",
       "giver_npc": "Gardener Ran Jia",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "look",
@@ -55474,7 +55474,7 @@
       "description": "The east gate of Jade Crown Spirit City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Teng Ting",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "walk",
@@ -55526,7 +55526,7 @@
       "description": "Clerk Xin Kun of Jade Crown Ministry Row needs something looked into quietly and someone talked to who will not talk to Clerk. Look around Jade Crown Ministry Row, have a word with Petitioner Yue Shu, and come back.",
       "giver_npc": "Clerk Xin Kun",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "look",
@@ -55585,7 +55585,7 @@
       "description": "The north gate of Jadeflow Spirit City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Zhai Zhen",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "walk",
@@ -55637,7 +55637,7 @@
       "description": "Barge Master Diao Shan of Jadeflow River Landings needs something looked into quietly and someone talked to who will not talk to Barge. Look around Jadeflow River Landings, have a word with Net Mender Ge Ze, and come back.",
       "giver_npc": "Barge Master Diao Shan",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "look",
@@ -55807,7 +55807,7 @@
       "description": "The west gate of Lunar Shadow Celestial City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Min Jian",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "walk",
@@ -55859,7 +55859,7 @@
       "description": "Ferrywoman Pu Lian of Lunar Shadow Mist Docks needs something looked into quietly and someone talked to who will not talk to Ferrywoman. Look around Lunar Shadow Mist Docks, have a word with Fishmonger Que Tao, and come back.",
       "giver_npc": "Ferrywoman Pu Lian",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "look",
@@ -55918,7 +55918,7 @@
       "description": "The north gate of Lunar Veil Immortal City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Rui Bao",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "walk",
@@ -55970,7 +55970,7 @@
       "description": "Ferrywoman Tai Nuo of Lunar Veil Mist Docks needs something looked into quietly and someone talked to who will not talk to Ferrywoman. Look around Lunar Veil Mist Docks, have a word with Fishmonger Wei Tian, and come back.",
       "giver_npc": "Ferrywoman Tai Nuo",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "look",
@@ -56029,7 +56029,7 @@
       "description": "The east gate of Mandate Crown Celestial City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Xiao Ai",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "walk",
@@ -56081,7 +56081,7 @@
       "description": "Clerk Zhuge Lei of Mandate Crown Ministry Row needs something looked into quietly and someone talked to who will not talk to Clerk. Look around Mandate Crown Ministry Row, have a word with Petitioner Ao Qi, and come back.",
       "giver_npc": "Clerk Zhuge Lei",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "look",
@@ -56140,7 +56140,7 @@
       "description": "The east gate of Mandate Spear City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Bu Xi",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "walk",
@@ -56192,7 +56192,7 @@
       "description": "Quartermaster Fei Wei of Mandate Spear Garrison Ward needs something looked into quietly and someone talked to who will not talk to Quartermaster. Look around Mandate Spear Garrison Ward, have a word with Sergeant Ding Ning, and come back.",
       "giver_npc": "Quartermaster Fei Wei",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "look",
@@ -56362,7 +56362,7 @@
       "description": "The north gate of Moonfrost Spirit City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Mi Bei",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "walk",
@@ -56414,7 +56414,7 @@
       "description": "Ferrywoman Hu Ni of Moonfrost Mist Docks needs something looked into quietly and someone talked to who will not talk to Ferrywoman. Look around Moonfrost Mist Docks, have a word with Fishmonger Yang Su, and come back.",
       "giver_npc": "Ferrywoman Hu Ni",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "look",
@@ -56473,7 +56473,7 @@
       "description": "The north gate of Nine-Heavens Immortal Court has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Zhao Zhu",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "walk",
@@ -56525,7 +56525,7 @@
       "description": "Steward Xie Rui of Nine-Heavens North District needs something looked into quietly and someone talked to who will not talk to Steward. Look around Nine-Heavens North District, have a word with Young Mistress Liang Yun, and come back.",
       "giver_npc": "Steward Xie Rui",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "look",
@@ -56584,7 +56584,7 @@
       "description": "Abbot Fan Fang of Nine-Heavens East District needs something looked into quietly and someone talked to who will not talk to Abbot. Look around Nine-Heavens East District, have a word with Incense Seller Qian Ling, and come back.",
       "giver_npc": "Abbot Fan Fang",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "look",
@@ -56643,7 +56643,7 @@
       "description": "Beggar King Chu Yan of Nine-Heavens South District needs something looked into quietly and someone talked to who will not talk to Beggar. Look around Nine-Heavens South District, have a word with Innkeeper Shi Ren, and come back.",
       "giver_npc": "Beggar King Chu Yan",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "look",
@@ -56702,7 +56702,7 @@
       "description": "The north gate of Ninefold Noble Immortal City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Kuang Ou",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "walk",
@@ -56754,7 +56754,7 @@
       "description": "Clerk Pan Kun of Ninefold Noble Ministry Row needs something looked into quietly and someone talked to who will not talk to Clerk. Look around Ninefold Noble Ministry Row, have a word with Petitioner Qu Shu, and come back.",
       "giver_npc": "Clerk Pan Kun",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "look",
@@ -56813,7 +56813,7 @@
       "description": "The north gate of Northwind Spirit City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Sima Zhen",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "walk",
@@ -56865,7 +56865,7 @@
       "description": "Fire Keeper Xiong Shan of Northwind Frost Market needs something looked into quietly and someone talked to who will not talk to Fire. Look around Northwind Frost Market, have a word with Fur Trader Wang Mo, and come back.",
       "giver_npc": "Fire Keeper Xiong Shan",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "look",
@@ -56924,7 +56924,7 @@
       "description": "The north gate of Polar Gate Immortal City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Yu Ze",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "walk",
@@ -56976,7 +56976,7 @@
       "description": "Fire Keeper Chai Pin of Polar Gate Frost Market needs something looked into quietly and someone talked to who will not talk to Fire. Look around Polar Gate Frost Market, have a word with Fur Trader Bao Kai, and come back.",
       "giver_npc": "Fire Keeper Chai Pin",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "look",
@@ -57146,7 +57146,7 @@
       "description": "The south gate of Ruined Constellation City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Lai Hong",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "walk",
@@ -57198,7 +57198,7 @@
       "description": "Old Sentry Ran Ai of Ruined Constellation Ruin Quarter needs something looked into quietly and someone talked to who will not talk to Old. Look around Ruined Constellation Ruin Quarter, have a word with Relic Digger Ouyang Tian, and come back.",
       "giver_npc": "Old Sentry Ran Ai",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "look",
@@ -57257,7 +57257,7 @@
       "description": "The north gate of Skyroad Immortal City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Shao Feng",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "walk",
@@ -57309,7 +57309,7 @@
       "description": "Caravan Master Wen Qi of Skyroad Caravan Yards needs something looked into quietly and someone talked to who will not talk to Caravan. Look around Skyroad Caravan Yards, have a word with Ostler Xin Xi, and come back.",
       "giver_npc": "Caravan Master Wen Qi",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "look",
@@ -57368,7 +57368,7 @@
       "description": "The east gate of Solar Crucible Celestial City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Yue Qiu",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "walk",
@@ -57420,7 +57420,7 @@
       "description": "Foreman Ba Wei of Solar Crucible Forge Terraces needs something looked into quietly and someone talked to who will not talk to Foreman. Look around Solar Crucible Forge Terraces, have a word with Ore Broker Cen Cheng, and come back.",
       "giver_npc": "Foreman Ba Wei",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "look",
@@ -57479,7 +57479,7 @@
       "description": "The south gate of Solar Furnace Immortal City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Diao Jin",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "walk",
@@ -57531,7 +57531,7 @@
       "description": "Foreman Hong Wan of Solar Furnace Forge Terraces needs something looked into quietly and someone talked to who will not talk to Foreman. Look around Solar Furnace Forge Terraces, have a word with Ore Broker Jing Bei, and come back.",
       "giver_npc": "Foreman Hong Wan",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "18-23",
       "objectives": [
         {
           "id": "look",
@@ -57590,7 +57590,7 @@
       "description": "The east gate of Spearwall Spirit City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Kou Gang",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "walk",
@@ -57642,7 +57642,7 @@
       "description": "Quartermaster Pu Yao of Spearwall Garrison Ward needs something looked into quietly and someone talked to who will not talk to Quartermaster. Look around Spearwall Garrison Ward, have a word with Sergeant Min Ru, and come back.",
       "giver_npc": "Quartermaster Pu Yao",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "look",
@@ -57701,7 +57701,7 @@
       "description": "The east gate of Spirit Jade Capital has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Que Zhi",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "walk",
@@ -57753,7 +57753,7 @@
       "description": "Steward Sang Xin of Spirit Jade North District needs something looked into quietly and someone talked to who will not talk to Steward. Look around Spirit Jade North District, have a word with Young Mistress Tai Dong, and come back.",
       "giver_npc": "Steward Sang Xin",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "look",
@@ -57812,7 +57812,7 @@
       "description": "Abbot Wei Kang of Spirit Jade East District needs something looked into quietly and someone talked to who will not talk to Abbot. Look around Spirit Jade East District, have a word with Incense Seller Xiao Qing, and come back.",
       "giver_npc": "Abbot Wei Kang",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "look",
@@ -57871,7 +57871,7 @@
       "description": "Beggar King Zhuge Chan of Spirit Jade South District needs something looked into quietly and someone talked to who will not talk to Beggar. Look around Spirit Jade South District, have a word with Innkeeper Yi Xue, and come back.",
       "giver_npc": "Beggar King Zhuge Chan",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "look",
@@ -57930,7 +57930,7 @@
       "description": "The east gate of Starroad Celestial City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Chi Su",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "walk",
@@ -57982,7 +57982,7 @@
       "description": "Caravan Master Ding Zhu of Starroad Caravan Yards needs something looked into quietly and someone talked to who will not talk to Caravan. Look around Starroad Caravan Yards, have a word with Ostler Fei Hua, and come back.",
       "giver_npc": "Caravan Master Ding Zhu",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "look",
@@ -58152,7 +58152,7 @@
       "description": "The south gate of Stoneheart Spirit City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Mi Ren",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "walk",
@@ -58204,7 +58204,7 @@
       "description": "Assayer Yang Kai of Stoneheart Ore Terraces needs something looked into quietly and someone talked to who will not talk to Assayer. Look around Stoneheart Ore Terraces, have a word with Mine Foreman Hu En, and come back.",
       "giver_npc": "Assayer Yang Kai",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "look",
@@ -58263,7 +58263,7 @@
       "description": "The north gate of Vermilion Furnace City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Zhao Pin",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "walk",
@@ -58315,7 +58315,7 @@
       "description": "Foreman Xie Jian of Vermilion Furnace Forge Terraces needs something looked into quietly and someone talked to who will not talk to Foreman. Look around Vermilion Furnace Forge Terraces, have a word with Ore Broker Liang Lian, and come back.",
       "giver_npc": "Foreman Xie Jian",
       "tier": 2,
-      "realm_band": "2-4",
+      "realm_band": "9-14",
       "objectives": [
         {
           "id": "look",
@@ -58374,7 +58374,7 @@
       "description": "The east gate of Worldstone Celestial City has had things go missing from the queue. Walk the wall twice, keep your eyes open, and tell the captain what you saw.",
       "giver_npc": "Gate Captain Fan Tao",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "walk",
@@ -58426,7 +58426,7 @@
       "description": "Assayer Chu Nuo of Worldstone Ore Terraces needs something looked into quietly and someone talked to who will not talk to Assayer. Look around Worldstone Ore Terraces, have a word with Mine Foreman Shi Hong, and come back.",
       "giver_npc": "Assayer Chu Nuo",
       "tier": 3,
-      "realm_band": "4-8",
+      "realm_band": "26-31",
       "objectives": [
         {
           "id": "look",
