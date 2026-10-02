@@ -75,11 +75,19 @@ class TheReadsStayOpen(unittest.TestCase):
         roster = dict(CONTENT.get("feature_unlocks") or {})
         leaves = dict(roster.get("leaves") or {})
         self.assertIn("stall open", leaves, "the roster read found no stall entry; the gate is broken, not the tree")
-        self.assertEqual(int(dict(roster.get("pages") or {}).get("economy / Market Stalls") or 0), 2)
+        # Tending a stall waits for the curriculum's second band - whichever
+        # realm that is (Foundation Establishment in v1.5.0, Qi Refining since
+        # v1.19.0 on the owner's call). The band is read off the roster rather
+        # than written here: a gate that pins the number fails exactly when the
+        # owner retunes it, which is the one time it should stay green (v1.0.8).
+        pages = {str(k): int(v or 0) for k, v in dict(roster.get("pages") or {}).items()}
+        band = min(realm for realm in pages.values() if realm > 0)
+        self.assertGreater(band, 0, "the roster holds no page back at all; the gate is broken, not the tree")
+        self.assertEqual(pages.get("economy / Market Stalls"), band, "the stall page is not on the second band")
         for leaf in ("stall board", "stall status", "stall buy"):
             self.assertNotIn(leaf, leaves, f"{leaf!r} waits for realm {leaves.get(leaf)}; buying is the owner's Shop and a read is never held back")
         for leaf in ("stall open", "stall list", "stall withdraw", "stall close"):
-            self.assertEqual(int(leaves.get(leaf) or 0), 2, leaf)
+            self.assertEqual(int(leaves.get(leaf) or 0), band, leaf)
 
     def test_the_realm_floor_the_panel_quotes_is_the_contents(self):
         content_floor = int(dict(CONTENT.get("stall_system") or {}).get("min_realm_index") or 0)
