@@ -156,7 +156,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 74; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 75; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -6275,6 +6275,52 @@ names the private gate it offered; the header dropping the seat names the city l
 `sect_gate` district of a non-capital city of its world. `sect_relations.relation_type` is `neutral`
 or `marriage_pact` and the score is what the tick moves, so the standing line reads the score alone
 rather than a vocabulary the table does not carry.
+
+### The Celestial ring turns (`scripts/author_celestial_compass.py`, schema 75, v1.19.1)
+
+Both world-flow studies measured the Celestial World's gates facing east ten times and west nine,
+north and south twice each. **The roads were never the fault**: a city's gates are read off its
+roads, both ends of a road face opposite ways, and the Celestial cities have always formed a ring.
+The compass folded at the two cities that faced both of their roads by one gate, Starroad and Lunar
+Shadow, so a walk around the world went east, doubled back west, and doubled back again.
+
+**The deferred entry's own plan could not be done**, and the reason is worth keeping. It asked for
+new gate rows and none removed - but turning a road's compass moves its gate at *both* ends, and at
+each fold the far end's gate faced nothing else, so it had to go. A gate's name is stored wherever a
+player stood, discovered, fought or was given a quest, so removing one is a rename across the
+schema. On the owner's call the two folds turn north and south (Starroad North to Celestial River
+City, South to Solar Crucible; Lunar Shadow North to Froststar Border, South to Mandate Spear), six
+gates are renamed to the side their road now leaves by, keeping their captains, boards and
+commissions, Celestial River City's west gate folds into the south gate that already stood, and two
+new gates have a captain each. The compass reads 7/6/6/5.
+
+**The merge was the one place the authoring went wrong**, and only a read of the result showed it:
+renaming every name in the file moved River's west gate onto the key its south gate already held,
+and the later of the two in the file won, so the south gate silently took the west gate's
+encounters. The script drops the old row before the names move now.
+
+**Migration 75 is a curated column list held by a gate that cannot be satisfied by a curated list.**
+Rewriting every text column would have touched audit logs and run hundreds of statements; a list is
+what a migration should be, and a list is how a column is missed. So
+`test_the_celestial_ring_turns.py` reads a fresh bootstrap and requires every column whose name says
+it holds a place (`PLACE_WORDS`) to be either rewritten or named in `LEFT_ALONE` with the reason it
+is not - the `test_startup_health` shape, the literal reviewable because the test makes it true.
+Three kinds of column, three statements: a plain place is updated; a place inside a unique key is
+updated `OR IGNORE`, and where a rename lands on a row that stood the old one is dropped (a
+discovery is kept once) - except a live world event or a raised crossing, which a migration does not
+delete; and text a rule reads back (a road journey, a waymark, a quest's objectives and the terms a
+player pinned) is `replace`d, safe because a gate's full name is a substring of nothing else.
+**`territory_state` is copied, never updated**: `territory_wars` is foreign-keyed to it, so the new
+row is made first, the wars are pointed at it, and the old row is deleted last, and no statement ever
+leaves a child pointing at nothing. The pairs are frozen (`CELESTIAL_GATE_RENAMES_AT_V1_19_1`, held
+equal to the script) because a later rename is a migration of its own.
+
+**The drills, and the one that caught the gate.** Not following the war prints `[] != ['Starroad
+Celestial City North Gate']`; dropping a column from the list names it undecided; keeping the old
+discovery on a merge lists both gates; and the old content fails four tests at once - including the
+rule that matters, *"Lunar Shadow Celestial City faces all 2 of its roads by one gate"*. That last
+drill printed the whole 2.5 MB content file, because `assertNotIn` quotes its haystack; the content
+check is an `assertFalse` now, the v1.0.8 dashboard finding met again.
 
 ## Testing conventions
 

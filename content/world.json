@@ -2873,13 +2873,11 @@
       ],
       "gates": {
         "South": [
-          "Celestial Mandate Palace"
+          "Celestial Mandate Palace",
+          "Starroad Celestial City"
         ],
         "East": [
           "Divine Herb Celestial City"
-        ],
-        "West": [
-          "Starroad Celestial City"
         ]
       }
     },
@@ -3007,8 +3005,10 @@
         "Solar Crucible Celestial City"
       ],
       "gates": {
-        "East": [
-          "Celestial River City",
+        "North": [
+          "Celestial River City"
+        ],
+        "South": [
           "Solar Crucible Celestial City"
         ]
       }
@@ -3137,11 +3137,11 @@
         "Worldstone Celestial City"
       ],
       "gates": {
-        "West": [
-          "Starroad Celestial City"
-        ],
         "East": [
           "Worldstone Celestial City"
+        ],
+        "North": [
+          "Starroad Celestial City"
         ]
       }
     },
@@ -3536,7 +3536,7 @@
         "West": [
           "Firmament Blade City"
         ],
-        "East": [
+        "North": [
           "Lunar Shadow Celestial City"
         ]
       }
@@ -3665,8 +3665,10 @@
         "Mandate Spear City"
       ],
       "gates": {
-        "West": [
-          "Froststar Border City",
+        "North": [
+          "Froststar Border City"
+        ],
+        "South": [
           "Mandate Spear City"
         ]
       }
@@ -3795,11 +3797,11 @@
         "Ruined Constellation City"
       ],
       "gates": {
-        "East": [
-          "Lunar Shadow Celestial City"
-        ],
         "North": [
           "Ruined Constellation City"
+        ],
+        "South": [
+          "Lunar Shadow Celestial City"
         ]
       }
     },
@@ -5494,7 +5496,7 @@
       "gate": "East"
     },
     "Celestial River City South Gate": {
-      "description": "The south gate of Celestial River City, facing the road to Celestial Mandate Palace. a gatehouse, a queue of carts, a guard post that checks every cultivator's token and a board of the city's notices. Everyone who arrives by road arrives here, and the streets of Celestial River City begin a step inside.",
+      "description": "The south gate of Celestial River City, facing the road to Celestial Mandate Palace, Starroad Celestial City. a gatehouse, a queue of carts, a guard post that checks every cultivator's token and a board of the city's notices. Everyone who arrives by road arrives here, and the streets of Celestial River City begin a step inside.",
       "world": "Celestial World",
       "min_realm_index": 0,
       "safe_zone": true,
@@ -5511,25 +5513,6 @@
         "Road dust, mule sweat and a hundred faint qi signatures pass through the arch every hour."
       ],
       "gate": "South"
-    },
-    "Celestial River City West Gate": {
-      "description": "The west gate of Celestial River City, facing the road to Starroad Celestial City. a gatehouse, a queue of carts, a guard post that checks every cultivator's token and a board of the city's notices. Everyone who arrives by road arrives here, and the streets of Celestial River City begin a step inside.",
-      "world": "Celestial World",
-      "min_realm_index": 0,
-      "safe_zone": true,
-      "district": "gate",
-      "outside_location": "Celestial River City",
-      "encounters": [
-        "The gate captain turns away a traveller whose token is a forgery, and does it politely.",
-        "A guard checks a cultivator's sect token against the notice board and waves them through with a nod.",
-        "A cart of spirit herbs is held at the gate while the toll is argued over.",
-        "A notice is nailed up: a bounty, a wedding, and a warning about the roads after dark."
-      ],
-      "sense_hints": [
-        "The gate's warding array hums under the arch; every token that passes leaves a flicker of its sect's qi.",
-        "Road dust, mule sweat and a hundred faint qi signatures pass through the arch every hour."
-      ],
-      "gate": "West"
     },
     "Celestial River River Landings": {
       "description": "The river landings of Celestial River City: well-swept quays where the barges tie up, nets dry on the rails, and the martial district's captains keep an eye on what comes ashore.",
@@ -5960,8 +5943,8 @@
       ],
       "gate": "North"
     },
-    "Froststar Border City East Gate": {
-      "description": "The east gate of Froststar Border City, facing the road to Lunar Shadow Celestial City. a gatehouse, a queue of carts, a guard post that checks every cultivator's token and a board of the city's notices. Everyone who arrives by road arrives here, and the streets of Froststar Border City begin a step inside.",
+    "Froststar Border City South Gate": {
+      "description": "The south gate of Froststar Border City, facing the road to Lunar Shadow Celestial City. a gatehouse, a queue of carts, a guard post that checks every cultivator's token and a board of the city's notices. Everyone who arrives by road arrives here, and the streets of Froststar Border City begin a step inside.",
       "world": "Celestial World",
       "min_realm_index": 0,
       "safe_zone": true,
@@ -5977,7 +5960,7 @@
         "The gate's warding array hums under the arch; every token that passes leaves a flicker of its sect's qi.",
         "Road dust, mule sweat and a hundred faint qi signatures pass through the arch every hour."
       ],
-      "gate": "East"
+      "gate": "South"
     },
     "Froststar Frost Market": {
       "description": "The frost market of Froststar Border City: a frost-rimed square of braziers and fur-hung stalls where the frontier trades furs, salt and news, and everyone stands close to a fire.",
@@ -6689,8 +6672,8 @@
         "The herbs breathe together at dusk and the terraces hum with it."
       ]
     },
-    "Lunar Shadow Celestial City West Gate": {
-      "description": "The west gate of Lunar Shadow Celestial City, facing the road to Froststar Border City, Mandate Spear City. a gatehouse, a queue of carts, a guard post that checks every cultivator's token and a board of the city's notices. Everyone who arrives by road arrives here, and the streets of Lunar Shadow Celestial City begin a step inside.",
+    "Lunar Shadow Celestial City North Gate": {
+      "description": "The north gate of Lunar Shadow Celestial City, facing the road to Froststar Border City. a gatehouse, a queue of carts, a guard post that checks every cultivator's token and a board of the city's notices. Everyone who arrives by road arrives here, and the streets of Lunar Shadow Celestial City begin a step inside.",
       "world": "Celestial World",
       "min_realm_index": 0,
       "safe_zone": true,
@@ -6706,7 +6689,26 @@
         "The gate's warding array hums under the arch; every token that passes leaves a flicker of its sect's qi.",
         "Road dust, mule sweat and a hundred faint qi signatures pass through the arch every hour."
       ],
-      "gate": "West"
+      "gate": "North"
+    },
+    "Lunar Shadow Celestial City South Gate": {
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "district": "gate",
+      "sense_hints": [
+        "The gate's warding array hums under the arch; every token that passes leaves a flicker of its sect's qi.",
+        "Road dust, mule sweat and a hundred faint qi signatures pass through the arch every hour."
+      ],
+      "outside_location": "Lunar Shadow Celestial City",
+      "encounters": [
+        "A cart of spirit herbs is held at the gate while the toll is argued over.",
+        "A notice is nailed up: a bounty, a wedding, and a warning about the roads after dark.",
+        "A returning hunting party comes through the gate with something wrapped in hide that is still moving.",
+        "A beggar at the gatehouse knows the name of everyone who has entered Lunar Shadow Celestial City today."
+      ],
+      "gate": "South",
+      "description": "The south gate of Lunar Shadow Celestial City, facing the road to Mandate Spear City. a gatehouse, a queue of carts, a guard post that checks every cultivator's token and a board of the city's notices. Everyone who arrives by road arrives here, and the streets of Lunar Shadow Celestial City begin a step inside."
     },
     "Lunar Shadow Mist Docks": {
       "description": "The mist docks of Lunar Shadow Celestial City: mist-hung jetties over black water, ferries appearing out of the fog, and the lamplit sheds where the night catch is sorted.",
@@ -6838,8 +6840,8 @@
         "The seals on the halls carry the mandate's authority in a thin, exact line."
       ]
     },
-    "Mandate Spear City East Gate": {
-      "description": "The east gate of Mandate Spear City, facing the road to Lunar Shadow Celestial City. a gatehouse, a queue of carts, a guard post that checks every cultivator's token and a board of the city's notices. Everyone who arrives by road arrives here, and the streets of Mandate Spear City begin a step inside.",
+    "Mandate Spear City North Gate": {
+      "description": "The north gate of Mandate Spear City, facing the road to Lunar Shadow Celestial City. a gatehouse, a queue of carts, a guard post that checks every cultivator's token and a board of the city's notices. Everyone who arrives by road arrives here, and the streets of Mandate Spear City begin a step inside.",
       "world": "Celestial World",
       "min_realm_index": 0,
       "safe_zone": true,
@@ -6855,7 +6857,7 @@
         "The gate's warding array hums under the arch; every token that passes leaves a flicker of its sect's qi.",
         "Road dust, mule sweat and a hundred faint qi signatures pass through the arch every hour."
       ],
-      "gate": "East"
+      "gate": "North"
     },
     "Mandate Spear City West Gate": {
       "description": "The west gate of Mandate Spear City, facing the road to Firmament Blade City. a gatehouse, a queue of carts, a guard post that checks every cultivator's token and a board of the city's notices. Everyone who arrives by road arrives here, and the streets of Mandate Spear City begin a step inside.",
@@ -7509,8 +7511,8 @@
       ],
       "gate": "East"
     },
-    "Solar Crucible Celestial City West Gate": {
-      "description": "The west gate of Solar Crucible Celestial City, facing the road to Starroad Celestial City. a gatehouse, a queue of carts, a guard post that checks every cultivator's token and a board of the city's notices. Everyone who arrives by road arrives here, and the streets of Solar Crucible Celestial City begin a step inside.",
+    "Solar Crucible Celestial City North Gate": {
+      "description": "The north gate of Solar Crucible Celestial City, facing the road to Starroad Celestial City. a gatehouse, a queue of carts, a guard post that checks every cultivator's token and a board of the city's notices. Everyone who arrives by road arrives here, and the streets of Solar Crucible Celestial City begin a step inside.",
       "world": "Celestial World",
       "min_realm_index": 0,
       "safe_zone": true,
@@ -7526,7 +7528,7 @@
         "The gate's warding array hums under the arch; every token that passes leaves a flicker of its sect's qi.",
         "Road dust, mule sweat and a hundred faint qi signatures pass through the arch every hour."
       ],
-      "gate": "West"
+      "gate": "North"
     },
     "Solar Crucible Forge Terraces": {
       "description": "The forge terraces of Solar Crucible Celestial City: tier on soot-warm tier of workshops and furnaces climbing the slope, ore carts on rails, and the ring of hammers that never quite stops.",
@@ -7768,8 +7770,8 @@
         "The seals on the halls carry the mandate's authority in a thin, exact line."
       ]
     },
-    "Starroad Celestial City East Gate": {
-      "description": "The east gate of Starroad Celestial City, facing the road to Celestial River City, Solar Crucible Celestial City. a gatehouse, a queue of carts, a guard post that checks every cultivator's token and a board of the city's notices. Everyone who arrives by road arrives here, and the streets of Starroad Celestial City begin a step inside.",
+    "Starroad Celestial City North Gate": {
+      "description": "The north gate of Starroad Celestial City, facing the road to Celestial River City. a gatehouse, a queue of carts, a guard post that checks every cultivator's token and a board of the city's notices. Everyone who arrives by road arrives here, and the streets of Starroad Celestial City begin a step inside.",
       "world": "Celestial World",
       "min_realm_index": 0,
       "safe_zone": true,
@@ -7785,7 +7787,26 @@
         "The gate's warding array hums under the arch; every token that passes leaves a flicker of its sect's qi.",
         "Road dust, mule sweat and a hundred faint qi signatures pass through the arch every hour."
       ],
-      "gate": "East"
+      "gate": "North"
+    },
+    "Starroad Celestial City South Gate": {
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "district": "gate",
+      "sense_hints": [
+        "The gate's warding array hums under the arch; every token that passes leaves a flicker of its sect's qi.",
+        "Road dust, mule sweat and a hundred faint qi signatures pass through the arch every hour."
+      ],
+      "outside_location": "Starroad Celestial City",
+      "encounters": [
+        "A cart of spirit herbs is held at the gate while the toll is argued over.",
+        "A notice is nailed up: a bounty, a wedding, and a warning about the roads after dark.",
+        "A returning hunting party comes through the gate with something wrapped in hide that is still moving.",
+        "A beggar at the gatehouse knows the name of everyone who has entered Starroad Celestial City today."
+      ],
+      "gate": "South",
+      "description": "The south gate of Starroad Celestial City, facing the road to Solar Crucible Celestial City. a gatehouse, a queue of carts, a guard post that checks every cultivator's token and a board of the city's notices. Everyone who arrives by road arrives here, and the streets of Starroad Celestial City begin a step inside."
     },
     "Starroad Caravan Yards": {
       "description": "The caravan yards of Starroad Celestial City: road-worn acres of wagons, mules and hired guards, where every road in the region begins or ends and a rumour costs a cup of tea.",
@@ -15337,21 +15358,21 @@
     },
     "Gate Captain Shao Yao": {
       "role": "Celestial River City captain of the gate guard",
-      "location": "Celestial River City West Gate",
+      "location": "Celestial River City South Gate",
       "realm": "Celestial",
       "stage": 1,
-      "district": "Celestial River City West Gate",
+      "district": "Celestial River City South Gate",
       "speech": "Formal and brief; asks for your token before your name.",
       "want": "Keep Celestial River City's gate orderly and every token honest.",
       "fear": "A forged token in a hand that should not be inside the walls.",
       "personality": "Steady, watchful and fair.",
       "secret": "Reports to Celestial River City's auction steward on who buys what, for a cut.",
       "schedule": {
-        "Dawn": "Celestial River City West Gate",
-        "Morning": "Celestial River City West Gate",
-        "Afternoon": "Celestial River City West Gate",
-        "Evening": "Celestial River City West Gate",
-        "Night": "Celestial River City West Gate"
+        "Dawn": "Celestial River City South Gate",
+        "Morning": "Celestial River City South Gate",
+        "Afternoon": "Celestial River City South Gate",
+        "Evening": "Celestial River City South Gate",
+        "Night": "Celestial River City South Gate"
       }
     },
     "Barge Master Teng Zhi": {
@@ -15945,21 +15966,21 @@
     },
     "Gate Captain Le En": {
       "role": "Froststar Border City captain of the gate guard",
-      "location": "Froststar Border City East Gate",
+      "location": "Froststar Border City South Gate",
       "realm": "Celestial",
       "stage": 1,
-      "district": "Froststar Border City East Gate",
+      "district": "Froststar Border City South Gate",
       "speech": "Friendly to anyone with a valid token and to no one else.",
       "want": "Keep Froststar Border City's gate orderly and every token honest.",
       "fear": "A forged token in a hand that should not be inside the walls.",
       "personality": "Sharp, quick and fond of a bargain.",
       "secret": "Once wore a sect robe under a different name and left it behind on a road out of Froststar Border City.",
       "schedule": {
-        "Dawn": "Froststar Border City East Gate",
-        "Morning": "Froststar Border City East Gate",
-        "Afternoon": "Froststar Border City East Gate",
-        "Evening": "Froststar Border City East Gate",
-        "Night": "Froststar Border City East Gate"
+        "Dawn": "Froststar Border City South Gate",
+        "Morning": "Froststar Border City South Gate",
+        "Afternoon": "Froststar Border City South Gate",
+        "Evening": "Froststar Border City South Gate",
+        "Night": "Froststar Border City South Gate"
       }
     },
     "Fur Trader Mi Kai": {
@@ -16914,21 +16935,21 @@
     },
     "Gate Captain Min Jian": {
       "role": "Lunar Shadow Celestial City captain of the gate guard",
-      "location": "Lunar Shadow Celestial City West Gate",
+      "location": "Lunar Shadow Celestial City North Gate",
       "realm": "Celestial",
       "stage": 1,
-      "district": "Lunar Shadow Celestial City West Gate",
+      "district": "Lunar Shadow Celestial City North Gate",
       "speech": "Friendly to anyone with a valid token and to no one else.",
       "want": "Keep Lunar Shadow Celestial City's gate orderly and every token honest.",
       "fear": "A forged token in a hand that should not be inside the walls.",
       "personality": "Quiet, exact and slow to trust.",
       "secret": "Has seen what is under the district and told no one.",
       "schedule": {
-        "Dawn": "Lunar Shadow Celestial City West Gate",
-        "Morning": "Lunar Shadow Celestial City West Gate",
-        "Afternoon": "Lunar Shadow Celestial City West Gate",
-        "Evening": "Lunar Shadow Celestial City West Gate",
-        "Night": "Lunar Shadow Celestial City West Gate"
+        "Dawn": "Lunar Shadow Celestial City North Gate",
+        "Morning": "Lunar Shadow Celestial City North Gate",
+        "Afternoon": "Lunar Shadow Celestial City North Gate",
+        "Evening": "Lunar Shadow Celestial City North Gate",
+        "Night": "Lunar Shadow Celestial City North Gate"
       }
     },
     "Ferrywoman Pu Lian": {
@@ -17123,21 +17144,21 @@
     },
     "Gate Captain Bu Xi": {
       "role": "Mandate Spear City captain of the gate guard",
-      "location": "Mandate Spear City East Gate",
+      "location": "Mandate Spear City North Gate",
       "realm": "Celestial",
       "stage": 1,
-      "district": "Mandate Spear City East Gate",
+      "district": "Mandate Spear City North Gate",
       "speech": "Weary, exact and impossible to hurry.",
       "want": "Keep Mandate Spear City's gate orderly and every token honest.",
       "fear": "A forged token in a hand that should not be inside the walls.",
       "personality": "Loud, generous and easily wounded.",
       "secret": "Keeps a letter from a clan that would change hands in Mandate Spear City if it were read aloud.",
       "schedule": {
-        "Dawn": "Mandate Spear City East Gate",
-        "Morning": "Mandate Spear City East Gate",
-        "Afternoon": "Mandate Spear City East Gate",
-        "Evening": "Mandate Spear City East Gate",
-        "Night": "Mandate Spear City East Gate"
+        "Dawn": "Mandate Spear City North Gate",
+        "Morning": "Mandate Spear City North Gate",
+        "Afternoon": "Mandate Spear City North Gate",
+        "Evening": "Mandate Spear City North Gate",
+        "Night": "Mandate Spear City North Gate"
       }
     },
     "Gate Captain Chi Qiu": {
@@ -18054,21 +18075,21 @@
     },
     "Gate Captain Zhai Ning": {
       "role": "Solar Crucible Celestial City captain of the gate guard",
-      "location": "Solar Crucible Celestial City West Gate",
+      "location": "Solar Crucible Celestial City North Gate",
       "realm": "Celestial",
       "stage": 1,
-      "district": "Solar Crucible Celestial City West Gate",
+      "district": "Solar Crucible Celestial City North Gate",
       "speech": "Friendly to anyone with a valid token and to no one else.",
       "want": "Keep Solar Crucible Celestial City's gate orderly and every token honest.",
       "fear": "A forged token in a hand that should not be inside the walls.",
       "personality": "Quiet, exact and slow to trust.",
       "secret": "Has seen what is under the district and told no one.",
       "schedule": {
-        "Dawn": "Solar Crucible Celestial City West Gate",
-        "Morning": "Solar Crucible Celestial City West Gate",
-        "Afternoon": "Solar Crucible Celestial City West Gate",
-        "Evening": "Solar Crucible Celestial City West Gate",
-        "Night": "Solar Crucible Celestial City West Gate"
+        "Dawn": "Solar Crucible Celestial City North Gate",
+        "Morning": "Solar Crucible Celestial City North Gate",
+        "Afternoon": "Solar Crucible Celestial City North Gate",
+        "Evening": "Solar Crucible Celestial City North Gate",
+        "Night": "Solar Crucible Celestial City North Gate"
       }
     },
     "Foreman Ba Wei": {
@@ -18453,21 +18474,21 @@
     },
     "Gate Captain Chi Su": {
       "role": "Starroad Celestial City captain of the gate guard",
-      "location": "Starroad Celestial City East Gate",
+      "location": "Starroad Celestial City North Gate",
       "realm": "Celestial",
       "stage": 1,
-      "district": "Starroad Celestial City East Gate",
+      "district": "Starroad Celestial City North Gate",
       "speech": "Friendly to anyone with a valid token and to no one else.",
       "want": "Keep Starroad Celestial City's gate orderly and every token honest.",
       "fear": "A forged token in a hand that should not be inside the walls.",
       "personality": "Sharp, quick and fond of a bargain.",
       "secret": "Once wore a sect robe under a different name and left it behind on a road out of Starroad Celestial City.",
       "schedule": {
-        "Dawn": "Starroad Celestial City East Gate",
-        "Morning": "Starroad Celestial City East Gate",
-        "Afternoon": "Starroad Celestial City East Gate",
-        "Evening": "Starroad Celestial City East Gate",
-        "Night": "Starroad Celestial City East Gate"
+        "Dawn": "Starroad Celestial City North Gate",
+        "Morning": "Starroad Celestial City North Gate",
+        "Afternoon": "Starroad Celestial City North Gate",
+        "Evening": "Starroad Celestial City North Gate",
+        "Night": "Starroad Celestial City North Gate"
       }
     },
     "Caravan Master Ding Zhu": {
@@ -23529,6 +23550,44 @@
         "Afternoon": "Shattered Firmament",
         "Evening": "Shattered Firmament",
         "Night": "Shattered Firmament"
+      }
+    },
+    "Gate Captain Yan Hui": {
+      "role": "Starroad Celestial City captain of the gate guard",
+      "location": "Starroad Celestial City South Gate",
+      "realm": "Celestial",
+      "stage": 1,
+      "district": "Starroad Celestial City South Gate",
+      "speech": "Unhurried; reads a token twice and a face three times.",
+      "want": "Keep Starroad Celestial City's gate orderly and every token honest.",
+      "fear": "A forged token in a hand that should not be inside the walls.",
+      "personality": "Patient, dry and impossible to rush.",
+      "secret": "Keeps a ledger of every caravan that has failed to come back up the south road, and why.",
+      "schedule": {
+        "Dawn": "Starroad Celestial City South Gate",
+        "Morning": "Starroad Celestial City South Gate",
+        "Afternoon": "Starroad Celestial City South Gate",
+        "Evening": "Starroad Celestial City South Gate",
+        "Night": "Starroad Celestial City South Gate"
+      }
+    },
+    "Gate Captain Qiu Lan": {
+      "role": "Lunar Shadow Celestial City captain of the gate guard",
+      "location": "Lunar Shadow Celestial City South Gate",
+      "realm": "Celestial",
+      "stage": 1,
+      "district": "Lunar Shadow Celestial City South Gate",
+      "speech": "Quiet, and answers a question with a shorter one.",
+      "want": "Keep Lunar Shadow Celestial City's gate orderly and every token honest.",
+      "fear": "A forged token in a hand that should not be inside the walls.",
+      "personality": "Watchful, careful and slow to trust a stranger's story.",
+      "secret": "Was posted to the south gate after asking too many questions about who comes and goes at night.",
+      "schedule": {
+        "Dawn": "Lunar Shadow Celestial City South Gate",
+        "Morning": "Lunar Shadow Celestial City South Gate",
+        "Afternoon": "Lunar Shadow Celestial City South Gate",
+        "Evening": "Lunar Shadow Celestial City South Gate",
+        "Night": "Lunar Shadow Celestial City South Gate"
       }
     }
   },
@@ -50626,9 +50685,9 @@
       "city_board": "Jadewood Medicine City"
     },
     "Gate Captain Min Jian": {
-      "location": "Lunar Shadow Celestial City West Gate",
+      "location": "Lunar Shadow Celestial City North Gate",
       "title": "Lunar Shadow Celestial City captain of the gate guard",
-      "board": "the notice board at the Lunar Shadow Celestial City West Gate",
+      "board": "the notice board at the Lunar Shadow Celestial City North Gate",
       "tier_ceiling": 3,
       "city_board": "Lunar Shadow Celestial City"
     },
@@ -50668,9 +50727,9 @@
       "city_board": "Mandate Crown Celestial City"
     },
     "Gate Captain Bu Xi": {
-      "location": "Mandate Spear City East Gate",
+      "location": "Mandate Spear City North Gate",
       "title": "Mandate Spear City captain of the gate guard",
-      "board": "the notice board at the Mandate Spear City East Gate",
+      "board": "the notice board at the Mandate Spear City North Gate",
       "tier_ceiling": 3,
       "city_board": "Mandate Spear City"
     },
@@ -50892,9 +50951,9 @@
       "city_board": "Spirit Jade Capital"
     },
     "Gate Captain Chi Su": {
-      "location": "Starroad Celestial City East Gate",
+      "location": "Starroad Celestial City North Gate",
       "title": "Starroad Celestial City captain of the gate guard",
-      "board": "the notice board at the Starroad Celestial City East Gate",
+      "board": "the notice board at the Starroad Celestial City North Gate",
       "tier_ceiling": 3,
       "city_board": "Starroad Celestial City"
     },
@@ -55754,8 +55813,8 @@
           "id": "walk",
           "type": "explore",
           "count": 2,
-          "target": "Lunar Shadow Celestial City West Gate",
-          "label": "Walk the Lunar Shadow Celestial City West Gate twice"
+          "target": "Lunar Shadow Celestial City North Gate",
+          "label": "Walk the Lunar Shadow Celestial City North Gate twice"
         },
         {
           "id": "report",
@@ -56087,8 +56146,8 @@
           "id": "walk",
           "type": "explore",
           "count": 2,
-          "target": "Mandate Spear City East Gate",
-          "label": "Walk the Mandate Spear City East Gate twice"
+          "target": "Mandate Spear City North Gate",
+          "label": "Walk the Mandate Spear City North Gate twice"
         },
         {
           "id": "report",
@@ -57877,8 +57936,8 @@
           "id": "walk",
           "type": "explore",
           "count": 2,
-          "target": "Starroad Celestial City East Gate",
-          "label": "Walk the Starroad Celestial City East Gate twice"
+          "target": "Starroad Celestial City North Gate",
+          "label": "Walk the Starroad Celestial City North Gate twice"
         },
         {
           "id": "report",

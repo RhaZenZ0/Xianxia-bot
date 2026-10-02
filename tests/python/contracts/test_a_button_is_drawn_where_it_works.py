@@ -96,8 +96,10 @@ def hides(location: str, *, uid: int = 42, manor: dict | None = None) -> dict[st
 class TheTwinsAnswerWhatTheEngineAnswers(unittest.TestCase):
     def test_the_reader_sees_the_world(self):
         """Asserted before it is trusted (rc.57)."""
-        # 477 until v1.17.0 gave each upper world a district and a wild place.
-        self.assertEqual(len(LOCATIONS), 483, "the content reader found a different world; re-check the counts")
+        # 477 until v1.17.0 gave each upper world a district and a wild place;
+        # 483 until v1.19.1 turned the Celestial folds (two gates more, one
+        # folded into a gate that already stood).
+        self.assertEqual(len(LOCATIONS), 484, "the content reader found a different world; re-check the counts")
         self.assertTrue(go_shop_at("Jadewood Apothecary"))
         self.assertTrue(go_auction_door("Greenriver Town"))
         self.assertTrue(go_sect_gate("Azure Cloud Mountain Gate"))

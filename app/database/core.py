@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 74
+SCHEMA_VERSION = 75
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -282,6 +282,137 @@ def _sect_seat_claim_statements() -> tuple[str, ...]:
             f"WHERE territory_key='{g}' AND controller_type='sect' "
             f"AND EXISTS (SELECT 1 FROM territory_state s WHERE s.territory_key='{c}' AND s.controller_type='sect' AND s.controller_key=territory_state.controller_key)"
         )
+    return tuple(out)
+
+
+# The Celestial gates renamed in v1.19.1 - a frozen copy of
+# `scripts/author_celestial_compass.py`'s `GATE_RENAMES`, the migration-46
+# shape, read by migration 75 alone. The ring folded back on itself at two
+# cities, each facing both of its roads by one gate; turning those roads north
+# and south moved six gates to the side they now face, and Celestial River
+# City's west gate folded into the south gate that already stood.
+CELESTIAL_GATE_RENAMES_AT_V1_19_1: tuple[tuple[str, str], ...] = (
+    ("Celestial River City West Gate", "Celestial River City South Gate"),
+    ("Solar Crucible Celestial City West Gate", "Solar Crucible Celestial City North Gate"),
+    ("Starroad Celestial City East Gate", "Starroad Celestial City North Gate"),
+    ("Lunar Shadow Celestial City West Gate", "Lunar Shadow Celestial City North Gate"),
+    ("Froststar Border City East Gate", "Froststar Border City South Gate"),
+    ("Mandate Spear City East Gate", "Mandate Spear City North Gate"),
+)
+
+# Every column whose whole value is a place, at schema 74: a renamed gate is
+# rewritten where it stands. `test_the_celestial_ring_turns.py` holds this list,
+# `PLACE_COLUMNS_KEYED` and `PLACE_COLUMNS_LEFT` together to every place-like
+# column a fresh bootstrap makes, so a column nobody decided about fails there.
+PLACE_COLUMNS_AT_V1_19_1: tuple[tuple[str, str], ...] = (
+    ("alchemy_batches", "location"),
+    ("auction_house_channels", "location"),
+    ("battles", "location"),
+    ("birth_families", "location"),
+    ("black_market_posts", "location"),
+    ("boss_encounters", "location"),
+    ("caravans", "origin"),
+    ("caravans", "destination"),
+    ("cave_abodes", "base_location"),
+    ("characters", "location"),
+    ("civilization_events", "location"),
+    ("economy_events", "location"),
+    ("expedition_threads", "last_location"),
+    ("exploration_events", "location"),
+    ("merchant_state", "location"),
+    ("merchant_state", "destination"),
+    ("npc_civilization_state", "home_location"),
+    ("npc_civilization_state", "current_location"),
+    ("npc_graves", "location"),
+    ("npc_graves", "home_location"),
+    ("npc_registry", "location"),
+    ("player_scene_state", "physical_location"),
+    ("player_scene_state", "scene_key"),
+    ("player_scene_state", "scene_label"),
+    ("player_stalls", "city"),
+    ("pvp_matches", "location"),
+    ("rag_canon_documents", "location"),
+    ("rag_memories", "location"),
+    ("realm_hub_channels", "location"),
+    ("samsara_ancestral_leads", "location"),
+    ("seclusion_sessions", "start_location"),
+    ("sect_abodes", "base_location"),
+    ("sect_manors", "base_location"),
+    ("sect_recruitment_attempts", "location"),
+    ("stall_listings", "city"),
+    ("trade_offers", "location"),
+    ("wild_beast_encounters", "location"),
+    ("world_action_events", "location"),
+    ("world_action_events", "target_key"),
+    ("world_crossings", "destination_location"),
+    ("world_event_npcs", "location"),
+    ("world_history_events", "location"),
+    ("world_history_events", "actor_key"),
+    ("world_history_events", "target_key"),
+    ("world_history_events", "target_name"),
+)
+
+# Place columns inside a unique key. A rename onto a gate that already stood
+# can meet a row there, so the row that stood is kept and the old one dropped
+# where the table says so (`True`); a live world event or a raised crossing is
+# never dropped by a migration, and an unmovable one is left to expire or to
+# stand where it was (`False`).
+PLACE_COLUMNS_KEYED: tuple[tuple[str, str, bool], ...] = (
+    ("character_location_discoveries", "location", True),
+    ("civilization_regions", "location", True),
+    ("deployed_location_arrays", "location", True),
+    ("economy_markets", "location", True),
+    ("world_events", "location", False),
+    ("world_crossings", "location_key", False),
+)
+
+# Live state written as JSON or prose that a rule reads back: the road a
+# journey is on, a waymark, a quest's objectives and the terms a player pinned,
+# an event's payload. A gate's full name is a substring of nothing else, so
+# replacing it inside the text renames the place and nothing beside it.
+PLACE_TEXT_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("world_state", "value_json"),
+    ("player_scene_state", "metadata_json"),
+    ("quest_definitions", "objectives_json"),
+    ("quest_definitions", "variants_json"),
+    ("quest_definitions", "description"),
+    ("character_quests", "terms_json"),
+    ("character_quests", "progress_json"),
+    ("world_events", "payload_json"),
+)
+
+
+def _sql(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
+
+
+def _celestial_gate_rename_statements() -> tuple[str, ...]:
+    """Migration 75's statements: every renamed Celestial gate is rewritten
+    wherever a running world stored it.
+
+    `territory_state` is copied rather than updated, because `territory_wars`
+    is foreign-keyed to it: the new row is made (or the row that stood is
+    kept), the wars are pointed at it, and only then is the old row deleted,
+    so no statement ever leaves a child pointing at nothing."""
+    out: list[str] = []
+    for old, new in CELESTIAL_GATE_RENAMES_AT_V1_19_1:
+        o, n = _sql(old), _sql(new)
+        for table, column in PLACE_COLUMNS_AT_V1_19_1:
+            out.append(f"UPDATE {table} SET {column}={n} WHERE {column}={o}")
+        for table, column, drop in PLACE_COLUMNS_KEYED:
+            out.append(f"UPDATE OR IGNORE {table} SET {column}={n} WHERE {column}={o}")
+            if drop:
+                out.append(f"DELETE FROM {table} WHERE {column}={o}")
+        for table, column in PLACE_TEXT_COLUMNS:
+            out.append(f"UPDATE {table} SET {column}=replace({column},{o},{n}) WHERE instr({column},{o})>0")
+        out.append(
+            "INSERT OR IGNORE INTO territory_state(territory_key,name,region,controller_type,controller_key,"
+            "resource_type,prosperity,defense,unrest,updated_game_minute,updated_at) "
+            f"SELECT {n},{n},region,controller_type,controller_key,resource_type,prosperity,defense,unrest,"
+            f"updated_game_minute,updated_at FROM territory_state WHERE territory_key={o}"
+        )
+        out.append(f"UPDATE territory_wars SET territory_key={n} WHERE territory_key={o}")
+        out.append(f"DELETE FROM territory_state WHERE territory_key={o}")
     return tuple(out)
 
 
@@ -2969,6 +3100,17 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
         # part, so each such claim moves onto the seat where the seat is
         # neutral. See `_sect_seat_claim_statements` for what is left alone.
         _sect_seat_claim_statements(),
+    ),
+    (
+        75,
+        "the_celestial_ring_turns",
+        # v1.19.1: the Celestial compass folded back on itself at Starroad and
+        # Lunar Shadow, each facing both of its roads by one gate. Turning
+        # those roads north and south renamed six gates; a running world holds
+        # the old names wherever somebody stood, discovered, fought, traded or
+        # was given a quest, and is carried onto the new ones here. See
+        # `_celestial_gate_rename_statements` for the columns and the order.
+        _celestial_gate_rename_statements(),
     ),
 )
 
