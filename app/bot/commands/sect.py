@@ -425,7 +425,12 @@ async def sect_recruitment_recommendation(interaction: discord.Interaction, npc:
     roll=dict(r.get('roll') or {}); roll_text=f"2d10 {int(roll.get('modifier',0)):+d} = **{int(roll.get('total',0))}** vs TN **{int(roll.get('tn',0))}**"
     if r.get('success'):
         lines=[f"📜 **{npc}** puts their name to you for the **{sect_name}**: **+{int(r.get('recommendation_bonus',0))} on both entrance-trial rolls**."]
-        if gate:
+        seat=str(r.get('seat') or '')
+        if gate and seat:
+            # The gate is a district of the sect's seat (v1.19.0): the city is
+            # the route, and the gate a step inside it.
+            lines.append(f"🗺️ **{seat}** is on your travel list — **/travel** there, **/world → City → Enter** the **{gate}**, then sit the trial with **/sect → Recruitment → Trial**.")
+        elif gate:
             lines.append(f"🗺️ **{gate}** is on your travel list — **/travel** there, then sit the trial with **/sect → Recruitment → Trial**.")
     else:
         lines=[

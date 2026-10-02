@@ -400,10 +400,28 @@ async def run(url: str, token: str, db_path: str) -> Report:
         named = {str(r.get("sect_name")): str(r.get("gate")) for r in envoys.get("sects") or []}
         report.add("PASS" if named == public_gates else "FAIL", "the envoys name every public gate of the world, and no other", f"{sorted(named)}")
     gate = public_gates.get(sect, "")
-    walked = await step(report, "travel to the gate the envoys named", act_free("exploration.travel", APPLICANT, {"destination": gate, "mode": "known"}))
+    # A public gate is a district of the sect's seat (v1.19.0), and a district
+    # is entered from inside its city, so the hall puts the *seat* on the travel
+    # list: the applicant walks the road there (a toll, paid in stones the GM
+    # grants) and then steps through the gate as any district is entered.
+    seat = next((str(r.get("seat") or "") for r in (envoys or {}).get("sects") or [] if str(r.get("sect_name")) == sect), "")
+    report.add("PASS" if seat and world["locations"].get(gate, {}).get("outside_location") == seat else "FAIL",
+               "the envoys name the city each gate stands in", f"{sect}: {gate} in {seat or '-'}")
+    await step(report, "the applicant can pay the road", gm("admin.player.grant_currency", {"user_id": APPLICANT, "currency_id": "low_spirit_stone", "amount": 300, "reason": "playtest: the road to a seat"}))
+    await step(report, "travel straight to the gate is refused: it is entered from its seat",
+               act_free("exploration.travel", APPLICANT, {"destination": gate, "mode": "known"}), expect_error="travel there first")
+    walked = await step(report, "travel to the seat the envoys named", act_free("exploration.travel", APPLICANT, {"destination": seat, "mode": "known"}))
     if walked is not None:
+        # A road arrives at the gate facing where you came from (v1.0.9), and a
+        # city's gate is that city - so the arrival is held to the seat's parts,
+        # not to the seat's own name.
         where = str((await db.get_character(APPLICANT) or {}).get("location"))
-        report.add("PASS" if where == gate else "FAIL", "the gate is on the travel list, and the road-less jump lands there", where)
+        arrived = str(world["locations"].get(where, {}).get("outside_location") or where) if world["locations"].get(where, {}).get("district") else where
+        report.add("PASS" if arrived == seat else "FAIL", "the seat is on the travel list, and the road lands in it", where)
+    entered = await step(report, "enter the gate from the seat's street", act_free("exploration.travel", APPLICANT, {"destination": gate, "mode": "known"}))
+    if entered is not None:
+        where = str((await db.get_character(APPLICANT) or {}).get("location"))
+        report.add("PASS" if where == gate else "FAIL", "the gate is entered like any district of its city", where)
     await step(report, "put the applicant at the gate", gm("admin.player.teleport", {"user_id": APPLICANT, "location": gate, "reason": "playtest"}))
     entry = next(c for c in world["commissions"] if c.get("requires_sect") == sect and (c.get("seed") or {}).get("outsider_standing"))
     await step(report, "an outsider takes the gate's entry-level work", act("commission.accept", APPLICANT, {"quest_key": entry["quest_key"], "variant_index": 0}))
@@ -2499,7 +2517,11 @@ async def run(url: str, token: str, db_path: str) -> Report:
     await audited("admin.player.set_realm_perfection", {"user_id": BUYER, "track": "cultivation", "realm_index": 0, "progress": 100, "reason": "playtest"})
     await step(report, "perfection.abandon is idempotent", act("perfection.abandon", BUYER, {}))
     await step(report, "perfection.body_abandon is idempotent", act("perfection.body_abandon", BUYER, {}))
-    await audited("admin.player.set_sect", {"user_id": BUYER, "sect_name": "Azure Cloud Sect", "rank_name": "Outer Disciple", "rank_level": 10, "reason": "playtest"})
+    # The master lever wants both in one sect, and the player climbed into the
+    # allied sect above in the v1.18.0 leg - so the buyer is set into whichever
+    # sect the player holds now, read back rather than written down.
+    players_sect = str((await db.get_sect_membership(PLAYER) or {}).get("sect_name") or "Azure Cloud Sect")
+    await audited("admin.player.set_sect", {"user_id": BUYER, "sect_name": players_sect, "rank_name": "Outer Disciple", "rank_level": 10, "reason": "playtest"})
     await audited("admin.player.set_sect_rank", {"user_id": BUYER, "rank_name": "Inner Disciple", "rank_level": 30, "reason": "playtest"})
     await audited("admin.player.set_master", {"disciple_user_id": BUYER, "master_user_id": PLAYER, "reason": "playtest"})
     await audited("admin.player.master_attention", {"disciple_user_id": BUYER, "delta": 5, "reason": "playtest"})

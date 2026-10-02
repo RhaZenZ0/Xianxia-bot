@@ -825,6 +825,17 @@ func knownLocationsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 			known[fmt.Sprint(row[0])] = true
 		}
 	}
+	// A known part of a city is a known city (v1.19.0). Somebody who has stood
+	// at a sect's gate knows which city it is a district of - and a district is
+	// walked into only from inside its city, so a gate revealed before the gates
+	// were seated (an envoys' hall, a sponsor) would otherwise be known and
+	// unreachable. The rule rather than a migration: it is true of every part a
+	// discovery row will ever name, and it costs a running world nothing.
+	for place := range known {
+		if city := cityOf(catalog, place); city != place {
+			known[city] = true
+		}
+	}
 	if c.Location != "" && !strings.HasPrefix(c.Location, "abode:") && !strings.HasPrefix(c.Location, "personal_world:") {
 		known[c.Location] = true
 		for _, neighbor := range canonicalRoadNeighbors(catalog, c.Location, c.accessRealmIndex()) {
@@ -841,7 +852,11 @@ func knownLocationsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 			}
 		}
 		for _, part := range cityPartsOf(catalog, city) {
-			known[part] = true
+			// A private district (a demonic sect's gate, v1.19.0) is not in
+			// plain sight: a sponsor reveals it, as a sponsor always has.
+			if !catalog.Locations[part].Private {
+				known[part] = true
+			}
 		}
 		// At a road-side site (v0.39.0) the road runs both ways: both ends
 		// of the leg are known, and so is every other site on it.

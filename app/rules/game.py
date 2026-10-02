@@ -8,6 +8,7 @@ from typing import Any, Protocol
 
 from .advanced_catalog import augment_advanced_catalog
 from .item_grades import base_item_id, grade_rung, graded_name, split_item_grade
+from .realm_hubs import city_of_place
 
 # The content's word for an effect cast at somebody else. The engine states it
 # once as `lawControlCategory`; this is the same string read from the same
@@ -321,6 +322,29 @@ class World:
             if str(rank.get("name", "")).casefold() == needle:
                 return dict(rank)
         return None
+
+    def sect_seat(self, sect: str) -> str:
+        """The city a public sect keeps its gate in (v1.19.0) - the display twin
+        of the engine's `sectSeat`: the gate's city when the gate is a district
+        of one, else "" (a wilderness gate, a hidden sect, no gate). Read off
+        the catalogue through the one `cityOf` rule, never off a field of the
+        sect, so the seat and the gate cannot disagree."""
+        definition = self.sects.get(sect) or {}
+        if definition.get("hidden"):
+            return ""
+        gate = str((definition.get("recruitment") or {}).get("location") or "").strip()
+        if not gate or gate not in self.locations:
+            return ""
+        city = city_of_place(gate, self.locations)
+        return city if city != gate else ""
+
+    def seated_sect(self, city: str) -> str:
+        """The sect whose seat is `city`, or "" - one city seats at most one
+        sect, which `test_a_sect_keeps_its_seat_in_a_city.py` holds."""
+        for name in sorted(self.sects):
+            if self.sect_seat(name) == str(city or ""):
+                return name
+        return ""
 
     def sect_rank_name(self, level: int) -> str:
         """The name of the rank at `level` on `sect_system.ranks` (v1.17.1),

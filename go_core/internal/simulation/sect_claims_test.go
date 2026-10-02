@@ -14,8 +14,10 @@ import (
 // Sects take unclaimed ground (v1.12.0). Every place is seeded neutral and
 // the war step moves only on ground a rival holds, so in a world no player had
 // claimed from, the sieges never ran at all. These drive the shipped
-// catalogue, because the rule is about the real map: a road-less gate, a
-// beachhead, and roads out of it.
+// catalogue, because the rule is about the real map: since v1.19.0 a sect's
+// home is the city it keeps its gate in (its seat), which has roads out, so a
+// sect grows out of its own city; the beachhead rule is kept for a gate that
+// stands in the wilderness and is cornered with crafted neutral maps below.
 
 const claimStrong, claimRival, claimWeak = "Azure Cloud Sect", "Crimson Furnace Sect", "Frozen Moon Palace"
 
@@ -82,58 +84,53 @@ func holdings(t *testing.T, path, sect string) []string {
 	return out
 }
 
-func TestAStrongSectClaimsItsGateThenABeachheadThenOutwardByRoad(t *testing.T) {
+func TestAStrongSectClaimsItsSeatThenGrowsByRoad(t *testing.T) {
 	defer gamerng.UseRoller(func(int) int { return 0 })()
 	path, r := claimWorld(t)
-	gate := game.SectGate(r.World, claimStrong)
-	if gate == "" {
-		t.Fatal("the sect's gate could not be read; the gate reader is broken, not the tree")
+	home := game.SectHome(r.World, claimStrong)
+	if home == "" || home == game.SectGate(r.World, claimStrong) {
+		t.Fatalf("the sect's home %q is not a seat city; the seat reader is broken, not the tree", home)
+	}
+	if !game.TerritoryIsWholePlace(r.World, home) {
+		t.Fatalf("the seat %q is not a whole place", home)
 	}
 
 	runClaims(t, path, r)
-	if got := holdings(t, path, claimStrong); len(got) != 1 || got[0] != gate {
-		t.Fatalf("a sect's first claim is its own gate %q, got %v", gate, got)
+	if got := holdings(t, path, claimStrong); len(got) != 1 || got[0] != home {
+		t.Fatalf("a sect's first claim is its own seat %q, got %v", home, got)
 	}
 	if got := holdings(t, path, claimWeak); len(got) != 0 {
 		t.Fatalf("a sect too weak to go to war claimed %v", got)
 	}
 
-	runClaims(t, path, r)
-	got := holdings(t, path, claimStrong)
-	if len(got) != 2 {
-		t.Fatalf("the second tick should take a beachhead, holdings %v", got)
-	}
-	beachhead := ""
-	for _, place := range got {
-		if place != gate {
-			beachhead = place
+	// Every later claim is one walk step from something it already holds,
+	// in the seat's world: a seated sect grows out of its own city and never
+	// takes a beachhead, because its home has roads.
+	for tick := 2; tick <= 3; tick++ {
+		before := holdings(t, path, claimStrong)
+		runClaims(t, path, r)
+		after := holdings(t, path, claimStrong)
+		if len(after) != len(before)+1 {
+			t.Fatalf("tick %d claimed %d places, want one: %v -> %v", tick, len(after)-len(before), before, after)
 		}
-	}
-	if r.World.Locations[beachhead].World != r.World.Locations[gate].World {
-		t.Fatalf("the beachhead %q is not in the gate's world", beachhead)
-	}
-	if !game.TerritoryIsWholePlace(r.World, beachhead) {
-		t.Fatalf("the beachhead %q is a street or a room, not a place", beachhead)
-	}
-
-	runClaims(t, path, r)
-	third := ""
-	for _, place := range holdings(t, path, claimStrong) {
-		if place != gate && place != beachhead {
-			third = place
+		newest := after[len(after)-1]
+		if r.World.Locations[newest].World != r.World.Locations[home].World {
+			t.Fatalf("tick %d: %q is not in the seat's world", tick, newest)
 		}
-	}
-	if third == "" {
-		t.Fatal("the third tick claimed nothing")
-	}
-	adjacent := false
-	for _, step := range game.WhereAnNPCCanWalk(r.World, beachhead, 1<<30) {
-		if r.wholePlace(step) == third {
-			adjacent = true
+		if !game.TerritoryIsWholePlace(r.World, newest) {
+			t.Fatalf("tick %d: %q is a street or a room, not a place", tick, newest)
 		}
-	}
-	if !adjacent {
-		t.Fatalf("after a beachhead a sect grows by road: %q is not one step from %q", third, beachhead)
+		adjacent := false
+		for _, held := range before {
+			for _, step := range game.WhereAnNPCCanWalk(r.World, held, 1<<30) {
+				if r.wholePlace(step) == newest {
+					adjacent = true
+				}
+			}
+		}
+		if !adjacent {
+			t.Fatalf("tick %d: a seated sect grows by road, and %q is not one step from %v", tick, newest, before)
+		}
 	}
 }
 
@@ -142,7 +139,7 @@ func TestASectStopsAtItsCapAndNeverTakesAnothersGate(t *testing.T) {
 	path, r := claimWorld(t)
 	gates := map[string]string{}
 	for name := range r.World.Sects {
-		if g := game.SectGate(r.World, name); g != "" {
+		if g := game.SectHome(r.World, name); g != "" {
 			gates[g] = name
 		}
 	}
@@ -156,7 +153,7 @@ func TestASectStopsAtItsCapAndNeverTakesAnothersGate(t *testing.T) {
 		}
 		for _, place := range got {
 			if owner, isGate := gates[place]; isGate && owner != sect {
-				t.Fatalf("%s took %s's gate %q", sect, owner, place)
+				t.Fatalf("%s took %s's home %q", sect, owner, place)
 			}
 		}
 	}
@@ -190,7 +187,7 @@ func TestClaimsGiveTheWarStepATarget(t *testing.T) {
 func TestAContestedPlaceIsNotClaimed(t *testing.T) {
 	defer gamerng.UseRoller(func(int) int { return 0 })()
 	path, r := claimWorld(t)
-	gate := game.SectGate(r.World, claimStrong)
+	gate := game.SectHome(r.World, claimStrong)
 	conn, err := storage.Open(path)
 	if err != nil {
 		t.Fatal(err)
@@ -210,21 +207,21 @@ func TestAContestedPlaceIsNotClaimed(t *testing.T) {
 	}
 }
 
-// The gate rule has to be cornered: on the shipped map no road step and no
-// beachhead hash happens to land on a rival's gate, so the tests above pass
+// The home rule has to be cornered: on the shipped map no road step and no
+// beachhead hash happens to land on a rival's seat, so the tests above pass
 // just as well without it. Here the only neutral place left is one.
-func TestARivalsGateIsNeverABeachhead(t *testing.T) {
+func TestARivalsHomeIsNeverABeachhead(t *testing.T) {
 	_, r := claimWorld(t)
-	own, rival := game.SectGate(r.World, claimStrong), game.SectGate(r.World, claimRival)
+	own, rival := game.SectHome(r.World, claimStrong), game.SectHome(r.World, claimRival)
 	if r.World.Locations[own].World != r.World.Locations[rival].World {
 		t.Fatalf("the fixture wants two sects of one world: %q and %q", own, rival)
 	}
-	gateOf := map[string]string{own: claimStrong, rival: claimRival}
-	if got := r.claimTarget(claimStrong, []string{own}, map[string]bool{rival: true}, gateOf); got != "" {
-		t.Fatalf("with only a rival's gate neutral, %s claimed %q", claimStrong, got)
+	homeOf := map[string]string{own: claimStrong, rival: claimRival}
+	if got := r.claimTarget(claimStrong, []string{own}, map[string]bool{rival: true}, homeOf); got != "" {
+		t.Fatalf("with only a rival's seat neutral, %s claimed %q", claimStrong, got)
 	}
-	if got := r.claimTarget(claimRival, nil, map[string]bool{rival: true}, gateOf); got != rival {
-		t.Fatalf("a sect's own gate is its to claim: got %q", got)
+	if got := r.claimTarget(claimRival, nil, map[string]bool{rival: true}, homeOf); got != rival {
+		t.Fatalf("a sect's own seat is its to claim: got %q", got)
 	}
 }
 
@@ -234,7 +231,7 @@ func TestARivalsGateIsNeverABeachhead(t *testing.T) {
 // everything the sect held.
 func TestASectWithNoRoadLeftDoesNotLeapAcrossTheMap(t *testing.T) {
 	_, r := claimWorld(t)
-	gate := game.SectGate(r.World, claimStrong)
+	gate := game.SectHome(r.World, claimStrong)
 	world := r.World.Locations[gate].World
 	beachhead, elsewhere := "", ""
 	for name := range r.World.Locations {
@@ -245,12 +242,17 @@ func TestASectWithNoRoadLeftDoesNotLeapAcrossTheMap(t *testing.T) {
 			beachhead = name
 		}
 	}
+	// Somewhere off the roads of both the home and the beachhead: since
+	// v1.19.0 the home is a seat city with roads of its own, so a place one
+	// step from it is a legitimate claim and not a leap.
 	for name := range r.World.Locations {
 		if name != gate && name != beachhead && r.World.Locations[name].World == world && game.TerritoryIsWholePlace(r.World, name) {
 			walks := false
-			for _, step := range game.WhereAnNPCCanWalk(r.World, beachhead, 1<<30) {
-				if r.wholePlace(step) == name {
-					walks = true
+			for _, from := range []string{gate, beachhead} {
+				for _, step := range game.WhereAnNPCCanWalk(r.World, from, 1<<30) {
+					if r.wholePlace(step) == name {
+						walks = true
+					}
 				}
 			}
 			if !walks {
@@ -267,6 +269,6 @@ func TestASectWithNoRoadLeftDoesNotLeapAcrossTheMap(t *testing.T) {
 		t.Fatalf("holding %q with no road left, the sect leapt to %q", beachhead, got)
 	}
 	if got := r.claimTarget(claimStrong, []string{gate}, neutral, map[string]string{gate: claimStrong}); got != elsewhere {
-		t.Fatalf("a sect holding only its gate may still take a beachhead: got %q", got)
+		t.Fatalf("a sect holding only its home may still take a beachhead: got %q", got)
 	}
 }

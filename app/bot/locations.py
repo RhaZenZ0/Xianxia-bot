@@ -513,11 +513,15 @@ def here_summary(location: str, limit: int = 180, *, present: Sequence[str] | No
     elif data.get("gate"):
         faces = ", ".join(str(x) for x in (WORLD.locations.get(city, {}).get("gates") or {}).get(str(data["gate"]), []))
         what = f"the {data['gate']} Gate of {city}" + (f", facing {faces}" if faces else "")
+    elif any(str((sect.get("recruitment") or {}).get("location")) == name for sect in WORLD.sects.values()):
+        # A sect's gate is asked before the district branch: since v1.19.0 a
+        # seated gate is a `sect_gate` district of its city, and "the sect
+        # gate of Cloudblade City" says less than whose gate it is.
+        sect_name = next(s for s, sect in WORLD.sects.items() if str((sect.get("recruitment") or {}).get("location")) == name)
+        seat = WORLD.sect_seat(sect_name)
+        what = f"the gate of the {sect_name}" + (f", its seat in {seat}" if seat else "") + " · trials before its examiner"
     elif data.get("district"):
         what = f"the {str(data['district']).replace('_', ' ')} of {city}" if data["district"] != "inn" else f"the inn of {city}"
-    elif any(str((sect.get("recruitment") or {}).get("location")) == name for sect in WORLD.sects.values()):
-        sect_name = next(s for s, sect in WORLD.sects.items() if str((sect.get("recruitment") or {}).get("location")) == name)
-        what = f"the gate of the {sect_name} · trials before its examiner"
     else:
         parts = sorted(n for n, d in WORLD.locations.items() if d.get("district") and str(d.get("outside_location")) == name)
         gates = [p for p in parts if WORLD.locations[p].get("gate")]
@@ -525,6 +529,10 @@ def here_summary(location: str, limit: int = 180, *, present: Sequence[str] | No
         roads = [str(r) for r in list(data.get("roads") or [])]
         if parts:
             what = f"a {'capital' if data.get('realm_hub') else str(data.get('settlement_type') or 'city')} · {len(gates)} gate{'s' if len(gates) != 1 else ''}, {len(districts)} district{'s' if len(districts) != 1 else ''}"
+            # The city a sect sits in says so (v1.19.0): the seat is the
+            # city's politics, and the panel header is where a city is read.
+            if seated := WORLD.seated_sect(name):
+                what += f" · seat of the {seated}"
         elif roads:
             what = f"{str(data.get('terrain') or 'open country')} · roads to {', '.join(roads[:3])}"
         else:

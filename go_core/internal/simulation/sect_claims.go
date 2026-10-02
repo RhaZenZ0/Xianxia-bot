@@ -12,15 +12,18 @@ package simulation
 //
 // Four rules hold it:
 //
-//   - **Home first.** A sect's first claim is its own gate, and nobody else
-//     may take a sect's gate while it lies neutral - home ground is not up for
-//     grabs by a stranger who walked past it.
+//   - **Home first.** A sect's first claim is its home - the city it keeps
+//     its gate in (its seat, `game.SectHome`, v1.19.0), or the gate itself
+//     where a gate stands in the wilderness - and nobody else may take a
+//     sect's home while it lies neutral: home ground is not up for grabs by a
+//     stranger who walked past it.
 //   - **Then outward by road.** Afterwards it claims only neutral ground one
 //     step from something it already holds (`game.WhereAnNPCCanWalk`, the
-//     map's own rule). Every gate is road-less, so a sect holding only its
-//     gate reaches once into its gate's world for a beachhead - the neutral
-//     place a stable hash of the sect's name picks, so a sect always starts
-//     from the same town and an empire grows contiguous from there.
+//     map's own rule). A seat city has roads, so a seated sect grows out of
+//     its own city. A wilderness gate is road-less, so a sect holding only
+//     such a gate reaches once into its world for a beachhead - the neutral
+//     place a stable hash of the sect's name picks, so it always starts from
+//     the same town and an empire grows contiguous from there.
 //   - **A place, not a street** (`game.TerritoryIsWholePlace`): a city, a road
 //     site, the wilds, a gate; never a district, a shop or a private room.
 //   - **Bounded.** Only a sect strong enough to go to war claims, at most one
@@ -93,11 +96,12 @@ func (r *Runner) npcSectClaims(conn *storage.Conn, steps, gm int64) (int64, erro
 			neutral[key] = true
 		}
 	}
-	// A neutral gate belongs to its own sect alone.
-	gateOf := map[string]string{}
+	// A neutral home - a seat city, or a wilderness gate - belongs to its
+	// own sect alone.
+	homeOf := map[string]string{}
 	for name := range r.World.Sects {
-		if gate := game.SectGate(r.World, name); gate != "" {
-			gateOf[gate] = name
+		if home := game.SectHome(r.World, name); home != "" {
+			homeOf[home] = name
 		}
 	}
 	chance := min64(60, claimChance*max1(min64(3, steps)))
@@ -115,7 +119,7 @@ func (r *Runner) npcSectClaims(conn *storage.Conn, steps, gm int64) (int64, erro
 		if int64(roll) >= chance {
 			continue
 		}
-		target := r.claimTarget(sect, held[sect], neutral, gateOf)
+		target := r.claimTarget(sect, held[sect], neutral, homeOf)
 		if target == "" {
 			continue
 		}
@@ -137,28 +141,29 @@ func (r *Runner) npcSectClaims(conn *storage.Conn, steps, gm int64) (int64, erro
 }
 
 // claimTarget is the one place this sect claims next, or "" for none.
-// neutral identifies available places; gateOf maps gates to their own sects.
-// It prefers the sect's gate, then a random whole place one walk step from its
-// holdings in the gate's world, excluding other sects' gates. With no such step
-// and no holdings beyond its gate, it picks a beachhead by a stable hash of the
-// eligible places. A missing gate or a failed random draw returns "".
-func (r *Runner) claimTarget(sect string, holdings []string, neutral map[string]bool, gateOf map[string]string) string {
-	gate := game.SectGate(r.World, sect)
-	if gate == "" {
+// neutral identifies available places; homeOf maps every sect's home (its
+// seat city, or its wilderness gate) to its own sect. It prefers the sect's
+// home, then a random whole place one walk step from its holdings in the
+// home's world, excluding other sects' homes. With no such step and no
+// holdings beyond its home, it picks a beachhead by a stable hash of the
+// eligible places. A missing home or a failed random draw returns "".
+func (r *Runner) claimTarget(sect string, holdings []string, neutral map[string]bool, homeOf map[string]string) string {
+	home := game.SectHome(r.World, sect)
+	if home == "" {
 		return ""
 	}
 	open := func(place string) bool {
 		if !neutral[place] || !game.TerritoryIsWholePlace(r.World, place) {
 			return false
 		}
-		owner, isGate := gateOf[place]
-		return !isGate || owner == sect
+		owner, isHome := homeOf[place]
+		return !isHome || owner == sect
 	}
 	// Home first.
-	if open(gate) {
-		return gate
+	if open(home) {
+		return home
 	}
-	world := r.World.Locations[gate].World
+	world := r.World.Locations[home].World
 	// Then one road step from what it already holds.
 	frontier := map[string]bool{}
 	for _, place := range holdings {
@@ -180,15 +185,16 @@ func (r *Runner) claimTarget(sect string, holdings []string, neutral map[string]
 		}
 		return options[pick]
 	}
-	// Nothing it holds has a road out (a gate never does): one beachhead in
+	// Nothing it holds has a road out (a wilderness gate never does; a seat
+	// city whose every neighbour is taken has none left): one beachhead in
 	// its own world, the same one every time, so a sect's expansion starts
 	// from a place of its own rather than wherever the dice fell this week.
-	// Only while the gate is all it holds: a sect whose beachhead's roads are
+	// Only while the home is all it holds: a sect whose beachhead's roads are
 	// all taken has stopped growing, and a second beachhead would be a claim
 	// cut off from everything it holds. A beachhead lost in a war leaves the
-	// gate alone again, and then it may start over.
+	// home alone again, and then it may start over.
 	for _, place := range holdings {
-		if place != gate {
+		if place != home {
 			return ""
 		}
 	}

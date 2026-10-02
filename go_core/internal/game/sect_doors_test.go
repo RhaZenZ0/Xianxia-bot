@@ -225,10 +225,20 @@ func TestClearingTheTrialNodeRevealsTheSectAndItsGate(t *testing.T) {
 	if got := storage.ParseInt(actionScalar(t, path, `SELECT COUNT(*) FROM character_sect_discoveries WHERE user_id=42 AND sect_name=?`, sect)); got != 1 {
 		t.Fatal("the sect was not recorded as discovered")
 	}
-	// The whole point: /travel now reaches the gate.
-	travel := batch4Result(t, batch4Apply(t, path, world, "exploration.travel", 3, map[string]any{"destination": gate, "mode": "known"}))
-	if travel["destination"] != gate {
-		t.Fatalf("travel to the revealed gate: %v", travel)
+	// The whole point: /travel now reaches the gate - through its seat
+	// (v1.19.0): the gate is a district of the city the sect sits in, so the
+	// reveal puts the city on the map and the gate is a step inside it.
+	seat := fmt.Sprint(shown["seat"])
+	if seat == "" || seat == gate {
+		t.Fatalf("a seated sect's reveal names no seat: %v", shown)
+	}
+	travel := batch4Result(t, batch4Apply(t, path, world, "exploration.travel", 3, map[string]any{"destination": seat, "mode": "known"}))
+	if travel["destination"] != seat {
+		t.Fatalf("travel to the revealed seat: %v", travel)
+	}
+	inside := batch4Result(t, batch4Apply(t, path, world, "exploration.travel", 4, map[string]any{"destination": gate, "mode": "known"}))
+	if inside["destination"] != gate {
+		t.Fatalf("travel from the seat into the revealed gate: %v", inside)
 	}
 }
 
@@ -387,10 +397,25 @@ func TestTheEnvoysHallPutsItsWorldsPublicGatesOnTheMap(t *testing.T) {
 	if got := storage.ParseInt(actionScalar(t, path, `SELECT COUNT(*) FROM character_location_discoveries WHERE user_id=42 AND location='Blood River Gorge'`)); got != 0 {
 		t.Fatal("the envoys revealed a private gate")
 	}
-	// "Their gates are on your travel list now" has to be true.
-	travel := batch4Result(t, batch4Apply(t, path, world, "exploration.travel", 4, map[string]any{"destination": "Crimson Furnace Valley", "mode": "known"}))
-	if travel["destination"] != "Crimson Furnace Valley" {
-		t.Fatalf("travel to a gate the envoys named: %v", travel)
+	// "Their seats are on your travel list now" has to be true: the city a
+	// sect sits in is walked to from anywhere, and its gate from inside it.
+	seat := sectSeat(catalog, "Crimson Furnace Sect")
+	if seat == "" {
+		t.Fatal("the Crimson Furnace Sect keeps no seat; the content is wrong, not the rule")
+	}
+	if got := storage.ParseInt(actionScalar(t, path, `SELECT COUNT(*) FROM character_location_discoveries WHERE user_id=42 AND location=?`, seat)); got != 1 {
+		t.Fatalf("the envoys named the Crimson Furnace Sect and its seat %s is not on the travel list", seat)
+	}
+	// A road has a toll where a road-less jump had none: the fixture pays it.
+	batch4Exec(t, path, `UPDATE characters SET spirit_stones=500 WHERE user_id=42`)
+	syncPurse(t, path)
+	travel := batch4Result(t, batch4Apply(t, path, world, "exploration.travel", 4, map[string]any{"destination": seat, "mode": "known"}))
+	if travel["destination"] != seat {
+		t.Fatalf("travel to a seat the envoys named: %v", travel)
+	}
+	inside := batch4Result(t, batch4Apply(t, path, world, "exploration.travel", 5, map[string]any{"destination": "Crimson Furnace Valley", "mode": "known"}))
+	if inside["destination"] != "Crimson Furnace Valley" {
+		t.Fatalf("travel from the seat into the gate the envoys named: %v", inside)
 	}
 }
 
