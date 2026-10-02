@@ -1078,6 +1078,11 @@ PROGRESSION_GATES: dict[str, tuple[str, ...]] = {
                     "sect manor establish", "sect manor upgrade", "sect abode", "sect treasury", "sect contribute", "sect redeem",
                     "sect discipleship request", "sect discipleship accept", "sect discipleship reject", "sect discipleship leave"),
     "sect_outsider": ("sect recruitment recommendation", "sect recruitment trial"),
+    # The way up into an allied sect (v1.18.0): a member's door, drawn at the
+    # gate of the sect `ascends_to` names, at that world's floor. Each refusal
+    # the engine makes (`sectAscendActionGo`) is anticipated here with its
+    # reason, so the one leaf is hidden for four different reasons.
+    "sect_ascent": ("sect recruitment ascend",),
     # `abode leave` and `abode focus` are not here since v1.1.0: they work for
     # an invited guest who owns no home, and hiding them on "you have no
     # property" hid the way out of somebody else's. Both are where you stand,
@@ -1105,6 +1110,28 @@ PROGRESSION_GATES: dict[str, tuple[str, ...]] = {
     "stall_open": ("stall open",),
     "samsara": ("family ancestry", "family legacy", "family investigate", "family quest", "family claim", "family conflict"),
 }
+
+
+def _sect_ascent_refusal(sect: str, here: str, realm: int) -> str:
+    """Why `sect.ascend` would refuse a member of `sect` standing at `here`,
+    or "" when it would not - the twin of `sectAscendActionGo`'s four
+    refusals, in the engine's order: the sect names nothing above it, the
+    sect above keeps no gate, you are not at that gate, you stand below the
+    gate's world's floor."""
+    above = str((WORLD.sects.get(sect) or {}).get("ascends_to") or "").strip()
+    if not above:
+        return f"{sect or 'your sect'} names no sect above it"
+    gate = ""
+    if above in WORLD.sects and not WORLD.sects[above].get("hidden"):
+        gate = str((WORLD.sects[above].get("recruitment") or {}).get("location") or "").strip()
+    if not gate or gate not in WORLD.locations:
+        return f"{above} keeps no gate a letter can be carried to"
+    if here != gate:
+        return f"the way up into {above} is taken at {gate}; you stand at {here or 'nowhere'}"
+    floor = int(WORLD.locations[gate].get("min_realm_index") or 0)
+    if realm < floor:
+        return f"the way up into {above} asks for {WORLD.realm_name(floor)}; you stand at {WORLD.realm_name(realm)}"
+    return ""
 
 
 async def _progression_hidden_actions(interaction: discord.Interaction, c: dict) -> dict[str, str]:
@@ -1143,8 +1170,12 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
     membership = await DB.get_sect_membership(uid)
     if not membership:
         shut["sect_member"] = "you are in no sect — see Recruitment"
+        shut["sect_ascent"] = "the way up is a member's — join a sect first"
     else:
         shut["sect_outsider"] = "you already belong to a sect"
+        ascent = _sect_ascent_refusal(str(membership.get("sect_name") or ""), here, realm)
+        if ascent:
+            shut["sect_ascent"] = ascent
     # The standing each door asks (v1.17.1), named the way the engine refuses.
     rank_level = int((membership or {}).get("rank_level") or 0)
     held = f"you hold {membership.get('rank_name')}" if membership else "you are in no sect"

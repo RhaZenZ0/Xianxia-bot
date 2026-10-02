@@ -16,6 +16,35 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.18.0)** — *The road stopped at the Mortal seam.* The second world-flow study's first
+  recommendation, on the owner's call ("Do the recommendations"): `realm_road` runs from realm 1 to
+  realm 31 now, twenty-four stages through the three upper worlds naming each world's capital,
+  flame, raid, keyed realm and job district, chained from the Mortal stages and handed over by the
+  crossing into each realm. Three objective types for it: `law_comprehend`, `law_technique`,
+  `personal_world`.
+- **fixed (v1.18.0)** — *Ten Laws had no technique.* Only Space had any; the other ten were a
+  comprehension number and nothing to do with it. Each has a control technique and a Domain now,
+  placed on realms 20-22 and 28-29, which the study found had no content of their own. The battle
+  resolves a control technique by its effect's tags (`damage` crushes, else holds) rather than by
+  two Space ids, and the technique picker offers only Laws begun.
+- **fixed (v1.18.0)** — *A sect was for life in one world.* `sect.ascend`: each public sect names
+  the allied sect one world above (`ascends_to`), and a member at its gate at the world's floor is
+  taken in as an Outer Disciple with standing reset. The promotion ladder reaches Elder (50) at
+  25,000 earned, the manor's construction rank. A sect residence (`sect_abodes`) is deliberately
+  left where it was on an ascent: the row names a Discord thread, and moving or deleting it is the
+  v1.0.8 thread question, which is a decision.
+- **fixed (v1.18.0)** — *Autonomous world events drew from every world evenly.* The weekly tick
+  picks a world a living cultivator stands in or has discovered a place in
+  (`worldsWithLivingCharacters`); with nobody living, every world is eligible as before.
+- **deferred (design)** — *Open the Qi Refining pages at realm 1 rather than realm 2.* The second
+  study's measurement: realm 1 opens almost nothing the first hour did not already show, and the
+  curriculum's second band lands at Foundation Establishment. Whether the first gate should open
+  more is a pacing decision the owner has not taken; nothing is changed.
+- **deferred (content)** — *The Celestial ring is a line.* Both world-flow studies: the Celestial
+  World's gates face east ten times and west nine, north and south twice each, where the Spiritual
+  and Immortal rings are near even. Re-authoring its compass - directions on gates and new gate rows
+  where a city lacks a side, no row removed - is additive layout work nothing depends on, and which
+  cities gain a side is a decision; nothing is changed.
 - **fixed (v1.17.1)** — *Two doors on the panel opened for nobody.* The world-flow study's finding,
   on the owner's call: the homestead asked sect rank 40 and the promotion ladder stopped at 30, the
   manor asked rank 70 as a Go literal, and the Personal World page opened at realm 5 for a world the

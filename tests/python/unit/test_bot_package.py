@@ -879,7 +879,7 @@ SURFACE = {
         "groups": ('sect_group', 'sect_manor_group', 'sect_disciple_group', 'sect_recruitment_group'),
         "roots": (),
         "leaves": {
-            "sect_recruitment_group": ('status', 'info', 'recommendation', 'recommendations', 'trial', 'history'),
+            "sect_recruitment_group": ('status', 'info', 'recommendation', 'recommendations', 'trial', 'ascend', 'history'),
             "sect_group": ('form', 'status', 'abode', 'shadow', 'roster', 'politics', 'treasury', 'contribute', 'redeem', 'address', 'family'),
             "sect_disciple_group": ('status', 'request', 'accept', 'reject', 'leave'),
             "sect_manor_group": ('status', 'establish', 'upgrade'),

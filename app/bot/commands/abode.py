@@ -347,7 +347,11 @@ async def innerworld_create(interaction:discord.Interaction,name:str)->None:
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    # The last door on the ladder is what the road's last stage asks for
+    # (v1.18.0): recorded once the engine has made the world, told after.
+    progressed=await record_quest_progress(interaction.user.id,"personal_world",amount=1,game_minute=wt.total_minutes)
     await interaction.followup.send(f"🌌 Personal world **{result.get('name',name)}** created.",ephemeral=False)
+    await announce_quest_progress(interaction,progressed)
 
 
 @registered_group_command(innerworld_group, name="status",description="Inspect your stabilized personal world")

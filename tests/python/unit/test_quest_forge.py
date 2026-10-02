@@ -168,7 +168,10 @@ class ValidatorTests(unittest.TestCase):
              # The realm road's six (v1.16.0): a flame, a raid, a hidden post,
              # a Perfect Path, a secret realm's door, the heavens survived.
              "flame_capture", "raid_win", "black_market", "perfection_start", "realm_enter",
-             "tribulation_cleared"},
+             "tribulation_cleared",
+             # The upper road's three (v1.18.0): a Law begun, a technique
+             # manifested, a world of your own.
+             "law_comprehend", "law_technique", "personal_world"},
         )
 
     def test_the_procedural_draft_always_validates(self):

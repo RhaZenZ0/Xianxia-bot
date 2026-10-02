@@ -941,17 +941,25 @@ func combatTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 		if margin >= 5 {
 			turns = 2
 		}
-		switch p.Technique {
-		case "spatial_lockdown":
-			b.Suppressed = maxI64(b.Suppressed, turns)
-			out["suppressed_turns"] = b.Suppressed
-		case "spatial_strangulation":
+		// What a control technique does to the fight is read off its effect's
+		// tags rather than its id (v1.18.0): until the ten other Laws had a
+		// technique, this was a switch on `spatial_lockdown` and
+		// `spatial_strangulation`, and a technique with any other id was
+		// "law dominance" and nothing. A control effect tagged `damage`
+		// crushes as the strangulation does and holds for a turn; any other
+		// control effect holds as the lockdown does, for a turn or two by the
+		// margin. A Domain is the caster's own ground and does neither.
+		switch {
+		case landedEffect != nil && lawEffectIsControl(landedEffect) && effectHasTag(landedEffect, "damage"):
 			dmg := maxI64(2, 3+comp/25+maxI64(0, margin)/3)
 			b.NPCHP = maxI64(0, b.NPCHP-dmg)
 			b.Suppressed = maxI64(b.Suppressed, 1)
 			out["damage_dealt"] = dmg
 			out["npc_hp"] = b.NPCHP
 			out["opponent_defeated"] = b.NPCHP <= 0
+		case landedEffect != nil && lawEffectIsControl(landedEffect):
+			b.Suppressed = maxI64(b.Suppressed, turns)
+			out["suppressed_turns"] = b.Suppressed
 		default:
 			out["law_dominance"] = true
 		}

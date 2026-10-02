@@ -495,6 +495,34 @@ async def sect_recruitment_trial(interaction: discord.Interaction, sect_name: st
     await announce_quest_progress(interaction, progressed)
 
 
+@registered_group_command(sect_recruitment_group, name="ascend", description="Carry your sect's letter to the gate of the allied sect one world above and be taken in")
+@serialized_user_action
+async def sect_recruitment_ascend(interaction: discord.Interaction) -> None:
+    """The way up into an allied sect (v1.18.0).
+
+    A sect is for life and the trial refuses anybody already in one, so a
+    cultivator who took the sect road at realm 1 carried a Mortal sect through
+    three worlds. Each public sect names in content the sect one world above
+    (`ascends_to`); a member standing at that sect's gate, at the world's own
+    floor, is taken in as an Outer Disciple on their elders' letter. No roll,
+    and the payload carries nothing: which sect, which gate and which floor
+    are the engine's to read off the catalogue (v1.1.0).
+    """
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        e = await ENGINE.authoritative_action("sect.ascend", interaction.user.id, {}, action_id=f"discord:{interaction.id}:sect.ascend")
+        r = dict(e.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    text = (f"📜 **The way up.** The letter of the **{r.get('from')}** is read at **{r.get('gate')}**, and the "
+            f"**{r.get('to')}** takes you in as **{r.get('rank_name')}**. Your standing begins again here: "
+            f"rank, contribution and the disciple bond were your old sect's.")
+    await interaction.response.send_message(text, ephemeral=False)
+
+
 @registered_group_command(sect_recruitment_group, name="history", description="Review your recent sect recommendation and entrance-trial history")
 async def sect_recruitment_history(interaction: discord.Interaction) -> None:
     if not await require_character(interaction):

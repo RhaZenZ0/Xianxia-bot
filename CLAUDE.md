@@ -6122,6 +6122,76 @@ drives `_progression_hidden_actions` with a fake database at each rank, and its 
 new gate raising: a read that answered nothing was iterated, which is the v1.0.10 rule that a
 provider drawn beside everything else on a panel must never raise.
 
+### The road through the upper worlds, and three more missing wires (v1.18.0)
+
+The second world-flow study's four recommendations, on the owner's call ("Do the recommendations").
+Each is a finished mechanism with one wire missing, found by measuring rather than reading.
+
+**The road stopped at the seam.** v1.16.0 built `realm_road` for the seven Mortal realms and stopped,
+and v1.17.0 gave each upper world a job, a raid, a wild place and a keyed realm that nothing pointed
+at - so from realm 8 to realm 31, two thirds of the ladder and most of the playing time, a cultivator
+read the panel or found nothing. Twenty-four more stages are **the same mechanism, nothing new**:
+each opens with a `breakthrough` into its own realm, is handed over by the crossing
+(`grantRealmRoadTx` was realm-agnostic from the start) and by the stage before it, and names a place
+the content already carries. `scripts/author_realm_road_upper.py` reads every name off the file -
+the capital with `realm_hub`, the flame by world, the wilds by `wilds_of`, the job district by kind -
+so a renamed city fails the script rather than a label. Three objective types were missing for it:
+`law_comprehend` (target a Law id), `law_technique` (a technique id) and `personal_world`, each
+reported after the engine agreed and before the command answers (rc.28, v1.0.5). The stage at the
+seam chains **past** it (`realm_road_7.follow_on = realm_road_8`): the ascension quest at each seam
+is handed over beside the road by the cleared tribulation, never instead of it. `test_realm_road.py`
+holds the whole ladder 1..31, one chain, and that every world's stages between them name its capital,
+its flame, a raid and a realm standing in it.
+
+**Ten Laws had no technique.** `law_system.techniques` carried five, all Space; the other ten Laws
+were a comprehension number with nothing to spend it on, and `combat.technique` resolved a control
+technique by **two ids** - `spatial_lockdown` held, `spatial_strangulation` crushed, anything else
+was "law dominance". Each Law has a control technique and a Domain now, authored onto realms 20-22
+and 28-29 (the study found those realms had no content of their own) and the two Space floors for
+the rest. **The battle reads the effect's tags**, not its id: a Law Control effect tagged `damage`
+crushes as the strangulation does and one without holds as the lockdown does (`effectHasTag`), so a
+technique authored tomorrow is held to the same rule - and the two `_test.go` fixtures drive the
+shipped `ember_brand` and `tide_bind` for exactly that reason. Every authored stat is one a rule
+fetches, which `modifier_vocabulary_test.go` already held shut. The technique picker offers only the
+Laws a cultivator has begun (`DB.get_law_progress`), falling back to all when the read fails, rc.46's
+rule: a surface must not offer what the engine will refuse.
+
+**A sect was for life in one world.** Nothing lets a member leave a sect, and the recommendation and
+the trial refuse "already belongs to a public sect" - so the sect road the beginner path hands
+everybody at realm 1 carried a Mortal sect through three worlds, and the six upper sects, half the
+sects in the game, could take nobody. `sect.ascend` (`sect_ascend.go`) is the second door: each
+public sect names in content the allied sect one world above (`ascends_to`, orthodox to orthodox
+where the world above has one), and a member standing at that sect's gate at the world's own floor is
+taken in as an Outer Disciple on their elders' letter. **No roll** - the sect above is reading its
+ally's word, not examining a stranger - and **no payload**: which sect, which gate and which floor
+are the catalogue's (v1.1.0), and `test_the_way_up_into_a_sect.py` holds the command's payload to an
+empty dict by AST. Standing begins again (rank, contribution, the disciple bond), which is v1.8.0's
+rule that rank is earned in the sect it is held in; the sect residence is deliberately left where it
+was, because the row names a Discord thread and moving it is the v1.0.8 thread question. The
+promotion ladder reaches Elder at 25,000, the manor's construction rank, so a manor is somebody's
+without a GM. The panel anticipates each of the four refusals with its reason (`_sect_ascent_refusal`,
+the engine's order), and `TestTheWayUpAlwaysClimbsOneWorld` holds the content to climbing exactly one
+world, read off the realms' world order rather than a list.
+
+**Autonomous events landed anywhere.** `autonomousWorldEvents` chose a location from the whole
+catalogue evenly, so a server with every player in the Mortal World was told about sieges in the
+Celestial one. `worldsWithLivingCharacters` reads the worlds where a living cultivator stands or has
+discovered a place, and the candidate loop skips the rest; with nobody living it is nil and every
+world is eligible as before, because a filter that emptied the pool would silence the tick. The dead
+keep no world in play, and a world crossed into is.
+
+**What the drills printed.** Disabling the damage case in the battle: *"a damage-tagged control
+technique dealt <nil>"*; the gate not asked in the engine: *"want a refusal naming 'is taken at Jade
+Meridian Stone Gate', got <nil>"*; the panel not asking: the member in the street is shown the door;
+the living-worlds filter removed: *"the event landed at Spirit Jade Capital; the only living
+cultivator has never left the Mortal World"*. The Python ascent gate's first version read
+`ast.unparse`'s quoting and failed on correct code - v1.0.16's lesson in the same session - and reads
+string constants now.
+
+**Two of the study's items are deliberately left alone**, both in `docs/TODO.md` as deferred: opening
+the Qi Refining pages at realm 1, and the Celestial capital's compass. Each is a decision the owner
+has not taken.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

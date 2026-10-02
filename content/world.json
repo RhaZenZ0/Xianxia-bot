@@ -31662,7 +31662,7 @@
       "cap": 60
     },
     "exchange": {
-      "description": "Every sect issues its own stock to members for contribution points, at a fixed multiple of each item's sect value. Better stock unlocks with sect rank, and each sect keeps one item of its own for its members alone. A member rises to Inner Disciple, Core Disciple and Deacon on the contribution they have earned over their time in the sect; spending points never lowers it. Deacon is the standing a homestead of one's own asks (abode_system.founding_rank_level), so the ladder reaches it; the sect's own offices above it are not earned by donating.",
+      "description": "Every sect issues its own stock to members for contribution points, at a fixed multiple of each item's sect value. Better stock unlocks with sect rank, and each sect keeps one item of its own for its members alone. A member rises to Inner Disciple, Core Disciple and Deacon on the contribution they have earned over their time in the sect; spending points never lowers it. Deacon is the standing a homestead of one's own asks (abode_system.founding_rank_level), so the ladder reaches it; the sect's own offices above it are not earned by donating. Elder (50) is earned at 25,000, which is the rank that directs the manor's construction (v1.18.0).",
       "points_per_sect_value": 3,
       "stock": [
         {
@@ -31809,6 +31809,10 @@
         {
           "rank_level": 40,
           "earned": 9000
+        },
+        {
+          "rank_level": 50,
+          "earned": 25000
         }
       ]
     }
@@ -31837,7 +31841,8 @@
         ],
         "karma_preference": "righteous",
         "recommendation_bonus": 2
-      }
+      },
+      "ascends_to": "Jade Meridian Sect"
     },
     "Crimson Furnace Sect": {
       "alignment": "Orthodox",
@@ -31864,7 +31869,8 @@
         },
         "karma_preference": "neutral",
         "recommendation_bonus": 2
-      }
+      },
+      "ascends_to": "Jade Meridian Sect"
     },
     "Frozen Moon Palace": {
       "alignment": "Orthodox",
@@ -31889,7 +31895,8 @@
         ],
         "karma_preference": "righteous",
         "recommendation_bonus": 2
-      }
+      },
+      "ascends_to": "Jade Meridian Sect"
     },
     "Black Serpent Clan": {
       "alignment": "Neutral",
@@ -31914,7 +31921,8 @@
         ],
         "karma_preference": "neutral",
         "recommendation_bonus": 2
-      }
+      },
+      "ascends_to": "Thousand Beast Valley"
     },
     "Blood River Sect": {
       "alignment": "Demonic",
@@ -31939,7 +31947,8 @@
         ],
         "karma_preference": "demonic",
         "recommendation_bonus": 3
-      }
+      },
+      "ascends_to": "Thousand Beast Valley"
     },
     "Corpse Lantern Pavilion": {
       "alignment": "Demonic",
@@ -31965,7 +31974,8 @@
         ],
         "karma_preference": "demonic",
         "recommendation_bonus": 3
-      }
+      },
+      "ascends_to": "Thousand Beast Valley"
     },
     "Heaven-Devouring Demon Sect": {
       "alignment": "Demonic",
@@ -32005,7 +32015,8 @@
         ],
         "karma_preference": "righteous",
         "recommendation_bonus": 2
-      }
+      },
+      "ascends_to": "Heavenblade Immortal Sect"
     },
     "Thousand Beast Valley": {
       "alignment": "Neutral",
@@ -32031,7 +32042,8 @@
         ],
         "karma_preference": "neutral",
         "recommendation_bonus": 2
-      }
+      },
+      "ascends_to": "Ashen Lotus Pavilion"
     },
     "Heavenblade Immortal Sect": {
       "alignment": "Orthodox",
@@ -32057,7 +32069,8 @@
         ],
         "karma_preference": "righteous",
         "recommendation_bonus": 2
-      }
+      },
+      "ascends_to": "Celestial Mandate Academy"
     },
     "Ashen Lotus Pavilion": {
       "alignment": "Demonic",
@@ -32084,7 +32097,8 @@
         ],
         "karma_preference": "demonic",
         "recommendation_bonus": 2
-      }
+      },
+      "ascends_to": "Void Serpent Cult"
     },
     "Celestial Mandate Academy": {
       "alignment": "Orthodox",
@@ -32934,6 +32948,166 @@
         "min_realm_index": 30,
         "description": "Use a stabilized personal world as a conceptual weapon against another domain.",
         "effect": "world_collapse"
+      },
+      "ember_brand": {
+        "name": "Ember Brand",
+        "law": "fire",
+        "requires_stage": 3,
+        "min_realm_index": 12,
+        "description": "Press a sigil of Fire Law into an opponent's flesh; it burns inward until the fight ends.",
+        "effect": "ember_brand"
+      },
+      "furnace_heart_domain": {
+        "name": "Furnace Heart Domain",
+        "law": "fire",
+        "requires_stage": 4,
+        "min_realm_index": 20,
+        "description": "Project a domain of furnace heat in which every flame answers the cultivator and nothing else burns.",
+        "effect": "furnace_heart_domain"
+      },
+      "tide_bind": {
+        "name": "Tide Bind",
+        "law": "water",
+        "requires_stage": 3,
+        "min_realm_index": 12,
+        "description": "Wrap an opponent in a tide that pulls against every step; movement and escape are dragged under.",
+        "effect": "tide_bind"
+      },
+      "still_water_domain": {
+        "name": "Still Water Domain",
+        "law": "water",
+        "requires_stage": 4,
+        "min_realm_index": 20,
+        "description": "A domain as still as a winter pool: poisons settle out, the heart quiets, and nothing moves unseen.",
+        "effect": "still_water_domain"
+      },
+      "severing_edge": {
+        "name": "Severing Edge",
+        "law": "sword",
+        "requires_stage": 3,
+        "min_realm_index": 13,
+        "description": "An edge of pure intent that parts flesh and footing alike.",
+        "effect": "severing_edge"
+      },
+      "sword_heart_domain": {
+        "name": "Sword Heart Domain",
+        "law": "sword",
+        "requires_stage": 4,
+        "min_realm_index": 21,
+        "description": "Everything within the domain is a sword, including the way out.",
+        "effect": "sword_heart_domain"
+      },
+      "thread_severance": {
+        "name": "Thread Severance",
+        "law": "fate",
+        "requires_stage": 3,
+        "min_realm_index": 13,
+        "description": "Cut one thread of an opponent's fate; what they would have reached for is no longer there.",
+        "effect": "thread_severance"
+      },
+      "fate_weave_domain": {
+        "name": "Fate Weave Domain",
+        "law": "fate",
+        "requires_stage": 4,
+        "min_realm_index": 21,
+        "description": "A domain in which every road the cultivator takes was always the one they were going to take.",
+        "effect": "fate_weave_domain"
+      },
+      "slowed_moment": {
+        "name": "Slowed Moment",
+        "law": "time",
+        "requires_stage": 3,
+        "min_realm_index": 14,
+        "description": "Thicken the moment around an opponent until a step takes a season.",
+        "effect": "slowed_moment"
+      },
+      "time_dilation_domain": {
+        "name": "Time Dilation Domain",
+        "law": "time",
+        "requires_stage": 4,
+        "min_realm_index": 22,
+        "description": "Inside the domain an hour of the cultivator's is a day of the world's.",
+        "effect": "time_dilation_domain"
+      },
+      "karmic_debt": {
+        "name": "Karmic Debt",
+        "law": "karma",
+        "requires_stage": 3,
+        "min_realm_index": 14,
+        "description": "Call an opponent's debts due at once; every wrong they did arrives as weight.",
+        "effect": "karmic_debt"
+      },
+      "ledger_domain": {
+        "name": "Ledger Domain",
+        "law": "karma",
+        "requires_stage": 4,
+        "min_realm_index": 22,
+        "description": "A domain in which every deed is written as it is done and the cultivator reads the page.",
+        "effect": "ledger_domain"
+      },
+      "wither": {
+        "name": "Wither",
+        "law": "life",
+        "requires_stage": 3,
+        "min_realm_index": 20,
+        "description": "Draw the vitality out of an opponent the way a drought draws a field.",
+        "effect": "wither"
+      },
+      "verdant_domain": {
+        "name": "Verdant Domain",
+        "law": "life",
+        "requires_stage": 4,
+        "min_realm_index": 28,
+        "description": "A domain in which everything that lives grows toward the cultivator, and the cultivator grows too.",
+        "effect": "verdant_domain"
+      },
+      "grave_chill": {
+        "name": "Grave Chill",
+        "law": "death",
+        "requires_stage": 3,
+        "min_realm_index": 21,
+        "description": "The cold of the grave settles into an opponent's joints; they move as the dead do.",
+        "effect": "grave_chill"
+      },
+      "yin_court_domain": {
+        "name": "Yin Court Domain",
+        "law": "death",
+        "requires_stage": 4,
+        "min_realm_index": 28,
+        "description": "A domain of the courts below: the cultivator presides, and the dead attend.",
+        "effect": "yin_court_domain"
+      },
+      "unravelling": {
+        "name": "Unravelling",
+        "law": "chaos",
+        "requires_stage": 3,
+        "min_realm_index": 22,
+        "description": "Pull one thread of order out of an opponent and watch the rest come loose.",
+        "effect": "unravelling"
+      },
+      "maelstrom_domain": {
+        "name": "Maelstrom Domain",
+        "law": "chaos",
+        "requires_stage": 4,
+        "min_realm_index": 29,
+        "description": "A domain of turning chaos in which only the cultivator has a centre.",
+        "effect": "maelstrom_domain"
+      },
+      "hollow_grasp": {
+        "name": "Hollow Grasp",
+        "law": "void",
+        "requires_stage": 3,
+        "min_realm_index": 28,
+        "description": "Open a nothing beneath an opponent's feet; there is nowhere to step to.",
+        "effect": "hollow_grasp"
+      },
+      "null_domain": {
+        "name": "Null Domain",
+        "law": "void",
+        "requires_stage": 4,
+        "min_realm_index": 29,
+        "description": "A domain in which there is nothing but the cultivator and whatever the cultivator permits.",
+        "effect": "null_domain"
       }
     },
     "comprehend_cooldown_minutes": 120,
@@ -33027,6 +33201,562 @@
           "stat": "sense_power",
           "operation": "add",
           "value": 8
+        },
+        {
+          "stat": "sense_precision",
+          "operation": "add",
+          "value": 4
+        },
+        {
+          "stat": "escape_bonus",
+          "operation": "add",
+          "value": 4
+        }
+      ]
+    },
+    "ember_brand": {
+      "name": "Ember Brand",
+      "category": "Law Control",
+      "description": "A sigil of fire burns inward; the body it marks is weakened until the fight ends.",
+      "tags": [
+        "law",
+        "fire",
+        "control",
+        "damage"
+      ],
+      "severity": 4,
+      "modifiers": [
+        {
+          "stat": "body",
+          "operation": "add",
+          "value": -2
+        }
+      ]
+    },
+    "furnace_heart_domain": {
+      "name": "Furnace Heart Domain",
+      "category": "Domain",
+      "description": "Furnace heat answers the cultivator alone: strikes land hotter, fire does not harm them, and the craft of flame steadies.",
+      "tags": [
+        "law",
+        "fire",
+        "domain"
+      ],
+      "severity": 5,
+      "modifiers": [
+        {
+          "stat": "combat_bonus",
+          "operation": "add",
+          "value": 3
+        },
+        {
+          "stat": "fire_resistance",
+          "operation": "add",
+          "value": 10
+        },
+        {
+          "stat": "alchemy_bonus",
+          "operation": "add",
+          "value": 2
+        },
+        {
+          "stat": "forging_bonus",
+          "operation": "add",
+          "value": 2
+        }
+      ]
+    },
+    "tide_bind": {
+      "name": "Tide Bind",
+      "category": "Law Control",
+      "description": "A tide drags at every step. Movement and escape are pulled under.",
+      "tags": [
+        "law",
+        "water",
+        "control"
+      ],
+      "severity": 3,
+      "modifiers": [
+        {
+          "stat": "agility",
+          "operation": "add",
+          "value": -3
+        },
+        {
+          "stat": "escape_bonus",
+          "operation": "add",
+          "value": -4
+        }
+      ]
+    },
+    "still_water_domain": {
+      "name": "Still Water Domain",
+      "category": "Domain",
+      "description": "Still as a winter pool: poisons settle out, the heart quiets, and nothing moves unseen.",
+      "tags": [
+        "law",
+        "water",
+        "domain"
+      ],
+      "severity": 5,
+      "modifiers": [
+        {
+          "stat": "combat_bonus",
+          "operation": "add",
+          "value": 2
+        },
+        {
+          "stat": "sense_precision",
+          "operation": "add",
+          "value": 4
+        },
+        {
+          "stat": "detox_power",
+          "operation": "add",
+          "value": 15
+        },
+        {
+          "stat": "heart_demon_resistance",
+          "operation": "add",
+          "value": 10
+        }
+      ]
+    },
+    "severing_edge": {
+      "name": "Severing Edge",
+      "category": "Law Control",
+      "description": "An edge of pure intent has parted flesh and footing.",
+      "tags": [
+        "law",
+        "sword",
+        "control",
+        "damage"
+      ],
+      "severity": 4,
+      "modifiers": [
+        {
+          "stat": "body",
+          "operation": "add",
+          "value": -2
+        },
+        {
+          "stat": "agility",
+          "operation": "add",
+          "value": -1
+        }
+      ]
+    },
+    "sword_heart_domain": {
+      "name": "Sword Heart Domain",
+      "category": "Domain",
+      "description": "Everything within is a sword, including the way out.",
+      "tags": [
+        "law",
+        "sword",
+        "domain"
+      ],
+      "severity": 5,
+      "modifiers": [
+        {
+          "stat": "combat_bonus",
+          "operation": "add",
+          "value": 4
+        },
+        {
+          "stat": "agility",
+          "operation": "add",
+          "value": 1
+        },
+        {
+          "stat": "escape_bonus",
+          "operation": "add",
+          "value": 2
+        }
+      ]
+    },
+    "thread_severance": {
+      "name": "Thread Severance",
+      "category": "Law Control",
+      "description": "One thread of fate is cut; what the target reaches for is no longer there.",
+      "tags": [
+        "law",
+        "fate",
+        "control",
+        "damage"
+      ],
+      "severity": 4,
+      "modifiers": [
+        {
+          "stat": "body",
+          "operation": "add",
+          "value": -1
+        },
+        {
+          "stat": "escape_bonus",
+          "operation": "add",
+          "value": -3
+        }
+      ]
+    },
+    "fate_weave_domain": {
+      "name": "Fate Weave Domain",
+      "category": "Domain",
+      "description": "Every road the cultivator takes was always the one they were going to take.",
+      "tags": [
+        "law",
+        "fate",
+        "domain"
+      ],
+      "severity": 5,
+      "modifiers": [
+        {
+          "stat": "combat_bonus",
+          "operation": "add",
+          "value": 2
+        },
+        {
+          "stat": "escape_bonus",
+          "operation": "add",
+          "value": 5
+        },
+        {
+          "stat": "insight",
+          "operation": "add",
+          "value": 2
+        },
+        {
+          "stat": "sense_power",
+          "operation": "add",
+          "value": 3
+        }
+      ]
+    },
+    "slowed_moment": {
+      "name": "Slowed Moment",
+      "category": "Law Control",
+      "description": "The moment thickens; a step takes a season.",
+      "tags": [
+        "law",
+        "time",
+        "control"
+      ],
+      "severity": 4,
+      "modifiers": [
+        {
+          "stat": "agility",
+          "operation": "add",
+          "value": -4
+        },
+        {
+          "stat": "escape_bonus",
+          "operation": "add",
+          "value": -3
+        }
+      ]
+    },
+    "time_dilation_domain": {
+      "name": "Time Dilation Domain",
+      "category": "Domain",
+      "description": "An hour of the cultivator's is a day of the world's.",
+      "tags": [
+        "law",
+        "time",
+        "domain"
+      ],
+      "severity": 6,
+      "modifiers": [
+        {
+          "stat": "combat_bonus",
+          "operation": "add",
+          "value": 3
+        },
+        {
+          "stat": "sense_power",
+          "operation": "add",
+          "value": 3
+        },
+        {
+          "stat": "cultivation_gain",
+          "operation": "mul",
+          "value": 1.15
+        },
+        {
+          "stat": "insight_gain",
+          "operation": "mul",
+          "value": 1.1
+        }
+      ]
+    },
+    "karmic_debt": {
+      "name": "Karmic Debt",
+      "category": "Law Control",
+      "description": "Every debt comes due at once and arrives as weight.",
+      "tags": [
+        "law",
+        "karma",
+        "control",
+        "damage"
+      ],
+      "severity": 4,
+      "modifiers": [
+        {
+          "stat": "body",
+          "operation": "add",
+          "value": -2
+        },
+        {
+          "stat": "escape_bonus",
+          "operation": "add",
+          "value": -2
+        }
+      ]
+    },
+    "ledger_domain": {
+      "name": "Ledger Domain",
+      "category": "Domain",
+      "description": "Every deed is written as it is done, and the cultivator reads the page.",
+      "tags": [
+        "law",
+        "karma",
+        "domain"
+      ],
+      "severity": 6,
+      "modifiers": [
+        {
+          "stat": "combat_bonus",
+          "operation": "add",
+          "value": 3
+        },
+        {
+          "stat": "presence",
+          "operation": "add",
+          "value": 2
+        },
+        {
+          "stat": "will",
+          "operation": "add",
+          "value": 1
+        },
+        {
+          "stat": "heart_demon_resistance",
+          "operation": "add",
+          "value": 15
+        }
+      ]
+    },
+    "wither": {
+      "name": "Wither",
+      "category": "Law Control",
+      "description": "Vitality drains as a drought drains a field.",
+      "tags": [
+        "law",
+        "life",
+        "control",
+        "damage"
+      ],
+      "severity": 5,
+      "modifiers": [
+        {
+          "stat": "body",
+          "operation": "add",
+          "value": -3
+        }
+      ]
+    },
+    "verdant_domain": {
+      "name": "Verdant Domain",
+      "category": "Domain",
+      "description": "Everything that lives grows toward the cultivator, and the cultivator grows too.",
+      "tags": [
+        "law",
+        "life",
+        "domain"
+      ],
+      "severity": 6,
+      "modifiers": [
+        {
+          "stat": "combat_bonus",
+          "operation": "add",
+          "value": 4
+        },
+        {
+          "stat": "body",
+          "operation": "add",
+          "value": 1
+        },
+        {
+          "stat": "detox_power",
+          "operation": "add",
+          "value": 20
+        },
+        {
+          "stat": "cultivation_gain",
+          "operation": "mul",
+          "value": 1.1
+        }
+      ]
+    },
+    "grave_chill": {
+      "name": "Grave Chill",
+      "category": "Law Control",
+      "description": "The cold of the grave is in the joints; the target moves as the dead do.",
+      "tags": [
+        "law",
+        "death",
+        "control"
+      ],
+      "severity": 5,
+      "modifiers": [
+        {
+          "stat": "agility",
+          "operation": "add",
+          "value": -3
+        },
+        {
+          "stat": "body",
+          "operation": "add",
+          "value": -1
+        },
+        {
+          "stat": "escape_bonus",
+          "operation": "add",
+          "value": -4
+        }
+      ]
+    },
+    "yin_court_domain": {
+      "name": "Yin Court Domain",
+      "category": "Domain",
+      "description": "The courts below are in session; the cultivator presides and the dead attend.",
+      "tags": [
+        "law",
+        "death",
+        "domain"
+      ],
+      "severity": 6,
+      "modifiers": [
+        {
+          "stat": "combat_bonus",
+          "operation": "add",
+          "value": 4
+        },
+        {
+          "stat": "sense_power",
+          "operation": "add",
+          "value": 5
+        },
+        {
+          "stat": "presence",
+          "operation": "add",
+          "value": 2
+        },
+        {
+          "stat": "spirit",
+          "operation": "add",
+          "value": 1
+        }
+      ]
+    },
+    "unravelling": {
+      "name": "Unravelling",
+      "category": "Law Control",
+      "description": "One thread of order is gone and the rest is coming loose.",
+      "tags": [
+        "law",
+        "chaos",
+        "control",
+        "damage"
+      ],
+      "severity": 5,
+      "modifiers": [
+        {
+          "stat": "body",
+          "operation": "add",
+          "value": -2
+        },
+        {
+          "stat": "agility",
+          "operation": "add",
+          "value": -2
+        }
+      ]
+    },
+    "maelstrom_domain": {
+      "name": "Maelstrom Domain",
+      "category": "Domain",
+      "description": "Turning chaos in which only the cultivator has a centre.",
+      "tags": [
+        "law",
+        "chaos",
+        "domain"
+      ],
+      "severity": 6,
+      "modifiers": [
+        {
+          "stat": "combat_bonus",
+          "operation": "add",
+          "value": 5
+        },
+        {
+          "stat": "escape_bonus",
+          "operation": "add",
+          "value": 3
+        },
+        {
+          "stat": "flame_affinity",
+          "operation": "add",
+          "value": 5
+        },
+        {
+          "stat": "breakthrough_bonus",
+          "operation": "add",
+          "value": 1
+        }
+      ]
+    },
+    "hollow_grasp": {
+      "name": "Hollow Grasp",
+      "category": "Law Control",
+      "description": "A nothing has opened underfoot; there is nowhere to step to.",
+      "tags": [
+        "law",
+        "void",
+        "control"
+      ],
+      "severity": 5,
+      "modifiers": [
+        {
+          "stat": "agility",
+          "operation": "add",
+          "value": -4
+        },
+        {
+          "stat": "escape_bonus",
+          "operation": "add",
+          "value": -6
+        }
+      ]
+    },
+    "null_domain": {
+      "name": "Null Domain",
+      "category": "Domain",
+      "description": "Nothing here but the cultivator and whatever the cultivator permits.",
+      "tags": [
+        "law",
+        "void",
+        "domain"
+      ],
+      "severity": 6,
+      "modifiers": [
+        {
+          "stat": "combat_bonus",
+          "operation": "add",
+          "value": 5
+        },
+        {
+          "stat": "sense_power",
+          "operation": "add",
+          "value": 6
         },
         {
           "stat": "sense_precision",
@@ -71850,6 +72580,786 @@
       "rewards": {
         "insight_xp": 320,
         "spirit_stones": 400
+      },
+      "follow_on": "realm_road_8"
+    },
+    {
+      "quest_key": "realm_road_8",
+      "realm_index": 8,
+      "title": "The Second World",
+      "description": "The Spiritual World is the Mortal World again with more in it, and its capital is Spirit Jade Capital. Chart a road to it with **/world → Act → Explore** from the cities you know and walk there. If you carry a Mortal sect's standing, its elders have a letter for you: the allied sect above keeps a gate in this world, and **/sect → Recruitment → Ascend** reads it there.",
+      "opening": "The seam closes behind you and the qi here is a river where the Mortal World's was a stream. Every city on this side is a stranger, and one of them is the capital.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Spirit Body Transformation",
+          "count": 1,
+          "label": "Break through into Spirit Body Transformation - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "walk",
+          "type": "travel",
+          "target": "Spirit Jade Capital",
+          "count": 1,
+          "label": "Walk the roads to Spirit Jade Capital - **/travel → Destinations → Go**"
+        },
+        {
+          "id": "look",
+          "type": "explore",
+          "target": "Spirit Jade Capital",
+          "count": 1,
+          "label": "Look around the capital - **/world → Act → Explore**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 348,
+        "spirit_stones": 425
+      },
+      "follow_on": "realm_road_9"
+    },
+    {
+      "quest_key": "realm_road_9",
+      "realm_index": 9,
+      "title": "The Flame and the Archive",
+      "description": "Two things this world keeps that the Mortal World did not: the Crimson Lotus Flame on the Vermilion Furnace Forge Terraces, and the Laws. Jade Crown Sutra Archive is where the Laws are read, and a Law comprehended under its roof is comprehended more clearly.",
+      "opening": "Your trade has a flame waiting for it, and your mind has a Law. Neither is given; both are at the end of a road.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Soul Transformation",
+          "count": 1,
+          "label": "Break through into Soul Transformation - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "flame",
+          "type": "flame_capture",
+          "target": "crimson_lotus_flame",
+          "count": 1,
+          "label": "Capture the Crimson Lotus Flame at Vermilion Furnace Forge Terraces - **/craft → Flames → Capture**"
+        },
+        {
+          "id": "law",
+          "type": "law_comprehend",
+          "count": 1,
+          "label": "Comprehend a Law - under the roof of Jade Crown Sutra Archive if you can - **/cultivation → Laws → Comprehend**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 376,
+        "spirit_stones": 450
+      },
+      "follow_on": "realm_road_10"
+    },
+    {
+      "quest_key": "realm_road_10",
+      "realm_index": 10,
+      "title": "The Steppe",
+      "description": "Thousand Beast Steppe lies in the wilds of Galevein Spirit City; an explore from that city finds it. The Ancestor Stag's Bone Hall opens there to a key the world's array workshops sell.",
+      "opening": "Beyond the last road out of the spirit city the grass goes on to the horizon, and under it is bone.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Spirit Transformation",
+          "count": 1,
+          "label": "Break through into Spirit Transformation - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "steppe",
+          "type": "travel",
+          "target": "Thousand Beast Steppe",
+          "count": 1,
+          "label": "Walk the roads to Thousand Beast Steppe - **/travel → Destinations → Go**"
+        },
+        {
+          "id": "hall",
+          "type": "realm_enter",
+          "target": "ancestor_stag_bone_hall",
+          "count": 1,
+          "label": "Enter the Ancestor Stag's Bone Hall at Thousand Beast Steppe - **/realm → Secret Realms → Enter**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 404,
+        "spirit_stones": 475
+      },
+      "follow_on": "realm_road_11"
+    },
+    {
+      "quest_key": "realm_road_11",
+      "realm_index": 11,
+      "title": "The Hundred-Horn Ancestor",
+      "description": "Nirvana is the floor of a supreme Law, and the Hundred-Horn Ancestor Stag walks the steppe at this realm. Gather a party, or go alone and face it at its lesser strength.",
+      "opening": "The herd has an ancestor, and the ancestor has been waiting for somebody at your realm since before the steppe had a name.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Nirvana",
+          "count": 1,
+          "label": "Break through into Nirvana - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "raid",
+          "type": "raid_win",
+          "target": "Hundred-Horn Ancestor Stag",
+          "count": 1,
+          "label": "Bring down the Hundred-Horn Ancestor Stag and claim your share - **/combat → Boss Raids → Claim**"
+        },
+        {
+          "id": "space",
+          "type": "law_comprehend",
+          "count": 1,
+          "label": "Begin the Law of Space, the supreme Law whose floor is Nirvana - **/cultivation → Laws → Comprehend**",
+          "target": "space"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 432,
+        "spirit_stones": 500
+      },
+      "follow_on": "realm_road_12"
+    },
+    {
+      "quest_key": "realm_road_12",
+      "realm_index": 12,
+      "title": "A Law Made Manifest",
+      "description": "Law Manifestation is where a comprehended Law first does something: every Law has a technique at this realm. The Last Lantern Wake at Last Lantern Ruin opens on the rotation.",
+      "opening": "The Law you have been reading turns in your hands and asks to be used.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Law Manifestation",
+          "count": 1,
+          "label": "Break through into Law Manifestation - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "manifest",
+          "type": "law_technique",
+          "count": 1,
+          "label": "Manifest a Law technique - **/cultivation → Laws → Technique**"
+        },
+        {
+          "id": "wake",
+          "type": "realm_enter",
+          "target": "last_lantern_wake",
+          "count": 1,
+          "label": "Enter the Last Lantern Wake at Last Lantern Ruin - **/realm → Secret Realms → Enter**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 460,
+        "spirit_stones": 525
+      },
+      "follow_on": "realm_road_13"
+    },
+    {
+      "quest_key": "realm_road_13",
+      "realm_index": 13,
+      "title": "The Ninth Stage Again",
+      "description": "The Perfect Path is open at the ninth stage of every realm, and this world's are worth perfecting. The Broken Pagoda Sutra Hall at Broken Pagoda Ruin is the Spiritual World's first ruin.",
+      "opening": "You have stood at a ninth stage before. This time you know what it is for.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Dao Comprehension",
+          "count": 1,
+          "label": "Break through into Dao Comprehension - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "perfect",
+          "type": "perfection_start",
+          "count": 1,
+          "label": "Begin a Perfect Path at the ninth stage - **/ascend → Perfection → Start**"
+        },
+        {
+          "id": "pagoda",
+          "type": "realm_enter",
+          "target": "broken_pagoda_sutra_hall",
+          "count": 1,
+          "label": "Enter the Broken Pagoda Sutra Hall at Broken Pagoda Ruin - **/realm → Secret Realms → Enter**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 488,
+        "spirit_stones": 550
+      },
+      "follow_on": "realm_road_14"
+    },
+    {
+      "quest_key": "realm_road_14",
+      "realm_index": 14,
+      "title": "The Toppled Stele",
+      "description": "The Toppled Stele Sword Field at Toppled Stele Ruin is the deepest ruin of this world that needs no key, and its last room is where a swordsman's trial leaves its mark.",
+      "opening": "One realm stands between you and the Transcendence Tribulation. The sword field is where the old ones went to be sure of themselves first.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Dao Integration",
+          "count": 1,
+          "label": "Break through into Dao Integration - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "stele",
+          "type": "realm_enter",
+          "target": "toppled_stele_sword_field",
+          "count": 1,
+          "label": "Enter the Toppled Stele Sword Field at Toppled Stele Ruin - **/realm → Secret Realms → Enter**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 516,
+        "spirit_stones": 575
+      },
+      "follow_on": "realm_road_15"
+    },
+    {
+      "quest_key": "realm_road_15",
+      "realm_index": 15,
+      "title": "The Transcendence Tribulation",
+      "description": "The Transcendence Realm is the last of this world. Prepare at the place you will stand with **/ascend → Tribulation / Ascension → Prepare** and survive the three waves; what survives them is told where the seam is.",
+      "opening": "The sky over the Spiritual World is a different colour from the Mortal one, and it has noticed you all the same.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Transcendence Realm",
+          "count": 1,
+          "label": "Break through into Transcendence Realm - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "heaven",
+          "type": "tribulation_cleared",
+          "count": 1,
+          "label": "Survive the Transcendence Tribulation - **/ascend → Tribulation / Ascension → Attempt**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 544,
+        "spirit_stones": 600
+      },
+      "follow_on": "realm_road_16"
+    },
+    {
+      "quest_key": "realm_road_16",
+      "realm_index": 16,
+      "title": "The Immortal Court",
+      "description": "The Immortal World is where the crafts are judged. Its capital is Nine-Heavens Immortal Court; chart a road to it and walk there. A sect's letter is read at the gate of the allied sect in this world, as before.",
+      "opening": "Immortals are not what the Mortal World's stories said. They are tired, mostly, and very good at one thing each.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "True Immortal",
+          "count": 1,
+          "label": "Break through into True Immortal - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "walk",
+          "type": "travel",
+          "target": "Nine-Heavens Immortal Court",
+          "count": 1,
+          "label": "Walk the roads to Nine-Heavens Immortal Court - **/travel → Destinations → Go**"
+        },
+        {
+          "id": "look",
+          "type": "explore",
+          "target": "Nine-Heavens Immortal Court",
+          "count": 1,
+          "label": "Look around the court - **/world → Act → Explore**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 572,
+        "spirit_stones": 625
+      },
+      "follow_on": "realm_road_17"
+    },
+    {
+      "quest_key": "realm_road_17",
+      "realm_index": 17,
+      "title": "The Sun Flame and the Grandmasters",
+      "description": "The Nine-Heavens Sun Flame on the Solar Furnace Forge Terraces is the first flame that opens the top grade. Ninefold Grandmasters' Court judges every craft made in its square and lends the roll its eye.",
+      "opening": "What you make here is weighed by people who have made it better. That is the point of coming.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Earth Immortal",
+          "count": 1,
+          "label": "Break through into Earth Immortal - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "flame",
+          "type": "flame_capture",
+          "target": "nine_heavens_sun_flame",
+          "count": 1,
+          "label": "Capture the Nine-Heavens Sun Flame at Solar Furnace Forge Terraces - **/craft → Flames → Capture**"
+        },
+        {
+          "id": "craft",
+          "type": "craft",
+          "count": 1,
+          "label": "Make something in your trade - in Ninefold Grandmasters' Court if you can - **/craft → General Crafting → Craft**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 600,
+        "spirit_stones": 650
+      },
+      "follow_on": "realm_road_18"
+    },
+    {
+      "quest_key": "realm_road_18",
+      "realm_index": 18,
+      "title": "The Crater",
+      "description": "Starfall Crater lies in the wilds of Fallen Star Immortal City. The The Fallen Star's Forge opens there to a key the world's array workshops sell.",
+      "opening": "Something fell here long before the court was built, and the court was built where it could keep an eye on the hole.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Sky Immortal",
+          "count": 1,
+          "label": "Break through into Sky Immortal - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "crater",
+          "type": "travel",
+          "target": "Starfall Crater",
+          "count": 1,
+          "label": "Walk the roads to Starfall Crater - **/travel → Destinations → Go**"
+        },
+        {
+          "id": "forge",
+          "type": "realm_enter",
+          "target": "fallen_star_forge",
+          "count": 1,
+          "label": "Enter the The Fallen Star's Forge at Starfall Crater - **/realm → Secret Realms → Enter**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 628,
+        "spirit_stones": 675
+      },
+      "follow_on": "realm_road_19"
+    },
+    {
+      "quest_key": "realm_road_19",
+      "realm_index": 19,
+      "title": "The Iron Colossus",
+      "description": "The Starfall Iron Colossus stands in the crater at this realm. A party fights it at full strength; one cultivator alone at its lesser.",
+      "opening": "It was a forge once. Then it was a weapon. Now it is waiting.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Star Immortal",
+          "count": 1,
+          "label": "Break through into Star Immortal - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "raid",
+          "type": "raid_win",
+          "target": "Starfall Iron Colossus",
+          "count": 1,
+          "label": "Bring down the Starfall Iron Colossus and claim your share - **/combat → Boss Raids → Claim**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 656,
+        "spirit_stones": 700
+      },
+      "follow_on": "realm_road_20"
+    },
+    {
+      "quest_key": "realm_road_20",
+      "realm_index": 20,
+      "title": "A Domain of Your Own",
+      "description": "At Golden Immortal every Law has a Domain - a technique that holds the ground around you. The Weeping Wall Sanctum at Weeping Wall Ruin is this world's first ruin, and its last room keeps a ring worth a city.",
+      "opening": "A technique strikes once. A Domain is a place that is yours while you stand in it.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Golden Immortal",
+          "count": 1,
+          "label": "Break through into Golden Immortal - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "domain",
+          "type": "law_technique",
+          "count": 1,
+          "label": "Manifest a Law technique - a Domain, if your Law has reached one - **/cultivation → Laws → Technique**"
+        },
+        {
+          "id": "sanctum",
+          "type": "realm_enter",
+          "target": "weeping_wall_sanctum",
+          "count": 1,
+          "label": "Enter the Weeping Wall Sanctum at Weeping Wall Ruin - **/realm → Secret Realms → Enter**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 684,
+        "spirit_stones": 725
+      },
+      "follow_on": "realm_road_21"
+    },
+    {
+      "quest_key": "realm_road_21",
+      "realm_index": 21,
+      "title": "The Ash Gate",
+      "description": "The Ash Gate Threshold at Ash Gate Ruin opens on the rotation. The halls of this world examine the trades; sit the one your trade is ready for.",
+      "opening": "The gate is ash because everything that came through it burned. The threshold is still there.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Void Immortal",
+          "count": 1,
+          "label": "Break through into Void Immortal - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "ash",
+          "type": "realm_enter",
+          "target": "ash_gate_threshold",
+          "count": 1,
+          "label": "Enter the Ash Gate Threshold at Ash Gate Ruin - **/realm → Secret Realms → Enter**"
+        },
+        {
+          "id": "exam",
+          "type": "profession_exam",
+          "count": 1,
+          "label": "Pass a hall's examination in your trade - **/craft → Profession → Profession Exam**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 712,
+        "spirit_stones": 750
+      },
+      "follow_on": "realm_road_22"
+    },
+    {
+      "quest_key": "realm_road_22",
+      "realm_index": 22,
+      "title": "The Cracked Altar",
+      "description": "The Cracked Altar Sanctum at Cracked Altar Ruin is the deepest ruin of this world that needs no key. Every Law has a Domain by now; the Immortal Sovereign's tribulation is one realm on.",
+      "opening": "The altar cracked when somebody asked the heavens a question they did not want answered. Ask a smaller one.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Chaos Immortal",
+          "count": 1,
+          "label": "Break through into Chaos Immortal - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "altar",
+          "type": "realm_enter",
+          "target": "cracked_altar_sanctum",
+          "count": 1,
+          "label": "Enter the Cracked Altar Sanctum at Cracked Altar Ruin - **/realm → Secret Realms → Enter**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 740,
+        "spirit_stones": 775
+      },
+      "follow_on": "realm_road_23"
+    },
+    {
+      "quest_key": "realm_road_23",
+      "realm_index": 23,
+      "title": "The Celestial Ascension Tribulation",
+      "description": "Immortal Sovereign is the last of this world. Prepare at the place you will stand with **/ascend → Tribulation / Ascension → Prepare** and survive the three waves.",
+      "opening": "The heavens over the Immortal World are close enough to hear, and they are not pleased.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Immortal Sovereign",
+          "count": 1,
+          "label": "Break through into Immortal Sovereign - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "heaven",
+          "type": "tribulation_cleared",
+          "count": 1,
+          "label": "Survive the Celestial Ascension Tribulation - **/ascend → Tribulation / Ascension → Attempt**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 768,
+        "spirit_stones": 800
+      },
+      "follow_on": "realm_road_24"
+    },
+    {
+      "quest_key": "realm_road_24",
+      "realm_index": 24,
+      "title": "The Mandate Palace",
+      "description": "The Celestial World is where the heavens are nearest. Its capital is Celestial Mandate Palace; chart a road to it and walk there. Mandate Crown Heaven-Reading Altar stands in it, and a breakthrough made on its stone is made a little more surely.",
+      "opening": "There is no sky here. There is the Mandate, and it is looking down.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Celestial",
+          "count": 1,
+          "label": "Break through into Celestial - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "walk",
+          "type": "travel",
+          "target": "Celestial Mandate Palace",
+          "count": 1,
+          "label": "Walk the roads to Celestial Mandate Palace - **/travel → Destinations → Go**"
+        },
+        {
+          "id": "look",
+          "type": "explore",
+          "target": "Celestial Mandate Palace",
+          "count": 1,
+          "label": "Look around the palace - **/world → Act → Explore**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 796,
+        "spirit_stones": 825
+      },
+      "follow_on": "realm_road_25"
+    },
+    {
+      "quest_key": "realm_road_25",
+      "realm_index": 25,
+      "title": "The Chaos Flame",
+      "description": "The Primordial Chaos Flame on the Solar Crucible Forge Terraces is the last flame. The Hollow Throne Vault at Hollow Throne Ruin is this world's first ruin.",
+      "opening": "The flame that was here before anything was made is still here, and it does not care who holds it.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Celestial Duke",
+          "count": 1,
+          "label": "Break through into Celestial Duke - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "flame",
+          "type": "flame_capture",
+          "target": "primordial_chaos_flame",
+          "count": 1,
+          "label": "Capture the Primordial Chaos Flame at Solar Crucible Forge Terraces - **/craft → Flames → Capture**"
+        },
+        {
+          "id": "throne",
+          "type": "realm_enter",
+          "target": "hollow_throne_vault",
+          "count": 1,
+          "label": "Enter the Hollow Throne Vault at Hollow Throne Ruin - **/realm → Secret Realms → Enter**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 824,
+        "spirit_stones": 850
+      },
+      "follow_on": "realm_road_26"
+    },
+    {
+      "quest_key": "realm_road_26",
+      "realm_index": 26,
+      "title": "The Firmament",
+      "description": "Shattered Firmament lies in the wilds of Ruined Constellation City. The The Unmoored Star's Hollow opens there to a key the world's array workshops sell, and nothing in it fades with your realm.",
+      "opening": "Where the firmament broke, the stars came loose. One of them is still falling.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Celestial Lord",
+          "count": 1,
+          "label": "Break through into Celestial Lord - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "firmament",
+          "type": "travel",
+          "target": "Shattered Firmament",
+          "count": 1,
+          "label": "Walk the roads to Shattered Firmament - **/travel → Destinations → Go**"
+        },
+        {
+          "id": "hollow",
+          "type": "realm_enter",
+          "target": "unmoored_star_hollow",
+          "count": 1,
+          "label": "Enter the The Unmoored Star's Hollow at Shattered Firmament - **/realm → Secret Realms → Enter**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 852,
+        "spirit_stones": 875
+      },
+      "follow_on": "realm_road_27"
+    },
+    {
+      "quest_key": "realm_road_27",
+      "realm_index": 27,
+      "title": "The Leviathan",
+      "description": "The Unmoored Star Leviathan swims the broken firmament at this realm. It is the last raid in the world.",
+      "opening": "It has no lair because it needs none. It is the thing the stars were afraid of.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Celestial King",
+          "count": 1,
+          "label": "Break through into Celestial King - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "raid",
+          "type": "raid_win",
+          "target": "Unmoored Star Leviathan",
+          "count": 1,
+          "label": "Bring down the Unmoored Star Leviathan and claim your share - **/combat → Boss Raids → Claim**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 880,
+        "spirit_stones": 900
+      },
+      "follow_on": "realm_road_28"
+    },
+    {
+      "quest_key": "realm_road_28",
+      "realm_index": 28,
+      "title": "The Buried Court",
+      "description": "The Buried Court Assize at Buried Court Ruin opens on the rotation. At Celestial Emperor the deepest Laws - Life, Death, the Void - have a Domain.",
+      "opening": "The court was buried with its judges in it. They are still in session.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Celestial Emperor",
+          "count": 1,
+          "label": "Break through into Celestial Emperor - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "assize",
+          "type": "realm_enter",
+          "target": "buried_court_assize",
+          "count": 1,
+          "label": "Enter the Buried Court Assize at Buried Court Ruin - **/realm → Secret Realms → Enter**"
+        },
+        {
+          "id": "deep",
+          "type": "law_technique",
+          "count": 1,
+          "label": "Manifest a Law technique - the deep Laws have theirs now - **/cultivation → Laws → Technique**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 908,
+        "spirit_stones": 925
+      },
+      "follow_on": "realm_road_29"
+    },
+    {
+      "quest_key": "realm_road_29",
+      "realm_index": 29,
+      "title": "Nine Pillars",
+      "description": "The Nine Pillar Vault at Nine Pillar Ruin is the deepest ruin in the game that needs no key. The Perfect Path at this ninth stage is the last one worth walking before the Saint's.",
+      "opening": "Nine pillars hold the vault up. Nobody remembers what the tenth held.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Celestial Ancestor",
+          "count": 1,
+          "label": "Break through into Celestial Ancestor - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "pillars",
+          "type": "realm_enter",
+          "target": "nine_pillar_vault",
+          "count": 1,
+          "label": "Enter the Nine Pillar Vault at Nine Pillar Ruin - **/realm → Secret Realms → Enter**"
+        },
+        {
+          "id": "perfect",
+          "type": "perfection_start",
+          "count": 1,
+          "label": "Begin a Perfect Path at the ninth stage - **/ascend → Perfection → Start**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 936,
+        "spirit_stones": 950
+      },
+      "follow_on": "realm_road_30"
+    },
+    {
+      "quest_key": "realm_road_30",
+      "realm_index": 30,
+      "title": "A World of Your Own",
+      "description": "A Dao Saint who holds the whole of the Law of Space folds a world of their own. Comprehend Space to Essence/Origin, then stabilize the world with **/innerworld → Personal World → Create**.",
+      "opening": "Everything you have walked through was somebody's. This is where you make one.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Dao Saint",
+          "count": 1,
+          "label": "Break through into Dao Saint - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "space",
+          "type": "law_comprehend",
+          "count": 1,
+          "label": "Comprehend the Law of Space to Essence/Origin - **/cultivation → Laws → Comprehend**",
+          "target": "space"
+        },
+        {
+          "id": "world",
+          "type": "personal_world",
+          "count": 1,
+          "label": "Stabilize a personal world - **/innerworld → Personal World → Create**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 964,
+        "spirit_stones": 975
+      },
+      "follow_on": "realm_road_31"
+    },
+    {
+      "quest_key": "realm_road_31",
+      "realm_index": 31,
+      "title": "The Sovereign",
+      "description": "Dao Sovereign is the top of the ladder. World Collapse is the Law of Space's capstone, manifested inside a world you folded yourself; nothing stands above it, and nothing is handed over after it.",
+      "opening": "There is no realm above this one. What you do here is the end of the road and the only reason it was built.",
+      "objectives": [
+        {
+          "id": "gate",
+          "type": "breakthrough",
+          "target": "Dao Sovereign",
+          "count": 1,
+          "label": "Break through into Dao Sovereign - **/cultivation → Cultivate → Breakthrough**"
+        },
+        {
+          "id": "collapse",
+          "type": "law_technique",
+          "count": 1,
+          "label": "Manifest World Collapse inside your own world - **/cultivation → Laws → Technique**",
+          "target": "world_collapse"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 992,
+        "spirit_stones": 1000
       },
       "follow_on": ""
     }

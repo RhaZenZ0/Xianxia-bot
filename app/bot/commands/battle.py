@@ -356,6 +356,11 @@ async def _execute_battle_law_technique(interaction: discord.Interaction, battle
     roll = SimpleNamespace(**dict(result.get("roll") or {}))
     lines = [f"🌌 **{result.get('technique_name', technique)}**", roll_line(roll)]
     if bool(getattr(roll, "success", False)):
+        # A technique that landed is what the upper worlds' road asks for
+        # (v1.18.0): recorded once the engine has resolved the roll, and before
+        # anything is sent. The caller draws the battle panel; the journal
+        # carries the advance.
+        await record_quest_progress(interaction.user.id, "law_technique", target=technique, amount=1, game_minute=wt.total_minutes)
         # What the effect did to the opponent (v1.3.3), read off the engine's
         # own sum rather than the content: the battle row carries it now.
         debuff = opponent_debuff_label(result.get("opponent_modifiers"))
@@ -367,12 +372,17 @@ async def _execute_battle_law_technique(interaction: discord.Interaction, battle
         if result.get("effect_target") == "user":
             # A Domain is the caster's own ground, not the opponent's debuff.
             lines.append(f"🌀 **{result.get('effect_label') or result.get('technique_name', technique)}** settles around **you** for {max(1, int(result.get('duration_game_minutes', 0)) // 60)} world hour(s).")
-        if technique == "spatial_lockdown":
-            lines.append(f"Space freezes around **{battle['npc_name']}**. Their counteractions are suppressed for **{int(result.get('suppressed_turns', 1))} turn(s)**.")
-        elif technique == "spatial_strangulation":
-            lines.append(f"Space compresses inward for **{int(result.get('damage_dealt', 0))} conceptual damage**. Opponent Vitality: **{int(result.get('npc_hp', 0))}**.")
+        # What the technique did is read off the result, never off its id
+        # (v1.18.0): a control effect tagged `damage` crushes, any other holds,
+        # and the engine says which by the keys it answers with. Twenty
+        # techniques across ten more Laws would otherwise each have needed a
+        # line here.
+        if "damage_dealt" in result:
+            lines.append(f"**{result.get('technique_name', technique)}** lands for **{int(result.get('damage_dealt', 0))} conceptual damage**. Opponent Vitality: **{int(result.get('npc_hp', 0))}**.")
             if result.get("opponent_defeated"):
                 lines.append("🏆 **Opponent defeated.** The battle remains open for your explicit **Spare** or **Kill** decision.")
+        elif "suppressed_turns" in result:
+            lines.append(f"**{battle['npc_name']}** is held. Their counteractions are suppressed for **{int(result.get('suppressed_turns', 1))} turn(s)**.")
         else:
             lines.append("Your Law dominates the local rules of the exchange.")
     else:

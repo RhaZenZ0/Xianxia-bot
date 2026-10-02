@@ -980,6 +980,46 @@ func (r *Runner) applyAutonomousWorldEffect(conn *storage.Conn, event Unexpected
 	return impacts, nil
 }
 
+// worldsWithLivingCharacters is the set of worlds a living cultivator has set
+// foot in: the worlds of every place a living character has discovered, plus
+// wherever they stand now. It answers nil - "no preference" - when no living
+// character knows a catalogue place, or when the tables are not there yet (the
+// compose stack's migration window, v1.1.0's rule), so the autonomous batch
+// then draws from every world as it always did. Known places rather than the
+// current location alone, because a character inside a household or a
+// personal world stands somewhere the catalogue does not carry, and a
+// cultivator who crossed a world and went home still keeps the world above
+// in play.
+func (r *Runner) worldsWithLivingCharacters(conn *storage.Conn) map[string]bool {
+	if !simTableExists(conn, "characters") {
+		return nil
+	}
+	out := map[string]bool{}
+	note := func(res storage.Result, err error) {
+		if err != nil {
+			return
+		}
+		for _, row := range res.Rows {
+			if len(row) == 0 {
+				continue
+			}
+			if loc, ok := r.Catalog.Locations[strings.TrimSpace(fmt.Sprint(row[0]))]; ok && strings.TrimSpace(loc.World) != "" {
+				out[loc.World] = true
+			}
+		}
+	}
+	res, err := conn.Execute(`SELECT location FROM characters WHERE life_status='alive'`, nil)
+	note(res, err)
+	if simTableExists(conn, "character_location_discoveries") {
+		res, err = conn.Execute(`SELECT DISTINCT d.location FROM character_location_discoveries d JOIN characters c ON c.user_id=d.user_id WHERE c.life_status='alive'`, nil)
+		note(res, err)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
 func (r *Runner) autonomousWorldEvents(conn *storage.Conn, steps, gm int64) (string, []SpawnedWorldEvent, error) {
 	_ = steps
 	if !simTableExists(conn, "world_events") {
@@ -996,9 +1036,20 @@ func (r *Runner) autonomousWorldEvents(conn *storage.Conn, steps, gm int64) (str
 		location string
 		event    UnexpectedEvent
 	}
+	// Where the players are (v1.18.0). The pick used to be uniform over every
+	// place in all four worlds, so on a server whose cultivators were all in
+	// the Mortal World - every server until somebody reaches realm 8 - three
+	// events in four manifested, spawned their site and cast and posted to a
+	// per-world feed in a world no player could enter, and expired unvisited.
+	// A world nobody living has set foot in is left alone; with nobody living
+	// at all, every world is eligible, as before.
+	living := r.worldsWithLivingCharacters(conn)
 	candidates := []candidate{}
 	for location, loc := range r.Catalog.Locations {
 		if loc.Private || strings.HasPrefix(location, "abode:") || strings.HasPrefix(location, "personal_world:") || loc.interior() {
+			continue
+		}
+		if living != nil && !living[loc.World] {
 			continue
 		}
 		for _, event := range r.Catalog.UnexpectedEvents {
