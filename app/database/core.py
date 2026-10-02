@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 73
+SCHEMA_VERSION = 74
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -237,6 +237,54 @@ OPERATIONAL_REQUIRED_TABLES = frozenset(
         "world_state",
     }
 )
+# Where each public sect's gate was seated in v1.19.0 - a frozen copy of
+# content/world.json at that release, the migration-46 shape, read by
+# migration 74 alone. A gate was a road-less place of its own before and a
+# sect's first claim in the politics tick; seated, it is a district of its
+# city, which no sect claims, and the sect's home is the city. The live rule
+# reads the catalogue (`cityOf`); a migration must not, because the content a
+# running world is upgraded against is the content of the release it upgrades
+# to, and a later re-seating must not silently rewrite this one.
+SECT_SEATS_AT_V1_19_0: tuple[tuple[str, str], ...] = (
+    ("Ashen Lotus Shrine Gate", "Lunar Veil Immortal City"),
+    ("Azure Cloud Mountain Gate", "Cloudblade City"),
+    ("Black Serpent Ravine", "Moonfen City"),
+    ("Blood River Gorge", "Riverguard City"),
+    ("Mandate Academy Star Steps", "Mandate Crown Celestial City"),
+    ("Corpse Lantern Necropolis", "Ashenwall City"),
+    ("Crimson Furnace Valley", "Emberforge City"),
+    ("Frozen Moon Terrace", "Frostwatch City"),
+    ("Heavenblade Sword Terrace", "Heavenblade Immortal City"),
+    ("Jade Meridian Stone Gate", "Jade Crown Spirit City"),
+    ("Thousand Beast Valley Mouth", "Galevein Spirit City"),
+    ("Void Serpent Pit", "Lunar Shadow Celestial City"),
+)
+
+
+def _sect_seat_claim_statements() -> tuple[str, ...]:
+    """Migration 74's statements: a sect's claim on a gate moves to the gate's
+    seat where the seat is neutral, and the gate - a district now, which no
+    sect claims - goes back to neutral once the seat carries the same banner.
+    A seat another sect holds is left alone, and so is the gate's claim beside
+    it: a war may be on over it, and a migration does not take sides."""
+    out: list[str] = []
+    for gate, seat in SECT_SEATS_AT_V1_19_0:
+        g, c = gate.replace("'", "''"), seat.replace("'", "''")
+        out.append(
+            "UPDATE territory_state SET controller_type='sect', "
+            f"controller_key=(SELECT g.controller_key FROM territory_state g WHERE g.territory_key='{g}'), "
+            "updated_at=strftime('%s','now') "
+            f"WHERE territory_key='{c}' AND controller_type='neutral' "
+            f"AND EXISTS (SELECT 1 FROM territory_state g WHERE g.territory_key='{g}' AND g.controller_type='sect' AND g.controller_key<>'')"
+        )
+        out.append(
+            "UPDATE territory_state SET controller_type='neutral', controller_key='', updated_at=strftime('%s','now') "
+            f"WHERE territory_key='{g}' AND controller_type='sect' "
+            f"AND EXISTS (SELECT 1 FROM territory_state s WHERE s.territory_key='{c}' AND s.controller_type='sect' AND s.controller_key=territory_state.controller_key)"
+        )
+    return tuple(out)
+
+
 SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
     (
         1,
@@ -2910,6 +2958,17 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             "WHEN 'Ghost Cultivator' THEN json_object('body',1+COALESCE(body_realm_index,0),'agility',2,'spirit',3,'insight',2,'will',3,'presence',1) "
             "ELSE attributes_json END",
         ),
+    ),
+    (
+        74,
+        "sect_claims_sit_in_the_seat",
+        # v1.19.0: every public sect's gate is a district of a seat city and
+        # the sect's home in the politics tick is the city. A world that ran
+        # v1.12.0's claims holds `territory_state` rows naming a gate as a
+        # sect's ground; a gate is a part of its city now and no sect claims a
+        # part, so each such claim moves onto the seat where the seat is
+        # neutral. See `_sect_seat_claim_statements` for what is left alone.
+        _sect_seat_claim_statements(),
     ),
 )
 

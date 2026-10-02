@@ -62,8 +62,11 @@ PERSONAL_WORLD_FLOOR = int(
 #   0 Body Tempering      the first hour: cultivate, break through, explore, buy,
 #                         craft, forge, gather, hunt, mine, quest - the owner's
 #                         list (v1.2.0) - plus a companion and the body path
-#   2 Foundation Establishment  everything else the game has: a sect's rooms,
-#                         a party, the auction floor, the markets, the roads
+#   1 Qi Refining         everything else the game has: a sect's rooms, a
+#                         party, the auction floor, the markets, the roads -
+#                         the second band, moved down from Foundation
+#                         Establishment on the owner's call (v1.19.0): the
+#                         first gate opens the game, not the second
 #   3 Core Formation      the underworld, the caravans, a home of your own
 #   4 Nascent Soul        holding ground: territory, war, a house, a partner
 #   5 Soul Formation      what a life leaves behind
@@ -74,8 +77,11 @@ PERSONAL_WORLD_FLOOR = int(
 #
 # v1.2.0, on the owner's call: *"Cultivation, Breakthrough, Explore, Shop,
 # Craft, Forge, Gather, Hunt, Mine, Quest until Foundation Establishment -
-# these things are enough."* So everything outside that list waits for realm
-# 2 at the earliest; the floors already above 2 stay where they were. Two
+# these things are enough."* So everything outside that list waited for realm
+# 2 at the earliest; since v1.19.0 it waits for realm 1, the first gate, on the
+# owner's call - the second world-flow study measured that realm 1 opened
+# almost nothing the first hour had not shown - and the floors already above
+# that stay where they were. Two
 # things stay at 0 against the list, on the same call: `beast / Companions`
 # (a companion is the one system the first hour has to be told about) and
 # `cultivation / Body` (the body path is a way of cultivating, not a system
@@ -84,7 +90,7 @@ PERSONAL_WORLD_FLOOR = int(
 # content floor `law_system.normal_min_realm_index` rather than by an entry
 # here (a second statement of one rule is the rc.39 fault).
 PAGES: dict[str, int] = {
-    "character / Afflictions": 2,
+    "character / Afflictions": 1,
     "character / Consequences": 3,
     "character / Dao Partnership": 4,
     "character / Fate": 4,
@@ -95,50 +101,50 @@ PAGES: dict[str, int] = {
     # rest while a path is under way, so the page is never a wall of refusals.
     "ascend / Perfection": 0,
     "cultivation / Qi Body": 8,
-    "cultivation / Ghost": 2,
-    "cultivation / Path": 2,
-    "cultivation / Arts": 2,
-    "items / Storage": 2,
-    "items / Artifacts": 2,
-    "items / Provenance": 2,
-    "world / City": 2,
-    "travel / Realm Capitals": 2,
-    "travel / Teleportation Arrays": 2,
-    "combat / Active Battle": 2,
-    "combat / Duels": 2,
-    "combat / Party": 2,
-    "combat / Formations": 2,
+    "cultivation / Ghost": 1,
+    "cultivation / Path": 1,
+    "cultivation / Arts": 1,
+    "items / Storage": 1,
+    "items / Artifacts": 1,
+    "items / Provenance": 1,
+    "world / City": 1,
+    "travel / Realm Capitals": 1,
+    "travel / Teleportation Arrays": 1,
+    "combat / Active Battle": 1,
+    "combat / Duels": 1,
+    "combat / Party": 1,
+    "combat / Formations": 1,
     "combat / Boss Raids": 3,
     "combat / Bounty Hunter": 3,
-    "economy / Local Market": 2,
-    "economy / Market Stalls": 2,
-    "economy / Auction House": 2,
-    "economy / Merchants": 2,
-    "economy / Trade": 2,
+    "economy / Local Market": 1,
+    "economy / Market Stalls": 1,
+    "economy / Auction House": 1,
+    "economy / Merchants": 1,
+    "economy / Trade": 1,
     "economy / Black Market": 3,
     "economy / Caravans": 3,
-    "craft / Alchemy": 2,
-    "craft / Profession": 2,
+    "craft / Alchemy": 1,
+    "craft / Profession": 1,
     # Flames (v1.10.0): a system past the first hour, like the rest of the
     # trades beyond the basics. The Mortal flame is held from the same realm.
-    "craft / Flames": 2,
-    "craft / Spirit Sense": 2,
-    "sect / Sect": 2,
+    "craft / Flames": 1,
+    "craft / Spirit Sense": 1,
+    "sect / Sect": 1,
     # `sect / Recruitment` stays at 0 (v1.1.0): Recommendation and Trial take
     # an argument, so a hub press is the only way to reach them, and
     # `road_to_a_sect` - which the path hands everybody - asks exactly that.
-    "sect / Discipleship": 2,
-    "sect / Holdings": 2,
+    "sect / Discipleship": 1,
+    "sect / Holdings": 1,
     "sect / Territory": 4,
     "sect / War": 4,
-    "family / Family": 2,
+    "family / Family": 1,
     "family / House": 4,
     "family / Legacy": 5,
     "abode / Property": 3,
     "abode / Access": 3,
     "innerworld / Personal World": PERSONAL_WORLD_FLOOR,
-    "realm / Secret Realms": 2,
-    "realm / Spatial Keys": 2,
+    "realm / Secret Realms": 1,
+    "realm / Spatial Keys": 1,
 }
 
 # Leaf -> the realm it opens at, overriding its page. Each says why.
@@ -147,9 +153,9 @@ LEAVES: dict[str, int] = {
     # not happened yet. The sheet is the first thing anybody opens.
     "sheet": 0,
     "lifespan": 0,
-    "karma": 2,
-    "reputation": 2,
-    "daoheart": 2,
+    "karma": 1,
+    "reputation": 1,
+    "daoheart": 1,
     "inheritances": 5,
     "soul": 5,
     # `character / Samsara` is gated at 5, but a reset is for the player who
@@ -202,8 +208,8 @@ LEAVES: dict[str, int] = {
     "provenance": 0,
     # The hidden sect's door is its own karma gate, not a realm one; the
     # recruitment page it sits on opens at 0 since v1.1.0, and this does not.
-    "sect shadow": 2,
-    "boss list": 2,
+    "sect shadow": 1,
+    "boss list": 1,
 }
 
 # `is_status_read` is the rule rather than a list, because the list is what

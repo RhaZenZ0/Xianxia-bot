@@ -150,3 +150,50 @@ func TestAPrivateGateIsNotInPlainSightFromItsSeat(t *testing.T) {
 		}
 	}
 }
+
+// A gate known before v1.19.0 seated it was a road-less place a cultivator
+// could jump to; seated, it is a district, entered only from inside its city.
+// A world upgrading carries `character_location_discoveries` rows naming the
+// gate and not the seat, so the rule that grandfathers them is that a known
+// part of a city is a known city: the seat is on the travel list because the
+// gate is. Its drill removes the expansion from knownLocationsTx and prints
+// the seat as unknown.
+func TestAGateKnownBeforeTheSeatsPutsTheSeatOnTheMap(t *testing.T) {
+	catalog := seatCatalog(t)
+	sect := ""
+	for name, def := range catalog.Sects {
+		if gate := sectGate(catalog, name); gate != "" && !catalog.Locations[gate].Private && def.Recruitment.Public() {
+			if sect == "" || name < sect {
+				sect = name
+			}
+		}
+	}
+	if sect == "" {
+		t.Fatal("the content carries no public seated sect; the fixture is broken, not the rule")
+	}
+	seat, gate := sectSeat(catalog, sect), sectGate(catalog, sect)
+	path := setupSectTrialDB(t)
+	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS character_location_discoveries(user_id INTEGER NOT NULL, location TEXT NOT NULL, discovery_kind TEXT NOT NULL DEFAULT '', discovered_game_minute INTEGER NOT NULL DEFAULT 0, created_at REAL NOT NULL DEFAULT 0, PRIMARY KEY(user_id,location))`)
+	// Standing somewhere with no roads to the seat, holding the pre-seat row.
+	batch4Exec(t, path, `UPDATE characters SET location='Greenriver Town' WHERE user_id=42`)
+	batch4Exec(t, path, `INSERT INTO character_location_discoveries(user_id,location,discovery_kind,discovered_game_minute,created_at) VALUES(42,'`+gate+`','recruitment_route',0,0)`)
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	c, err := loadMechanicsCharacter(conn, catalog, 42)
+	if err != nil {
+		t.Fatal(err)
+	}
+	known, err := knownLocationsTx(conn, catalog, 42, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !known[gate] {
+		t.Fatalf("the discovery row for %q was not read; the fixture is broken, not the rule", gate)
+	}
+	if !known[seat] {
+		t.Fatalf("%s is known from before the seats and %s, the city it is a district of, is not: the gate is on the map and cannot be walked to", gate, seat)
+	}
+}

@@ -825,6 +825,17 @@ func knownLocationsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 			known[fmt.Sprint(row[0])] = true
 		}
 	}
+	// A known part of a city is a known city (v1.19.0). Somebody who has stood
+	// at a sect's gate knows which city it is a district of - and a district is
+	// walked into only from inside its city, so a gate revealed before the gates
+	// were seated (an envoys' hall, a sponsor) would otherwise be known and
+	// unreachable. The rule rather than a migration: it is true of every part a
+	// discovery row will ever name, and it costs a running world nothing.
+	for place := range known {
+		if city := cityOf(catalog, place); city != place {
+			known[city] = true
+		}
+	}
 	if c.Location != "" && !strings.HasPrefix(c.Location, "abode:") && !strings.HasPrefix(c.Location, "personal_world:") {
 		known[c.Location] = true
 		for _, neighbor := range canonicalRoadNeighbors(catalog, c.Location, c.accessRealmIndex()) {

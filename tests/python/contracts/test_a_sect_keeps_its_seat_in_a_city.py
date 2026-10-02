@@ -25,7 +25,10 @@ import asyncio
 import importlib
 import json
 import os
+import sqlite3
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -214,3 +217,55 @@ class EverySurfaceNamesTheSeat(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ARunningWorldIsCarriedOntoTheSeats(unittest.IsolatedAsyncioTestCase):
+    """Migration 74 (v1.19.0). A world that ran v1.12.0's politics tick holds
+    `territory_state` rows in which a sect's first claim is its gate - a
+    road-less place of its own then, a district of its seat now, and a sect
+    claims a city rather than one of its streets. The claim moves onto the
+    seat where the seat is neutral; a seat another sect holds, and the gate
+    beside it, are left as they are, because a war may be on over them and a
+    migration does not take sides."""
+
+    async def _world_at(self, version: int):
+        from tests.support import install_aiosqlite_shim
+        install_aiosqlite_shim()
+        from app.database import Database
+        from app.database import core as database_core
+        tmp = tempfile.mkdtemp()
+        path = Path(tmp) / "seats.sqlite3"
+        migrations = tuple(m for m in database_core.SCHEMA_MIGRATIONS if int(m[0]) <= version)
+        with patch.object(database_core, "SCHEMA_VERSION", version), patch.object(database_core, "SCHEMA_MIGRATIONS", migrations):
+            await Database(path).init()
+        return path, Database
+
+    def _territory(self, conn, key, controller_type="neutral", controller_key=""):
+        conn.execute(
+            "INSERT OR REPLACE INTO territory_state(territory_key,name,region,controller_type,controller_key,updated_at) VALUES(?,?,?,?,?,0)",
+            (key, key, "Mortal World", controller_type, controller_key),
+        )
+
+    async def test_a_claim_on_a_gate_moves_to_its_seat_and_a_contested_seat_is_left(self):
+        from app.database import core as database_core
+        pairs = dict(database_core.SECT_SEATS_AT_V1_19_0)
+        self.assertEqual(pairs, {_gate(s): _seat_by_content(s) for s in _public_sects()},
+                         "the frozen pairs no longer match the content: a re-seating needs a migration of its own, not an edit to this one")
+        path, Database = await self._world_at(73)
+        moved_gate, moved_seat = "Azure Cloud Mountain Gate", "Cloudblade City"
+        held_gate, held_seat = "Crimson Furnace Valley", "Emberforge City"
+        with sqlite3.connect(path) as conn:
+            self._territory(conn, moved_gate, "sect", "Azure Cloud Sect")
+            self._territory(conn, moved_seat)
+            self._territory(conn, held_gate, "sect", "Crimson Furnace Sect")
+            self._territory(conn, held_seat, "sect", "Frozen Moon Palace")
+            conn.commit()
+        await Database(path).init()
+        with sqlite3.connect(path) as conn:
+            rows = {k: (t, c) for k, t, c in conn.execute("SELECT territory_key,controller_type,controller_key FROM territory_state")}
+            version = conn.execute("SELECT current_version FROM schema_version WHERE singleton=1").fetchone()[0]
+        self.assertGreaterEqual(version, 74, "the migration did not run; the reader is broken, not the tree")
+        self.assertEqual(rows[moved_seat], ("sect", "Azure Cloud Sect"), "the sect's claim on its gate did not move onto its seat")
+        self.assertEqual(rows[moved_gate], ("neutral", ""), "the gate is a district of its seat now, and no sect claims a street")
+        self.assertEqual(rows[held_seat], ("sect", "Frozen Moon Palace"), "a seat another sect holds is not taken by a migration")
+        self.assertEqual(rows[held_gate], ("sect", "Crimson Furnace Sect"), "a gate beside a contested seat is left as it is")

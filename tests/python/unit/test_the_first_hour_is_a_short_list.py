@@ -118,12 +118,19 @@ class TheThresholdIsOne(unittest.TestCase):
         held = sorted(f"{leaf!r} (opens at realm {LEAVES[leaf]})" for leaf in STARTER_LEAVES if leaf in LEAVES)
         self.assertEqual(held, [], "the owner's first-hour list is held back:\n  " + "\n  ".join(held))
 
-    def test_nothing_opens_between_body_tempering_and_foundation_establishment(self):
-        """One threshold, not a staircase: a door either belongs to the first
-        hour or waits for Foundation Establishment at the earliest."""
-        early = sorted(f"{leaf!r} (realm {realm})" for leaf, realm in LEAVES.items() if 0 < realm < 2)
-        self.assertEqual(early, [], "a door opens at Qi Refining, between the two ends of the first hour:\n  "
-                         + "\n  ".join(early))
+    def test_the_second_band_is_no_later_than_foundation_establishment(self):
+        """The owner's list (v1.2.0) is *"these things are enough until
+        Foundation Establishment"*: a door either belongs to the first hour or
+        waits for the second band, and the band is never later than that
+        realm. Which realm it is - Foundation Establishment in v1.2.0, Qi
+        Refining since v1.19.0 on the owner's call - is a decision this gate
+        deliberately does not pin (v1.0.8: a gate that pins a decision fails
+        exactly when the decision is taken again)."""
+        foundation = next(i for i, realm in enumerate(CONTENT["realms"]) if realm.get("name") == "Foundation Establishment")
+        self.assertGreater(foundation, 0, "the ladder could not be read; the gate is broken, not the tree")
+        band = min(realm for realm in LEAVES.values() if realm > 0)
+        self.assertLessEqual(band, foundation, f"the second band opens at realm {band}, later than Foundation "
+                             f"Establishment ({foundation}); the owner's first-hour list ran out before the game opened")
 
     def test_the_qi_body_and_the_laws_wait_for_the_spiritual_world(self):
         """Meridians for the Spiritual World (the owner's call), gated two ways

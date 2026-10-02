@@ -412,8 +412,12 @@ async def run(url: str, token: str, db_path: str) -> Report:
                act_free("exploration.travel", APPLICANT, {"destination": gate, "mode": "known"}), expect_error="travel there first")
     walked = await step(report, "travel to the seat the envoys named", act_free("exploration.travel", APPLICANT, {"destination": seat, "mode": "known"}))
     if walked is not None:
+        # A road arrives at the gate facing where you came from (v1.0.9), and a
+        # city's gate is that city - so the arrival is held to the seat's parts,
+        # not to the seat's own name.
         where = str((await db.get_character(APPLICANT) or {}).get("location"))
-        report.add("PASS" if where == seat else "FAIL", "the seat is on the travel list, and the road lands there", where)
+        arrived = str(world["locations"].get(where, {}).get("outside_location") or where) if world["locations"].get(where, {}).get("district") else where
+        report.add("PASS" if arrived == seat else "FAIL", "the seat is on the travel list, and the road lands in it", where)
     entered = await step(report, "enter the gate from the seat's street", act_free("exploration.travel", APPLICANT, {"destination": gate, "mode": "known"}))
     if entered is not None:
         where = str((await db.get_character(APPLICANT) or {}).get("location"))
@@ -2513,7 +2517,11 @@ async def run(url: str, token: str, db_path: str) -> Report:
     await audited("admin.player.set_realm_perfection", {"user_id": BUYER, "track": "cultivation", "realm_index": 0, "progress": 100, "reason": "playtest"})
     await step(report, "perfection.abandon is idempotent", act("perfection.abandon", BUYER, {}))
     await step(report, "perfection.body_abandon is idempotent", act("perfection.body_abandon", BUYER, {}))
-    await audited("admin.player.set_sect", {"user_id": BUYER, "sect_name": "Azure Cloud Sect", "rank_name": "Outer Disciple", "rank_level": 10, "reason": "playtest"})
+    # The master lever wants both in one sect, and the player climbed into the
+    # allied sect above in the v1.18.0 leg - so the buyer is set into whichever
+    # sect the player holds now, read back rather than written down.
+    players_sect = str((await db.get_sect_membership(PLAYER) or {}).get("sect_name") or "Azure Cloud Sect")
+    await audited("admin.player.set_sect", {"user_id": BUYER, "sect_name": players_sect, "rank_name": "Outer Disciple", "rank_level": 10, "reason": "playtest"})
     await audited("admin.player.set_sect_rank", {"user_id": BUYER, "rank_name": "Inner Disciple", "rank_level": 30, "reason": "playtest"})
     await audited("admin.player.set_master", {"disciple_user_id": BUYER, "master_user_id": PLAYER, "reason": "playtest"})
     await audited("admin.player.master_attention", {"disciple_user_id": BUYER, "delta": 5, "reason": "playtest"})

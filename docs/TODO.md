@@ -42,10 +42,11 @@ deferred half and not the half that says what was done about it.
 - **fixed (v1.18.0)** — *Autonomous world events drew from every world evenly.* The weekly tick
   picks a world a living cultivator stands in or has discovered a place in
   (`worldsWithLivingCharacters`); with nobody living, every world is eligible as before.
-- **deferred (design)** — *Open the Qi Refining pages at realm 1 rather than realm 2.* The second
-  study's measurement: realm 1 opens almost nothing the first hour did not already show, and the
-  curriculum's second band lands at Foundation Establishment. Whether the first gate should open
-  more is a pacing decision the owner has not taken; nothing is changed.
+- **fixed (v1.19.0)** — *Open the Qi Refining pages at realm 1 rather than realm 2.* The second
+  study's measurement: realm 1 opened almost nothing the first hour did not already show, and the
+  curriculum's second band landed at Foundation Establishment. On the owner's call ("the next open
+  todo") the band is Qi Refining: every page `scripts/author_feature_unlocks.py` held to realm 2
+  opens at realm 1, the deeper floors stay where they were, and the first gate opens the game.
 - **deferred (content)** — *The Celestial ring is a line.* Both world-flow studies: the Celestial
   World's gates face east ten times and west nine, north and south twice each, where the Spiritual
   and Immortal rings are near even. Re-authoring its compass - directions on gates and new gate rows

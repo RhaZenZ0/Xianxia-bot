@@ -10,7 +10,14 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 Asked for as *"more capitals with rivals, and move the sects that fit"*, and taken as the smaller shape: one capital per world stays, and the rivalry the sects already run between them - the weekly claims, the wars, the relations the politics tick moves - becomes a city's politics by giving each sect a city to run it from. The Azure Cloud Sect sits in Cloudblade City, the Crimson Furnace Sect in Emberforge, the Frozen Moon Palace in Frostwatch, the Black Serpent Clan in Moonfen, the Blood River Sect in Riverguard, the Corpse Lantern Pavilion in Ashenwall; the Jade Meridian Sect and the Thousand Beast Valley in the Spiritual World's two cities, the Heavenblade Immortal Sect and the Ashen Lotus Pavilion in the Immortal World's, the Celestial Mandate Academy and the Void Serpent Cult in the Celestial World's. No two sects share a seat, no capital seats one, and the starting town is nobody's.
 
-It also changes what the politics tick does with a sect: a strong sect claims its seat city first and grows outward from it along the roads, where it used to claim a road-less gate and leap to a beachhead. A world event that lands in a seat city recruits for the sect seated there, and a sect's envoys and a sponsor's recommendation put the seat city on the travel list, because a gate is entered from inside its city. The two demonic sects' gates stay private: a sponsor reveals them, the street does not show them, and City → Enter never offers them. Nothing stored changes and no schema moved; the gates keep their names and their people.
+It also changes what the politics tick does with a sect: a strong sect claims its seat city first and grows outward from it along the roads, where it used to claim a road-less gate and leap to a beachhead. A world event that lands in a seat city recruits for the sect seated there, and a sect's envoys and a sponsor's recommendation put the seat city on the travel list, because a gate is entered from inside its city. The two demonic sects' gates stay private: a sponsor reveals them, the street does not show them, and City → Enter never offers them. The gates keep their names and their people, and a world already running is carried onto the seats: a
+gate a cultivator knew before it was seated puts its city on their travel list, because a known part of
+a city is a known city, and schema 74 moves a sect's claim on its own gate onto its seat.
+
+And the game's second band opens one gate earlier, on the owner's call: every page the curriculum held
+to Foundation Establishment - the sect's rooms, a party, the auction floor, the markets, the roads, the
+trades beyond the basics - opens at Qi Refining now, so the first breakthrough opens the game rather
+than the second. The deeper floors stay where they were.
 
 **1.18.0** carries the realm road through the three upper worlds - one quest a realm from Spirit Body Transformation to Dao Sovereign, each naming a real place and the thing done there - gives every Law a technique and a Domain of its own, opens a way up into the allied sect one world above for a member who carries their elders' letter to its gate, and lands the world's own events in the worlds somebody living has reached.
 
@@ -427,6 +434,9 @@ to reorder anything.
 - **Schema 66** adds `stall_channels` (one read-only market-stalls channel per world, the
   `world_event_channels` shape) and `stall_card_messages` (the live card per open stall) - Discord ids
   only; the stall is the `player_stalls` row the engine owns.
+- **Schema 74** moves a sect's claim on its own gate onto the gate's seat city where the seat is
+  neutral, and sets the gate - a district of its seat now, which no sect claims - back to neutral; a
+  seat another sect holds, and the gate beside it, are left as they are (v1.19.0).
 - **Schema 73** rewrites `characters.attributes_json` to the base the engine grows from: the path's
   starting spread plus the body ladder's +1 body a body realm. Qi-stage growth is computed (v1.14.0).
 - **Schema 72** adds `characters.path_resource`: a path's banked resource, today a Sword

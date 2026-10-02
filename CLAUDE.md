@@ -156,7 +156,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 73; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 74; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -6242,6 +6242,32 @@ a `sect_gate` district of its city, and five readers had to learn what a distric
 counts a city's own districts and the people gate wants two per district; a `sect_gate` is excluded
 from the first and wants one in the second, like a gate or an inn, because its people are the sect's
 examiner and doorkeeper and the city's own district is still the one the rule is about.
+
+**A world already running is carried onto the seats, two ways.** A gate a cultivator knew before it was
+seated - an envoys' hall, a sponsor - was a road-less place they could jump to; seated, it is a district
+entered only from inside its city, and their `character_location_discoveries` row names the gate and
+not the seat. `knownLocationsTx` reads a known part of a city as a known city now, the rule rather than
+a data rewrite, because it is true of every part a discovery row will ever name; its drill prints *"the
+gate is on the map and cannot be walked to"*. And **migration 74** moves a sect's claim on its own gate
+(v1.12.0's first claim) onto its seat where the seat is neutral, setting the gate back to neutral once
+the seat carries the same banner - a seat another sect holds, and the gate beside it, are left alone,
+because a war may be on over them and a migration does not take sides. The pairs are a frozen copy of
+the content at v1.19.0 (`SECT_SEATS_AT_V1_19_0`, the migration-46 shape), and the test holds them equal
+to the content so a re-seating is a migration of its own rather than an edit to this one.
+
+**And the second band opens one gate earlier**, on the owner's call ("the next open todo" being the
+deferred pacing decision): every page `scripts/author_feature_unlocks.py` held to Foundation
+Establishment opens at Qi Refining, the deeper floors unchanged. `test_nothing_opens_between_body_tempering_and_foundation_establishment`
+had pinned the band to realm 2 and went red on the retune - the v1.0.8 shape - and holds the rule now:
+the band is never later than Foundation Establishment, read off the ladder, and which realm it is is the
+owner's.
+
+**The release playtest ran, and found two harness faults and nothing in the tree.** The envoys step held
+the road's arrival to the seat's own name, and a road arrives at the gate facing where you came from
+(v1.0.9), so it reads the city of the arrival. And the GM-lever leg set the buyer into the Azure Cloud
+Sect before `set_master` - which wants both in one sect - while v1.18.0's leg had climbed the player
+into the Jade Meridian Sect two sections earlier and never ran its playtest; the buyer is set into
+whichever sect the player holds, read back. The Discord half swept every hub green in three parts.
 
 **The drills.** The twin returning "" fails four tests at once; the street showing private parts
 names the private gate it offered; the header dropping the seat names the city line; and
