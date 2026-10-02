@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 75
+SCHEMA_VERSION = 76
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -413,6 +413,111 @@ def _celestial_gate_rename_statements() -> tuple[str, ...]:
         )
         out.append(f"UPDATE territory_wars SET territory_key={n} WHERE territory_key={o}")
         out.append(f"DELETE FROM territory_state WHERE territory_key={o}")
+    return tuple(out)
+
+
+# The upper worlds' city commissions re-banded in v1.19.2 - a frozen copy of
+# what `scripts/author_commission_bands.py` moved, the migration-46 shape, read
+# by migration 76 alone. Each was written with a Mortal band ("2-4" or "4-8")
+# that nobody standing in its world could fall inside, so the offer an NPC makes
+# in conversation never once offered it there.
+COMMISSION_BANDS_AT_V1_19_2: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    ('2-4', '9-14', (
+        'commission_city_broken_halo_spirit_city_1',
+        'commission_city_broken_halo_spirit_city_2',
+        'commission_city_cloudedge_spirit_city_1',
+        'commission_city_cloudedge_spirit_city_2',
+        'commission_city_galevein_spirit_city_1',
+        'commission_city_galevein_spirit_city_2',
+        'commission_city_hundred_herb_spirit_city_1',
+        'commission_city_hundred_herb_spirit_city_2',
+        'commission_city_jade_crown_spirit_city_1',
+        'commission_city_jade_crown_spirit_city_2',
+        'commission_city_jadeflow_spirit_city_1',
+        'commission_city_jadeflow_spirit_city_2',
+        'commission_city_moonfrost_spirit_city_1',
+        'commission_city_moonfrost_spirit_city_2',
+        'commission_city_northwind_spirit_city_1',
+        'commission_city_northwind_spirit_city_2',
+        'commission_city_spearwall_spirit_city_1',
+        'commission_city_spearwall_spirit_city_2',
+        'commission_city_spirit_jade_capital_1',
+        'commission_city_spirit_jade_capital_2',
+        'commission_city_spirit_jade_capital_3',
+        'commission_city_spirit_jade_capital_4',
+        'commission_city_stoneheart_spirit_city_1',
+        'commission_city_stoneheart_spirit_city_2',
+        'commission_city_vermilion_furnace_city_1',
+        'commission_city_vermilion_furnace_city_2',
+    )),
+    ('4-8', '18-23', (
+        'commission_city_adamant_body_immortal_city_1',
+        'commission_city_adamant_body_immortal_city_2',
+        'commission_city_fallen_star_immortal_city_1',
+        'commission_city_fallen_star_immortal_city_2',
+        'commission_city_golden_spear_immortal_city_1',
+        'commission_city_golden_spear_immortal_city_2',
+        'commission_city_heavenblade_immortal_city_1',
+        'commission_city_heavenblade_immortal_city_2',
+        'commission_city_immortal_river_city_1',
+        'commission_city_immortal_river_city_2',
+        'commission_city_jade_cauldron_immortal_city_1',
+        'commission_city_jade_cauldron_immortal_city_2',
+        'commission_city_lunar_veil_immortal_city_1',
+        'commission_city_lunar_veil_immortal_city_2',
+        'commission_city_nine_heavens_immortal_court_1',
+        'commission_city_nine_heavens_immortal_court_2',
+        'commission_city_nine_heavens_immortal_court_3',
+        'commission_city_nine_heavens_immortal_court_4',
+        'commission_city_ninefold_noble_immortal_city_1',
+        'commission_city_ninefold_noble_immortal_city_2',
+        'commission_city_polar_gate_immortal_city_1',
+        'commission_city_polar_gate_immortal_city_2',
+        'commission_city_skyroad_immortal_city_1',
+        'commission_city_skyroad_immortal_city_2',
+        'commission_city_solar_furnace_immortal_city_1',
+        'commission_city_solar_furnace_immortal_city_2',
+    )),
+    ('4-8', '26-31', (
+        'commission_city_celestial_mandate_palace_1',
+        'commission_city_celestial_mandate_palace_2',
+        'commission_city_celestial_mandate_palace_3',
+        'commission_city_celestial_mandate_palace_4',
+        'commission_city_celestial_river_city_1',
+        'commission_city_celestial_river_city_2',
+        'commission_city_divine_herb_celestial_city_1',
+        'commission_city_divine_herb_celestial_city_2',
+        'commission_city_firmament_blade_city_1',
+        'commission_city_firmament_blade_city_2',
+        'commission_city_froststar_border_city_1',
+        'commission_city_froststar_border_city_2',
+        'commission_city_lunar_shadow_celestial_city_1',
+        'commission_city_lunar_shadow_celestial_city_2',
+        'commission_city_mandate_crown_celestial_city_1',
+        'commission_city_mandate_crown_celestial_city_2',
+        'commission_city_mandate_spear_city_1',
+        'commission_city_mandate_spear_city_2',
+        'commission_city_ruined_constellation_city_1',
+        'commission_city_ruined_constellation_city_2',
+        'commission_city_solar_crucible_celestial_city_1',
+        'commission_city_solar_crucible_celestial_city_2',
+        'commission_city_starroad_celestial_city_1',
+        'commission_city_starroad_celestial_city_2',
+        'commission_city_worldstone_celestial_city_1',
+        'commission_city_worldstone_celestial_city_2',
+    )),
+)
+
+
+def _commission_band_statements() -> tuple[str, ...]:
+    """Migration 76's statements: the commission pool is seeded insert-only, so
+    a running world keeps the Mortal bands it was first given until this moves
+    them. Only a row still carrying the band it was authored with moves - a
+    band a GM has edited is obeyed (migration 55's rule)."""
+    out: list[str] = []
+    for old, new, keys in COMMISSION_BANDS_AT_V1_19_2:
+        listed = ",".join(_sql(key) for key in keys)
+        out.append(f"UPDATE quest_definitions SET realm_band={_sql(new)} WHERE realm_band={_sql(old)} AND quest_key IN ({listed})")
     return tuple(out)
 
 
@@ -3111,6 +3216,15 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
         # was given a quest, and is carried onto the new ones here. See
         # `_celestial_gate_rename_statements` for the columns and the order.
         _celestial_gate_rename_statements(),
+    ),
+    (
+        76,
+        "a_world_offers_its_own_work",
+        # v1.19.2: the upper worlds' city commissions carried Mortal realm
+        # bands, so the conversation offer never offered them to anybody in
+        # their own world. The content is re-banded; a running world's pool is
+        # insert-only and is moved here. See `_commission_band_statements`.
+        _commission_band_statements(),
     ),
 )
 

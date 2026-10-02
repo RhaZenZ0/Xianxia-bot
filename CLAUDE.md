@@ -156,7 +156,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 75; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 76; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -6321,6 +6321,38 @@ discovery on a merge lists both gates; and the old content fails four tests at o
 rule that matters, *"Lunar Shadow Celestial City faces all 2 of its roads by one gate"*. That last
 drill printed the whole 2.5 MB content file, because `assertNotIn` quotes its haystack; the content
 check is an `assertFalse` now, the v1.0.8 dashboard finding met again.
+
+### A world offers its own work (`scripts/author_commission_bands.py`, schema 76, v1.19.2)
+
+The deferred entry said a commission's `realm_band` was stored and read nowhere, and asked whether it
+should mean anything. **It was read, at one of its two doors**, and that is the finding. The offer an
+NPC makes in conversation filters the pool through `realm_band_allows`; the city's notice board, the
+other door to the same work, read no band at all. Every upper-world city commission was authored with
+a Mortal band - "2-4" in the Spiritual World, "4-8" in the Immortal and Celestial - while those
+worlds begin at realms 8, 16 and 24, so in conversation none of the seventy-eight was ever offered to
+anybody who could stand where it was posted, and the board offered all of them to anybody. Two doors,
+opposite answers, each right by its own reading: rc.28's *"worse than either being wrong alone"*.
+
+**A claim about what reads a field is only as good as the search behind it.** The v1.17.0 inventory
+searched Go, found the engine storing the band and reading it nowhere, and wrote "nothing breaks
+today" - which was true of the engine and false of the game, because the reader is Python. The
+v1.0.1 field gate is Go-only for the same reason and says so; a "read nowhere" note has to name
+where it looked.
+
+On the owner's call each world's city work sits inside its own realms, the way the Mortal tiers sit
+inside realms 0 to 7 (Spiritual 9-14, Immortal 18-23, Celestial 26-31), and `_city_board` takes the
+realm and applies the same `realm_band_allows` the conversation does, at the board, the accept check
+and the accept picker. `test_a_world_offers_its_own_work.py` holds the rule that would have caught it
+- every band lies inside the realms of the world its giver posts in, read off the ladder - and holds
+the board to the conversation's answer at every realm. The band is still an offer filter and not an
+engine bound, as it always was: `commission.accept` reads the tier and the giver, never the band.
+
+**Migration 76 moves a running world's pool**, which `sync_commission_pool` seeds insert-only, and
+moves only a row still carrying the band it was authored with (migration 55's rule: a GM's edit is
+obeyed). The pairs are frozen (`COMMISSION_BANDS_AT_V1_19_2`) and held equal to the script. Drills:
+the old bands name `commission_city_adamant_body_immortal_city_1` *"posted in the Immortal World
+(realms 16-23) and banded 4-8"*; a board that reads no band hands a realm-5 cultivator Celestial
+work; a migration without the guard overwrites the GM's `17-20`.
 
 ## Testing conventions
 

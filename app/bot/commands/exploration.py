@@ -19,6 +19,7 @@ from discord import app_commands
 from ...rules.advanced_runtime import BOSS_TEMPLATES, boss_lair, deed_karma_line, spirit_gain_line
 from ...rules.alchemy import alchemy_purge_refusal, toxicity_band
 from ...rules.birthfamily import family_profession_bonus
+from ...rules.commissions import realm_band_allows
 from ...rules.item_grades import grade_cap_note
 from ...ops.game_engine import GameEngineError
 from ...rules.progression_systems import profession_rank, profession_xp_needed
@@ -1453,14 +1454,22 @@ def _commission_giver_home(giver: str) -> str:
     return str((givers.get(giver) or {}).get("location") or (WORLD.npcs.get(giver) or {}).get("location") or "").strip()
 
 
-def _city_board(city: str) -> list[dict[str, Any]]:
-    """The commissions whose givers live in this city or its parts."""
+def _city_board(city: str, realm_index: int | None = None) -> list[dict[str, Any]]:
+    """The commissions whose givers live in this city or its parts.
+
+    Given a realm, only the work whose `realm_band` that realm falls inside
+    (v1.19.2): the offer an NPC makes in conversation reads the band through
+    `realm_band_allows`, and the board is the other door to the same work, so
+    the two must not give opposite answers about one commission."""
     rows = []
     for c in WORLD.data.get("commissions", []) or []:
         giver = str(c.get("giver_npc") or "")
         where = _commission_giver_home(giver)
-        if where and _city_of(where) == city:
-            rows.append(dict(c))
+        if not where or _city_of(where) != city:
+            continue
+        if realm_index is not None and not realm_band_allows(str(c.get("realm_band") or ""), realm_index):
+            continue
+        rows.append(dict(c))
     return sorted(rows, key=lambda c: (int(c.get("tier") or 1), str(c.get("title"))))
 
 
@@ -1610,9 +1619,14 @@ async def city_board(interaction: discord.Interaction) -> None:
     if not c:
         return
     city = _city_of(str(c.get("location") or ""))
-    board = _city_board(city)
-    if not board:
+    if not _city_board(city):
         await interaction.response.send_message(f"🪧 No board in {city} - find one in a city.", ephemeral=False)
+        return
+    board = _city_board(city, int(c.get("realm_index", 0) or 0))
+    if not board:
+        await interaction.response.send_message(
+            f"🪧 Nothing on {city}'s board is work for your realm - its commissions are for cultivators further along.",
+            ephemeral=False)
         return
     capital = bool(WORLD.locations.get(city, {}).get("realm_hub"))
     held = {str(r.get("quest_key")): str(r.get("status")) for r in await DB.list_character_quests(interaction.user.id)}
@@ -1644,7 +1658,7 @@ async def city_accept(interaction: discord.Interaction, quest: str, terms: app_c
     if not c:
         return
     city = _city_of(str(c.get("location") or ""))
-    board = {str(q.get("quest_key")): q for q in _city_board(city)}
+    board = {str(q.get("quest_key")): q for q in _city_board(city, int(c.get("realm_index", 0) or 0))}
     if quest not in board:
         await interaction.followup.send(f"❌ That is not on {city}'s board. Read it with **/world → City → Board**.", ephemeral=False)
         return
@@ -1671,7 +1685,7 @@ async def city_accept_quest_autocomplete(interaction: discord.Interaction, curre
     held = {str(r.get("quest_key")) for r in await DB.list_character_quests(interaction.user.id)}
     needle = current.casefold().strip()
     choices = []
-    for q in _city_board(city):
+    for q in _city_board(city, int(c.get("realm_index", 0) or 0)):
         key = str(q.get("quest_key"))
         if key in held:
             continue
