@@ -29,11 +29,11 @@ deferred half and not the half that says what was done about it.
   its cities, a secret realm at that wild place, and a key to it on its array workshops' shelves;
   and a raid's reward is paid in the money of the world it is fought in, where `boss.claim` paid
   the Mortal stone everywhere (rc.44's class, found at a sixteenth site).
-- **open (content)** — *Commission realm bands above the Mortal World.* The twenty-six city
+- **deferred (content)** — *Commission realm bands above the Mortal World.* The twenty-six city
   commissions of each upper world carry a `realm_band` of "2-4" (Spiritual) or "4-8" (Immortal and
   Celestial), which are Mortal ranges; the engine stores the band and reads it nowhere, so nothing
   breaks today. Found by the v1.17.0 inventory; whether a band should mean anything is a decision.
-- **open (content)** — *`world_rules.physical_laws.local_time_flow` is read by nothing in Go.*
+- **deferred (content)** — *`world_rules.physical_laws.local_time_flow` is read by nothing in Go.*
   1 / 3 / 9 / 27 per world, mentioned only in `app/rules/advanced_catalog.py`. Either a rule reads
   it or it goes; found by the v1.17.0 inventory.
 - **fixed (v1.14.0)** — *Attributes grow every stage.* (Deferred from v1.13.0 on the owner's call "ship paths first".)
