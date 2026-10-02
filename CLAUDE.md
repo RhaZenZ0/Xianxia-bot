@@ -6354,6 +6354,44 @@ the old bands name `commission_city_adamant_body_immortal_city_1` *"posted in th
 (realms 16-23) and banded 4-8"*; a board that reads no band hands a realm-5 cultivator Celestial
 work; a migration without the guard overwrites the GM's `17-20`.
 
+### Rules the world does not have (`test_every_world_rule_has_a_reader.py`, v1.19.3)
+
+`world_rules` carried two blocks that read like physics and sociology and that nothing read:
+`physical_laws` (a time flow of 1/3/9/27 per world, "higher worlds are stricter") and `social_laws`
+("npc ambition", a "world state driven" conflict multiplier). The engine indexes `WorldRules` for
+`forbidden_arts` alone and `/worldrules` prints the principle lists, and the one test naming the two
+blocks held only that they existed - a test of decoration's presence. Wiring the time flow was
+refused on the owner's call: faster higher worlds is already `world_qi_density`, read in every
+session, and a second number on that axis would price it twice, while a per-world clock would end
+the one canonical clock rc.39 and rc.48 built. Both blocks went, with their defaults in
+`augment_advanced_catalog`, which would otherwise have put them back in memory on every load.
+
+The gate holds every top-level `world_rules` key to a reader: an index on `catalog.WorldRules` in
+production Go, or a string named in a Python function that touches `world_rules`. It is a floor, and
+says so. Its own first run failed on `ai_router.py`, because `code_only` blanks a docstring-only
+class body and leaves Python that does not parse - so it parses the original source and skips
+docstrings itself. `UNREAD_RULES` is not empty on the day it was written: `faction_attitudes` is
+per-alignment numbers nothing reads, and whether a rule should is a decision (`docs/TODO.md`).
+
+### A sect member sees their sect (`_curriculum_opened`, v1.19.4)
+
+Asked for from play: *"if you in a sect if your not at the needed stage open all the commands for
+it."* The trial opens at realm 0 (v1.1.0) and the curriculum held `sect / Sect`, `Holdings` and
+`Discipleship` to realm 1 and `Territory` and `War` to 4, so a new member met their sect as one
+collapsed line. `locked_leaves` and `hidden_hubs` take `opened`, which only ever drops a leaf from
+what is held back, and `_curriculum_opened` answers every leaf of the sect hub for anybody with a
+`sect_membership` row - nothing for a failed read, because the curriculum as it was is the safe
+side. The engine sets no realm floor on any sect action, so nothing opened is a button that only
+refuses; `PROGRESSION_GATES` still hides the manor below its ranks.
+
+**`/locked` asks the panels' provider now**, not the pure helper: what is shut depends on more than
+the realm, and the provider is where that is decided. `test_the_curriculum_opens_as_you_cultivate`
+had held `/locked` to calling `locked_leaves` - the spelling of "one statement of what is shut" -
+and went red on the change that kept that rule (v1.0.8); it holds the provider now and forbids the
+helper beside it. **The menu half is read, not driven**, and its drill is why: at realm 0 the sect
+hub is never left off the menu, because Recruitment's two doors are open there, so a behavioural
+test passed with the menu's exemption taken out.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

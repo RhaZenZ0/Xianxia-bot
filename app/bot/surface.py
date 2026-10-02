@@ -747,6 +747,29 @@ def _hub_page_leaves() -> dict[str, dict[str, list[str]]]:
     return _HUB_PAGE_LEAVES
 
 
+async def _curriculum_opened(user_id: int) -> frozenset[str]:
+    """What this player's standing opens whatever their realm (v1.19.4).
+
+    Asked for from play: *"if you in a sect if your not at the needed stage
+    open all the commands for it."* A sect is joined at the gate from realm 0,
+    and the curriculum held its pages to Qi Refining and its territory and war
+    to the Nascent Soul, so a new member saw the sect they had just joined as a
+    collapsed line. Membership is the introduction the curriculum stands in
+    for, so a member is shown every leaf on the sect hub. The engine's own
+    refusals are untouched (`PROGRESSION_GATES` still hides a manor below its
+    rank), and the panel, the menu and `/locked` all read this one answer.
+
+    A failed read opens nothing: the curriculum as it was is the safe side.
+    """
+    try:
+        if not await DB.get_sect_membership(user_id):
+            return frozenset()
+    except Exception:
+        log.exception("Sect membership unavailable for the curriculum")
+        return frozenset()
+    return frozenset(leaf for leaves in _hub_page_leaves().get("sect", {}).values() for leaf in leaves)
+
+
 async def _menu_shape(interaction: discord.Interaction) -> dict[str, Any]:
     """Which hubs the menu leaves off for this player, and the tutorial's
     next step (v1.2.0).
@@ -763,7 +786,8 @@ async def _menu_shape(interaction: discord.Interaction) -> dict[str, Any]:
         return {}
     realm = int(c.get("realm_index") or 0)
     roster = WORLD.data.get("feature_unlocks") or {}
-    hidden = unlocks.hidden_hubs(roster, realm, _hub_page_leaves())
+    hidden = unlocks.hidden_hubs(roster, realm, _hub_page_leaves(),
+                                 opened=await _curriculum_opened(interaction.user.id))
     tutorial = ""
     for row in await DB.list_character_quests(interaction.user.id, status="active"):
         definition = await QUESTS.definition(str(row.get("quest_key") or "")) or {}
@@ -1557,7 +1581,8 @@ async def _curriculum_unlocks(interaction: discord.Interaction) -> dict[str, int
     if not c:
         return {}
     roster = WORLD.data.get("feature_unlocks") or {}
-    locked = unlocks.locked_leaves(roster, int(c.get("realm_index") or 0))
+    locked = unlocks.locked_leaves(roster, int(c.get("realm_index") or 0),
+                                   opened=await _curriculum_opened(interaction.user.id))
     return {"/" + path: realm for path, realm in locked.items()}
 
 
