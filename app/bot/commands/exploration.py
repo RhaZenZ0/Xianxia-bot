@@ -19,6 +19,7 @@ from discord import app_commands
 from ...rules.advanced_runtime import BOSS_TEMPLATES, boss_lair, deed_karma_line, spirit_gain_line
 from ...rules.alchemy import alchemy_purge_refusal, toxicity_band
 from ...rules.birthfamily import family_profession_bonus
+from ...rules.body_tempering import tempered_line
 from ...rules.commissions import realm_band_allows
 from ...rules.item_grades import grade_cap_note
 from ...ops.game_engine import GameEngineError
@@ -618,6 +619,8 @@ async def hunt(interaction: discord.Interaction) -> None:
             f"\n\n**Loot:** +{cultivation_awarded} cultivation, +{int(beast.get('stones',0))} spirit stones, "
             f"{WORLD.item_names(loot)}"
         )
+        if tempered := tempered_line(outcome, "hunt"):
+            text += f"\n{tempered}"
         bonded = dict(outcome.get("bonded_beast") or {})
         wild = dict(outcome.get("wild_encounter") or {})
         if bonded:
@@ -714,6 +717,8 @@ async def mine(interaction: discord.Interaction) -> None:
     makings_line = f"\n📜 Craft makings: **{WORLD.item_names(makings)}**." if makings else ""
     stones = int(resolved.get("stones", 0) or 0)
     stones_line = f"\n💰 A rich seam: **+{stones} spirit stones**." if stones else ""
+    tempered = tempered_line(resolved, "dig")
+    tempered_bit = f"\n{tempered}" if tempered else ""
     # One `gather` report per distinct material that came out of the ground,
     # recorded before the reply and told after (rc.28, v1.0.5).
     progressed: list[dict] = []
@@ -725,7 +730,7 @@ async def mine(interaction: discord.Interaction) -> None:
         interaction,
         f"⛏️ **Mine — {seam}**\n{roll_line(roll)}\n"
         f"Regional spirit resources: **{int(resolved.get('spirit_resources', 0))}/100**.{bonus_bits}\n"
-        f"Mined: **{WORLD.item_names(awarded)}**.{rare_line}{makings_line}{stones_line}" + rank_line,
+        f"Mined: **{WORLD.item_names(awarded)}**.{rare_line}{makings_line}{stones_line}{tempered_bit}" + rank_line,
     )
     await announce_quest_progress(interaction, progressed)
 

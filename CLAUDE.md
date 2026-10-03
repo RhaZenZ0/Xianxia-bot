@@ -6403,6 +6403,43 @@ v1.9.1. `_tree_command` registers the very root the hub leaf presses, and
 `cultivation.breakthrough` rather than the body's action. It joins the acting side of
 `test_seclusion_lockout`, refused behind a closed door as the leaf is.
 
+### The body path is sped up (`body_tempering.go`, v1.20.0)
+
+Asked for by the owner: *"We need something to speed up the body cultivation."* The body ladder was the
+slower one for three reasons, each measured before anything was built: its phase costs run 14-22%
+above the qi ladder's at the same realm; the only body draught in the game, Blood-River Essence, is
+one sect's `market_excluded` stock, while the qi path has two pills on forty-six shelves and two
+recipes; and every multiplier written for qi - the manor's array, a qi storm, a deployed array, the
+element - is qi-path weather by design (v1.2.3) and skips it. Cheaper body stages were offered and
+declined. The owner took the other three.
+
+**Pills, as content.** Bone-Tempering (x1.2) and Iron-Blood (x1.35) are the qi pills' twins -
+same price, sect value, strength and shelf, on every shelf carrying the twin, bought back at the
+twin's rate - because a pill priced apart from its twin would be a second answer to "what is a
+session-speed pill worth". They are shelf-only: Alchemy is at
+`test_no_crafting_profession_is_left_far_behind`'s limit, and a thirteenth recipe fails it. Blood-
+River Essence stays the Blood River Sect's own.
+
+**Tempered by use.** `temperBodyByUseTx` adds `body_tempering.by_use[deed]` of one session's
+`stagePace` - the session's worth before multipliers, so the same deed is the same share of a stage
+at every realm - after a successful hunt, a successful dig and a battle won, and never past the
+stage's room: a breakthrough is still the player's to attempt. A deed the content does not name
+tempers nothing. `TestEveryDeedTempersWhereItHappens` reads the three call sites and their deed
+keys by AST, for `TestEveryGoodDeedIsPaidWhereItHappens`' reason; the reply prints the engine's
+`body_tempered` and restates no share (`app/rules/body_tempering.py`).
+
+**Tempering grounds.** `bodyTemperingGround` reads a road site kind, a district kind, or any place
+in the wilds of a city, off `body_tempering.grounds`, and `placeMultiplierForPath` and
+`seclusionEnvironmentGo` both apply it to the body path and only the body path - one rule at both
+doors, v1.2.3's. A retreat still asks for a protected site, so the hunting grounds and the wilds
+reach hand-sat sessions only, and the forge terraces and garrison wards reach both. A shrine and a
+temple are deliberately not tempering grounds: they are already ground for both paths, and a second
+multiplier there would price one place twice.
+
+**One fixture lesson.** The ground tests first used the batch-5 fixture, and the qi half failed on
+`no such column: name` - the body half had passed only because a tempering ground short-circuits
+the abode query. `setupSectResidenceDB` carries every table both doors read.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

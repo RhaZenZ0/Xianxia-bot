@@ -263,6 +263,7 @@ func explorationMineAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	success, _ := roll["success"].(bool)
 	loot := map[string]int64{}
 	stones := int64(0)
+	bodyTempered := int64(0)
 	if success {
 		for k, v := range lootPlan {
 			loot[k] = v
@@ -275,6 +276,11 @@ func explorationMineAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 		}
 		if _, _, err := applyCanonicalRewardTx(conn, catalog, userID, cr, canonicalReward{SpiritStones: stones, Items: loot}, "mine_success", now); err != nil {
 			return authoritativeMutation{}, err
+		}
+		// A dig tempers the body that swung the pick (v1.20.0).
+		var terr error
+		if bodyTempered, terr = temperBodyByUseTx(conn, catalog, userID, "mine", now); terr != nil {
+			return authoritativeMutation{}, terr
 		}
 	} else {
 		// Nothing is carried out of a failed dig, so nothing is reported found.
@@ -307,6 +313,7 @@ func explorationMineAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 		"family_bonus":        familyBonus,
 		"family_trade":        familyTrade,
 		"profession_progress": prog,
+		"body_tempered":       bodyTempered,
 	}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "exploration", EventType: "mine_resolved", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 }

@@ -1917,9 +1917,14 @@ func explorationHuntAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	awarded := int64(0)
 	var bonded map[string]any
 	var wild map[string]any
+	bodyTempered := int64(0)
 	if roll["success"].(bool) {
 		awarded, _, err = applyCanonicalRewardTx(conn, catalog, userID, c, canonicalReward{Cultivation: beast.Cultivation, SpiritStones: beast.Stones, Items: beast.Loot}, "hunt_success", now)
 		if err != nil {
+			return authoritativeMutation{}, err
+		}
+		// A hunt tempers the body that made it (v1.20.0).
+		if bodyTempered, err = temperBodyByUseTx(conn, catalog, userID, "hunt", now); err != nil {
 			return authoritativeMutation{}, err
 		}
 		margin := storage.ParseInt(roll["margin"])
@@ -1980,6 +1985,6 @@ func explorationHuntAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 		}
 	}
 	beastOut := map[string]any{"name": beast.Name, "tn": beast.TN, "taming_tn": beast.TamingTN, "rank": beast.Rank, "element": beast.Element, "temperament": beast.Temperament, "bloodline": beast.Bloodline, "intelligence": beast.Intelligence, "loot": beast.Loot, "stones": beast.Stones, "cultivation": beast.Cultivation}
-	result := map[string]any{"beast": beastOut, "roll": roll, "success": roll["success"], "cultivation_awarded": awarded, "bonded_beast": bonded, "wild_encounter": wild, "site_kind": siteKind, "site_bonus": siteBonus}
+	result := map[string]any{"beast": beastOut, "roll": roll, "success": roll["success"], "cultivation_awarded": awarded, "bonded_beast": bonded, "wild_encounter": wild, "site_kind": siteKind, "site_bonus": siteBonus, "body_tempered": bodyTempered}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "exploration", EventType: "hunt_resolved", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 }

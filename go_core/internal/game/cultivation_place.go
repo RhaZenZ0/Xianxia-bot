@@ -35,7 +35,8 @@ func placeCultivationMultiplier(conn *storage.Conn, catalog worlddata.Catalog, u
 // placeMultiplierForPath is the same reading for either path. A deployed
 // qi-gathering array is qi-path weather, the way the manor's is and the way a
 // closed-door retreat has always read it (v1.2.3); the site and the abode's
-// own chamber and array are ground and count for both.
+// own chamber and array are ground and count for both. A tempering ground
+// (v1.20.0) is the body path's own and counts for it alone.
 func placeMultiplierForPath(conn *storage.Conn, catalog worlddata.Catalog, userID int64, location string, gameMinute int64, body bool) (string, float64, error) {
 	name := ""
 	mult := 1.0
@@ -49,6 +50,11 @@ func placeMultiplierForPath(conn *storage.Conn, catalog worlddata.Catalog, userI
 		case def.District == "temple":
 			name, mult = "the temple quarter", placeTempleMult
 		}
+	}
+	if name == "" && body {
+		// Ground that tempers flesh (v1.20.0): a hunting ground, a forge
+		// terrace, a garrison ward, the wilds. Body sessions only.
+		name, mult = bodyTemperingGround(catalog, location)
 	}
 	if name == "" {
 		for sectName, sect := range catalog.Sects {

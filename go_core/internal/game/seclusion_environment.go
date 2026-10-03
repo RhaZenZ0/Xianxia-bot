@@ -136,6 +136,18 @@ func seclusionEnvironmentGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 			env["array_mult"] = arrayMult
 		}
 	}
+	// A tempering ground (v1.20.0) is the body path's own, at this door as at
+	// the hand-sat one. Seclusion asks for a protected site, so in practice
+	// it is a city's forge terraces or garrison ward that reaches here.
+	env["tempering_ground"] = ""
+	env["tempering_mult"] = 1.0
+	if mode == "body" {
+		if ground, groundMult := bodyTemperingGround(catalog, location); ground != "" {
+			mult *= groundMult
+			env["tempering_ground"] = ground
+			env["tempering_mult"] = groundMult
+		}
+	}
 	mult = math.Max(seclusionMultFloor, math.Min(seclusionMultCeiling, mult))
 	env["environment_mult"] = mult
 	return env, mult, nil

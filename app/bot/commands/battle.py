@@ -20,6 +20,7 @@ import discord
 from discord import app_commands
 
 from ...rules.advanced_runtime import deed_karma_line, describe_manual_technique
+from ...rules.body_tempering import tempered_line
 from ...rules.path_traits import sword_intent_cap
 from ...rules.item_grades import effect_mult, graded_amount
 from ...rules.sect import sect_points_line
@@ -489,6 +490,8 @@ async def _finish_battle(interaction:discord.Interaction,outcome:str,*,expected_
             lines.append(f"🌠 Meaningful mercy draws providence: **Fate {int(result['fate_after'])}/9**.")
     if int(result.get("sword_intent",0)):
         lines.append(f"🗡️ The win sharpens your sword intent: **{int(result['sword_intent'])}** held.")
+    if tempered:=tempered_line(result,"fight"):
+        lines.append(tempered)
     impacts=list(impact.get("impacts") or [])
     if impacts:
         lines.append("🌍 **World consequences:**")
