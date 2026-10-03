@@ -15,8 +15,17 @@ import (
 )
 
 type craftResolvePayload struct {
-	Recipe string `json:"recipe"`
+	Recipe   string `json:"recipe"`
+	Quantity *int64 `json:"quantity"`
+	All      bool   `json:"all"`
 }
+
+// craftBatchMax is the most units one craft.resolve makes (v1.21.0). It is the
+// engine's bound, and the bot's CRAFT_BATCH_MAX is held equal to it by a test
+// that reads this line. It is a bound on one action's work, not a pace: "craft
+// all" (v1.21.0) makes up to this many, says when it stopped short, and a
+// second press makes the rest.
+const craftBatchMax int64 = 50
 
 const maxSectManorFacilityLevel int64 = 5
 
@@ -273,6 +282,28 @@ func consumeInventoryTx(conn *storage.Conn, userID int64, costs map[string]int64
 	return missing, nil
 }
 
+// craftAffordableTx is how many units of a recipe the bags pay for now, or
+// craftBatchMax+1 for a recipe that costs nothing (so "all" stops at the cap
+// and says so rather than looping without end).
+func craftAffordableTx(conn *storage.Conn, userID int64, cost map[string]int64) (int64, error) {
+	affordable := craftBatchMax + 1
+	for item, qty := range cost {
+		if qty <= 0 {
+			continue
+		}
+		r, err := conn.Execute(`SELECT quantity FROM inventory WHERE user_id=? AND item_id=?`, []any{userID, item})
+		if err != nil {
+			return 0, err
+		}
+		have := int64(0)
+		if row := firstRowMap(r); row != nil {
+			have = i64(row["quantity"])
+		}
+		affordable = minI64(affordable, maxI64(0, have)/qty)
+	}
+	return affordable, nil
+}
+
 // craftFailureRefund is the share of a failed craft's inputs that comes back:
 // half of each, rounded down, so one unit of anything is the stake. It is a
 // function so the refund and the reply cannot state the share differently.
@@ -307,7 +338,7 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		return authoritativeMutation{}, errors.New("payload must be a JSON object")
 	}
 	for field := range supplied {
-		if field != "recipe" {
+		if field != "recipe" && field != "quantity" && field != "all" {
 			return authoritativeMutation{}, fmt.Errorf("client-supplied %s is forbidden", field)
 		}
 	}
@@ -323,6 +354,18 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	recipe, ok := catalog.Recipes[p.Recipe]
 	if !ok {
 		return authoritativeMutation{}, fmt.Errorf("unknown recipe: %s", p.Recipe)
+	}
+	// An absent quantity is one craft, so every caller that predates the
+	// batch is the single craft it always was.
+	quantity := int64(1)
+	if p.Quantity != nil {
+		quantity = *p.Quantity
+	}
+	if quantity < 1 || quantity > craftBatchMax {
+		return authoritativeMutation{}, fmt.Errorf("a batch is 1 to %d crafts, not %d", craftBatchMax, quantity)
+	}
+	if p.All && p.Quantity != nil {
+		return authoritativeMutation{}, errors.New("a craft is all or a quantity, not both")
 	}
 
 	cr, err := loadMechanicsCharacter(conn, catalog, userID)
@@ -427,163 +470,89 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	// court is made better, whichever trade it is.
 	placeName, placeBonus := craftPlaceBonus(catalog, location)
 	contextBonus := effectBonus + facilityBonus + manorFacilityBonus + familyBonus + craftEcho + flameBonus + senseBonus + placeBonus
-	mod := base + level + contextBonus
-
-	roll, err := roll2d10(mod, recipe.TN)
-	if err != nil {
-		return authoritativeMutation{}, err
+	// Craft all (v1.21.0): as many as the bags pay for, counted here, in the
+	// transaction that spends them, so the number cannot be stale. Bags that
+	// pay for none leave the batch at one, which is refused below with the
+	// shortfall for that one - the refusal a single craft gives.
+	capped := false
+	if p.All {
+		affordable, err := craftAffordableTx(conn, userID, recipe.Cost)
+		if err != nil {
+			return authoritativeMutation{}, err
+		}
+		quantity = maxI64(1, affordable)
+		if quantity > craftBatchMax {
+			quantity, capped = craftBatchMax, true
+		}
 	}
-	d1, d2 := i64(roll["die1"]), i64(roll["die2"])
-	total, margin := i64(roll["total"]), i64(roll["margin"])
-	success, _ := roll["success"].(bool)
-
-	missing, err := consumeInventoryTx(conn, userID, recipe.Cost)
+	// The batch (v1.21.0). A quantity is N crafts in one action and nothing
+	// else: every unit rolls on its own, earns its own XP, may raise the rank
+	// the next unit is rolled at, and writes its own alchemy record - exactly
+	// what pressing the button N times did, minus the presses. The materials
+	// for the whole batch are taken first, so a batch the bags cannot pay for
+	// is refused before a single die is cast, and a refusal costs nothing.
+	totalCost := map[string]int64{}
+	for item, qty := range recipe.Cost {
+		totalCost[item] = qty * quantity
+	}
+	missing, err := consumeInventoryTx(conn, userID, totalCost)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
 	if len(missing) > 0 {
+		if quantity > 1 {
+			return authoritativeMutation{}, fmt.Errorf("missing materials for a batch of %d: %s",
+				quantity, describeMaterials(catalog, missing))
+		}
 		return authoritativeMutation{}, fmt.Errorf("missing materials: %s",
 			describeMaterials(catalog, missing))
 	}
 
-	qkey, qlabel, xpbonus, qpoints := "", "", int64(0), int64(0)
-	if strings.EqualFold(profession, "Alchemy") {
-		qkey, qlabel, _, xpbonus = alchemyQualityGo(margin, success)
-		if margin > 0 {
-			qpoints = margin
-		}
-	} else {
-		qkey, qlabel, xpbonus, qpoints, _ = craftQuality(margin, success)
-	}
-	// The grade (v1.7.0). Quality used to multiply an alchemy batch and do
-	// nothing for the other three trades; it is spent on the grade of what is
-	// made now, capped by the crafter's rank in this trade.
-	gradeIndex, gradeReached := craftGradeIndex(catalog, qkey, margin, level, flameOpens || senseOpens)
-	// What making the rung the roll reached would really take (v1.12.3): the
-	// rank that can, and the opener it needs if that is the only road.
-	gradeReachedRank, needsOpener := craftGradeRequirement(catalog, gradeReached)
-	gradeReachedOpener := ""
-	if needsOpener {
-		gradeReachedOpener = craftGradeOpener(catalog, profession)
-	}
-	output := map[string]int64{}
-	for k, v := range recipe.Output {
-		output[gradedID(catalog, k, gradeIndex)] = v
-	}
-	// What a miss leaves you (v1.3.0). The inputs were consumed above whether
-	// or not the roll landed, and until now a failure kept all of them: the
-	// tutorial's forge cost three spirit iron and another dig on one miss in
-	// seven. Half of each input comes back, rounded down, so a single unit of
-	// anything is still spent - a craft that could be retried for free would
-	// be a roll with no stake.
-	returned := map[string]int64{}
-	if success {
-		if err := addInventoryTx(conn, userID, output); err != nil {
-			return authoritativeMutation{}, err
-		}
-	} else {
-		returned = craftFailureRefund(recipe.Cost)
-		if err := addInventoryTx(conn, userID, returned); err != nil {
-			return authoritativeMutation{}, err
-		}
-	}
-
-	xp := int64(5)
-	if success {
-		xp = 12 + xpbonus
-	}
 	now := float64(time.Now().UnixNano()) / 1e9
-	// The rank before the craft, so a rank reached by this one can be told
-	// from a rank the candidate walked in holding (v1.0.0-rc.45).
-	rankBefore, err := professionLevelTx(conn, userID, profession)
-	if err != nil {
-		return authoritativeMutation{}, err
-	}
-	prog, err := advanceProfessionTx(conn, userID, profession, success, xp, qpoints, now)
-	if err != nil {
-		return authoritativeMutation{}, err
-	}
-	// `advanceProfessionTx` is deliberately untouched and still raises a rank
-	// on XP alone - the examination is what the rank is worth, never a toll on
-	// reaching it. The offer is made here rather than in the advance because
-	// this is the only caller whose trade has examinations at all, and the
-	// only one holding the catalogue and the canonical minute.
-	//
-	// A craft generous enough to cross two ranks offers the higher one: the
-	// examination certifies what the candidate now is, and the action itself
-	// only ever sits the rank they currently hold.
+	totalOutput := map[string]int64{}
+	totalReturned := map[string]int64{}
+	// No capacity hint: quantity is bounded by craftBatchMax above, and a
+	// make sized by a payload-derived number is what CodeQL flags as an
+	// uncontrolled allocation whatever bound sits before it.
+	crafts := []map[string]any{}
+	successes := int64(0)
 	examOffered := ""
-	if rankAfter := i64(prog["level"]); rankAfter > rankBefore {
-		if examOffered, err = offerProfessionExamTx(conn, catalog, userID, profession, rankAfter, gameMinute); err != nil {
+	var senseGain map[string]any
+	senseGained := int64(0)
+	var unit craftUnit
+	var prog map[string]any
+	for i := int64(0); i < quantity; i++ {
+		unit, prog, err = craftOneUnitTx(conn, catalog, userID, p.Recipe, recipe, profession, base, level, contextBonus,
+			flameOpens || senseOpens, location, gameMinute, now)
+		if err != nil {
 			return authoritativeMutation{}, err
 		}
-	}
-
-	if strings.EqualFold(profession, "Alchemy") {
-		outJSON, _ := json.Marshal(func() map[string]int64 {
-			if success {
-				return output
+		if unit.success {
+			successes++
+		}
+		for k, v := range unit.output {
+			totalOutput[k] += v
+		}
+		for k, v := range unit.returned {
+			totalReturned[k] += v
+		}
+		if unit.examOffered != "" {
+			examOffered = unit.examOffered
+		}
+		// The rank the next unit is rolled at: a unit that crossed a rank
+		// makes the rest of the batch at the new one, as the next press would.
+		level = i64(prog["level"])
+		// Only a Formation or Inscription craft builds the spirit sense
+		// (v1.12.3): the call was unconditional, so a Forging craft filled a
+		// sense it cannot use - craftSpiritSenseTx already says "nothing for a
+		// trade it does not serve", and the practice has to say the same.
+		if spiritSenseServesTrade(spiritSenseRules(catalog), profession) {
+			if gained := spiritSenseGainTx(conn, catalog, userID, "craft", !unit.success, gameMinute, float64(time.Now().UnixNano())/1e9); gained != nil {
+				senseGained += i64(gained["gain"])
+				senseGain = gained
 			}
-			return map[string]int64{}
-		}())
-		_, err = conn.Execute(
-			`INSERT INTO alchemy_batches(user_id,recipe_name,quality,margin,success,output_json,location,game_minute,created_at)
-			 VALUES(?,?,?,?,?,?,?,?,?)`,
-			[]any{
-				userID,
-				p.Recipe,
-				qkey,
-				margin,
-				func() int64 {
-					if success {
-						return 1
-					}
-					return 0
-				}(),
-				string(outJSON),
-				location,
-				gameMinute,
-				now,
-			},
-		)
-		if err != nil {
-			return authoritativeMutation{}, err
 		}
-		_, err = conn.Execute(
-			`INSERT INTO alchemy_state(
-				user_id,pill_toxicity,last_toxicity_game_minute,total_refinements,
-				successful_refinements,flawless_refinements,best_margin,last_quality,updated_at
-			) VALUES(?,0,?,1,?,?,?, ?,?)
-			ON CONFLICT(user_id) DO UPDATE SET
-				total_refinements=alchemy_state.total_refinements+1,
-				successful_refinements=alchemy_state.successful_refinements+excluded.successful_refinements,
-				flawless_refinements=alchemy_state.flawless_refinements+excluded.flawless_refinements,
-				best_margin=MAX(alchemy_state.best_margin,excluded.best_margin),
-				last_quality=excluded.last_quality,
-				updated_at=excluded.updated_at`,
-			[]any{
-				userID,
-				gameMinute,
-				func() int64 {
-					if success {
-						return 1
-					}
-					return 0
-				}(),
-				func() int64 {
-					if success && qkey == "flawless" {
-						return 1
-					}
-					return 0
-				}(),
-				margin,
-				qkey,
-				now,
-			},
-		)
-		if err != nil {
-			return authoritativeMutation{}, err
-		}
+		crafts = append(crafts, unit.summary(catalog))
 	}
 
 	result := map[string]any{
@@ -593,30 +562,35 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		// (v1.0.3). The flat d1/d2 beside it are not what `roll_line` reads,
 		// and craft was the last caller still shipping only those - the same
 		// omission v1.0.1 fixed for forage and did not carry across the file.
-		"roll":          roll,
-		"d1":            d1,
-		"d2":            d2,
-		"modifier":      mod,
+		//
+		// In a batch these single-craft fields describe the last unit; the
+		// whole batch is `crafts`, and `output`/`returned` are its totals.
+		"roll":          unit.roll,
+		"d1":            i64(unit.roll["die1"]),
+		"d2":            i64(unit.roll["die2"]),
+		"modifier":      unit.mod,
 		"tn":            recipe.TN,
-		"total":         total,
-		"margin":        margin,
-		"success":       success,
-		"quality":       qkey,
-		"quality_label": qlabel,
-		"output": func() map[string]int64 {
-			if success {
-				return output
-			}
-			return map[string]int64{}
-		}(),
-		"returned":             returned,
+		"total":         i64(unit.roll["total"]),
+		"margin":        unit.margin,
+		"success":       successes > 0,
+		"quality":       unit.qkey,
+		"quality_label": unit.qlabel,
+		"quantity":      quantity,
+		"all":           p.All,
+		"capped":        capped,
+		"successes":     successes,
+		"crafts":        crafts,
+		"output":        totalOutput,
+		"returned":      totalReturned,
+		// The cost of one unit, stated here so the reply never restates it.
+		"cost_per_unit":        recipe.Cost,
 		"profession_progress":  prog,
 		"exam_offered":         examOffered,
-		"profession_bonus":     level,
-		"grade":                craftGradeLabel(catalog, gradeIndex),
-		"grade_reached":        craftGradeLabel(catalog, gradeReached),
-		"grade_reached_rank":   gradeReachedRank,
-		"grade_reached_opener": gradeReachedOpener,
+		"profession_bonus":     unit.level,
+		"grade":                craftGradeLabel(catalog, unit.gradeIndex),
+		"grade_reached":        craftGradeLabel(catalog, unit.gradeReached),
+		"grade_reached_rank":   unit.gradeReachedRank,
+		"grade_reached_opener": unit.gradeReachedOpener,
 		"location":             location,
 		"game_minute":          gameMinute,
 		"effect_bonus":         effectBonus,
@@ -636,14 +610,10 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		"spirit_sense_bonus":   senseBonus,
 		"spirit_sense_opens":   senseOpens,
 	}
-	// Only a Formation or Inscription craft builds the spirit sense (v1.12.3):
-	// the call was unconditional, so a Forging craft filled a sense it cannot
-	// use - craftSpiritSenseTx already says "nothing for a trade it does not
-	// serve", and the practice has to say the same.
-	if spiritSenseServesTrade(spiritSenseRules(catalog), profession) {
-		if gained := spiritSenseGainTx(conn, catalog, userID, "craft", !success, gameMinute, float64(time.Now().UnixNano())/1e9); gained != nil {
-			result["spirit_sense_gain"] = gained
-		}
+	if senseGain != nil {
+		// The last practice's state, carrying what the whole batch built.
+		senseGain["gain"] = senseGained
+		result["spirit_sense_gain"] = senseGain
 	}
 	evp, _ := json.Marshal(result)
 	return authoritativeMutation{
@@ -655,6 +625,159 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 			Payload:    evp,
 		},
 	}, nil
+}
+
+// craftUnit is one unit of a batch: the roll and what it made.
+type craftUnit struct {
+	roll               map[string]any
+	mod                int64
+	level              int64
+	margin             int64
+	success            bool
+	qkey, qlabel       string
+	gradeIndex         int
+	gradeReached       int
+	gradeReachedRank   int64
+	gradeReachedOpener string
+	output             map[string]int64
+	returned           map[string]int64
+	examOffered        string
+}
+
+// summary is the unit as the reply reads it: the whole roll (v1.0.3), never
+// the flattened dice.
+func (u craftUnit) summary(catalog worlddata.Catalog) map[string]any {
+	return map[string]any{
+		"roll":          u.roll,
+		"success":       u.success,
+		"margin":        u.margin,
+		"quality":       u.qkey,
+		"quality_label": u.qlabel,
+		"grade":         craftGradeLabel(catalog, u.gradeIndex),
+		"output":        u.output,
+		"returned":      u.returned,
+	}
+}
+
+// craftOneUnitTx resolves one unit of a craft whose materials are already
+// taken: the roll, the grade, the output or the refund, the XP and the
+// examination a rank reached opens, and an alchemist's record. It is the
+// whole of what one press of /craft did before v1.21.0, so a batch of N is N
+// of these and cannot drift from a single craft.
+func craftOneUnitTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, recipeName string, recipe worlddata.Recipe,
+	profession string, base, level, contextBonus int64, opensTop bool, location string, gameMinute int64, now float64) (craftUnit, map[string]any, error) {
+	u := craftUnit{level: level, mod: base + level + contextBonus, output: map[string]int64{}, returned: map[string]int64{}}
+	roll, err := roll2d10(u.mod, recipe.TN)
+	if err != nil {
+		return u, nil, err
+	}
+	u.roll = roll
+	u.margin = i64(roll["margin"])
+	u.success, _ = roll["success"].(bool)
+
+	xpbonus, qpoints := int64(0), int64(0)
+	if strings.EqualFold(profession, "Alchemy") {
+		u.qkey, u.qlabel, _, xpbonus = alchemyQualityGo(u.margin, u.success)
+		if u.margin > 0 {
+			qpoints = u.margin
+		}
+	} else {
+		u.qkey, u.qlabel, xpbonus, qpoints, _ = craftQuality(u.margin, u.success)
+	}
+	// The grade (v1.7.0). Quality used to multiply an alchemy batch and do
+	// nothing for the other three trades; it is spent on the grade of what is
+	// made now, capped by the crafter's rank in this trade.
+	u.gradeIndex, u.gradeReached = craftGradeIndex(catalog, u.qkey, u.margin, level, opensTop)
+	// What making the rung the roll reached would really take (v1.12.3): the
+	// rank that can, and the opener it needs if that is the only road.
+	gradeReachedRank, needsOpener := craftGradeRequirement(catalog, u.gradeReached)
+	u.gradeReachedRank = gradeReachedRank
+	if needsOpener {
+		u.gradeReachedOpener = craftGradeOpener(catalog, profession)
+	}
+	// What a miss leaves you (v1.3.0). The inputs were consumed whether or
+	// not the roll landed, and until v1.3.0 a failure kept all of them: the
+	// tutorial's forge cost three spirit iron and another dig on one miss in
+	// seven. Half of each input comes back, rounded down, so a single unit of
+	// anything is still spent - a craft that could be retried for free would
+	// be a roll with no stake.
+	if u.success {
+		for k, v := range recipe.Output {
+			u.output[gradedID(catalog, k, u.gradeIndex)] = v
+		}
+		if err := addInventoryTx(conn, userID, u.output); err != nil {
+			return u, nil, err
+		}
+	} else {
+		u.returned = craftFailureRefund(recipe.Cost)
+		if err := addInventoryTx(conn, userID, u.returned); err != nil {
+			return u, nil, err
+		}
+	}
+
+	xp := int64(5)
+	if u.success {
+		xp = 12 + xpbonus
+	}
+	// The rank before the craft, so a rank reached by this one can be told
+	// from a rank the candidate walked in holding (v1.0.0-rc.45).
+	rankBefore, err := professionLevelTx(conn, userID, profession)
+	if err != nil {
+		return u, nil, err
+	}
+	prog, err := advanceProfessionTx(conn, userID, profession, u.success, xp, qpoints, now)
+	if err != nil {
+		return u, nil, err
+	}
+	// `advanceProfessionTx` is deliberately untouched and still raises a rank
+	// on XP alone - the examination is what the rank is worth, never a toll on
+	// reaching it. The offer is made here rather than in the advance because
+	// this is the only caller whose trade has examinations at all, and the
+	// only one holding the catalogue and the canonical minute.
+	//
+	// A craft generous enough to cross two ranks offers the higher one: the
+	// examination certifies what the candidate now is, and the action itself
+	// only ever sits the rank they currently hold.
+	if rankAfter := i64(prog["level"]); rankAfter > rankBefore {
+		if u.examOffered, err = offerProfessionExamTx(conn, catalog, userID, profession, rankAfter, gameMinute); err != nil {
+			return u, nil, err
+		}
+	}
+
+	if strings.EqualFold(profession, "Alchemy") {
+		outJSON, _ := json.Marshal(u.output)
+		success, flawless := int64(0), int64(0)
+		if u.success {
+			success = 1
+			if u.qkey == "flawless" {
+				flawless = 1
+			}
+		}
+		if _, err := conn.Execute(
+			`INSERT INTO alchemy_batches(user_id,recipe_name,quality,margin,success,output_json,location,game_minute,created_at)
+			 VALUES(?,?,?,?,?,?,?,?,?)`,
+			[]any{userID, recipeName, u.qkey, u.margin, success, string(outJSON), location, gameMinute, now},
+		); err != nil {
+			return u, nil, err
+		}
+		if _, err := conn.Execute(
+			`INSERT INTO alchemy_state(
+				user_id,pill_toxicity,last_toxicity_game_minute,total_refinements,
+				successful_refinements,flawless_refinements,best_margin,last_quality,updated_at
+			) VALUES(?,0,?,1,?,?,?, ?,?)
+			ON CONFLICT(user_id) DO UPDATE SET
+				total_refinements=alchemy_state.total_refinements+1,
+				successful_refinements=alchemy_state.successful_refinements+excluded.successful_refinements,
+				flawless_refinements=alchemy_state.flawless_refinements+excluded.flawless_refinements,
+				best_margin=MAX(alchemy_state.best_margin,excluded.best_margin),
+				last_quality=excluded.last_quality,
+				updated_at=excluded.updated_at`,
+			[]any{userID, gameMinute, success, flawless, u.margin, u.qkey, now},
+		); err != nil {
+			return u, nil, err
+		}
+	}
+	return u, prog, nil
 }
 
 func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {

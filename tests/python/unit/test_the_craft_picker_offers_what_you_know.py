@@ -69,9 +69,18 @@ class TheCraftPickerOffersWhatYouKnowTests(unittest.TestCase):
     def setUp(self) -> None:
         self.source = EXPLORATION.read_text(encoding="utf-8")
         self.picker = _function(self.source, "recipe_autocomplete")
+        # Since v1.21.0 the slash picker and the panel's menu both read through
+        # `craft_menu`, so the rule is held there, and each picker is held to
+        # reading through it rather than to spelling the read itself.
+        self.menu = _function(self.source, "craft_menu")
+
+    def test_both_pickers_read_through_the_craft_menu(self):
+        for name in ("recipe_autocomplete", "recipe_hub_options"):
+            self.assertIn("craft_menu(", _code(_function(self.source, name)),
+                          f"{name} no longer reads through craft_menu, so it can offer a menu of its own")
 
     def test_it_reads_what_the_cultivator_has_learned(self):
-        body = _code(self.picker)
+        body = _code(self.menu)
         self.assertIn(
             "get_known_recipes", body,
             "the craft picker does not read what the player has learned, so it is offering the "
@@ -79,7 +88,7 @@ class TheCraftPickerOffersWhatYouKnowTests(unittest.TestCase):
         )
 
     def test_it_no_longer_offers_the_whole_catalogue(self):
-        body = _code(self.picker)
+        body = _code(self.picker) + _code(self.menu)
         self.assertNotIn(
             "search_catalog", body,
             "the craft picker searches the whole recipe catalogue again; rc.46's rule is that a "
@@ -99,8 +108,16 @@ class TheCraftPickerOffersWhatYouKnowTests(unittest.TestCase):
             async def fake_known(_user_id):
                 return known
 
+            async def nothing_carried(_user_id):
+                return {}
+
+            async def no_ranks(_user_id):
+                return []
+
             interaction = SimpleNamespace(user=SimpleNamespace(id=42))
-            with patch.object(exploration.DB, "get_known_recipes", fake_known):
+            with patch.object(exploration.DB, "get_known_recipes", fake_known), \
+                    patch.object(exploration.DB, "get_inventory", nothing_carried), \
+                    patch.object(exploration.DB, "get_profession_progress", no_ranks):
                 offered = asyncio.run(exploration.recipe_autocomplete(interaction, ""))
                 self.assertEqual(
                     sorted(choice.value for choice in offered),

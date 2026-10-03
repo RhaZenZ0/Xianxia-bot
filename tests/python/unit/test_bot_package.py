@@ -817,7 +817,7 @@ SURFACE = {
     },
     "commands/exploration.py": {
         "groups": ('alchemy_group', 'realmhub_group', 'city_group', 'travel_group'),
-        "roots": ('explore', 'hunt', 'mine', 'craft', 'learn', 'forage'),
+        "roots": ('explore', 'hunt', 'mine', 'craft', 'craft_all', 'learn', 'forage'),
         "leaves": {
             "alchemy_group": ('status', 'forage', 'purge'),
             "city_group": ('look', 'enter', 'board', 'accept', 'envoys', 'rumours', 'inn'),

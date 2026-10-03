@@ -7,7 +7,9 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from .advanced_catalog import augment_advanced_catalog
-from .item_grades import base_item_id, grade_rung, graded_name, split_item_grade
+from .advanced_runtime import describe_equipment
+from .item_effects import describe_item_use
+from .item_grades import base_item_id, effect_mult, grade_rung, graded_name, split_item_grade
 from .realm_hubs import city_of_place
 
 # The content's word for an effect cast at somebody else. The engine states it
@@ -238,6 +240,23 @@ class World:
         base = base_item_id(item_id)
         name = str(self.items.get(base, {}).get("name", base.replace("_", " ").title()))
         return graded_name(name, self.item_grades, item_id)
+
+    def item_does(self, item_id: str) -> str:
+        """What an item does, at its grade, in one line (v1.21.0), or ``""``.
+
+        The one door the bot asks: the base entry through ``item_definition``,
+        the grade's multiplier, and gear through ``describe_equipment``, so a
+        picker, a craft reply and the status page cannot describe one pill
+        three ways.
+        """
+        definition = self.item_definition(item_id)
+        if not definition:
+            return ""
+        return describe_item_use(
+            definition,
+            mult=effect_mult(self.item_grades, item_id),
+            equipment=describe_equipment(item_id, ladder=self.item_grades),
+        )
 
     def item_definition(self, item_id: str) -> dict[str, Any]:
         """An item's definition at its grade (v1.7.0): the base entry, named at

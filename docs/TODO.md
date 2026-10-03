@@ -937,3 +937,17 @@ deferred half and not the half that says what was done about it.
   is a roster and a decision, not a wiring, and inventing it unasked is what this file exists to
   refuse. What v1.0.12 does instead is raise the player past the curriculum before the sweep, which
   is what reached this one.
+- **fixed (v1.21.0)** — *Craft All, and a craft menu that says what a method makes does.* Asked for
+  as "Multi craft system for pills", then "a better menu for selecting what you want to craft, and
+  what the crafted items does is needed", then "maybe a craft all would be better" in place of a
+  quantity step. `craft.resolve` takes `all: true` (counted by the engine, up to `craftBatchMax`, 50)
+  or a `quantity`: the whole batch's materials are taken first, then each unit is one
+  `craftOneUnitTx`, the body a single craft always ran. The picker and the panel's menu read through
+  `craft_menu` (ready first, how many the materials pay for, what the output does through
+  `World.item_does`), and the reply and the status page print the same line.
+- **deferred (content)** — *A deployable array's numbers are not on the craft menu.* The effect of an
+  array disk lives in the engine's `deployedArrayDefs` (`property_storage_actions.go`), a Go literal
+  Python cannot read, so `item_does` describes an array in the item's own words rather than copy the
+  numbers into a second table. Moving those six definitions into `content/world.json` (an
+  `array_effect` block on each disk, read by both sides) would let the menu print them; it is a
+  content move of its own, so it waits for the owner's word.

@@ -6487,6 +6487,38 @@ they must not name, and an AST check refuses any command that formats a resolved
 name assigned from one) into a reply; its drills restore each old line and print the leaked
 reply.
 
+### Craft All is N crafts, and the menu says what a method makes does (v1.21.0)
+
+Asked for as "Multi craft system for pills", then "a better menu for selecting what you want to
+craft, and what the crafted items does is needed", then "maybe a craft all would be better" - in
+place of a quantity step the first draft put before every craft. `craft.resolve` takes `all: true`
+(Craft All, `/craft_all`) or an explicit `quantity`, never both, up to `craftBatchMax` (50, a Go
+constant); absent is one craft, so `/craft` is the payload and the one press it always was. **The
+engine counts "all"** (`craftAffordableTx`) in the transaction that spends the materials, so the bot
+sends no number and the count cannot be stale (rc.48). **A batch is N crafts and nothing else**: the
+materials for the whole batch are taken first, then `craftOneUnitTx` - the whole of what one press
+did, roll to alchemy record - runs N times, each unit rolling on its own, earning its own XP and
+possibly raising the rank the next unit is rolled at. Bags that pay for none leave Craft All at one
+unit, which is refused with the single craft's shortfall, so a refusal costs nothing; past the cap
+the result says `capped` and the reply says to press again. The single-craft fields on the result
+describe the last unit; `crafts` is every unit, and `output`/`returned` are the totals. The reply
+prints every roll up to `CRAFT_ROLL_LINES` (10) and a tally past it. The bot's `CRAFT_BATCH_MAX` is
+held to the Go line.
+
+**One drill broke the build instead of failing a test** - `quantity = 1` left `affordable` unused -
+which proves nothing, and was redone as a disabled term (`affordable*0`), the shape CLAUDE.md
+already asks for.
+
+**`World.item_does` is the one door for what an item does**, and `app/rules/item_effects.py` is a
+display twin of the engine's grade scaling (`gradedAmount`, `gradedEffectPayload`), held to the Go
+bodies. The picker, the panel's menu, the craft reply and `/profession status` all ask it.
+`craft_menu` reads the recipes off the in-process catalogue, because it runs on every autocomplete
+keystroke (rc.28), and orders ready (✅) before short (❌) before above the rank (🔴). An array disk's
+numbers live in `deployedArrayDefs`, which Python cannot read, so an array is described in its own
+words - a decision in `docs/TODO.md`, not a gap. **The ordering drill stayed green on its first
+fixture**, because the ready recipes already sorted first by name (rc.53's lesson): the fixture
+carries an alphabetically-first recipe above the rank now, and the drill fails.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

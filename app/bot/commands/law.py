@@ -460,9 +460,13 @@ async def profession_status(interaction: discord.Interaction) -> None:
         under = levels.get(trade, 0) < needed
         mark = "🔴" if under else ("❌" if short else "✅")
         tail = f" • needs Level {needed}" if under else ""
+        # What the method's output does (v1.21.0), through the one door.
+        outputs = list(dict(definition.get("output") or {}))
+        does = WORLD.item_does(outputs[0]) if outputs else ""
         by_trade.setdefault(trade, []).append(
             f"  {mark} **{entry['recipe']}** — {', '.join(parts) or 'no materials'}"
             f" • TN {int(definition.get('tn') or 0)}{tail}"
+            + (f"\n    ↳ {does}" if does else "")
         )
 
     if not rows and not known:
