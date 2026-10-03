@@ -1,6 +1,7 @@
 """Shared pytest bootstrap for the Python-owned test surface."""
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -32,3 +33,25 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             item.add_marker(pytest.mark.contract)
         elif "integration" in parts:
             item.add_marker(pytest.mark.integration)
+
+
+# PYTEST_SHARD="<i>/<n>" runs one shard of the suite, which is how CI runs the
+# python job as several jobs at once. A file outside the shard is never
+# collected, so a shard does not pay to import what it does not run.
+from tests.support import parse_shard, shard_assignment, suite_test_files  # noqa: E402
+
+_SHARD = parse_shard(os.environ.get("PYTEST_SHARD", ""))
+_SHARD_OF = shard_assignment(suite_test_files(), _SHARD[1]) if _SHARD else {}
+
+
+def pytest_ignore_collect(collection_path: Path, config: pytest.Config) -> bool | None:
+    if not _SHARD:
+        return None
+    try:
+        name = collection_path.resolve().relative_to(PROJECT_ROOT).as_posix()
+    except ValueError:
+        return None
+    shard = _SHARD_OF.get(name)
+    if shard is None:
+        return None
+    return shard != _SHARD[0] or None

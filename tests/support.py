@@ -894,3 +894,45 @@ def bot_module_defining(name: str) -> Path:
     if len(hits) > 1:
         raise AssertionError(f"{name!r} is defined in more than one bot module: {hits}")
     return hits[0]
+
+
+# ---------------------------------------------------------------------------
+# CI shards
+# ---------------------------------------------------------------------------
+# The python job in .github/workflows/ci.yml runs the suite as several jobs at
+# once, each with PYTEST_SHARD="<i>/<n>". tests/conftest.py keeps the files of
+# that shard and deselects the rest; test_ci_shards.py holds that the shards
+# split the suite, every file in exactly one.
+
+TESTS_ROOT = PROJECT_ROOT / "tests" / "python"
+
+
+def parse_shard(value: str) -> tuple[int, int] | None:
+    """`"2/4"` -> `(2, 4)`; empty means the whole suite. Anything else is an
+    error rather than the whole suite, because a shard that quietly ran every
+    test would hide the one that ran none."""
+    value = (value or "").strip()
+    if not value:
+        return None
+    index, _, total = value.partition("/")
+    try:
+        shard = (int(index), int(total))
+    except ValueError:
+        raise ValueError(f"PYTEST_SHARD must be <i>/<n>, got {value!r}") from None
+    if not 1 <= shard[0] <= shard[1]:
+        raise ValueError(f"PYTEST_SHARD {value!r} is not a shard of {shard[1]}")
+    return shard
+
+
+def shard_assignment(files: list[str], total: int) -> dict[str, int]:
+    """The 1-based shard each test file runs in: the sorted files dealt round
+    the shards like cards. A file is the unit so a module's or a class's
+    fixtures are set up once, in one shard, and a shard never imports a file
+    it does not run."""
+    return {name: i % total + 1 for i, name in enumerate(sorted(files))}
+
+
+def suite_test_files() -> list[str]:
+    """Every test file pytest collects, relative to the repository, in a
+    stable order - the deck `shard_assignment` deals."""
+    return sorted(p.relative_to(PROJECT_ROOT).as_posix() for p in TESTS_ROOT.rglob("test_*.py"))

@@ -9,9 +9,15 @@ description: How to verify a change in this repo - the full test suite runs in G
 
 | Job | What it runs |
 |---|---|
-| `python` | `ruff check app scripts`, then `pytest -q` (all ~2,250 tests, about 7 minutes) |
+| `python (1/4)` … `(4/4)` | four shards side by side, each `pytest -q` with `PYTEST_SHARD=<i>/4` over a quarter of the test files (shard 1 also runs `ruff check app scripts`) |
 | `go` | `gofmt -l`, `go vet`, `staticcheck` and `govulncheck` at the Makefile's pins, `go test -race ./...` |
 | `containers` | builds both images, then imports every bot service and boots the engine to `/livez` |
+
+All of those start at the same time: none waits for another. `tests/conftest.py` deals the test
+files round the shards (sorted, like cards), and `tests/python/unit/test_ci_shards.py` holds that
+every file runs in exactly one. The shard count is the matrix list in `ci.yml` and nothing else.
+To reproduce one shard's failure locally, run that test by node id, or the whole shard with
+`PYTEST_SHARD=2/4 python -m pytest -q`.
 | `pages` | only on a push to main, after the three above: builds the release-notes site from `VERSIONS.md` and deploys it to GitHub Pages |
 | `release` | only on a `v*` tag, after the three above: manifest verify, archive, GitHub Release |
 
