@@ -11,7 +11,7 @@ import hashlib
 import time
 from collections.abc import Awaitable, Callable
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Mapping
 
 import discord
 from discord import app_commands
@@ -21,6 +21,7 @@ from ...rules.alchemy import alchemy_purge_refusal, toxicity_band
 from ...rules.birthfamily import family_profession_bonus
 from ...rules.body_tempering import tempered_line
 from ...rules.commissions import realm_band_allows
+from ...rules.item_effects import craft_readiness
 from ...rules.item_grades import grade_cap_note
 from ...ops.game_engine import GameEngineError
 from ...rules.progression_systems import profession_rank, profession_xp_needed
@@ -735,38 +736,122 @@ async def mine(interaction: discord.Interaction) -> None:
     await announce_quest_progress(interaction, progressed)
 
 
+TRADE_EMOJI = {"Alchemy": "⚗️", "Forging": "🔨", "Inscription": "📜", "Formation": "🔷"}
+
+# The most units one press of Craft All makes. The engine's `craftBatchMax` is
+# the bound and this is its display twin, read only to say so;
+# `test_what_a_crafted_item_does.py` reads the Go line and holds the two equal.
+CRAFT_BATCH_MAX = 50
+
+# A batch this size or smaller prints every unit's roll; a larger one prints a
+# tally, because fifty roll lines would bury what the batch made.
+CRAFT_ROLL_LINES = 10
+
+
+async def craft_menu(user_id: int) -> list[dict[str, Any]]:
+    """Every method this cultivator knows, as the craft picker shows it (v1.21.0).
+
+    Reported from play: "we need a better menu for selecting what you want to
+    craft, and what the crafted items does is needed". The picker was a bare
+    list of recipe names in the order they sort, so a player chose between six
+    pills by name alone and learned what one did only by making it and using
+    it. Each row now carries the trade, the status page's mark (✅ ready, ❌
+    short of materials, 🔴 rank too low), how many the bags pay for - which is
+    the batch `craft.resolve` will accept - and what the item made does,
+    through `WORLD.item_does`, the one door for that line.
+
+    Ready methods come first, then the short ones, then those above the rank,
+    each by trade and name. The recipes are read off the in-process catalogue
+    rather than one `get_recipe_definition` round trip per method: this runs on
+    every keystroke of an autocomplete (rc.28's lesson). The bags and the ranks
+    are best-effort - a failed read shows every method as short rather than
+    hiding the menu - while the known methods are the menu, so their failure
+    raises to the caller, which offers nothing.
+    """
+    known = await DB.get_known_recipes(user_id)
+    try:
+        carried = dict(await DB.get_inventory(user_id) or {})
+    except Exception:
+        log.exception("Inventory could not be read for the craft menu")
+        carried = {}
+    try:
+        rows = await DB.get_profession_progress(user_id)
+        levels = {str(row["profession"]): int(row.get("level", 0)) for row in list(rows or [])}
+    except Exception:
+        log.exception("Profession ranks could not be read for the craft menu")
+        levels = {}
+    menu: list[dict[str, Any]] = []
+    for name in sorted({str(row.get("recipe") or "") for row in known if row.get("recipe")}):
+        definition = dict(WORLD.recipes.get(name) or {})
+        trade = str(definition.get("profession") or "")
+        cost = dict(definition.get("cost") or {})
+        mark, makeable = craft_readiness(cost, carried, levels.get(trade, 0), int(definition.get("min_level") or 0))
+        outputs = list(dict(definition.get("output") or {}))
+        does = WORLD.item_does(outputs[0]) if outputs else ""
+        menu.append({
+            "recipe": name, "trade": trade, "mark": mark, "makeable": makeable,
+            "does": does, "min_level": int(definition.get("min_level") or 0),
+        })
+    order = {"✅": 0, "❌": 1, "🔴": 2}
+    menu.sort(key=lambda row: (order.get(row["mark"], 3), row["trade"], row["recipe"]))
+    return menu
+
+
+def _menu_note(row: Mapping[str, Any]) -> str:
+    """The short line under a method: its readiness, then what it makes does."""
+    if row["mark"] == "✅":
+        ready = f"✅ can make {row['makeable']}"
+    elif row["mark"] == "🔴":
+        ready = f"🔴 needs rank {row['min_level']}"
+    else:
+        ready = "❌ short of materials"
+    return f"{ready} · {row['does']}" if row["does"] else ready
+
+
 async def recipe_autocomplete(
     interaction: discord.Interaction, current: str
 ) -> list[app_commands.Choice[str]]:
-    """The methods this cultivator actually knows (v1.0.5).
+    """The methods this cultivator actually knows (v1.0.5), with what each makes does.
 
     It was `DB.search_catalog("recipe", current, 25)` - the whole 33-recipe
     catalogue, capped at Discord's 25 - while `craft.resolve` refuses any method
-    the player has not learned. So a fresh character who knows about three was
-    offered twenty-five, and the hub renders this same callback as a drop-down
-    (`_autocomplete_provider` reuses it rather than duplicating game lookups),
-    which is how "why is crafting a drop-down menu" came to mean "a menu of
-    things I cannot make".
-
-    rc.46's rule, one surface over: a surface must not offer what the engine
-    will refuse. The journal stopped listing quests no roster would hand over
-    for exactly this reason.
+    the player has not learned. rc.46's rule, one surface over: a surface must
+    not offer what the engine will refuse.
 
     Knowing a method is not the same as being equal to it - a rank too low is a
-    second, different refusal - so those stay on the list. `/craft → Profession
-    → Profession Status` is where the ranks and the materials are spelled out.
+    second, different refusal - so those stay on the list, marked 🔴. Since
+    v1.21.0 each choice also says whether it is ready and what it makes does
+    (`craft_menu`); the value is still the bare recipe name.
     """
     try:
-        known = await DB.get_known_recipes(interaction.user.id)
+        menu = await craft_menu(interaction.user.id)
     except Exception:
         log.exception("Known recipes could not be read for the craft picker")
         return []
     needle = current.casefold().strip()
-    names = sorted({str(row.get("recipe") or "") for row in known if row.get("recipe")})
     return [
-        app_commands.Choice(name=name[:100], value=name[:100])
-        for name in names
-        if not needle or needle in name.casefold()
+        app_commands.Choice(name=f"{row['recipe']} — {_menu_note(row)}"[:100], value=row["recipe"][:100])
+        for row in menu
+        if not needle or needle in row["recipe"].casefold()
+    ][:25]
+
+
+async def recipe_hub_options(interaction: discord.Interaction, current: str) -> list[HubDynamicOption]:
+    """The panel's craft menu: the trade's emoji, the method, and under it
+    whether it is ready and what it makes does (v1.21.0)."""
+    try:
+        menu = await craft_menu(interaction.user.id)
+    except Exception:
+        log.exception("Known recipes could not be read for the craft menu")
+        return []
+    needle = current.casefold().strip()
+    return [
+        HubDynamicOption(
+            label=row["recipe"][:100], value=row["recipe"][:100],
+            description=_menu_note(row)[:100], emoji=TRADE_EMOJI.get(row["trade"], "🛠️"),
+        )
+        for row in menu
+        if not needle or needle in row["recipe"].casefold()
     ][:25]
 
 
@@ -834,7 +919,7 @@ async def _where_to_find_what_is_short(user_id: int, cost: dict[str, Any], locat
         return []
 
 
-async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
+async def _run_crafting(interaction: discord.Interaction, recipe: str, craft_all: bool = False) -> None:
     c = await require_character(interaction)
     if not c:
         return
@@ -853,7 +938,10 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
         envelope = await ENGINE.authoritative_action(
             "craft.resolve",
             interaction.user.id,
-            {"recipe": recipe},
+            # Craft All (v1.21.0): the engine counts what the bags pay for in
+            # the transaction that spends it, so the bot sends no number. A
+            # single craft is the payload it always was.
+            {"recipe": recipe, **({"all": True} if craft_all else {})},
             action_id=f"discord:{interaction.id}:craft.resolve",
         )
     except GameEngineError as exc:
@@ -863,6 +951,8 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
         # Two layers each discarding the one fact the player needed.
         message = str(exc)
         if "missing materials" in message.casefold():
+            # Craft All refuses only when the bags pay for none, so the
+            # shortfall is always one unit's.
             where = await _where_to_find_what_is_short(
                 interaction.user.id, dict(r.get("cost") or {}), str(c.get("location") or ""))
             message = "\n".join([
@@ -892,7 +982,36 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
     output = {str(k): int(v) for k, v in dict(resolved.get("output") or {}).items()}
     success = bool(resolved.get("success"))
     returned = {str(k): int(v) for k, v in dict(resolved.get("returned") or {}).items() if int(v) > 0}
-    if success:
+    quantity_made = int(resolved.get("quantity") or 1)
+    successes = int(resolved.get("successes", 1 if success else 0))
+    if quantity_made > 1:
+        # A batch: every unit's own roll when there are few, a tally of the
+        # outcomes when there are many, then what the whole batch made.
+        units = [dict(unit) for unit in list(resolved.get("crafts") or [])]
+        unit_lines = []
+        if len(units) <= CRAFT_ROLL_LINES:
+            for index, unit in enumerate(units, start=1):
+                made = {str(k): int(v) for k, v in dict(unit.get("output") or {}).items()}
+                back = {str(k): int(v) for k, v in dict(unit.get("returned") or {}).items() if int(v) > 0}
+                what = (f"**{WORLD.item_names(made)}**" if unit.get("success")
+                        else (f"failed, salvaged {WORLD.item_names(back)}" if back else "failed"))
+                unit_lines.append(f"`#{index}` {roll_line(SimpleNamespace(**dict(unit.get('roll') or {})))} → {what}\n")
+        else:
+            tally: dict[str, int] = {}
+            for unit in units:
+                key = (f"{unit.get('quality_label') or 'Made'} ({unit.get('grade') or 'Low'})"
+                       if unit.get("success") else "Failed")
+                tally[key] = tally.get(key, 0) + 1
+            unit_lines.append("🎲 " + " · ".join(f"{label} ×{count}" for label, count in tally.items()) + "\n")
+        outcome = "".join(unit_lines) + f"**{successes}/{quantity_made}** succeeded."
+        if output:
+            outcome += f" Made **{WORLD.item_names(output)}**."
+        if returned:
+            outcome += f" Salvaged **{WORLD.item_names(returned)}**."
+        if resolved.get("capped"):
+            outcome += (f"\n-# Craft All makes at most {CRAFT_BATCH_MAX} at a press; your bags pay for more, "
+                        "so press it again for the rest.")
+    elif success:
         outcome = f"Created **{WORLD.item_names(output)}**."
     elif returned:
         # The engine hands half of each input back on a miss (v1.3.0) and
@@ -906,9 +1025,18 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
         f"\n🛠️ Profession: **{profession_rank(level, profession)}** (Level {level}) • "
         f"XP {profession_row.get('xp',0)}/{profession_xp_needed(level)}"
     )
+    # What the made thing does (v1.21.0), at the grade it was made: a crafter
+    # was told "Created Qi Nourishing Pill" and never what a Qi Nourishing Pill
+    # is for. `WORLD.item_does` is the one line for it.
+    does_lines = "".join(
+        f"\n📖 **{WORLD.item_name(item)}**: {WORLD.item_does(item)}"
+        for item in sorted(output) if WORLD.item_does(item)
+    )
     quality_label = str(resolved.get("quality_label") or "")
     quality_line = ""
-    if quality_label:
+    # A batch names each unit's grade on its own line, so the one-craft
+    # quality line, which would describe only the last unit, is left off.
+    if quality_label and quantity_made == 1:
         prefix = "⚗️ Batch quality" if profession == "Alchemy" else "✨ Craft quality"
         quality_line = f"\n{prefix}: **{quality_label}**"
         # The grade (v1.7.0): what the quality made, and when the crafter's
@@ -970,22 +1098,40 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
     if success:
         wt_craft = await current_world_time()
         progressed = await record_quest_progress(
-            interaction.user.id, "craft", amount=1, target=recipe,
+            interaction.user.id, "craft", amount=max(1, successes), target=recipe,
             game_minute=wt_craft.total_minutes)
     await interaction.response.send_message(
-        f"**{profession}: {recipe}**\n{roll_line(roll)}\n"
+        f"**{profession}: {recipe}**{f' ×{quantity_made}' if quantity_made > 1 else ''}\n"
+        + (f"{roll_line(roll)}\n" if quantity_made == 1 else "")
         + "".join(bonus_lines)
-        + f"{outcome}{quality_line}{mastery_line}{exam_line}"
+        + f"{outcome}{quality_line}{does_lines}{mastery_line}{exam_line}"
         + (f"\n{spirit_gain_line(resolved.get('spirit_sense_gain'))}" if spirit_gain_line(resolved.get("spirit_sense_gain")) else "")
     )
     await announce_quest_progress(interaction, progressed)
 
 
 @registered_root_command(name="craft", description="Practice alchemy, forging, formation or talisman inscription from a method you know", guild=GUILD)
+@app_commands.describe(recipe="A method you know; the menu says whether it is ready and what it makes does")
 @app_commands.autocomplete(recipe=recipe_autocomplete)
 @serialized_user_action
 async def craft(interaction: discord.Interaction, recipe: str) -> None:
     await _run_crafting(interaction, recipe)
+
+
+@registered_root_command(name="craft_all", description="Make as many of a method as your materials pay for, each with its own roll", guild=GUILD)
+@app_commands.describe(recipe="A method you know; the menu says how many your materials pay for")
+@app_commands.autocomplete(recipe=recipe_autocomplete)
+@serialized_user_action
+async def craft_all(interaction: discord.Interaction, recipe: str) -> None:
+    """Craft All (v1.21.0): asked for in place of the quantity step - "maybe a
+    craft all would be better". One press makes every unit the bags pay for,
+    up to the engine's cap, each rolled on its own; Craft stays one press for
+    one craft."""
+    await _run_crafting(interaction, recipe, craft_all=True)
+
+
+register_hub_option_provider(craft, "recipe", recipe_hub_options)
+register_hub_option_provider(craft_all, "recipe", recipe_hub_options)
 
 
 async def method_slip_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
@@ -2200,10 +2346,11 @@ async def restore_exploration_event_views(bot: discord.Client) -> int:
 VIEW_RESTORERS.register("exploration_event", restore_exploration_event_views)
 
 
-register_hub_option_hint(
-    craft,
-    "recipe",
-    "You have not learned a method yet. Buy a jade slip at a hall of the trade "
-    "(**/economy → City Shops → Here**) and read it with **/craft → Profession → Learn**; "
-    "**Profession Status** lists everything you know and what each one needs.",
-)
+for _crafting in (craft, craft_all):
+    register_hub_option_hint(
+        _crafting,
+        "recipe",
+        "You have not learned a method yet. Buy a jade slip at a hall of the trade "
+        "(**/economy → City Shops → Here**) and read it with **/craft → Profession → Learn**; "
+        "**Profession Status** lists everything you know and what each one needs.",
+    )

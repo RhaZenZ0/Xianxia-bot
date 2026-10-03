@@ -78,7 +78,9 @@ class CommandCleanupTests(unittest.TestCase):
         # city's street.
         # 87 since v1.10.0: `/flame` and `/spirit` joined, the craft hub's
         # Flames and Spirit Sense pages.
-        self.assertEqual(len(ast.literal_eval(migrated_node.value)), 87)
+        # 88 since v1.21.0: `/craft_all` joined, beside `/craft` on the General
+        # Crafting page.
+        self.assertEqual(len(ast.literal_eval(migrated_node.value)), 88)
         self.assertNotIn("tree.remove_command", source)
         self.assertIn('"alchemy": alchemy_group', source)
         self.assertIn('_hub_page("alchemy", "Alchemy"', source)
