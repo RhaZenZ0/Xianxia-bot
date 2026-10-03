@@ -861,6 +861,12 @@ SURFACE = {
         "leaves": {
         },
     },
+    "commands/overview.py": {
+        "groups": (),
+        "roots": ('commands',),
+        "leaves": {
+        },
+    },
     "commands/scene.py": {
         "groups": ('scene_group',),
         "roots": ('talk', 'action', 'npcinfo'),
