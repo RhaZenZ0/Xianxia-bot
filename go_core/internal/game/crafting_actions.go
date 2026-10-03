@@ -511,7 +511,10 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	now := float64(time.Now().UnixNano()) / 1e9
 	totalOutput := map[string]int64{}
 	totalReturned := map[string]int64{}
-	crafts := make([]map[string]any, 0, quantity)
+	// No capacity hint: quantity is bounded by craftBatchMax above, and a
+	// make sized by a payload-derived number is what CodeQL flags as an
+	// uncontrolled allocation whatever bound sits before it.
+	crafts := []map[string]any{}
 	successes := int64(0)
 	examOffered := ""
 	var senseGain map[string]any
