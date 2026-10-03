@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v1.21.0
+# Xianxia RP Discord Bot v1.21.1
 
 *A cultivation RPG played entirely through Discord commands: deterministic rules in Go, an AI that
 narrates but never decides, self-hosted on your own hardware.*
@@ -703,10 +703,14 @@ make check              # lint + format-check + test-python + test-go, the pytho
 ### What CI runs
 
 One workflow (`.github/workflows/ci.yml`) on every push to `main` and every pull request, in three
-jobs. `make check` covers the first two locally; the third has no local equivalent. `python` runs
-`ruff` and the whole pytest suite; `go` runs `go vet`, `staticcheck`, `govulncheck` and
-`go test -race`; and `containers`, which waits for both, builds the two images and then
-**starts** them:
+checks that all start at the same time. `make check` covers the first two locally; the third has
+no local equivalent. `python` runs the whole pytest suite as four jobs side by side,
+`python (1/4)` to `python (4/4)`, each over a quarter of the test files (`PYTEST_SHARD=<i>/<n>`,
+dealt by `tests/conftest.py`; shard 1 also runs `ruff`), and `test_ci_shards.py` holds that every
+test file runs in exactly one; `go` runs `go vet`, `staticcheck`, `govulncheck` and
+`go test -race`; and `containers` builds the two images and then **starts** them. To rerun one
+shard locally, `PYTEST_SHARD=2/4 python -m pytest -q`; with no `PYTEST_SHARD` it is the whole
+suite. The release and Pages jobs wait for every check.
 
 | Step | What it proves |
 | --- | --- |
