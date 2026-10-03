@@ -6440,6 +6440,29 @@ multiplier there would price one place twice.
 `no such column: name` - the body half had passed only because a tempering ground short-circuits
 the abode query. `setupSectResidenceDB` carries every table both doors read.
 
+### A batch is N crafts, and the menu says what a method makes does (v1.21.0)
+
+Asked for as "Multi craft system for pills", then "a better menu for selecting what you want to
+craft, and what the crafted items does is needed". `craft.resolve` takes an optional `quantity`, 1 to
+`craftBatchMax` (10, a Go constant), and absent is one craft, so every older caller is the payload
+it always was. **A batch is N crafts and nothing else**: the materials for the whole batch are taken
+first, then `craftOneUnitTx` - the whole of what one press did, roll to alchemy record - runs N
+times, each unit rolling on its own, earning its own XP and possibly raising the rank the next unit
+is rolled at. A batch the bags cannot pay for is refused before a die is cast, so a refusal costs
+nothing. The single-craft fields on the result describe the last unit; `crafts` is every unit, and
+`output`/`returned` are the totals. The bot's `CRAFT_BATCH_MAX` and the slash command's literal
+`Range[int, 1, 10]` (literal because the hub reads that annotation as text) are held to the Go line.
+
+**`World.item_does` is the one door for what an item does**, and `app/rules/item_effects.py` is a
+display twin of the engine's grade scaling (`gradedAmount`, `gradedEffectPayload`), held to the Go
+bodies. The picker, the panel's menu, the craft reply and `/profession status` all ask it.
+`craft_menu` reads the recipes off the in-process catalogue, because it runs on every autocomplete
+keystroke (rc.28), and orders ready (✅) before short (❌) before above the rank (🔴). An array disk's
+numbers live in `deployedArrayDefs`, which Python cannot read, so an array is described in its own
+words - a decision in `docs/TODO.md`, not a gap. **The ordering drill stayed green on its first
+fixture**, because the ready recipes already sorted first by name (rc.53's lesson): the fixture
+carries an alphabetically-first recipe above the rank now, and the drill fails.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —
