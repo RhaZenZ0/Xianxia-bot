@@ -6392,6 +6392,17 @@ helper beside it. **The menu half is read, not driven**, and its drill is why: a
 hub is never left off the menu, because Recruitment's two doors are open there, so a behavioural
 test passed with the menu's exemption taken out.
 
+### The qi breakthrough is a slash command (v1.19.5)
+
+Asked for as *"a command for cultivation breakthrough for qi"*. `breakthrough` has been a
+`registered_root_command` since before the hubs and was never in `TREE_COMMANDS`, so its only door
+was `/cultivation → Main Progression` - rc.43's `/learn`, v1.7.4's `/stall` and v1.7.10's `/boss`,
+met a fourth time, while the body's twin has been a tree command (`/body breakthrough`) since
+v1.9.1. `_tree_command` registers the very root the hub leaf presses, and
+`test_the_qi_breakthrough_has_a_slash_command.py` holds that identity and that the root calls
+`cultivation.breakthrough` rather than the body's action. It joins the acting side of
+`test_seclusion_lockout`, refused behind a closed door as the leaf is.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

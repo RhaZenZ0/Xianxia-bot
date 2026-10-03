@@ -1703,6 +1703,11 @@ TREE_COMMANDS: tuple[str, ...] = (
     "flame",
     # And its Formation/Inscription twin, built rather than captured.
     "spirit",
+    # The qi breakthrough (v1.19.5): asked for as "a command for cultivation
+    # breakthrough for qi". The root has existed since before the hubs and
+    # was only ever `/cultivation → Main Progression → Breakthrough`; the
+    # body's twin has been `/body breakthrough` since v1.9.1.
+    "breakthrough",
 )
 
 
