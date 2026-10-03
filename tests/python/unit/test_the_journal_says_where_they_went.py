@@ -76,6 +76,12 @@ class TheJournalSaysWhereTheyWent(unittest.TestCase):
         self.assertIn("missing", line)
         self.assertNotIn("Ashen Hollow", line)
 
+    def test_a_missing_person_the_searcher_stands_beside_is_here(self):
+        """v1.20.2: the rule every reply asks now. A searcher who arrived has
+        found them, and saying "nobody knows where" there would contradict the
+        `/talk` that reports the find."""
+        self.assertIn("is here with you", _suffix({"status": "missing"}, "Moonfen Mist Docks"))
+
     def test_the_dead_are_said_to_be(self):
         locations = _locations()
         self.assertIn("has died", _suffix({"status": "dead"}, locations.DEAD))

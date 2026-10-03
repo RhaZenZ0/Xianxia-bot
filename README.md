@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v1.20.1
+# Xianxia RP Discord Bot v1.20.2
 
 *A cultivation RPG played entirely through Discord commands: deterministic rules in Go, an AI that
 narrates but never decides, self-hosted on your own hardware.*
@@ -255,8 +255,8 @@ for a browser, mean for an attacker.
 `/menu` opens one panel of every hub, four rows of four - You, World, Doing, Home - under a header
 that says where you stand, your realm and stage with the essence, and what is waiting (a trade
 offer at the inn), with Begin when there is no character yet and Back to the hub you left
-(v1.0.0-rc.3); `/me` opens the player dashboard, and `/commands` lists every slash command in the
-server with what it does, read off the commands the bot has registered (v1.20.1). Each hub — character,
+(v1.0.0-rc.3); `/me` opens the player dashboard, and `/commands` lists the slash commands a player has
+with what each does, read off the commands the bot has registered (v1.20.1), trimmed the way the menu is (v1.20.2). Each hub — character,
 cultivation, world, travel, craft, realm, items, combat, economy, inner world, beast, abode, family,
 quest, sect, NPCs — is a live panel with one visible, tappable row per action. A hub's pages are
 named after the work rather than the commands: the cultivation hub is Cultivate, Body, Path and

@@ -61,7 +61,7 @@ from ...rules.sect_recruitment import (
     trial_profile,
 )
 from ..registry import registered_group_command
-from ..locations import DEAD, current_npc_location
+from ..locations import DEAD, current_npc_location, npc_whereabouts
 from ..character_state import record_quest_progress, announce_quest_progress
 from ..formatting import player_property_facility_lines, player_property_unbuilt
 from ..services import PLAYER_PROPERTY_FACILITY_LABELS, QUESTS, SIM
@@ -408,7 +408,10 @@ async def sect_recruitment_recommendation(interaction: discord.Interaction, npc:
     if npc_location==DEAD:
         await interaction.response.send_message(f"**{npc}** is dead and recommends nobody.",ephemeral=False);return
     if npc_location!=str(c.get('location') or ''):
-        await interaction.response.send_message(f"**{npc}** is currently at **{npc_location or 'an unknown location'}**, not **{await character_location_display(c)}**.",ephemeral=False);return
+        # The one whereabouts rule (v1.20.2): never a missing sponsor's true
+        # position, never a place the player has not found.
+        where=await npc_whereabouts(interaction.user.id,c,npc) or "is not here"
+        await interaction.response.send_message(f"**{npc}** {where}, not at **{await character_location_display(c)}**.",ephemeral=False);return
     # v1.1.0: a "speak with them first" check stood here and never fired -
     # `get_npc_memory` answers a sentence, never "", for somebody you have not
     # met - and it is gone rather than fixed: asking is the conversation.
