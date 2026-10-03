@@ -80,6 +80,7 @@ from .commands import cooldowns as _commands_cooldowns  # noqa: F401  (registers
 from .commands.exploration import _city_board, _city_inn, _city_of
 from ..rules.death_qi import GHOST_APPEASE_GROUND_CEILING, GHOST_HARVEST_GROUND_FLOOR, death_qi_ground_multiplier
 from .commands import locked as _commands_locked  # noqa: F401  (registers /locked on import)
+from .commands.overview import register_daily_actions  # (and registers /commands on import)
 from .commands import sense as _commands_sense  # noqa: F401  (registers its root commands on import)
 from .commands import support as _commands_support  # noqa: F401  (registers /tribute on import)
 from .commands.territory import caravan_group, party_group, party_status, territory_group, war_group, war_status
@@ -678,6 +679,8 @@ _DAILY_LEAVES: tuple[tuple[str, str, str], ...] = (
     ("mine", "world", "/mine"),
 )
 DAILY_ACTIONS: tuple[str, ...] = tuple(root for root, _, _ in _DAILY_LEAVES)
+# `/commands` (v1.20.1) heads its card with these, in this order.
+register_daily_actions(DAILY_ACTIONS)
 
 
 def _daily_leaf(hub: str, path: str) -> HubAction | None:
@@ -1680,6 +1683,9 @@ async def on_app_command_error(
 # KeyError on every bot startup.
 TREE_COMMANDS: tuple[str, ...] = (
     "begin", "me", "quests", "action", "check", "admin", "menu", "tribute", "cooldowns", "locked",
+    # The command overview (v1.20.1): asked for as "A command overview". It
+    # reads this tree, so it lists whatever is registered here.
+    "commands",
     # The daily five (v1.3.2): each is also a hub leaf, and a slash command
     # of its own is one step where the hub is three. `DAILY_ACTIONS` names
     # the leaf each one is, and the menu draws them as a row.
