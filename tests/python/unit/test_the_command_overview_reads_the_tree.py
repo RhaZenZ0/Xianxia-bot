@@ -55,14 +55,43 @@ class _Response:
 
 def _interaction(commands, *, admin):
     tree = SimpleNamespace(get_commands=lambda guild=None: list(commands))
-    user = SimpleNamespace(guild_permissions=SimpleNamespace(administrator=admin))
+    user = SimpleNamespace(id=1, guild_permissions=SimpleNamespace(administrator=admin))
     return SimpleNamespace(client=SimpleNamespace(tree=tree), user=user, response=_Response())
 
 
-def _handler_text(commands, *, admin):
+class _DB:
+    def __init__(self, character):
+        self.character = character
+
+    async def get_character(self, user_id):
+        if isinstance(self.character, Exception):
+            raise self.character
+        return self.character
+
+
+def _answer(value):
+    async def provider(interaction):
+        if isinstance(value, Exception):
+            raise value
+        return value
+    return provider
+
+
+def _handler_text(commands, *, admin, character=None, hidden_hubs=None, held=None, hidden=None,
+                  shape=None):
+    """Run the real handler against `commands`, with the character read and
+    the panels' three providers answered by the test. The providers are the
+    `hubs` wrappers, which already fail towards showing everything; a test
+    that wants a provider to raise patches the registered callable instead."""
     interaction = _interaction(commands, admin=admin)
     handler = surface.ACTIONS.handler_for(surface.ACTIONS.root("commands"))
-    asyncio.run(handler(interaction))
+    character = {"user_id": 1, "realm_index": 0} if character is None else character
+    shape = {"hidden_hubs": dict(hidden_hubs or {})} if shape is None else shape
+    with patch.object(overview, "DB", _DB(character)), \
+         patch.object(overview, "menu_shape", _answer(shape)), \
+         patch.object(overview, "not_yet_unlocked", _answer(dict(held or {}))), \
+         patch.object(overview, "hidden_actions", _answer(dict(hidden or {}))):
+        asyncio.run(handler(interaction))
     sent = interaction.response.sent
     if sent is None:
         raise AssertionError("/commands sent nothing")
@@ -116,7 +145,7 @@ class TheHandlerReadsTheRealSurface(unittest.TestCase):
 
     def test_every_registered_command_is_on_the_card(self):
         commands = _live_commands()
-        text, _ = _handler_text(commands, admin=True)
+        text, _ = _handler_text(commands, admin=True, character={})
         for command in commands:
             with self.subTest(command=command.name):
                 # assertTrue rather than assertIn: the haystack is the whole card.
@@ -141,6 +170,73 @@ class TheHandlerReadsTheRealSurface(unittest.TestCase):
                 continue
             with self.subTest(hub=definition.name):
                 self.assertIn(f"`/{definition.name}`", panels)
+
+
+class EachPlayerSeesWhatIsTheirs(unittest.TestCase):
+    """The four per-player rules, each asking the panels' own answer."""
+
+    def test_begin_heads_the_card_for_somebody_with_no_character(self):
+        text, _ = _handler_text(_live_commands(), admin=False, character={})
+        self.assertIn("🌱 Start here", text)
+        self.assertLess(text.index("`/begin`"), text.index("⚡ Every day"))
+
+    def test_begin_is_never_shown_to_somebody_with_a_character(self):
+        text, _ = _handler_text(_live_commands(), admin=False)
+        self.assertNotIn("`/begin`", text)
+        self.assertNotIn("Start here", text)
+
+    def test_a_hub_the_menu_leaves_off_is_left_off_and_named(self):
+        text, _ = _handler_text(_live_commands(), admin=False, hidden_hubs={"combat": 1, "abode": 4})
+        panels = text[text.index("🧭 Panels"):text.index("✳️ Commands")]
+        self.assertNotIn("`/combat`", panels)
+        self.assertNotIn("`/abode`", panels)
+        self.assertIn("`/world`", panels)
+        not_yet = text[text.index("🔒 Not yet"):]
+        self.assertIn("/combat", not_yet)
+        self.assertIn("/abode", not_yet)
+
+    def test_a_held_back_subcommand_is_left_off_and_counted(self):
+        text, _ = _handler_text(_live_commands(), admin=False,
+                                held={"/stall open": 1, "/stall list": 1, "/stall close": 1})
+        groups = text[text.index("📂 Command groups"):text.index("🔒 Not yet")]
+        stall = groups[groups.index("`/stall`"):].split("\n", 2)[1]
+        self.assertNotIn("open", stall.split(" · "))
+        self.assertIn("board", stall)
+        self.assertIn("3 subcommands", text[text.index("🔒 Not yet"):])
+
+    def test_a_group_with_nothing_open_is_left_off_and_named(self):
+        held = {"/flame status": 1, "/flame capture": 1, "/flame refine": 1, "/flame bind": 1}
+        text, _ = _handler_text(_live_commands(), admin=False, held=held)
+        self.assertNotIn("`/flame`", text)
+        self.assertIn("/flame", text[text.index("🔒 Not yet"):])
+
+    def test_another_paths_command_is_absent_and_uncounted(self):
+        text, _ = _handler_text(_live_commands(), admin=False,
+                                hidden={"/stall open": hubs.NOT_YOUR_PATH, "/stall board": "not here"})
+        groups = text[text.index("📂 Command groups"):]
+        stall = groups[groups.index("`/stall`"):].split("\n", 2)[1]
+        self.assertNotIn("open", stall.split(" · "))
+        self.assertIn("board", stall, "a padlock for where you stand is not this card's business")
+        self.assertNotIn("🔒 Not yet", text, "a road nobody can walk to is not counted")
+
+    def test_a_provider_that_fails_hides_nothing(self):
+        def broken(interaction):
+            raise RuntimeError("the curriculum is away")
+        with patch.object(hubs, "_MENU_SHAPE", broken), \
+             patch.object(hubs, "_NOT_YET_UNLOCKED", broken), \
+             patch.object(hubs, "_HIDDEN_ACTIONS", broken), \
+             patch.object(overview, "DB", _DB({"user_id": 1})):
+            interaction = _interaction(_live_commands(), admin=False)
+            asyncio.run(surface.ACTIONS.handler_for(surface.ACTIONS.root("commands"))(interaction))
+        text = cards.card_text(interaction.response.sent["view"])
+        for definition in hubs.REGISTERED_HUBS:
+            if definition.name != "admin":
+                self.assertTrue(f"`/{definition.name}`" in text, f"/{definition.name} was hidden by a failed lookup")
+        self.assertNotIn("🔒 Not yet", text)
+
+    def test_a_character_read_that_fails_does_not_offer_begin(self):
+        text, _ = _handler_text(_live_commands(), admin=False, character=RuntimeError("database is away"))
+        self.assertNotIn("`/begin`", text)
 
 
 if __name__ == "__main__":

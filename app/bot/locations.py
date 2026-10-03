@@ -312,8 +312,8 @@ async def _location_is_visible(user_id: int, character: dict[str, Any], location
     return str(location) in await _known_locations(user_id, character)
 
 
-async def talk_target_whereabouts(user_id: int, character: dict[str, Any], npc_name: str) -> str:
-    """Where somebody a quest asks you to speak with is now (v1.8.3).
+async def npc_whereabouts(user_id: int, character: dict[str, Any], npc_name: str) -> str:
+    """Where somebody is now, as a player may be told it (v1.8.3, v1.20.2).
 
     The civilization tick walks ordinary townsfolk off to the next district
     and home again, so a commission's fishmonger is often not on the dock the
@@ -323,6 +323,17 @@ async def talk_target_whereabouts(user_id: int, character: dict[str, Any], npc_n
     has not discovered is not named. A missing person is never placed, because
     finding them is the point of looking. It never raises, because it is drawn
     beside every line of the journal.
+
+    v1.20.2: it is also every reply's answer, not only the journal's. Asked
+    "why would a player see npc inspect", reading it found `/npcinfo`, `/talk`
+    and the sect recommendation each printing `current_npc_location` straight
+    back - which answers a missing person's true position on purpose, so the
+    pickers list them only where a searcher stands - so typing a missing
+    person's name did a disappearance quest's whole search, and the two
+    refusals named places the player had never found. Three readers had
+    drifted from the one statement of the rule; they all ask this now. A
+    missing person standing where the player stands *is* here: the searcher
+    has found them, and `/talk` there is what reports it.
     """
     name = str(npc_name or "").strip()
     if not name:
@@ -330,9 +341,11 @@ async def talk_target_whereabouts(user_id: int, character: dict[str, Any], npc_n
     try:
         state = await SIM.npc_status(name) or {}
         status = str(state.get("status") or "")
-        if status == "missing":
-            return "is missing; nobody knows where"
         where = await current_npc_location(name)
+        if status == "missing":
+            if where and str(where) == str(character.get("location") or ""):
+                return "is here with you"
+            return "is missing; nobody knows where"
         if where == DEAD or (state and status not in ("", "alive")):
             return "has died"
         if not where:
@@ -351,7 +364,7 @@ async def objective_line_suffix(user_id: int, character: dict[str, Any] | None, 
     """The whereabouts note for an unfinished `talk` objective, else nothing."""
     if done or not character or str(objective.get("type") or "") != "talk":
         return ""
-    where = await talk_target_whereabouts(user_id, character, str(objective.get("target") or ""))
+    where = await npc_whereabouts(user_id, character, str(objective.get("target") or ""))
     return f" · *{str(objective.get('target'))} {where}*" if where else ""
 
 

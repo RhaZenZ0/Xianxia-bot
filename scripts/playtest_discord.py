@@ -1157,11 +1157,17 @@ async def run(url: str, token: str, db_path: str, shard: tuple[int, int] | None 
         async def command_overview():
             # v1.20.1: the card reads the tree, so it is held to the tree this
             # run registered rather than to a list written down here.
+            # It is also this player's card: a hub the menu leaves off at realm
+            # 0 is named in its "Not yet" line rather than listed, and /begin
+            # is never shown to somebody who already has a character.
             text = result_text(await player.slash(channels["begin-here"], "commands"))
-            missing = sorted(name for name in wanted_commands if name != "admin" and f"`/{name}`" not in text)
-            expect(not missing, f"/commands leaves out {missing}")
+            missing = sorted(name for name in wanted_commands
+                             if name not in ("admin", "begin") and f"/{name}" not in text)
+            expect(not missing, f"/commands neither lists nor names {missing}")
             expect("`/admin`" not in text, "/commands shows /admin to a player who is not an administrator")
-        await step(report, "/commands lists every slash command a player has", command_overview())
+            expect("`/begin`" not in text, "/commands offers /begin to a player who has a character")
+            expect("Not yet" in text, f"at realm 0 the card names nothing as held back:\n{text[-600:]}")
+        await step(report, "/commands lists what this player has, and names what is not yet theirs", command_overview())
 
         # ---- 6b. the curriculum, and then past it ---------------------------------
         # v1.0.9 gave a page a **third** state: a leaf can be drawn, hidden with
