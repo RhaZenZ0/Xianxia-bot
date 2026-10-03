@@ -306,6 +306,10 @@ async def seclusion_start(
     array_mult = float(environment.get("array_mult", 1.0))
     if environment.get("array_name") and array_mult != 1.0:
         env_label += f" • {environment.get('array_name')} x{array_mult:.2f}"
+    # Ground that tempers flesh (v1.20.0), named the way the engine counted it.
+    tempering_mult = float(environment.get("tempering_mult", 1.0) or 1.0)
+    if environment.get("tempering_ground") and tempering_mult != 1.0:
+        env_label += f" • tempering ground x{tempering_mult:.2f}"
     await interaction.followup.send(
         f"🔒 **Closed-Door Seclusion Begun**\n"
         f"Path: **{'Qi' if mode.value == 'qi' else 'Body'} Cultivation**\n"

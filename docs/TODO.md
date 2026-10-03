@@ -16,6 +16,13 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.20.0)** — *Body cultivation is too slow.* Asked for in play. Measured: body stages
+  cost 14-22% more than qi stages at the same realm, no body pill was sold or craftable, and every
+  qi-path multiplier skips the body. On the owner's call: Bone-Tempering and Iron-Blood pills beside
+  their qi twins on every shelf, a quarter of a body session for each successful hunt, dig and
+  battle won (`body_tempering.by_use`), and tempering grounds - hunting grounds, forge terraces,
+  garrison wards, the wilds - for body sessions at both cultivation doors. Cheaper body stages were
+  offered and declined.
 - **fixed (v1.19.0)** — *More capitals, with rivals.* Asked for as *"more capital cities with rivals,
   maybe move the sects that fit"*; three shapes were offered and the owner took the smallest: one
   capital per world stays, every public sect's gate becomes a `sect_gate` district of a seat city of

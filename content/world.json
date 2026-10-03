@@ -649,6 +649,24 @@
     "kept_per_realm": 1,
     "stages_per_realm": 9
   },
+  "body_tempering": {
+    "description": "What tempers the body besides sitting down to train it (v1.20.0). A successful hunt, a successful dig and a battle won each add a share of one body session to the body stage being filled (by_use), never past what the stage can hold. And some ground tempers flesh the way a shrine feeds qi: a hunting ground, a city's forge terraces and garrison ward, and the wild places beyond the roads (grounds). A ground counts for body sessions only, hand-sat and closed-door alike.",
+    "by_use": {
+      "hunt": 0.25,
+      "mine": 0.25,
+      "battle": 0.25
+    },
+    "grounds": {
+      "road_sites": {
+        "hunting_ground": 1.15
+      },
+      "districts": {
+        "forge": 1.15,
+        "garrison": 1.1
+      },
+      "wilds": 1.2
+    }
+  },
   "roots": [
     "Fire",
     "Water",
@@ -27830,6 +27848,58 @@
         "consumed": true
       },
       "base_price": 768
+    },
+    "bone_tempering_pill": {
+      "name": "Bone-Tempering Pill",
+      "description": "A coarse brown pill pressed from beast marrow and bitter roots; the bones ache and harden faster while it lasts.",
+      "sect_value": 9,
+      "use": {
+        "effect_key": "bone_tempering",
+        "name": "Bone Tempering",
+        "duration_game_minutes": 240,
+        "consume": true,
+        "effect": {
+          "description": "Medicinal heat soaks into the bones; body tempering runs faster for a short period.",
+          "modifiers": [
+            {
+              "stat": "body_cultivation_gain",
+              "operation": "mul",
+              "value": 1.2
+            }
+          ],
+          "tags": [
+            "pill",
+            "cultivation"
+          ]
+        }
+      },
+      "base_price": 18
+    },
+    "iron_blood_pill": {
+      "name": "Iron-Blood Pill",
+      "description": "A dense red pill that tastes of iron; the blood runs hot and the flesh tempers quickly while it lasts.",
+      "sect_value": 28,
+      "use": {
+        "effect_key": "iron_blood_pill",
+        "name": "Iron-Blood Pill",
+        "duration_game_minutes": 240,
+        "consume": true,
+        "effect": {
+          "description": "The blood runs hot and heavy; body tempering runs faster while it lasts.",
+          "modifiers": [
+            {
+              "stat": "body_cultivation_gain",
+              "operation": "mul",
+              "value": 1.35
+            }
+          ],
+          "tags": [
+            "pill",
+            "cultivation"
+          ]
+        }
+      },
+      "base_price": 70
     }
   },
   "recipes": {
@@ -60096,6 +60166,12 @@
           "made_here": true
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 5,
+          "price": 13,
+          "made_here": true
+        },
+        {
           "item_id": "qi_pill@mid",
           "quantity": 2,
           "price": 26,
@@ -60151,6 +60227,12 @@
         },
         {
           "item_id": "spirit_condensation_pill",
+          "quantity": 2,
+          "price": 46,
+          "made_here": true
+        },
+        {
+          "item_id": "iron_blood_pill",
           "quantity": 2,
           "price": 46,
           "made_here": true
@@ -60216,7 +60298,9 @@
         "moonveil_recovery_pill@mid": 30,
         "spirit_condensation_pill@mid": 34,
         "marrow_tempering_pill": 40,
-        "marrow_tempering_pill@mid": 80
+        "marrow_tempering_pill@mid": 80,
+        "bone_tempering_pill": 5,
+        "iron_blood_pill": 17
       }
     },
     "azure_crown_talisman_hall": {
@@ -60791,6 +60875,12 @@
           "made_here": true
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 8,
+          "price": 26,
+          "made_here": true
+        },
+        {
           "item_id": "qi_pill@mid",
           "quantity": 4,
           "price": 52,
@@ -60864,6 +60954,12 @@
         },
         {
           "item_id": "spirit_condensation_pill",
+          "quantity": 2,
+          "price": 91,
+          "made_here": true
+        },
+        {
+          "item_id": "iron_blood_pill",
           "quantity": 2,
           "price": 91,
           "made_here": true
@@ -60977,7 +61073,9 @@
         "heavenpetal_elixir@mid": 186,
         "starlight_dao_pill@mid": 218,
         "marrow_tempering_pill": 40,
-        "marrow_tempering_pill@mid": 80
+        "marrow_tempering_pill@mid": 80,
+        "bone_tempering_pill": 10,
+        "iron_blood_pill": 17
       }
     },
     "celestial_mandate_talisman_hall": {
@@ -61336,6 +61434,12 @@
           "made_here": true
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 7,
+          "price": 21,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_herb",
           "quantity": 13,
           "price": 6,
@@ -61379,6 +61483,12 @@
         },
         {
           "item_id": "spirit_condensation_pill",
+          "quantity": 2,
+          "price": 73,
+          "made_here": true
+        },
+        {
+          "item_id": "iron_blood_pill",
           "quantity": 2,
           "price": 73,
           "made_here": true
@@ -61450,7 +61560,9 @@
         "immortal_marrow_pill": 44,
         "heavenpetal_elixir": 93,
         "starlight_dao_pill": 109,
-        "marrow_tempering_pill": 40
+        "marrow_tempering_pill": 40,
+        "bone_tempering_pill": 8,
+        "iron_blood_pill": 17
       }
     },
     "cloudblade_forge": {
@@ -61739,6 +61851,12 @@
           "made_here": true
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 7,
+          "price": 21,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_herb",
           "quantity": 13,
           "price": 6,
@@ -61782,6 +61900,12 @@
         },
         {
           "item_id": "spirit_condensation_pill",
+          "quantity": 2,
+          "price": 73,
+          "made_here": true
+        },
+        {
+          "item_id": "iron_blood_pill",
           "quantity": 2,
           "price": 73,
           "made_here": true
@@ -61853,7 +61977,9 @@
         "immortal_marrow_pill": 44,
         "heavenpetal_elixir": 93,
         "starlight_dao_pill": 109,
-        "marrow_tempering_pill": 40
+        "marrow_tempering_pill": 40,
+        "bone_tempering_pill": 8,
+        "iron_blood_pill": 17
       }
     },
     "divine_herb_talisman_hall": {
@@ -63100,6 +63226,12 @@
           "made_here": true
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 4,
+          "price": 11,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_herb",
           "quantity": 10,
           "price": 3,
@@ -63154,7 +63286,8 @@
         "beast_core": 2,
         "recovery_pill": 4,
         "qi_pill": 4,
-        "marrow_tempering_pill": 40
+        "marrow_tempering_pill": 40,
+        "bone_tempering_pill": 4
       }
     },
     "greenriver_provisions": {
@@ -63403,6 +63536,12 @@
           "made_here": true
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 5,
+          "price": 13,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_herb",
           "quantity": 11,
           "price": 4,
@@ -63439,6 +63578,12 @@
           "made_here": true
         },
         {
+          "item_id": "iron_blood_pill",
+          "quantity": 2,
+          "price": 44,
+          "made_here": true
+        },
+        {
           "item_id": "moonveil_recovery_pill_method",
           "quantity": 1,
           "price": 122,
@@ -63462,7 +63607,9 @@
         "qi_replenishment_pill": 5,
         "moonveil_recovery_pill": 15,
         "spirit_condensation_pill": 17,
-        "marrow_tempering_pill": 40
+        "marrow_tempering_pill": 40,
+        "bone_tempering_pill": 4,
+        "iron_blood_pill": 17
       }
     },
     "hundred_herb_talisman_hall": {
@@ -63625,6 +63772,12 @@
           "made_here": true
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 6,
+          "price": 16,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_herb",
           "quantity": 12,
           "price": 5,
@@ -63662,6 +63815,12 @@
         },
         {
           "item_id": "spirit_condensation_pill",
+          "quantity": 2,
+          "price": 55,
+          "made_here": true
+        },
+        {
+          "item_id": "iron_blood_pill",
           "quantity": 2,
           "price": 55,
           "made_here": true
@@ -63711,7 +63870,9 @@
         "spirit_condensation_pill": 17,
         "dawnlotus_vitality_pill": 37,
         "immortal_marrow_pill": 44,
-        "marrow_tempering_pill": 40
+        "marrow_tempering_pill": 40,
+        "bone_tempering_pill": 6,
+        "iron_blood_pill": 17
       }
     },
     "ironbanner_forge": {
@@ -63820,6 +63981,12 @@
           "made_here": true
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 6,
+          "price": 16,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_herb",
           "quantity": 12,
           "price": 5,
@@ -63857,6 +64024,12 @@
         },
         {
           "item_id": "spirit_condensation_pill",
+          "quantity": 2,
+          "price": 55,
+          "made_here": true
+        },
+        {
+          "item_id": "iron_blood_pill",
           "quantity": 2,
           "price": 55,
           "made_here": true
@@ -63906,7 +64079,9 @@
         "spirit_condensation_pill": 17,
         "dawnlotus_vitality_pill": 37,
         "immortal_marrow_pill": 44,
-        "marrow_tempering_pill": 40
+        "marrow_tempering_pill": 40,
+        "bone_tempering_pill": 6,
+        "iron_blood_pill": 17
       }
     },
     "jade_cauldron_talisman_hall": {
@@ -64198,6 +64373,12 @@
           "made_here": true
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 5,
+          "price": 13,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_herb",
           "quantity": 11,
           "price": 4,
@@ -64234,6 +64415,12 @@
           "made_here": true
         },
         {
+          "item_id": "iron_blood_pill",
+          "quantity": 2,
+          "price": 44,
+          "made_here": true
+        },
+        {
           "item_id": "moonveil_recovery_pill_method",
           "quantity": 1,
           "price": 122,
@@ -64257,7 +64444,9 @@
         "qi_replenishment_pill": 5,
         "moonveil_recovery_pill": 15,
         "spirit_condensation_pill": 17,
-        "marrow_tempering_pill": 40
+        "marrow_tempering_pill": 40,
+        "bone_tempering_pill": 4,
+        "iron_blood_pill": 17
       }
     },
     "jadewood_apothecary": {
@@ -64280,6 +64469,12 @@
         },
         {
           "item_id": "qi_pill",
+          "quantity": 4,
+          "price": 11,
+          "made_here": true
+        },
+        {
+          "item_id": "bone_tempering_pill",
           "quantity": 4,
           "price": 11,
           "made_here": true
@@ -64339,7 +64534,8 @@
         "beast_core": 2,
         "recovery_pill": 4,
         "qi_pill": 4,
-        "marrow_tempering_pill": 40
+        "marrow_tempering_pill": 40,
+        "bone_tempering_pill": 4
       }
     },
     "jadewood_talisman_hall": {
@@ -64528,6 +64724,12 @@
           "made_here": true
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 7,
+          "price": 21,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_herb",
           "quantity": 13,
           "price": 6,
@@ -64571,6 +64773,12 @@
         },
         {
           "item_id": "spirit_condensation_pill",
+          "quantity": 2,
+          "price": 73,
+          "made_here": true
+        },
+        {
+          "item_id": "iron_blood_pill",
           "quantity": 2,
           "price": 73,
           "made_here": true
@@ -64642,7 +64850,9 @@
         "immortal_marrow_pill": 44,
         "heavenpetal_elixir": 93,
         "starlight_dao_pill": 109,
-        "marrow_tempering_pill": 40
+        "marrow_tempering_pill": 40,
+        "bone_tempering_pill": 8,
+        "iron_blood_pill": 17
       }
     },
     "lunar_veil_talisman_hall": {
@@ -64748,6 +64958,12 @@
           "made_here": true
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 6,
+          "price": 16,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_herb",
           "quantity": 12,
           "price": 5,
@@ -64785,6 +65001,12 @@
         },
         {
           "item_id": "spirit_condensation_pill",
+          "quantity": 2,
+          "price": 55,
+          "made_here": true
+        },
+        {
+          "item_id": "iron_blood_pill",
           "quantity": 2,
           "price": 55,
           "made_here": true
@@ -64834,7 +65056,9 @@
         "spirit_condensation_pill": 17,
         "dawnlotus_vitality_pill": 37,
         "immortal_marrow_pill": 44,
-        "marrow_tempering_pill": 40
+        "marrow_tempering_pill": 40,
+        "bone_tempering_pill": 6,
+        "iron_blood_pill": 17
       }
     },
     "mandate_crown_provisions": {
@@ -65347,6 +65571,12 @@
           "made_here": true
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 4,
+          "price": 11,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_herb",
           "quantity": 10,
           "price": 3,
@@ -65401,7 +65631,8 @@
         "beast_core": 2,
         "recovery_pill": 4,
         "qi_pill": 4,
-        "marrow_tempering_pill": 40
+        "marrow_tempering_pill": 40,
+        "bone_tempering_pill": 4
       }
     },
     "moonfrost_talisman_hall": {
@@ -65500,6 +65731,12 @@
           "made_here": true
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 5,
+          "price": 13,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_herb",
           "quantity": 11,
           "price": 4,
@@ -65536,6 +65773,12 @@
           "made_here": true
         },
         {
+          "item_id": "iron_blood_pill",
+          "quantity": 2,
+          "price": 44,
+          "made_here": true
+        },
+        {
           "item_id": "moonveil_recovery_pill_method",
           "quantity": 1,
           "price": 122,
@@ -65559,7 +65802,9 @@
         "qi_replenishment_pill": 5,
         "moonveil_recovery_pill": 15,
         "spirit_condensation_pill": 17,
-        "marrow_tempering_pill": 40
+        "marrow_tempering_pill": 40,
+        "bone_tempering_pill": 4,
+        "iron_blood_pill": 17
       }
     },
     "nine_heavens_forge": {
@@ -65775,6 +66020,12 @@
           "made_here": true
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 7,
+          "price": 20,
+          "made_here": true
+        },
+        {
           "item_id": "qi_pill@mid",
           "quantity": 3,
           "price": 40,
@@ -65848,6 +66099,12 @@
         },
         {
           "item_id": "spirit_condensation_pill",
+          "quantity": 2,
+          "price": 69,
+          "made_here": true
+        },
+        {
+          "item_id": "iron_blood_pill",
           "quantity": 2,
           "price": 69,
           "made_here": true
@@ -65961,7 +66218,9 @@
         "heavenpetal_elixir@mid": 186,
         "starlight_dao_pill@mid": 218,
         "marrow_tempering_pill": 40,
-        "marrow_tempering_pill@mid": 80
+        "marrow_tempering_pill@mid": 80,
+        "bone_tempering_pill": 7,
+        "iron_blood_pill": 17
       }
     },
     "nine_heavens_talisman_hall": {
@@ -66741,6 +67000,12 @@
           "made_here": true
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 4,
+          "price": 11,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_herb",
           "quantity": 10,
           "price": 3,
@@ -66795,7 +67060,8 @@
         "beast_core": 2,
         "recovery_pill": 4,
         "qi_pill": 4,
-        "marrow_tempering_pill": 40
+        "marrow_tempering_pill": 40,
+        "bone_tempering_pill": 4
       }
     },
     "ruined_constellation_array_workshop": {
@@ -67861,6 +68127,12 @@
           "made_here": true
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 6,
+          "price": 16,
+          "made_here": true
+        },
+        {
           "item_id": "qi_pill@mid",
           "quantity": 3,
           "price": 32,
@@ -67922,6 +68194,12 @@
         },
         {
           "item_id": "spirit_condensation_pill",
+          "quantity": 2,
+          "price": 55,
+          "made_here": true
+        },
+        {
+          "item_id": "iron_blood_pill",
           "quantity": 2,
           "price": 55,
           "made_here": true
@@ -67998,7 +68276,9 @@
         "dawnlotus_vitality_pill@mid": 74,
         "immortal_marrow_pill@mid": 88,
         "marrow_tempering_pill": 40,
-        "marrow_tempering_pill@mid": 80
+        "marrow_tempering_pill@mid": 80,
+        "bone_tempering_pill": 6,
+        "iron_blood_pill": 17
       }
     },
     "spirit_jade_talisman_hall": {
@@ -69025,6 +69305,12 @@
           "made_here": false
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 5,
+          "price": 20,
+          "made_here": false
+        },
+        {
           "item_id": "talisman_paper",
           "quantity": 8,
           "price": 5,
@@ -69075,6 +69361,12 @@
           "made_here": false
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 3,
+          "price": 13,
+          "made_here": false
+        },
+        {
           "item_id": "talisman_paper",
           "quantity": 6,
           "price": 4,
@@ -69113,6 +69405,12 @@
         },
         {
           "item_id": "qi_pill",
+          "quantity": 3,
+          "price": 13,
+          "made_here": false
+        },
+        {
+          "item_id": "bone_tempering_pill",
           "quantity": 3,
           "price": 13,
           "made_here": false
@@ -69161,6 +69459,12 @@
           "made_here": false
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 4,
+          "price": 16,
+          "made_here": false
+        },
+        {
           "item_id": "talisman_paper",
           "quantity": 7,
           "price": 4,
@@ -69199,6 +69503,12 @@
         },
         {
           "item_id": "qi_pill",
+          "quantity": 6,
+          "price": 26,
+          "made_here": false
+        },
+        {
+          "item_id": "bone_tempering_pill",
           "quantity": 6,
           "price": 26,
           "made_here": false
@@ -69254,6 +69564,12 @@
           "made_here": false
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 6,
+          "price": 26,
+          "made_here": false
+        },
+        {
           "item_id": "talisman_paper",
           "quantity": 9,
           "price": 7,
@@ -69304,6 +69620,12 @@
           "made_here": false
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 3,
+          "price": 13,
+          "made_here": false
+        },
+        {
           "item_id": "talisman_paper",
           "quantity": 6,
           "price": 4,
@@ -69342,6 +69664,12 @@
         },
         {
           "item_id": "qi_pill",
+          "quantity": 6,
+          "price": 26,
+          "made_here": false
+        },
+        {
+          "item_id": "bone_tempering_pill",
           "quantity": 6,
           "price": 26,
           "made_here": false
@@ -69397,6 +69725,12 @@
           "made_here": false
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 4,
+          "price": 16,
+          "made_here": false
+        },
+        {
           "item_id": "talisman_paper",
           "quantity": 7,
           "price": 4,
@@ -69435,6 +69769,12 @@
         },
         {
           "item_id": "qi_pill",
+          "quantity": 5,
+          "price": 20,
+          "made_here": false
+        },
+        {
+          "item_id": "bone_tempering_pill",
           "quantity": 5,
           "price": 20,
           "made_here": false
@@ -69490,6 +69830,12 @@
           "made_here": false
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 5,
+          "price": 20,
+          "made_here": false
+        },
+        {
           "item_id": "talisman_paper",
           "quantity": 8,
           "price": 5,
@@ -69540,6 +69886,12 @@
           "made_here": false
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 3,
+          "price": 13,
+          "made_here": false
+        },
+        {
           "item_id": "talisman_paper",
           "quantity": 6,
           "price": 4,
@@ -69583,6 +69935,12 @@
           "made_here": false
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 4,
+          "price": 16,
+          "made_here": false
+        },
+        {
           "item_id": "talisman_paper",
           "quantity": 7,
           "price": 4,
@@ -69621,6 +69979,12 @@
         },
         {
           "item_id": "qi_pill",
+          "quantity": 5,
+          "price": 20,
+          "made_here": false
+        },
+        {
+          "item_id": "bone_tempering_pill",
           "quantity": 5,
           "price": 20,
           "made_here": false
@@ -69676,6 +70040,12 @@
           "made_here": false
         },
         {
+          "item_id": "bone_tempering_pill",
+          "quantity": 6,
+          "price": 26,
+          "made_here": false
+        },
+        {
           "item_id": "talisman_paper",
           "quantity": 9,
           "price": 7,
@@ -69721,6 +70091,12 @@
         },
         {
           "item_id": "qi_pill",
+          "quantity": 4,
+          "price": 16,
+          "made_here": false
+        },
+        {
+          "item_id": "bone_tempering_pill",
           "quantity": 4,
           "price": 16,
           "made_here": false

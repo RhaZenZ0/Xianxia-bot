@@ -1199,7 +1199,12 @@ func combatFinalizeAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 	// A win sharpens a Sword Cultivator's intent (v1.13.0); anybody else banks
 	// nothing, and a lost point never costs the win.
 	intent := bankSwordIntentTx(conn, catalog, userID)
-	out := map[string]any{"battle_id": b.BattleID, "outcome": outcome, "sword_intent": intent, "npc_name": b.NPCName, "npc_realm_index": b.NPCRealm, "npc_stage": b.NPCStage, "location": b.Location, "source": b.Source, "severity": severity, "insight_xp_awarded": reward, "event_manifestation": strings.HasPrefix(b.Source, "event:")}
+	// A fight won tempers the body that came out of it standing (v1.20.0).
+	bodyTempered, e := temperBodyByUseTx(conn, catalog, userID, "battle", now)
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	out := map[string]any{"battle_id": b.BattleID, "outcome": outcome, "sword_intent": intent, "body_tempered": bodyTempered, "npc_name": b.NPCName, "npc_realm_index": b.NPCRealm, "npc_stage": b.NPCStage, "location": b.Location, "source": b.Source, "severity": severity, "insight_xp_awarded": reward, "event_manifestation": strings.HasPrefix(b.Source, "event:")}
 	if !strings.HasPrefix(b.Source, "event:") {
 		karmaDelta := int64(2)
 		repDelta := int64(2)

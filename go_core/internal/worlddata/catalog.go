@@ -63,6 +63,24 @@ type AttributeGrowth struct {
 	StagesPerRealm int64 `json:"stages_per_realm"`
 }
 
+// BodyTempering (v1.20.0) is what tempers the body besides a body session:
+// a share of a session for each deed in ByUse (a successful hunt, a
+// successful dig, a battle won), and the ground that tempers flesh the way a
+// shrine feeds qi.
+type BodyTempering struct {
+	ByUse   map[string]float64   `json:"by_use"`
+	Grounds BodyTemperingGrounds `json:"grounds"`
+}
+
+// BodyTemperingGrounds is the body path's ground: a road site kind, a city
+// district kind, or any place in the wilds of a city (WildsOf), each with the
+// multiplier it gives a body session there.
+type BodyTemperingGrounds struct {
+	RoadSites map[string]float64 `json:"road_sites"`
+	Districts map[string]float64 `json:"districts"`
+	Wilds     float64            `json:"wilds"`
+}
+
 type RootGrade struct {
 	Name              string  `json:"name"`
 	MinRoll           int     `json:"min_roll"`
@@ -1016,6 +1034,7 @@ type Catalog struct {
 	Paths               map[string]Path                `json:"paths"`
 	PathSystem          PathSystem                     `json:"path_system"`
 	AttributeGrowth     AttributeGrowth                `json:"attribute_growth"`
+	BodyTempering       BodyTempering                  `json:"body_tempering"`
 	Roots               []string                       `json:"roots"`
 	SpiritualRootSystem RootSystem                     `json:"spiritual_root_system"`
 	Bloodlines          map[string]BloodlineDefinition `json:"bloodlines"`
