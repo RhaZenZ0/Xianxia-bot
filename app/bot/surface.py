@@ -179,7 +179,7 @@ _GROUP_ACTION_ROOTS = {
 _MIGRATED_ROOTS = {
     "abode", "afterlife", "alchemy", "aptitude", "array", "artifact", "auction", "battle", "beast",
     "body", "bond", "boss", "bounty", "breakthrough", "caravan",
-    "city", "civilization", "conceal", "condition", "craft", "crime", "cultivate",
+    "city", "civilization", "conceal", "condition", "craft", "craft_all", "crime", "cultivate",
     "dantian", "daoheart", "duel", "effects", "equipment", "era", "explore", "family",
     "formation", "ghost", "grudges", "hunt", "hunter", "inheritances", "fate", "mine",
     "innerworld", "inventory", "karma", "law", "learn", "lifespan", "manual", "market", "merchant", "shop", "trade", "blackmarket",
@@ -380,7 +380,7 @@ _HUB_DEFINITIONS = (
         description="Craft alchemy, forging, formation and talisman-inscription recipes; deploy shared location arrays through Items → Use Item.",
         pages=(
             _hub_page("alchemy", "Alchemy", "Refine pills, forage simulated herb resources, track toxicity and purge medicinal residue."),
-            _hub_page("craft", "General Crafting", "Practice alchemy, forging, formation or talisman inscription from known recipes."),
+            _hub_page("craft", "General Crafting", "Practice alchemy, forging, formation or talisman inscription from known recipes: one at a time, or Craft All for as many as your materials pay for.", "craft_all"),
             _hub_page("profession", "Profession", "Your crafting and support-profession mastery: what rank you hold, the hall examination that certifies it, and reading a method slip into a method you keep.", "learn"),
             _hub_page("flame", "Flames", "Capture a flame at a world's forge terraces, refine it and bind it: it steadies every alchemy and forging roll, and a fully refined heavenly flame opens the Transcendent grade."),
             _hub_page("spirit", "Spirit Sense", "Build your spirit sense through formation and inscription, meditation and scene actions, and settle each stage with qi: it steadies those two trades, and fully built it opens the Transcendent grade."),

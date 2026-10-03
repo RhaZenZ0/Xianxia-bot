@@ -6456,18 +6456,27 @@ filtered out of the handler) names it. The Discord playtest holds the card to th
 registered, and `#xianxia-info` points at it - and names `/forage` where it said `/alchemy forage`,
 which is a hub leaf path and not a command anybody can type.
 
-### A batch is N crafts, and the menu says what a method makes does (v1.21.0)
+### Craft All is N crafts, and the menu says what a method makes does (v1.21.0)
 
 Asked for as "Multi craft system for pills", then "a better menu for selecting what you want to
-craft, and what the crafted items does is needed". `craft.resolve` takes an optional `quantity`, 1 to
-`craftBatchMax` (10, a Go constant), and absent is one craft, so every older caller is the payload
-it always was. **A batch is N crafts and nothing else**: the materials for the whole batch are taken
-first, then `craftOneUnitTx` - the whole of what one press did, roll to alchemy record - runs N
-times, each unit rolling on its own, earning its own XP and possibly raising the rank the next unit
-is rolled at. A batch the bags cannot pay for is refused before a die is cast, so a refusal costs
-nothing. The single-craft fields on the result describe the last unit; `crafts` is every unit, and
-`output`/`returned` are the totals. The bot's `CRAFT_BATCH_MAX` and the slash command's literal
-`Range[int, 1, 10]` (literal because the hub reads that annotation as text) are held to the Go line.
+craft, and what the crafted items does is needed", then "maybe a craft all would be better" - in
+place of a quantity step the first draft put before every craft. `craft.resolve` takes `all: true`
+(Craft All, `/craft_all`) or an explicit `quantity`, never both, up to `craftBatchMax` (50, a Go
+constant); absent is one craft, so `/craft` is the payload and the one press it always was. **The
+engine counts "all"** (`craftAffordableTx`) in the transaction that spends the materials, so the bot
+sends no number and the count cannot be stale (rc.48). **A batch is N crafts and nothing else**: the
+materials for the whole batch are taken first, then `craftOneUnitTx` - the whole of what one press
+did, roll to alchemy record - runs N times, each unit rolling on its own, earning its own XP and
+possibly raising the rank the next unit is rolled at. Bags that pay for none leave Craft All at one
+unit, which is refused with the single craft's shortfall, so a refusal costs nothing; past the cap
+the result says `capped` and the reply says to press again. The single-craft fields on the result
+describe the last unit; `crafts` is every unit, and `output`/`returned` are the totals. The reply
+prints every roll up to `CRAFT_ROLL_LINES` (10) and a tally past it. The bot's `CRAFT_BATCH_MAX` is
+held to the Go line.
+
+**One drill broke the build instead of failing a test** - `quantity = 1` left `affordable` unused -
+which proves nothing, and was redone as a disabled term (`affordable*0`), the shape CLAUDE.md
+already asks for.
 
 **`World.item_does` is the one door for what an item does**, and `app/rules/item_effects.py` is a
 display twin of the engine's grade scaling (`gradedAmount`, `gradedEffectPayload`), held to the Go

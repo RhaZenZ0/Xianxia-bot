@@ -17,12 +17,15 @@ import (
 type craftResolvePayload struct {
 	Recipe   string `json:"recipe"`
 	Quantity *int64 `json:"quantity"`
+	All      bool   `json:"all"`
 }
 
 // craftBatchMax is the most units one craft.resolve makes (v1.21.0). It is the
-// engine's bound: the slash command's Range is held equal to it by a test that
-// reads this line, so the client never carries a number of its own.
-const craftBatchMax int64 = 10
+// engine's bound, and the bot's CRAFT_BATCH_MAX is held equal to it by a test
+// that reads this line. It is a bound on one action's work, not a pace: "craft
+// all" (v1.21.0) makes up to this many, says when it stopped short, and a
+// second press makes the rest.
+const craftBatchMax int64 = 50
 
 const maxSectManorFacilityLevel int64 = 5
 
@@ -279,6 +282,28 @@ func consumeInventoryTx(conn *storage.Conn, userID int64, costs map[string]int64
 	return missing, nil
 }
 
+// craftAffordableTx is how many units of a recipe the bags pay for now, or
+// craftBatchMax+1 for a recipe that costs nothing (so "all" stops at the cap
+// and says so rather than looping without end).
+func craftAffordableTx(conn *storage.Conn, userID int64, cost map[string]int64) (int64, error) {
+	affordable := craftBatchMax + 1
+	for item, qty := range cost {
+		if qty <= 0 {
+			continue
+		}
+		r, err := conn.Execute(`SELECT quantity FROM inventory WHERE user_id=? AND item_id=?`, []any{userID, item})
+		if err != nil {
+			return 0, err
+		}
+		have := int64(0)
+		if row := firstRowMap(r); row != nil {
+			have = i64(row["quantity"])
+		}
+		affordable = minI64(affordable, maxI64(0, have)/qty)
+	}
+	return affordable, nil
+}
+
 // craftFailureRefund is the share of a failed craft's inputs that comes back:
 // half of each, rounded down, so one unit of anything is the stake. It is a
 // function so the refund and the reply cannot state the share differently.
@@ -313,7 +338,7 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		return authoritativeMutation{}, errors.New("payload must be a JSON object")
 	}
 	for field := range supplied {
-		if field != "recipe" && field != "quantity" {
+		if field != "recipe" && field != "quantity" && field != "all" {
 			return authoritativeMutation{}, fmt.Errorf("client-supplied %s is forbidden", field)
 		}
 	}
@@ -338,6 +363,9 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	}
 	if quantity < 1 || quantity > craftBatchMax {
 		return authoritativeMutation{}, fmt.Errorf("a batch is 1 to %d crafts, not %d", craftBatchMax, quantity)
+	}
+	if p.All && p.Quantity != nil {
+		return authoritativeMutation{}, errors.New("a craft is all or a quantity, not both")
 	}
 
 	cr, err := loadMechanicsCharacter(conn, catalog, userID)
@@ -442,6 +470,21 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	// court is made better, whichever trade it is.
 	placeName, placeBonus := craftPlaceBonus(catalog, location)
 	contextBonus := effectBonus + facilityBonus + manorFacilityBonus + familyBonus + craftEcho + flameBonus + senseBonus + placeBonus
+	// Craft all (v1.21.0): as many as the bags pay for, counted here, in the
+	// transaction that spends them, so the number cannot be stale. Bags that
+	// pay for none leave the batch at one, which is refused below with the
+	// shortfall for that one - the refusal a single craft gives.
+	capped := false
+	if p.All {
+		affordable, err := craftAffordableTx(conn, userID, recipe.Cost)
+		if err != nil {
+			return authoritativeMutation{}, err
+		}
+		quantity = maxI64(1, affordable)
+		if quantity > craftBatchMax {
+			quantity, capped = craftBatchMax, true
+		}
+	}
 	// The batch (v1.21.0). A quantity is N crafts in one action and nothing
 	// else: every unit rolls on its own, earns its own XP, may raise the rank
 	// the next unit is rolled at, and writes its own alchemy record - exactly
@@ -530,6 +573,8 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		"quality":       unit.qkey,
 		"quality_label": unit.qlabel,
 		"quantity":      quantity,
+		"all":           p.All,
+		"capped":        capped,
 		"successes":     successes,
 		"crafts":        crafts,
 		"output":        totalOutput,

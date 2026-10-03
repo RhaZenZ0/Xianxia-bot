@@ -114,38 +114,45 @@ class TheGradeScalingIsTheEnginesTests(unittest.TestCase):
 
 
 class TheBatchIsTheEnginesTests(unittest.TestCase):
-    def test_the_cap_is_stated_once_and_spelled_twice_alike(self):
+    def test_the_cap_is_stated_once_and_its_twin_agrees(self):
         go = CRAFTING_GO.read_text(encoding="utf-8")
         match = re.search(r"const craftBatchMax int64 = (\d+)", go)
         self.assertIsNotNone(match, "craftBatchMax is gone from crafting_actions.go")
-        cap = int(match.group(1))
-        source = EXPLORATION.read_text(encoding="utf-8")
-        tree = ast.parse(source)
+        tree = ast.parse(EXPLORATION.read_text(encoding="utf-8"))
         constant = next(
             node.value.value for node in tree.body
             if isinstance(node, ast.Assign) and any(getattr(t, "id", "") == "CRAFT_BATCH_MAX" for t in node.targets)
         )
-        self.assertEqual(constant, cap, "the bot's CRAFT_BATCH_MAX disagrees with the engine's craftBatchMax")
-        craft = next(
-            node for node in ast.walk(tree)
-            if isinstance(node, ast.AsyncFunctionDef) and node.name == "craft"
-        )
-        quantity = next(arg for arg in craft.args.args if arg.arg == "quantity")
-        self.assertEqual(
-            ast.unparse(quantity.annotation), f"app_commands.Range[int, 1, {cap}]",
-            "the slash command's Range disagrees with the engine's craftBatchMax",
-        )
+        self.assertEqual(constant, int(match.group(1)), "the bot's CRAFT_BATCH_MAX disagrees with the engine's craftBatchMax")
 
-    def test_a_single_craft_sends_the_payload_it_always_did(self):
-        source = EXPLORATION.read_text(encoding="utf-8")
-        run = next(
-            node for node in ast.walk(ast.parse(source))
-            if isinstance(node, ast.AsyncFunctionDef) and node.name == "_run_crafting"
-        )
-        body = ast.unparse(run)
-        self.assertIn("{'quantity': int(quantity)} if int(quantity) != 1 else {}", body)
-        self.assertIn("amount=max(1, successes)", body,
-                      "a batch advances a craft quest by one however many it made")
+    def test_craft_is_one_and_craft_all_asks_the_engine_how_many(self):
+        """Craft All (v1.21.0) sends no number: the engine counts what the bags
+        pay for in the transaction that spends them. Craft sends neither, so it
+        is the payload it always was, and it has no quantity step."""
+        tree = ast.parse(EXPLORATION.read_text(encoding="utf-8"))
+        functions = {
+            node.name: node for node in ast.walk(tree)
+            if isinstance(node, ast.AsyncFunctionDef) and node.name in {"craft", "craft_all", "_run_crafting"}
+        }
+        self.assertEqual(set(functions), {"craft", "craft_all", "_run_crafting"})
+        self.assertEqual([a.arg for a in functions["craft"].args.args], ["interaction", "recipe"],
+                         "/craft grew a parameter, which is a step on the panel before every craft")
+        self.assertIn("craft_all=True", ast.unparse(functions["craft_all"]))
+        calls = [
+            node for node in ast.walk(functions["_run_crafting"])
+            if isinstance(node, ast.Call) and getattr(node.func, "attr", "") == "authoritative_action"
+        ]
+        self.assertEqual(len(calls), 1, "the reader did not find the one craft.resolve call")
+        payload = ast.unparse(calls[0].args[2])
+        self.assertEqual(payload, "{'recipe': recipe, **({'all': True} if craft_all else {})}",
+                         "the craft payload changed; the engine counts Craft All, the bot sends no number")
+        body = ast.unparse(functions["_run_crafting"])
+        self.assertTrue("amount=max(1, successes)" in body,
+                        "a batch advances a craft quest by one however many it made")
+
+    def test_craft_all_is_on_the_general_crafting_page(self):
+        surface = (PROJECT_ROOT / "app" / "bot" / "surface.py").read_text(encoding="utf-8")
+        self.assertRegex(surface, r'_hub_page\("craft", "General Crafting", "[^"]*", "craft_all"\)')
 
 
 class TheCraftMenuTests(unittest.TestCase):

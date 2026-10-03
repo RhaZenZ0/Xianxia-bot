@@ -738,12 +738,14 @@ async def mine(interaction: discord.Interaction) -> None:
 
 TRADE_EMOJI = {"Alchemy": "⚗️", "Forging": "🔨", "Inscription": "📜", "Formation": "🔷"}
 
-# The most units one craft makes. The engine's `craftBatchMax` is the bound and
-# this is its display twin; the slash command's `Range[int, 1, 10]` spells the
-# number because the hub reads that annotation as text and a name would not
-# match it. `test_what_a_crafted_item_does.py` reads the Go line and holds all
-# three equal.
-CRAFT_BATCH_MAX = 10
+# The most units one press of Craft All makes. The engine's `craftBatchMax` is
+# the bound and this is its display twin, read only to say so;
+# `test_what_a_crafted_item_does.py` reads the Go line and holds the two equal.
+CRAFT_BATCH_MAX = 50
+
+# A batch this size or smaller prints every unit's roll; a larger one prints a
+# tally, because fifty roll lines would bury what the batch made.
+CRAFT_ROLL_LINES = 10
 
 
 async def craft_menu(user_id: int) -> list[dict[str, Any]]:
@@ -853,20 +855,6 @@ async def recipe_hub_options(interaction: discord.Interaction, current: str) -> 
     ][:25]
 
 
-async def craft_quantity_hub_options(interaction: discord.Interaction, current: str) -> list[HubDynamicOption]:
-    """How many to make: one, or a batch where every unit rolls on its own."""
-    sizes = [n for n in (1, 2, 3, 5, CRAFT_BATCH_MAX) if n <= CRAFT_BATCH_MAX]
-    return [
-        HubDynamicOption(
-            label=("1 — a single craft" if n == 1 else f"{n} — a batch of {n}"), value=str(n),
-            description=("One roll." if n == 1 else
-                         f"{n} rolls, one per unit; the materials for all {n} are taken first."),
-            emoji="🔢",
-        )
-        for n in sizes
-    ]
-
-
 def where_it_is_sold(item_id: str, location: str) -> str:
     """Where a material is sold, measured from where the cultivator stands (v1.0.15).
 
@@ -931,7 +919,7 @@ async def _where_to_find_what_is_short(user_id: int, cost: dict[str, Any], locat
         return []
 
 
-async def _run_crafting(interaction: discord.Interaction, recipe: str, quantity: int = 1) -> None:
+async def _run_crafting(interaction: discord.Interaction, recipe: str, craft_all: bool = False) -> None:
     c = await require_character(interaction)
     if not c:
         return
@@ -950,9 +938,10 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str, quantity:
         envelope = await ENGINE.authoritative_action(
             "craft.resolve",
             interaction.user.id,
-            # The batch (v1.21.0): sent only when it is one, so a single craft
-            # is the payload it always was. The engine owns the bound.
-            {"recipe": recipe, **({"quantity": int(quantity)} if int(quantity) != 1 else {})},
+            # Craft All (v1.21.0): the engine counts what the bags pay for in
+            # the transaction that spends it, so the bot sends no number. A
+            # single craft is the payload it always was.
+            {"recipe": recipe, **({"all": True} if craft_all else {})},
             action_id=f"discord:{interaction.id}:craft.resolve",
         )
     except GameEngineError as exc:
@@ -962,9 +951,10 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str, quantity:
         # Two layers each discarding the one fact the player needed.
         message = str(exc)
         if "missing materials" in message.casefold():
-            batch_cost = {item: int(qty) * max(1, int(quantity)) for item, qty in dict(r.get("cost") or {}).items()}
+            # Craft All refuses only when the bags pay for none, so the
+            # shortfall is always one unit's.
             where = await _where_to_find_what_is_short(
-                interaction.user.id, batch_cost, str(c.get("location") or ""))
+                interaction.user.id, dict(r.get("cost") or {}), str(c.get("location") or ""))
             message = "\n".join([
                 f"🧰 {message}",
                 *where,
@@ -995,20 +985,32 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str, quantity:
     quantity_made = int(resolved.get("quantity") or 1)
     successes = int(resolved.get("successes", 1 if success else 0))
     if quantity_made > 1:
-        # A batch: every unit's own roll, then what the whole batch made.
+        # A batch: every unit's own roll when there are few, a tally of the
+        # outcomes when there are many, then what the whole batch made.
+        units = [dict(unit) for unit in list(resolved.get("crafts") or [])]
         unit_lines = []
-        for index, unit in enumerate(list(resolved.get("crafts") or []), start=1):
-            unit = dict(unit)
-            made = {str(k): int(v) for k, v in dict(unit.get("output") or {}).items()}
-            back = {str(k): int(v) for k, v in dict(unit.get("returned") or {}).items() if int(v) > 0}
-            what = (f"**{WORLD.item_names(made)}**" if unit.get("success")
-                    else (f"failed, salvaged {WORLD.item_names(back)}" if back else "failed"))
-            unit_lines.append(f"`#{index}` {roll_line(SimpleNamespace(**dict(unit.get('roll') or {})))} → {what}\n")
+        if len(units) <= CRAFT_ROLL_LINES:
+            for index, unit in enumerate(units, start=1):
+                made = {str(k): int(v) for k, v in dict(unit.get("output") or {}).items()}
+                back = {str(k): int(v) for k, v in dict(unit.get("returned") or {}).items() if int(v) > 0}
+                what = (f"**{WORLD.item_names(made)}**" if unit.get("success")
+                        else (f"failed, salvaged {WORLD.item_names(back)}" if back else "failed"))
+                unit_lines.append(f"`#{index}` {roll_line(SimpleNamespace(**dict(unit.get('roll') or {})))} → {what}\n")
+        else:
+            tally: dict[str, int] = {}
+            for unit in units:
+                key = (f"{unit.get('quality_label') or 'Made'} ({unit.get('grade') or 'Low'})"
+                       if unit.get("success") else "Failed")
+                tally[key] = tally.get(key, 0) + 1
+            unit_lines.append("🎲 " + " · ".join(f"{label} ×{count}" for label, count in tally.items()) + "\n")
         outcome = "".join(unit_lines) + f"**{successes}/{quantity_made}** succeeded."
         if output:
             outcome += f" Made **{WORLD.item_names(output)}**."
         if returned:
             outcome += f" Salvaged **{WORLD.item_names(returned)}**."
+        if resolved.get("capped"):
+            outcome += (f"\n-# Craft All makes at most {CRAFT_BATCH_MAX} at a press; your bags pay for more, "
+                        "so press it again for the rest.")
     elif success:
         outcome = f"Created **{WORLD.item_names(output)}**."
     elif returned:
@@ -1109,20 +1111,27 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str, quantity:
 
 
 @registered_root_command(name="craft", description="Practice alchemy, forging, formation or talisman inscription from a method you know", guild=GUILD)
-@app_commands.describe(
-    recipe="A method you know; the menu says whether it is ready and what it makes does",
-    quantity=f"How many to make, 1 to {CRAFT_BATCH_MAX}; every unit rolls on its own",
-)
+@app_commands.describe(recipe="A method you know; the menu says whether it is ready and what it makes does")
 @app_commands.autocomplete(recipe=recipe_autocomplete)
 @serialized_user_action
-async def craft(
-    interaction: discord.Interaction, recipe: str, quantity: app_commands.Range[int, 1, 10] = 1,
-) -> None:
-    await _run_crafting(interaction, recipe, quantity)
+async def craft(interaction: discord.Interaction, recipe: str) -> None:
+    await _run_crafting(interaction, recipe)
+
+
+@registered_root_command(name="craft_all", description="Make as many of a method as your materials pay for, each with its own roll", guild=GUILD)
+@app_commands.describe(recipe="A method you know; the menu says how many your materials pay for")
+@app_commands.autocomplete(recipe=recipe_autocomplete)
+@serialized_user_action
+async def craft_all(interaction: discord.Interaction, recipe: str) -> None:
+    """Craft All (v1.21.0): asked for in place of the quantity step - "maybe a
+    craft all would be better". One press makes every unit the bags pay for,
+    up to the engine's cap, each rolled on its own; Craft stays one press for
+    one craft."""
+    await _run_crafting(interaction, recipe, craft_all=True)
 
 
 register_hub_option_provider(craft, "recipe", recipe_hub_options)
-register_hub_option_provider(craft, "quantity", craft_quantity_hub_options)
+register_hub_option_provider(craft_all, "recipe", recipe_hub_options)
 
 
 async def method_slip_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
@@ -2337,10 +2346,11 @@ async def restore_exploration_event_views(bot: discord.Client) -> int:
 VIEW_RESTORERS.register("exploration_event", restore_exploration_event_views)
 
 
-register_hub_option_hint(
-    craft,
-    "recipe",
-    "You have not learned a method yet. Buy a jade slip at a hall of the trade "
-    "(**/economy → City Shops → Here**) and read it with **/craft → Profession → Learn**; "
-    "**Profession Status** lists everything you know and what each one needs.",
-)
+for _crafting in (craft, craft_all):
+    register_hub_option_hint(
+        _crafting,
+        "recipe",
+        "You have not learned a method yet. Buy a jade slip at a hall of the trade "
+        "(**/economy → City Shops → Here**) and read it with **/craft → Profession → Learn**; "
+        "**Profession Status** lists everything you know and what each one needs.",
+    )
