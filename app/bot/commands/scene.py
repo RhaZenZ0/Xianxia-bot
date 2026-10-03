@@ -23,7 +23,7 @@ from .. import scene_layout
 from ..cards import Card, card_view
 from ..character_state import record_quest_progress, announce_quest_progress, current_effect_modifiers
 from ..formatting import roll_line
-from ..locations import DEAD, _location_is_visible, current_npc_location, local_npc_autocomplete, npcs_present
+from ..locations import DEAD, _location_is_visible, current_npc_location, local_npc_autocomplete, npc_whereabouts, npcs_present
 from ..registry import EVENT_HANDLERS, registered_group_command, registered_root_command
 from ..runtime import (
     DB,
@@ -155,8 +155,12 @@ async def talk(
         )
         return
     if npc_location and npc_location != c.get("location"):
+        # Said through the one whereabouts rule (v1.20.2), never the resolved
+        # location: that is a missing person's true position, and a place the
+        # player may never have found.
+        where = await npc_whereabouts(interaction.user.id, c, npc) or "is not here"
         await interaction.response.send_message(
-            f"**{npc}** is currently at **{npc_location}** during the **{wt.period}**, not **{await character_location_display(c)}**.",
+            f"**{npc}** {where}, not at **{await character_location_display(c)}** (it is the **{wt.period}**).",
             ephemeral=False,
         )
         return
@@ -759,17 +763,25 @@ async def npc_info_command(interaction: discord.Interaction, npc: str) -> None:
     if resolved_location == DEAD:
         await interaction.response.send_message(f"🪦 **{npc}** is dead.", ephemeral=False)
         return
+    sim_state = await SIM.npc_status(npc) or {}
     current_location = resolved_location or data.get("location", "Unknown")
-    if not await _location_is_visible(interaction.user.id, c, str(current_location)):
+    # A missing person's resolved location is their true position (schema 47),
+    # so whether the card answers at all must not depend on it: "no reliable
+    # knowledge" against a card would itself say whether they are somewhere
+    # the player has been (v1.20.2). Gate on where they were last at home.
+    gate_location = current_location
+    if str(sim_state.get("status") or "") == "missing":
+        gate_location = sim_state.get("home_location") or data.get("location") or current_location
+    if not await _location_is_visible(interaction.user.id, c, str(gate_location)):
         await interaction.response.send_message("You have no reliable knowledge of that cultivator yet.", ephemeral=False)
         return
+    whereabouts = await npc_whereabouts(interaction.user.id, c, npc)
     lines = [
         f"👤 **{npc}**",
         f"Role: **{data.get('role', 'Unknown')}**",
         f"Public cultivation: **{data.get('realm', 'Unknown')}**" + (f" Stage {data.get('stage')}" if data.get('stage') else ""),
-        f"Current location ({wt.period}): **{current_location}**",
+        f"Whereabouts ({wt.period}): {npc} {whereabouts or 'cannot be placed'}",
     ]
-    sim_state = await SIM.npc_status(npc) or {}
     if sim_state.get("activity"):
         lines.append(f"Current activity: **{sim_state.get('activity')}**")
     mood = public_mood_hint(str(sim_state.get("mood") or ""))

@@ -6456,6 +6456,37 @@ filtered out of the handler) names it. The Discord playtest holds the card to th
 registered, and `#xianxia-info` points at it - and names `/forage` where it said `/alchemy forage`,
 which is a hub leaf path and not a command anybody can type.
 
+**Each player is shown what is theirs** (v1.20.2, asked the same day). Discord cannot hide a command per
+member, so the card asks the panels' own providers rather than a rule of its own: `menu_shape`
+for the hubs the menu leaves off, `not_yet_unlocked` for the curriculum, and `hidden_actions`
+for `NOT_YOUR_PATH` only - a padlock for where you stand is not a reference card's business. A
+group's subcommand *is* the hub leaf (`_tree_command` registers the group the pages are built
+from), so `/` + its qualified name is the leaf path and no table maps one to the other. What the
+curriculum held back is named in a "Not yet" line (rc.32); another path's doors are not counted
+(v1.13.0). `/begin` heads the card for somebody with no character and is never shown to somebody
+with one, and a failed character read counts as having one, because offering `/begin` to a
+cultivator sends them to a refusal.
+
+### Whereabouts have one rule (`npc_whereabouts`, v1.20.2)
+
+Asked "why would a player see npc inspect". `/admin npc npcinspect` was never visible to players;
+`/npcinfo` is meant to be - and reading it found it, `/talk`'s not-here refusal and the sect
+recommendation's each printing `current_npc_location` straight back. That resolver answers a
+missing person's **true** position on purpose (schema 47: the pickers list them only where a
+searcher stands), so typing a missing person's name did the whole search, and the two refusals
+named places the player had never found. The rule already existed once, in the journal (v1.8.3):
+a place the player has not found is not named and a missing person is never placed. It is
+`locations.npc_whereabouts` now (renamed from `talk_target_whereabouts`) and all four readers ask
+it; one case was added - a missing person standing where the player stands *is* here, because
+`/talk` there is what reports the find. `/npcinfo` gates a missing person's card on their home,
+not their position, or "no reliable knowledge" against a card would itself say whether they are
+somewhere the player has been. Remote lookups stay: v1.8.3 tells a player where a quest's person
+went, under this rule, so the fault was the leak and the ungated refusals, not the lookup.
+`test_whereabouts_has_one_rule.py` drives all three replies with the resolver answering a place
+they must not name, and an AST check refuses any command that formats a resolved location (or a
+name assigned from one) into a reply; its drills restore each old line and print the leaked
+reply.
+
 ### Craft All is N crafts, and the menu says what a method makes does (v1.21.0)
 
 Asked for as "Multi craft system for pills", then "a better menu for selecting what you want to
