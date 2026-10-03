@@ -16,7 +16,7 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
-- **fixed (v1.20.0)** — *Body cultivation is too slow.* Asked for in play. Measured: body stages
+- **fixed (v1.20.0)** — *Body cultivation is too slow.* Asked for by the owner. Measured: body stages
   cost 14-22% more than qi stages at the same realm, no body pill was sold or craftable, and every
   qi-path multiplier skips the body. On the owner's call: Bone-Tempering and Iron-Blood pills beside
   their qi twins on every shelf, a quarter of a body session for each successful hunt, dig and

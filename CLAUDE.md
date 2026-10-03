@@ -6405,7 +6405,7 @@ v1.9.1. `_tree_command` registers the very root the hub leaf presses, and
 
 ### The body path is sped up (`body_tempering.go`, v1.20.0)
 
-Asked for in play: *"We need something to speed up the body cultivation."* The body ladder was the
+Asked for by the owner: *"We need something to speed up the body cultivation."* The body ladder was the
 slower one for three reasons, each measured before anything was built: its phase costs run 14-22%
 above the qi ladder's at the same realm; the only body draught in the game, Blood-River Essence, is
 one sect's `market_excluded` stock, while the qi path has two pills on forty-six shelves and two

@@ -1,6 +1,6 @@
 """The body path is sped up three ways (v1.20.0).
 
-Asked for in play: *"We need something to speed up the body cultivation."* The
+Asked for by the owner: *"We need something to speed up the body cultivation."* The
 body ladder was the slower one for three reasons: its stages cost more than the
 qi ladder's, nothing anybody could buy sped it up (the one body pill was a
 single sect's members-only stock), and every multiplier written for qi skips
