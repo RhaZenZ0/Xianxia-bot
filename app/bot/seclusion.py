@@ -72,7 +72,7 @@ HUB_ROOTS = frozenset({
 
 # The slash commands that only read. `begin` (creation), `action` (the guided
 # intent picker) and `tribute` are deliberately absent: they act.
-OPEN_COMMANDS = frozenset({"me", "menu", "quests", "cooldowns", "check", "locked"})
+OPEN_COMMANDS = frozenset({"me", "menu", "quests", "cooldowns", "check", "locked", "commands"})
 
 # The hub leaves that stay open: the way out, and the cards that only read.
 # `/seclusion end` is a leaf rather than a slash command, so this is the name

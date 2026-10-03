@@ -699,6 +699,8 @@ async def run(url: str, token: str, db_path: str, shard: tuple[int, int] | None 
         other = guild.add_member(env.create_user("Player Two"))  # no character: every member picker's answer
         bot_id = int(bot.user.id)
 
+        wanted_commands = set(TREE_COMMANDS) | {c.name for c in _HUB_COMMANDS}
+
         # ---- 1. boot -----------------------------------------------------------
         async def boot():
             # The set, not a count (v1.0.12). This was `9 + len(_HUB_COMMANDS)`,
@@ -707,7 +709,7 @@ async def run(url: str, token: str, db_path: str, shard: tuple[int, int] | None 
             # saw it for three releases, because a harness is a script and not
             # CI. `TREE_COMMANDS` is a name now, so what the tree registers and
             # what this expects cannot differ.
-            wanted = set(TREE_COMMANDS) | {c.name for c in _HUB_COMMANDS}
+            wanted = wanted_commands
             synced = [c.name for c in bot.tree.get_commands(guild=GUILD)]
             expect(set(synced) == wanted,
                    f"synced and registered disagree: missing {sorted(wanted - set(synced))}, "
@@ -1151,6 +1153,15 @@ async def run(url: str, token: str, db_path: str, shard: tuple[int, int] | None 
             expect("**Waiting**" in text and "**Ready now**" in text, text[:600])
             expect("nothing." not in text.split("**Ready now**")[0], "no live wait after an explore")
         await step(report, "/cooldowns lists a live wait and a ready action", cooldowns())
+
+        async def command_overview():
+            # v1.20.1: the card reads the tree, so it is held to the tree this
+            # run registered rather than to a list written down here.
+            text = result_text(await player.slash(channels["begin-here"], "commands"))
+            missing = sorted(name for name in wanted_commands if name != "admin" and f"`/{name}`" not in text)
+            expect(not missing, f"/commands leaves out {missing}")
+            expect("`/admin`" not in text, "/commands shows /admin to a player who is not an administrator")
+        await step(report, "/commands lists every slash command a player has", command_overview())
 
         # ---- 6b. the curriculum, and then past it ---------------------------------
         # v1.0.9 gave a page a **third** state: a leaf can be drawn, hidden with

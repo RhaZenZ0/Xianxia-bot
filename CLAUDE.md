@@ -6440,6 +6440,22 @@ multiplier there would price one place twice.
 `no such column: name` - the body half had passed only because a tempering ground short-circuits
 the abode query. `setupSectResidenceDB` carries every table both doors read.
 
+### The command overview reads the tree (`commands/overview.py`, v1.20.1)
+
+Asked for as *"A command overview"*. `/commands` is one card built from
+`interaction.client.tree.get_commands(guild=GUILD)` and each command's own description, never from
+a list of its own: a list kept here would be the fifth copy of the tree tuple v1.0.12 retired, and
+the next command would be missing from it until somebody noticed. Which roots are the daily five is
+injected (`register_daily_actions`, called by `surface` with `DAILY_ACTIONS`), because `surface`
+imports this package and not the other way round; an unregistered list loses the heading, never a
+command. `/admin` is listed only for an administrator (rc.46). A hub's slash description is its
+panel description cut at Discord's 100 characters, so it arrives mid-word, and the card cuts it back
+to a word. `test_the_command_overview_reads_the_tree.py` drives the handler against the real
+surface and requires a command this repository never named to appear; its drill (one command
+filtered out of the handler) names it. The Discord playtest holds the card to the tree that run
+registered, and `#xianxia-info` points at it - and names `/forage` where it said `/alchemy forage`,
+which is a hub leaf path and not a command anybody can type.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —
