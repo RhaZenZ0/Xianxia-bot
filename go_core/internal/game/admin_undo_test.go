@@ -129,7 +129,7 @@ func TestAdminUndoLastSetSpiritualRootDeletesRowThatDidNotExistBefore(t *testing
 func TestAdminUndoLastSetSpiritualRootRestoresPriorRowWhenOneAlreadyExisted(t *testing.T) {
 	path := setupAdminDB(t)
 	applyAdmin(t, path, "admin.player.set_spiritual_root", map[string]any{"user_id": 42, "grade": "Common", "purity": 50, "mutation": "", "reason": "seed"})
-	applyAdmin(t, path, "admin.player.set_spiritual_root", map[string]any{"user_id": 42, "grade": "Heaven", "purity": 90, "mutation": "Phoenix Blood", "reason": "reward"})
+	applyAdmin(t, path, "admin.player.set_spiritual_root", map[string]any{"user_id": 42, "grade": "Heaven", "purity": 90, "mutation": "heavenly_flame", "reason": "reward"})
 	undoLast(t, path)
 	if got := fmt.Sprint(scalar(t, path, "SELECT grade FROM character_spiritual_roots WHERE user_id=42")); got != "Common" {
 		t.Fatalf("grade=%q, want restored to Common", got)

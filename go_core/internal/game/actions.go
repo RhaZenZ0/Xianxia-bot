@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 	"time"
 	"unicode"
@@ -177,6 +178,12 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 		result, err = adminGrantFlame(conn, catalog, req.ActorID, req.Payload)
 	case "admin.player.set_spirit_sense":
 		result, err = adminSetSpiritSense(conn, catalog, req.ActorID, req.Payload)
+	case "admin.player.set_profession":
+		result, err = adminSetProfession(conn, req.ActorID, req.Payload)
+	case "admin.player.set_law":
+		result, err = adminSetLaw(conn, catalog, req.ActorID, req.Payload)
+	case "admin.player.set_sect_contribution":
+		result, err = adminSetSectContribution(conn, req.ActorID, req.Payload)
 	case "admin.player.set_beast_stats":
 		result, err = adminSetBeastStats(conn, req.ActorID, req.Payload)
 	case "admin.player.remove_equipment":
@@ -2317,6 +2324,19 @@ func adminSetSpiritualRoot(conn *storage.Conn, catalog worlddata.Catalog, adminU
 		before = map[string]any{"grade": r["grade"], "purity": storage.ParseInt(r["purity"]), "mutation": r["mutation"]}
 	} else {
 		before = map[string]any{"grade": nil}
+	}
+	// A mutation is read by its catalogue id (rootCompatibility,
+	// loadEffectModifiers), so a typed name reaches no rule and was stored
+	// anyway (v1.23.0). The lever takes an id the catalogue carries, none, or
+	// whatever is already stored - an editor saved unchanged must not be
+	// refused over a value an older release let in.
+	if _, known := catalog.SpiritualRootSystem.Mutations[mutation]; mutation != "" && !known && mutation != fmt.Sprint(before["mutation"]) {
+		ids := make([]string, 0, len(catalog.SpiritualRootSystem.Mutations))
+		for id := range catalog.SpiritualRootSystem.Mutations {
+			ids = append(ids, id)
+		}
+		sort.Strings(ids)
+		return nil, fmt.Errorf("mutation must be empty or one of %s", strings.Join(ids, ", "))
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
 	if _, err = conn.Execute(`INSERT INTO character_spiritual_roots(user_id,grade,purity,mutation,updated_at) VALUES(?,?,?,?,?)

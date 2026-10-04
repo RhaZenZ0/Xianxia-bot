@@ -6595,6 +6595,43 @@ it stops before the next city"*) and disable the wilds (*"a city and the wilds b
 search area"*). That second drill first passed by breaking the build - removing the wilds term left
 `loc` unused - and a `grep` over the output hid the compile error; it is a disabled term now.
 
+### The editor read its pickers off the wrong response (v1.23.0)
+
+Asked for as *"make the player editor better / missing options"*, then *"options if we want to
+edit"* and *"do the same for all the player editor options"*. The first thing a read found is the
+finding: since v1.0.11 `loadPlayerEditor` built the root-grade and physique pickers from
+`d.aptitude_catalogue` - `d` being the `/api/admin` snapshot, which never carried one - while
+`player_detail` sent it on `p`. So the grade picker held only the current grade and the physique
+picker said the catalogue was unavailable, on every server, for twelve releases. The gate written
+for those pickers asked only that the body *name* `aptitude_catalogue` (rc.47: it could not see
+what it forbade); it asks for `p.` and refuses `d.` now, and its drill prints the old failure.
+
+**Every field with a vocabulary is a picker**, fed by `_editor_catalogue()` with the row: the
+two realm ladders, the gates, mutations, Laws, flames, sect ranks, trades, items and storage
+presets, each off `content/world.json`. Two are code on the engine side and are held to it by
+`test_the_player_editor_edits_what_the_engine_writes.py`: the trades (`adminProfessions` in Go) and
+the world-crossing gates, which the card used to carry as `[7,15,23]` beside `tribulationGates` and
+now reads off the realm ladder. The trades are the one list the dashboard keeps itself
+(`EDITOR_TRADES`): the first version imported `app.rules.progression_systems` for it, and CI's v0.30
+authority gate - the dashboard may import exactly two rules modules - refused it, rightly, so the
+tuple is held equal to Go's `adminProfessions` and to `PROFESSIONS` instead of widening that gate. A value a character holds that the catalogue lacks is offered,
+marked, so saving a card unchanged never changes it. The same file holds every `admin.player.*`
+case the engine dispatches to being mapped or named in `DISCORD_ONLY` with its reason (erase deletes
+threads only the bot can reach; `set_sect_rank` is the sect card's `set_sect`) - five levers the
+engine had (flame, spirit sense, master, attention, storage) were reachable from no card.
+
+**Three levers are new** (`admin_player_progress.go`): a trade's rank and XP, a Law's comprehension
+and a member's contribution, each audited and in `reversibleAdminActions`, the undo deleting a row
+the lever made. A rank is not an examination, so a stall certificate still comes from sitting one;
+the contribution lever promotes nobody, because a GM setting the count and the rank in one write
+would make one correction two. And the root lever now refuses a mutation the catalogue does not
+carry - mutations are read by id, so the card's own placeholder ("Chaos-Attuned") and two tests'
+"Phoenix Blood" reached no rule - while accepting whatever is already stored.
+
+The cards sit under six `<h2>` groups, which `sectionize` turns into tabs. The `'Mortal'` the
+root-ladder gate caught in the storage card's fallback was a storage grade, not a rung - the
+vocabulary collision v1.0.11 already names - and the fallback went rather than an allowlist entry.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —
