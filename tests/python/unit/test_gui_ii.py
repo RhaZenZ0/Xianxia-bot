@@ -141,7 +141,10 @@ class ThePanelBudget(unittest.TestCase):
                 view.result_actions = hubs.suggested_actions("**/world → City → Look** **/world → Explore** **/world → Hunt**")
                 view.rebuild()
                 worst = max(worst, sum(_count(c) for c in view.children))
-                self.assertLessEqual(view.row_limit, hubs._LAYOUT_ACTION_LIMIT)
+                # Since v1.22.0 a page draws at most three described rows and
+                # sizes its plain buttons to the budget that is left.
+                sections = [c for c in view.children[0].children if isinstance(c, hubs.discord.ui.Section)]
+                self.assertLessEqual(len(sections), hubs._LAYOUT_FEATURED)
         self.assertLessEqual(worst, hubs._LAYOUT_COMPONENT_CAP)
 
     def test_the_control_row_has_menu_and_at_most_five_buttons(self):

@@ -6521,8 +6521,8 @@ carries an alphabetically-first recipe above the rank now, and the drill fails.
 
 ### The menus say where to go (v1.22.0)
 
-Asked as *"research a better menu layout for all the menus"*, then the first three of six steps on
-the owner's call; `docs/TODO.md` holds the other three.
+Asked as *"research a better menu layout for all the menus"*, then the first four of six steps on
+the owner's call; `docs/TODO.md` holds the other two.
 
 **The jump came back, as a jump.** The layout hub once carried a system select and lost it, because
 beside Prev/Next it only showed the system the heading already named - and the class docstring kept
@@ -6550,6 +6550,18 @@ it never raises, so a menu that cannot read the cooldowns is the green menu it w
 `only`'s failure mode, so `LEAF_LABELS` must name live leaves and every `order` name must be a leaf
 of its page. The hint resolver still answers to the command name, so a path printed with an old
 label still resolves.
+
+**The compact page is a budget, not a count.** Step 4, asked for separately: `_LAYOUT_FEATURED` (3)
+actions keep a described Section (three components each) and the rest are `HubLayoutGridButton`s in
+rows of five (one component each, one more per row). `_grid_capacity` sizes the buttons to whatever
+the forty-component budget has left once the header, the jump, the result block and the control row
+have taken theirs, so with nothing else on the card a page holds seventeen - every page in the game,
+admin's Player Edit included - and More actions appears only under a result, where its offset walks
+the plain buttons and the described rows stay put. The control row is counted exactly (More actions
+only when the page pages), because the five-button allowance it used to reserve was the one
+component Player Edit needed. A described row's button is an arrow rather than "Open", because a
+plain button is now named for its action and Market Stalls has one called Open; the Discord harness
+finds a leaf by a Section's bold label or a button's own label, so it needed no change.
 
 **The Most-used commands card had only ever been Discord's.** The research said it was on the web
 dashboard; it was on `/admin server observability` alone. Player Activity reads `command_usage` over

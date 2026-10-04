@@ -20,12 +20,12 @@ deferred half and not the half that says what was done about it.
   steps taken on the owner's call: a jump to any system on every multi-system hub panel, the menu's
   tools row (the tutorial's next step pressed, the quest journal, the cooldowns) and Daily buttons
   that say how long they are still cooling down, readable labels for the leaves named like code, and
-  a hand-set order on nine pages. Asked in the same session, the GM dashboard's Player Activity page
-  shows the most-used commands.
-- **deferred (design)** — *The rest of the menu layout.* Three steps of the same research wait on the
+  a hand-set order on nine pages. Then step 4: a compact page, three described rows and the rest as
+  plain buttons, so every page shows all it holds at once. Asked in the same session, the GM
+  dashboard's Player Activity page shows the most-used commands.
+- **deferred (design)** — *The rest of the menu layout.* Two steps of the same research wait on the
   owner, and on the dashboard's new Most-used commands card for what players actually press:
-  a compact page (two or three described actions, the rest as rows of plain buttons, no More
-  actions); folding the seven one-action pages (Inventory, Use Item and Provenance into one Bag
+  folding the seven one-action pages (Inventory, Use Item and Provenance into one Bag
   page, Wallet into the Economy header, General Crafting into Alchemy); and sixteen hubs to twelve
   (Ascension into Cultivation, NPCs into World, Combat and Secret Realms into Adventure, Abode and
   Inner World into Home). The last renames printed hub paths - about 38 `/ascend`, 19 `/realm`,

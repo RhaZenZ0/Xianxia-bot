@@ -252,6 +252,65 @@ class TheDailyRowSaysWhatIsCoolingDown(unittest.TestCase):
         self.assertEqual(source.count('daily_waits=(shape or {}).get("daily_waits")'), 1, "the hub's Menu button does not")
 
 
+class ThePageIsCompact(unittest.TestCase):
+    """Step 4 (v1.22.0): three described rows, the rest as plain buttons."""
+
+    def _draw(self, hubs, definition, page, *, result=False):
+        view = hubs.LayoutHubView(1, definition, owner_name="T")
+        view.page_key = page.key
+        if result:
+            view.last_result = ("x" * 990 + "\n") * 3
+            view.result_pages = hubs._result_pages(view.last_result)
+            view.result_actions = hubs.suggested_actions("**/world → City → Look** **/world → Explore** **/world → Hunt**")
+        view.rebuild()
+        return view
+
+    def test_every_page_shows_every_action_with_nothing_else_on_the_card(self):
+        surface, hubs, _ = _modules()
+        for definition in [*hubs.REGISTERED_HUBS, surface._ADMIN_HUB_DEFINITION]:
+            for page in definition.pages:
+                with self.subTest(hub=definition.name, page=page.label):
+                    view = self._draw(hubs, definition, page)
+                    actions = view.page_actions(page)
+                    sections = [s.accessory.action for s in _of(view, "Section")]
+                    grid = [b.action for b in _of(view, "HubLayoutGridButton")]
+                    self.assertEqual([a.path for a in sections + grid], [a.path for a in actions],
+                                     "the page did not draw its actions, in its order, all at once")
+                    self.assertLessEqual(len(sections), hubs._LAYOUT_FEATURED)
+                    self.assertEqual(_of(view, "HubLayoutActionPageButton"), [], "the page still needs More actions")
+                    self.assertLessEqual(_count(view), hubs._LAYOUT_COMPONENT_CAP)
+
+    def test_a_plain_button_names_its_action_and_no_arrow_reads_like_one(self):
+        _, hubs, _ = _modules()
+        definition = next(d for d in hubs.REGISTERED_HUBS if d.name == "economy")
+        page = next(p for p in definition.pages if p.key == "stall")
+        view = self._draw(hubs, definition, page)
+        labels = [b.label for b in _of(view, "HubLayoutGridButton")]
+        self.assertIn("Open", labels)
+        for section in _of(view, "Section"):
+            button = section.accessory
+            if button.style is not discord.ButtonStyle.danger:
+                self.assertIsNone(button.label, "a described row's button reads like the action named Open")
+
+    def test_under_a_result_the_long_page_pages_its_plain_buttons_and_wraps(self):
+        surface, hubs, _ = _modules()
+        definition = surface._ADMIN_HUB_DEFINITION
+        page = next(p for p in definition.pages if p.key == "player")
+        view = self._draw(hubs, definition, page, result=True)
+        actions = view.page_actions(page)
+        seen: list[str] = [s.accessory.action.path for s in _of(view, "Section")]
+        more = next(b for b in _of(view, "HubLayoutActionPageButton"))
+        interaction = SimpleNamespace(response=SimpleNamespace(edit_message=AsyncMock(), defer=AsyncMock()))
+        for _ in range(10):
+            grid = [b.action.path for b in _of(view, "HubLayoutGridButton")]
+            if grid and grid[0] in seen:
+                break
+            seen += grid
+            asyncio.run(more.callback(interaction))
+            self.assertLessEqual(_count(view), hubs._LAYOUT_COMPONENT_CAP)
+        self.assertEqual(sorted(seen), sorted(a.path for a in actions), "More actions skipped or repeated a lever")
+
+
 class ThePlaytestNeverAnswersTheJump(unittest.TestCase):
     def test_the_harness_skips_the_select_by_the_panels_own_placeholder(self):
         _, hubs, _ = _modules()
