@@ -3273,6 +3273,10 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                 updated_at REAL NOT NULL,
                 PRIMARY KEY(guild_id,war_id)
             )""",
+            # And the sect each blow was struck for, so an ally's blows - a
+            # cultivator's or a whole allied sect's in the world's own sieges -
+            # are told apart from the field's, and a sect joins a war once.
+            "ALTER TABLE territory_war_actions ADD COLUMN sect_name TEXT NOT NULL DEFAULT ''",
         ),
     ),
 )
@@ -7964,10 +7968,20 @@ class Database:
                 # reader of its own, because a war and what happened in it are
                 # one answer.
                 cur=await db.execute(
-                    "SELECT side,tactic,power,siege_delta,morale_delta,game_minute,user_id"
-                    " FROM territory_war_actions WHERE war_id=? ORDER BY action_id DESC LIMIT 5",
+                    "SELECT * FROM territory_war_actions WHERE war_id=? ORDER BY action_id DESC LIMIT 5",
                     (int(row['war_id']),))
                 row['recent_actions']=[dict(r) for r in await cur.fetchall()]
+                # Who marched beside each side (v1.24.0): the sects other than
+                # the two belligerents that struck a blow, read off what was
+                # recorded rather than off who is allied now.
+                cur=await db.execute("PRAGMA table_info(territory_war_actions)")
+                if any(str(c[1])=="sect_name" for c in await cur.fetchall()):
+                    cur=await db.execute(
+                        "SELECT DISTINCT side,sect_name FROM territory_war_actions WHERE war_id=? AND sect_name NOT IN ('',?,?) ORDER BY sect_name",
+                        (int(row['war_id']),str(row['attacker_key']),str(row['defender_key'])))
+                    row['allies']=[{"side":str(r[0]),"sect_name":str(r[1])} for r in await cur.fetchall()]
+                else:
+                    row['allies']=[]
             return rows
 
 

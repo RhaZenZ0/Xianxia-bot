@@ -1852,6 +1852,23 @@ async def run(url: str, token: str, db_path: str) -> Report:
                 # Fighting pays sect contribution (v1.24.0).
                 report.add("PASS" if int(acted.get("points") or 0) > 0 else "FAIL", "the act earned sect contribution", str(acted.get("points")))
         await either("war.act again waits, or the war is over", act("war.act", PLAYER, {"war_id": war_id, "tactic": "repel"}), "still on cooldown", "active war not found")
+        # Peace (v1.24.0): a Deacon of a warring sect sues once the war is
+        # three days old, at a price; the terms follow the siege. Staged with
+        # levers - the rank, the purse and the days - and refused first while
+        # the war is young.
+        await audited("admin.player.set_sect_rank", {"user_id": PLAYER, "rank_name": "Deacon", "rank_level": 40, "reason": "playtest"}, name="admin.player.set_sect_rank a Deacon to make peace")
+        await step(report, "a purse to pay for peace", gm("admin.player.set_sect_contribution", {"user_id": PLAYER, "contribution_points": 300, "contribution_earned": 300, "reason": "playtest"}))
+        await step(report, "war.peace while the war is young is refused", act("war.peace", PLAYER, {"war_id": war_id}), expect_error="not ready for terms")
+        await step(report, "three days of war pass", gm("admin.world.advance_time", {"minutes": 3 * 24 * 60 + 60, "reason": "playtest"}))
+        open_wars = await step(report, "war.fronts before the peace", query("war.fronts", PLAYER, {}))
+        if any(int(f.get("war_id") or 0) == war_id for f in list((open_wars or {}).get("wars") or [])):
+            peace = await step(report, "war.peace", act("war.peace", PLAYER, {"war_id": war_id}))
+            if peace is not None:
+                report.add("PASS" if str(peace.get("status")) == "resolved" and str(peace.get("resolution")) in ("peace", "ceded") else "FAIL",
+                           "the war ends at the table on the siege's terms",
+                           f"{peace.get('resolution')} at siege {peace.get('siege_progress')}%, held by {peace.get('winner_key')}")
+        else:
+            report.add("PASS", "the war was already over before peace could be sued for", f"war={war_id}")
     # Both walked to the hills to claim them; the homestead below is founded
     # where its founder stands, and the buyer visits it in the town.
     for uid, who in ((PLAYER, "the founder"), (BUYER, "the buyer")):

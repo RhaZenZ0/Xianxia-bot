@@ -134,7 +134,7 @@ class TheRowsAreForgottenAndTheChannelsDeleted(unittest.TestCase):
 
 class TheCardFollowsTheWar(unittest.TestCase):
     def test_an_act_and_a_declaration_refresh_after_the_engine_agreed(self):
-        for handler, action in (("war_act", "war.act"), ("territory_claim", "territory.claim")):
+        for handler, action in (("war_act", "war.act"), ("war_peace", "war.peace"), ("territory_claim", "territory.claim")):
             with self.subTest(handler=handler):
                 body = _code(TERRITORY, handler)
                 self.assertIn("refresh_war(interaction.guild,", body, f"{handler} leaves the card stale")
@@ -148,8 +148,9 @@ class TheCardFollowsTheWar(unittest.TestCase):
 
 class ThePickerAsksTheEngine(unittest.TestCase):
     def test_the_picker_reads_the_fronts_and_never_the_relations(self):
-        body = _code(TERRITORY, "war_front_hub_options")
-        self.assertIn('"war.fronts"', body)
+        self.assertIn('"war.fronts"', _code(TERRITORY, "_war_fronts"))
+        for picker in ("war_front_hub_options", "war_peace_hub_options"):
+            self.assertIn("_war_fronts(interaction)", _code(TERRITORY, picker), f"{picker} does not ask the engine")
         self.assertNotIn("sect_relations", TERRITORY, "the panel is restating who may fight beside whom")
 
     def test_the_picker_offers_what_the_engine_answered(self):
@@ -168,6 +169,35 @@ class ThePickerAsksTheEngine(unittest.TestCase):
         self.assertEqual([o.value for o in options], [7])
         self.assertIn("(ally)", options[0].label)
         self.assertIn("16 pts left", options[0].description)
+
+
+class PeaceIsOfferedOnlyToABelligerent(unittest.TestCase):
+    def test_the_peace_picker_leaves_out_the_wars_you_fight_as_an_ally(self):
+        with patch.dict(os.environ, ENV):
+            import importlib
+            territory = importlib.import_module("app.bot.commands.territory")
+
+        async def action(op, uid, payload):
+            return {"wars": [
+                {"war_id": 7, "territory_name": "The Ford", "fights_for": "Mine", "ally": False,
+                 "attacker_key": "Mine", "defender_key": "Theirs"},
+                {"war_id": 8, "territory_name": "The Pass", "fights_for": "Friend", "ally": True,
+                 "attacker_key": "Friend", "defender_key": "Theirs"}]}
+
+        with patch.object(territory.ENGINE, "action", action):
+            peace = asyncio.run(territory.war_peace_hub_options(SimpleNamespace(user=SimpleNamespace(id=1)), ""))
+            fight = asyncio.run(territory.war_front_hub_options(SimpleNamespace(user=SimpleNamespace(id=1)), ""))
+        self.assertEqual([o.value for o in fight], [7, 8])
+        self.assertEqual([o.value for o in peace], [7], "an ally has no standing at the table")
+
+    def test_the_terms_are_printed_as_the_engine_made_them(self):
+        with patch.dict(os.environ, ENV):
+            import importlib
+            territory = importlib.import_module("app.bot.commands.territory")
+        text = territory.war_peace_text({"war_id": 3, "resolution": "ceded", "attacker_key": "A", "defender_key": "D",
+                                         "territory_name": "The Ford", "siege_progress": 64, "cost": 100, "sued_by": "D"})
+        for needle in ("**D** cedes **The Ford** to **A**", "**64%**", "**100**"):
+            self.assertIn(needle, text)
 
 
 class TheReplySaysWhatTheEngineDid(unittest.TestCase):

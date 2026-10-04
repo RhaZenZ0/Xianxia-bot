@@ -914,7 +914,7 @@ SURFACE = {
         "roots": (),
         "leaves": {
             "territory_group": ('status', 'claim'),
-            "war_group": ('status', 'act'),
+            "war_group": ('status', 'act', 'peace'),
             "caravan_group": ('dispatch', 'status', 'events'),
             "party_group": ('create', 'join', 'status', 'leave'),
         },

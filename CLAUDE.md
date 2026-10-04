@@ -6688,8 +6688,8 @@ is exactly what a crossing does. Not in `reversibleAdminActions`, beside the oth
 
 ### A war worth fighting, from both walls (`sect_war.go`, schema 78, v1.24.0)
 
-Asked for as *"Expand the war system"*, then, mid-build, *"Maybe a channel for war ?"* and *"We can
-help a allied sect in a war"*. Reading the system first found four faults, and they are the release.
+Asked for as *"Expand the war system"*, then, mid-build, *"Maybe a channel for war ?"*, *"We can
+help a allied sect in a war"*, *"Make it its own category"* and *"Fix them"* of the three it had deferred. Reading the system first found four faults, and they are the release.
 
 **The world's own sieges could only be lost by the defender.** `advanceWars` struck for one side a
 tick - the attacker, unless players had pushed the defender's force past it - and never moved the
@@ -6745,6 +6745,24 @@ the `territory_state` it is foreign-keyed to, which production always has, and t
 found it - the `npc_consignments` rule. And `war.act`'s 1800 seconds joined `actionCooldowns`
 (`war_action`, no operator key), keeping its raw `INSERT` because the cooldown-roster scanner holds
 that shape.
+
+**Then the three things the first push deferred, on the owner's call** (`sect_war_peace.go`).
+**Allies in the world's own sieges**: `WarAlliesTx` is every sect in `sect_politics_state` allied to
+exactly one side - the cultivator's rule, asked of whole sects - and `WarAllyStrength` lends
+`ally_strength_percent` of their summed strength, capped; `WarAllyJoinsTx` costs the standing once and
+writes a `territory_war_ally` history row. **Disciples**: `WarDisciplesTx` counts the living
+`npc_civilization_state.faction` rows, `WarDiscipleStrength` turns them into strength, and
+`MusterDisciplesTx` names the foremost few in `activity`. **Peace**: `war.peace` by a belligerent's own
+member at `peace_min_rank_level` once the war is `peace_min_days` old, for `peace_cost_points` of the
+balance (never the lifetime count, so it costs no rank); `NPCSuesForPeace` ends a world's war when a
+side's morale reaches `npc_peace_morale`. `PeaceTerms` is the one statement of the terms - below
+`peace_cede_siege` the holder keeps it (`peace`), at or above it the ground is ceded (`ceded`, no
+occupation) - and `ResolveWarTx` pays no victory for either, warms the standing, and the truce binds
+whichever side gave way: an attacker that made peace and a holder that ceded. Migration 78 also adds
+`territory_war_actions.sect_name`, so a blow is written under the sect it was struck for and an ally
+joins once by its own name rather than by whoever happens to be sworn to it now; every writer guards
+on the column. `TestTheSiegeTickAsksTheWarDoor` reads `advanceWars` by AST for each rule it must call,
+and its drill (the peace call replaced) names `game.NPCSuesForPeace`.
 
 **CI caught a printed path that names nothing.** The first push told players to use `**/war act**`, and
 `/war` is no slash command: the war and territory groups are pages of the sect hub, reached only as

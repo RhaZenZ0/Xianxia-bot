@@ -493,9 +493,25 @@ func (r *Runner) advanceWars(conn *storage.Conn, gm int64) (int64, error) {
 		af := i64(op["attacker_force"])
 		df := i64(op["defender_force"])
 		defense := i64(w["territory_defense"])
-		aStr := sectWarStrength(conn, attacker) + math.Min(5, float64(af)/100)
+		// Who stands behind each wall (v1.24.0): the sect's own NPC
+		// disciples, and every sect allied to exactly one side, which lends
+		// a share of its own strength and joins the war the first time.
+		aAllies, dAllies := game.WarAlliesTx(conn, r.World, attacker, defender)
+		aAllyStr, err := r.alliesJoin(conn, i64(w["war_id"]), aAllies, "attacker", attacker, defender, territory, gm, now)
+		if err != nil {
+			return changed, err
+		}
+		dAllyStr, err := r.alliesJoin(conn, i64(w["war_id"]), dAllies, "defender", defender, attacker, territory, gm, now)
+		if err != nil {
+			return changed, err
+		}
+		aStr := sectWarStrength(conn, attacker) + math.Min(5, float64(af)/100) + aAllyStr +
+			game.WarDiscipleStrength(r.World, game.WarDisciplesTx(conn, attacker))
 		dStr := sectWarStrength(conn, defender) + float64(defense)/10 +
-			math.Min(5, float64(game.ManorDefensePower(conn, defender, territory))/6) + math.Min(5, float64(df)/100)
+			math.Min(5, float64(game.ManorDefensePower(conn, defender, territory))/6) + math.Min(5, float64(df)/100) + dAllyStr +
+			game.WarDiscipleStrength(r.World, game.WarDisciplesTx(conn, defender))
+		game.MusterDisciplesTx(conn, r.World, attacker, territory, now)
+		game.MusterDisciplesTx(conn, r.World, defender, territory, now)
 		blunt := game.WarDefenseBlunt(rules, defense)
 		aPower, dPower, aSiege, dSiege, aMorale, dMorale := int64(0), int64(0), int64(0), int64(0), int64(0), int64(0)
 		winner, resolution := "", ""
@@ -530,6 +546,13 @@ func (r *Runner) advanceWars(conn *storage.Conn, gm int64) (int64, error) {
 				break
 			}
 		}
+		// A side whose morale has broken sues for peace once the war is old
+		// enough, and the terms follow the siege (v1.24.0).
+		if winner == "" {
+			if who, how, ok := game.NPCSuesForPeace(r.World, attacker, defender, i64(w["created_game_minute"]), gm, siege, am, dm); ok {
+				winner, resolution = who, how
+			}
+		}
 		af += aPower
 		df += dPower
 		if _, err = conn.Execute(`UPDATE territory_war_operations SET siege_progress=?,attacker_morale=?,defender_morale=?,attacker_force=?,defender_force=?,last_tick_game_minute=?,updated_at=? WHERE war_id=?`, []any{siege, am, dm, af, df, gm, now, warID}); err != nil {
@@ -538,10 +561,10 @@ func (r *Runner) advanceWars(conn *storage.Conn, gm int64) (int64, error) {
 		// One row a side a tick, so the blow-by-blow reads "the field" for
 		// both walls rather than for the besieger alone.
 		for _, row := range []struct {
-			side, tactic         string
+			side, tactic, sect   string
 			power, siege, morale int64
-		}{{"attacker", "siege", aPower, aSiege, aMorale}, {"defender", "fortify", dPower, dSiege, dMorale}} {
-			if _, err = conn.Execute(`INSERT INTO territory_war_actions(war_id,user_id,side,tactic,power,siege_delta,morale_delta,game_minute,created_at) VALUES(?,NULL,?,?,?,?,?,?,?)`, []any{warID, row.side, row.tactic, row.power, row.siege, row.morale, gm, now}); err != nil {
+		}{{"attacker", "siege", attacker, aPower, aSiege, aMorale}, {"defender", "fortify", defender, dPower, dSiege, dMorale}} {
+			if err = insertFieldAction(conn, warID, row.side, row.tactic, row.sect, row.power, row.siege, row.morale, gm, now); err != nil {
 				return changed, err
 			}
 		}
@@ -556,6 +579,43 @@ func (r *Runner) advanceWars(conn *storage.Conn, gm int64) (int64, error) {
 		changed++
 	}
 	return changed, nil
+}
+
+// alliesJoin is what a side's allies lend it on a day of siege, through the
+// war door's rule (game.WarAllyStrength). An ally joining for the first time
+// costs its standing with the enemy and is told to the world
+// (game.WarAllyJoinsTx); every ally's part is written to the blow-by-blow
+// under its own name, so the war card says who marched.
+func (r *Runner) alliesJoin(conn *storage.Conn, warID int64, allies []string, side, beside, enemy, territory string, gm int64, now float64) (float64, error) {
+	if len(allies) == 0 {
+		return 0, nil
+	}
+	strengths := make([]float64, 0, len(allies))
+	for _, ally := range allies {
+		if _, err := game.WarAllyJoinsTx(conn, r.World, warID, ally, beside, enemy, territory, gm, now); err != nil {
+			return 0, err
+		}
+		s := sectWarStrength(conn, ally)
+		strengths = append(strengths, s)
+		if game.WarActionsHaveSect(conn) {
+			if err := insertFieldAction(conn, warID, side, "ally", ally, int64(math.Round(s)), 0, 0, gm, now); err != nil {
+				return 0, err
+			}
+		}
+	}
+	return game.WarAllyStrength(r.World, strengths), nil
+}
+
+// insertFieldAction is one row of the blow-by-blow struck by the field rather
+// than a cultivator, under the sect it was struck for once migration 78 has
+// run.
+func insertFieldAction(conn *storage.Conn, warID int64, side, tactic, sect string, power, siege, morale, gm int64, now float64) error {
+	if game.WarActionsHaveSect(conn) {
+		_, err := conn.Execute(`INSERT INTO territory_war_actions(war_id,user_id,side,tactic,power,siege_delta,morale_delta,game_minute,created_at,sect_name) VALUES(?,NULL,?,?,?,?,?,?,?,?)`, []any{warID, side, tactic, power, siege, morale, gm, now, sect})
+		return err
+	}
+	_, err := conn.Execute(`INSERT INTO territory_war_actions(war_id,user_id,side,tactic,power,siege_delta,morale_delta,game_minute,created_at) VALUES(?,NULL,?,?,?,?,?,?,?)`, []any{warID, side, tactic, power, siege, morale, gm, now})
+	return err
 }
 
 // sectWarStrength is what a sect can put into a day of a siege on its own,

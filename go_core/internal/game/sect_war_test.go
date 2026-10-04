@@ -339,3 +339,118 @@ func TestTheFrontsOfferOnlyWarsTheActWouldTake(t *testing.T) {
 		t.Fatalf("a stranger is offered %d war(s) war.act would refuse", len(wars))
 	}
 }
+
+// Peace (v1.24.0): sued for by a ranked member of a warring sect, once the war
+// is old enough, at a price; the terms follow the siege, nobody is paid a
+// victory, the side that gave way is bound, and the two sects warm.
+func peaceReady(t *testing.T, path string, siege int64) *storage.Conn {
+	t.Helper()
+	batch4Exec(t, path, `UPDATE sect_membership SET rank_level=40,contribution_points=500 WHERE user_id IN (42,43)`)
+	batch4Exec(t, path, `UPDATE territory_war_operations SET siege_progress=? WHERE war_id=1`, siege)
+	return warConn(t, path)
+}
+
+func TestPeaceIsSuedOnTheTermsTheSiegeGives(t *testing.T) {
+	cat := worlddata.Catalog{}
+	rules := WarRules(cat)
+	ready := rules.PeaceMinDays * warMinutesPerDay
+	t.Run("the holder keeps the ground below the line", func(t *testing.T) {
+		conn := peaceReady(t, warDB(t), rules.PeaceCedeSiege-1)
+		out, err := warPeaceActionGo(conn, cat, 42, 1, ready)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if out["resolution"] != "peace" || out["winner_key"] != "Holding Sect" {
+			t.Fatalf("terms below the line: %v won by %v", out["resolution"], out["winner_key"])
+		}
+		if got := fmt.Sprint(scalarOn(t, conn, `SELECT controller_key FROM territory_state`)); got != "Holding Sect" {
+			t.Fatalf("a peace handed the ford to %s", got)
+		}
+		if p := storage.ParseInt(scalarOn(t, conn, `SELECT contribution_points FROM sect_membership WHERE user_id=42`)); p != 500-rules.PeaceCostPoints {
+			t.Fatalf("suing cost %d, want %d", 500-p, rules.PeaceCostPoints)
+		}
+		if s := storage.ParseInt(scalarOn(t, conn, `SELECT relation_score FROM sect_relations WHERE sect_a='Attacking Sect' AND sect_b='Holding Sect'`)); s != -rules.DeclareRelationDrop+rules.PeaceRelationGain {
+			t.Fatalf("a peace left the two at standing %d", s)
+		}
+		if _, err := DeclareWarTx(conn, cat, "Attacking Sect", "Holding Sect", "the_ford", ready+warMinutesPerDay, 0); !errors.Is(err, errWarTruce) {
+			t.Fatalf("the attacker that made peace declared again the next day: %v", err)
+		}
+	})
+	t.Run("the ground is ceded at the line, and the holder is bound", func(t *testing.T) {
+		conn := peaceReady(t, warDB(t), rules.PeaceCedeSiege)
+		out, err := warPeaceActionGo(conn, cat, 43, 1, ready)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if out["resolution"] != "ceded" || out["winner_key"] != "Attacking Sect" {
+			t.Fatalf("terms at the line: %v won by %v", out["resolution"], out["winner_key"])
+		}
+		if got := fmt.Sprint(scalarOn(t, conn, `SELECT controller_key FROM territory_state`)); got != "Attacking Sect" {
+			t.Fatalf("a cession left the ford with %s", got)
+		}
+		if WarOccupiedFromTx(conn, "the_ford", ready+1) != "" {
+			t.Fatal("ground ceded at a table is under occupation")
+		}
+		if _, err := DeclareWarTx(conn, cat, "Holding Sect", "Attacking Sect", "the_ford", ready+warMinutesPerDay, 0); !errors.Is(err, errWarTruce) {
+			t.Fatalf("the holder that ceded came straight back: %v", err)
+		}
+	})
+	t.Run("nobody is paid a victory at a table", func(t *testing.T) {
+		conn := peaceReady(t, warDB(t), 0)
+		if _, err := conn.Execute(`INSERT INTO territory_war_actions(war_id,user_id,side,tactic,created_at) VALUES(1,43,'defender','repel',0)`, nil); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := warPeaceActionGo(conn, cat, 42, 1, ready); err != nil {
+			t.Fatal(err)
+		}
+		if e := storage.ParseInt(scalarOn(t, conn, `SELECT contribution_earned FROM sect_membership WHERE user_id=43`)); e != 0 {
+			t.Fatalf("a peace paid the holders' fighter %d", e)
+		}
+	})
+}
+
+func TestPeaceIsRefusedToWhoeverHasNoStandingToMakeIt(t *testing.T) {
+	cat := worlddata.Catalog{}
+	rules := WarRules(cat)
+	ready := rules.PeaceMinDays * warMinutesPerDay
+	for _, c := range []struct {
+		name, setup, want string
+		user, gm          int64
+	}{
+		{"an ally", ``, "no standing at the table", 44, ready},
+		{"a junior member", `UPDATE sect_membership SET rank_level=10 WHERE user_id=42`, "peace is made by a", 42, ready},
+		{"a war too young", ``, "not ready for terms", 42, ready - 1},
+		{"an empty purse", `UPDATE sect_membership SET contribution_points=0 WHERE user_id=42`, "costs", 42, ready},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			path := warDB(t)
+			conn := peaceReady(t, path, 0)
+			if c.setup != "" {
+				if _, err := conn.Execute(c.setup, nil); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := warPeaceActionGo(conn, cat, c.user, 1, c.gm); err == nil || !strings.Contains(err.Error(), c.want) {
+				t.Fatalf("want a refusal naming %q, got %v", c.want, err)
+			}
+			if s := fmt.Sprint(scalarOn(t, conn, `SELECT status FROM territory_wars WHERE war_id=1`)); s != "active" {
+				t.Fatalf("a refused peace ended the war: %s", s)
+			}
+		})
+	}
+}
+
+func TestTheWorldsOwnSectsSueWhenTheirMoraleBreaks(t *testing.T) {
+	cat := worlddata.Catalog{}
+	rules := WarRules(cat)
+	ready := rules.PeaceMinDays * warMinutesPerDay
+	if _, _, ok := NPCSuesForPeace(cat, "A", "D", 0, ready-1, 10, rules.NPCPeaceMorale, 100); ok {
+		t.Fatal("a war too young was ended at a table")
+	}
+	if _, _, ok := NPCSuesForPeace(cat, "A", "D", 0, ready, 10, rules.NPCPeaceMorale+1, rules.NPCPeaceMorale+1); ok {
+		t.Fatal("two sides in good heart made peace")
+	}
+	if w, how, ok := NPCSuesForPeace(cat, "A", "D", 0, ready, rules.PeaceCedeSiege, 100, rules.NPCPeaceMorale); !ok || how != "ceded" || w != "A" {
+		t.Fatalf("a broken defender behind a breached wall: %v %v %v", w, how, ok)
+	}
+}

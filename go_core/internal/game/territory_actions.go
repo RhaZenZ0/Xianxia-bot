@@ -290,7 +290,13 @@ func territoryWarActActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	_, e = conn.Execute(`INSERT INTO territory_war_actions(war_id,user_id,side,tactic,power,siege_delta,morale_delta,game_minute,created_at) VALUES(?,?,?,?,?,?,?,?,?)`, []any{p.WarID, userID, side, p.Tactic, power, siegeDelta, moraleDelta, p.GameMinute, now})
+	// The sect the blow was struck for rides with it once migration 78 has
+	// run (v1.24.0), so an ally's sect is told apart from the field's.
+	if warActionsHaveSect(conn) {
+		_, e = conn.Execute(`INSERT INTO territory_war_actions(war_id,user_id,side,tactic,power,siege_delta,morale_delta,game_minute,created_at,sect_name) VALUES(?,?,?,?,?,?,?,?,?,?)`, []any{p.WarID, userID, side, p.Tactic, power, siegeDelta, moraleDelta, p.GameMinute, now, sect})
+	} else {
+		_, e = conn.Execute(`INSERT INTO territory_war_actions(war_id,user_id,side,tactic,power,siege_delta,morale_delta,game_minute,created_at) VALUES(?,?,?,?,?,?,?,?,?)`, []any{p.WarID, userID, side, p.Tactic, power, siegeDelta, moraleDelta, p.GameMinute, now})
+	}
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
@@ -334,6 +340,25 @@ func territoryWarActActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 		"territory_key": territory, "territory_defense": defense, "fights_for": fightsFor, "ally": fightsFor != sect, "ally_joined": allyJoined, "points": points, "victory_points": victory, "victors_paid": len(spoils), "promoted": promoted,
 		"operations": map[string]any{"siege_progress": siege, "attacker_morale": am, "defender_morale": dm, "attacker_force": af, "defender_force": df, "winner_key": winner, "resolution": resolution, "occupation_until_game_minute": occupation}}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "territory", EventType: "war.act", EntityType: "territory_war", EntityID: fmt.Sprint(p.WarID), GameMinute: p.GameMinute, Payload: out}}, nil
+}
+
+type warPeacePayload struct {
+	WarID      int64 `json:"war_id"`
+	GameMinute int64 `json:"game_minute"`
+}
+
+// territoryWarPeaceActionGo is `war.peace` (v1.24.0); the rule is
+// warPeaceActionGo's.
+func territoryWarPeaceActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+	var p warPeacePayload
+	if e := json.Unmarshal(raw, &p); e != nil {
+		return authoritativeMutation{}, e
+	}
+	out, e := warPeaceActionGo(conn, catalog, userID, p.WarID, p.GameMinute)
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "territory", EventType: "war.peace", EntityType: "territory_war", EntityID: fmt.Sprint(p.WarID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 func caravanDispatchActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p caravanDispatchPayload

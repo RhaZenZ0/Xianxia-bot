@@ -70,6 +70,17 @@ type WarRuleSet struct {
 	WearinessPerDay     int64
 	AllyMinRelation     int64
 	AllyRelationDrop    int64
+	AllyStrengthPercent int64
+	AllyStrengthCap     int64
+	DisciplesPerPoint   int64
+	DiscipleStrengthCap int64
+	DisciplesAtTheWalls int64
+	PeaceMinDays        int64
+	PeaceMinRankLevel   int64
+	PeaceCostPoints     int64
+	PeaceCedeSiege      int64
+	PeaceRelationGain   int64
+	NPCPeaceMorale      int64
 }
 
 // WarRules reads `war_system`. A key the content leaves out takes the value
@@ -84,6 +95,10 @@ func WarRules(catalog worlddata.Catalog) WarRuleSet {
 		DeclareRelationDrop: s.DeclareRelationDrop, EndRelationDrop: s.EndRelationDrop,
 		TickDaysCap: s.TickDaysCap, WearinessPerDay: s.WearinessPerDay,
 		AllyMinRelation: s.AllyMinRelationScore, AllyRelationDrop: s.AllyRelationDrop,
+		AllyStrengthPercent: s.AllyStrengthPercent, AllyStrengthCap: s.AllyStrengthCap,
+		DisciplesPerPoint: s.DisciplesPerPoint, DiscipleStrengthCap: s.DiscipleStrengthCap, DisciplesAtTheWalls: s.DisciplesAtTheWalls,
+		PeaceMinDays: s.PeaceMinDays, PeaceMinRankLevel: s.PeaceMinRankLevel, PeaceCostPoints: s.PeaceCostPoints,
+		PeaceCedeSiege: s.PeaceCedeSiege, PeaceRelationGain: s.PeaceRelationGain, NPCPeaceMorale: s.NPCPeaceMorale,
 	}
 	def := func(v *int64, d int64) {
 		if *v <= 0 {
@@ -106,6 +121,17 @@ func WarRules(catalog worlddata.Catalog) WarRuleSet {
 	def(&r.WearinessPerDay, 1)
 	def(&r.AllyMinRelation, 30)
 	def(&r.AllyRelationDrop, 5)
+	def(&r.AllyStrengthPercent, 50)
+	def(&r.AllyStrengthCap, 4)
+	def(&r.DisciplesPerPoint, 5)
+	def(&r.DiscipleStrengthCap, 4)
+	def(&r.DisciplesAtTheWalls, 3)
+	def(&r.PeaceMinDays, 3)
+	def(&r.PeaceMinRankLevel, 40)
+	def(&r.PeaceCostPoints, 100)
+	def(&r.PeaceCedeSiege, 60)
+	def(&r.PeaceRelationGain, 10)
+	def(&r.NPCPeaceMorale, 25)
 	r.FallDefense = min64(r.FallDefense, r.DefenseCap)
 	return r
 }
@@ -123,17 +149,19 @@ func WarDefenseBlunt(rules WarRuleSet, defense int64) int64 {
 var errWarTruce = errors.New("truce")
 
 // WarTruceUntilTx is the game minute a sect's truce on a territory ends, or 0
-// when there is none: the sect attacked there and was thrown back, and the
-// war ended less than TruceDays ago. Only a failed attacker is bound - a
-// holder that lost the ground is exactly who an occupation is waiting for.
+// when there is none: the sect gave way there - thrown back from an attack,
+// a peace made as the attacker, or the ground ceded as its holder - less than
+// TruceDays ago. A holder that lost the ground on the walls is not bound: that
+// is exactly who an occupation is waiting for.
 func WarTruceUntilTx(conn *storage.Conn, catalog worlddata.Catalog, sect, territory string, gm int64) int64 {
 	if !tableExistsTx(conn, "territory_war_operations") {
 		return 0
 	}
 	r, err := conn.Execute(`SELECT MAX(w.updated_game_minute) AS ended FROM territory_wars w
         JOIN territory_war_operations o ON o.war_id=w.war_id
-        WHERE w.territory_key=? AND w.attacker_key=? AND w.status='resolved' AND o.resolution='defender_holds'`,
-		[]any{territory, sect})
+        WHERE w.territory_key=? AND w.status='resolved'
+          AND ((w.attacker_key=? AND o.resolution IN ('defender_holds','peace')) OR (w.defender_key=? AND o.resolution='ceded'))`,
+		[]any{territory, sect, sect})
 	if err != nil {
 		return 0
 	}
@@ -284,8 +312,9 @@ func ResolveWarTx(conn *storage.Conn, catalog worlddata.Catalog, warID int64, wi
 	rules := warRules(catalog)
 	attacker, defender := fmt.Sprint(war["attacker_key"]), fmt.Sprint(war["defender_key"])
 	territory := fmt.Sprint(war["territory_key"])
+	negotiated := resolution == "peace" || resolution == "ceded"
 	occupation := int64(0)
-	if winner == attacker {
+	if winner == attacker && !negotiated {
 		occupation = gm + rules.OccupationDays*warMinutesPerDay
 	}
 	if tableExistsTx(conn, "territory_war_operations") {
@@ -294,27 +323,39 @@ func ResolveWarTx(conn *storage.Conn, catalog worlddata.Catalog, warID int64, wi
 			return nil, false, err
 		}
 	}
-	if winner == attacker {
+	switch {
+	case resolution == "peace":
+		// The holder keeps the ground and nobody's walls move.
+		_, err = conn.Execute(`UPDATE territory_state SET unrest=MAX(0,unrest-5),updated_game_minute=?,updated_at=? WHERE territory_key=?`,
+			[]any{gm, now, territory})
+	case resolution == "ceded":
+		// Handed over at a table: the walls are whole and nothing is occupied.
+		if err = endOtherOccupationsTx(conn, warID, territory, now); err != nil {
+			return nil, false, err
+		}
+		_, err = conn.Execute(`UPDATE territory_state SET controller_type='sect',controller_key=?,unrest=MIN(100,unrest+10),updated_game_minute=?,updated_at=? WHERE territory_key=?`,
+			[]any{attacker, gm, now, territory})
+	case winner == attacker:
 		// A fall ends whatever occupation the ground was under: the banner
 		// it is taken from was itself an occupier, and its 30 days must not
 		// come due later and hand the ground back to it.
-		if tableExistsTx(conn, "territory_war_operations") {
-			if _, err = conn.Execute(`UPDATE territory_war_operations SET resolution='occupation_lost',occupation_until_game_minute=0,updated_at=?
-                WHERE resolution='attacker_occupation' AND war_id<>? AND war_id IN (SELECT war_id FROM territory_wars WHERE territory_key=?)`,
-				[]any{now, warID, territory}); err != nil {
-				return nil, false, err
-			}
+		if err = endOtherOccupationsTx(conn, warID, territory, now); err != nil {
+			return nil, false, err
 		}
 		_, err = conn.Execute(`UPDATE territory_state SET controller_type='sect',controller_key=?,unrest=MIN(100,unrest+30),defense=?,updated_game_minute=?,updated_at=? WHERE territory_key=?`,
 			[]any{winner, rules.FallDefense, gm, now, territory})
-	} else {
+	default:
 		_, err = conn.Execute(`UPDATE territory_state SET unrest=MAX(0,unrest-10),defense=MIN(?,defense+?),updated_game_minute=?,updated_at=? WHERE territory_key=?`,
 			[]any{rules.DefenseCap, rules.HoldDefenseGain, gm, now, territory})
 	}
 	if err != nil {
 		return nil, false, err
 	}
-	if err = warSectRelationTx(conn, attacker, defender, -rules.EndRelationDrop, now); err != nil {
+	standing := -rules.EndRelationDrop
+	if negotiated {
+		standing = rules.PeaceRelationGain
+	}
+	if err = warSectRelationTx(conn, attacker, defender, standing, now); err != nil {
 		return nil, false, err
 	}
 	loser := defender
@@ -324,7 +365,14 @@ func ResolveWarTx(conn *storage.Conn, catalog worlddata.Catalog, warID int64, wi
 	name := territoryName(conn, territory)
 	title := winner + " takes " + name
 	summary := fmt.Sprintf("%s has taken %s from %s. It is occupied for now; the old banner may yet come back for it.", winner, name, loser)
-	if winner == defender {
+	switch {
+	case resolution == "peace":
+		title = attacker + " and " + defender + " make peace"
+		summary = fmt.Sprintf("%s and %s have made peace over %s. %s keeps it, and %s may not move on it again for a while.", attacker, defender, name, defender, attacker)
+	case resolution == "ceded":
+		title = defender + " cedes " + name
+		summary = fmt.Sprintf("%s has ceded %s to %s at the table rather than on the walls.", defender, name, attacker)
+	case winner == defender:
 		title = winner + " holds " + name
 		summary = fmt.Sprintf("%s has thrown %s back from %s. The walls stand higher for it.", winner, loser, name)
 	}
@@ -332,6 +380,10 @@ func ResolveWarTx(conn *storage.Conn, catalog worlddata.Catalog, warID int64, wi
 		territory, winner, "faction", winner, winner, "faction", loser, loser, nil, "",
 		[]string{"territory", "war", territory}, gm, map[string]any{"war_id": warID, "resolution": resolution}, now); err != nil {
 		return nil, false, err
+	}
+	// A victory is paid on the walls; a peace or a cession pays nobody.
+	if negotiated {
+		return []WarSpoil{}, true, nil
 	}
 	spoils, err := payWarVictorsTx(conn, catalog, warID, winner, winner == attacker)
 	if err != nil {
@@ -462,8 +514,12 @@ func warSideTx(conn *storage.Conn, catalog worlddata.Catalog, sect string, war m
 // the first time one of its members acts in this war. Read before the act's
 // own row is written.
 func warAllyJoinsTx(conn *storage.Conn, catalog worlddata.Catalog, warID int64, ally, enemy string, now float64) (bool, error) {
-	r, err := conn.Execute(`SELECT 1 FROM territory_war_actions a JOIN sect_membership m ON m.user_id=a.user_id
-        WHERE a.war_id=? AND m.sect_name=? LIMIT 1`, []any{warID, ally})
+	query := `SELECT 1 FROM territory_war_actions a JOIN sect_membership m ON m.user_id=a.user_id
+        WHERE a.war_id=? AND m.sect_name=? LIMIT 1`
+	if warActionsHaveSect(conn) {
+		query = `SELECT 1 FROM territory_war_actions WHERE war_id=? AND sect_name=? LIMIT 1`
+	}
+	r, err := conn.Execute(query, []any{warID, ally})
 	if err != nil {
 		return false, err
 	}

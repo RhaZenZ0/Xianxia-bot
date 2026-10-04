@@ -61,16 +61,21 @@ def war_card(war: dict[str, Any], *, game_minute: int | None = None) -> Card:
                                         f"{defender} **{int(op.get('defender_morale') or 0)}**", inline=False)
     card.add_field(name="Force committed", value=f"{attacker} **{int(op.get('attacker_force') or 0)}** · "
                                                  f"{defender} **{int(op.get('defender_force') or 0)}**", inline=False)
+    allies = list(war.get("allies") or [])
+    if allies:
+        beside = {"attacker": attacker, "defender": defender}
+        card.add_field(name="Allies", value="\n".join(
+            f"🤝 **{a.get('sect_name')}** beside {beside.get(str(a.get('side')), '?')}" for a in allies)[:1024], inline=False)
     blows = []
     for row in list(war.get("recent_actions") or [])[:3]:
-        who = f"<@{row['user_id']}>" if row.get("user_id") else "the field"
+        who = f"<@{row['user_id']}>" if row.get("user_id") else (str(row.get("sect_name") or "") or "the field")
         side = attacker if str(row.get("side")) == "attacker" else defender
         blows.append(f"{who} — **{str(row.get('tactic') or '').title()}** for {side} "
                      f"(siege {int(row.get('siege_delta') or 0):+d})")
     if blows:
         card.add_field(name="Lately", value="\n".join(blows)[:1024], inline=False)
     if active:
-        card.set_footer(text="Fight with /war act. A sect allied to either side may fight beside it.")
+        card.set_footer(text="Fight from /sect → War → Act; a sect allied to either side may fight beside it. Peace from War → Peace.")
     else:
         winner = str(op.get("winner_key") or "")
         verdict = str(op.get("resolution") or "")
@@ -82,6 +87,10 @@ def war_card(war: dict[str, Any], *, game_minute: int | None = None) -> Card:
                 line += f" Occupied for {days} more day(s): {defender} may yet come back for it."
         elif verdict == "occupation_lost":
             line = f"🏯 **{winner}** took {ground}, and has since lost it again."
+        elif verdict == "peace":
+            line = f"🕊️ Peace: **{defender}** keeps {ground}, and {attacker} may not move on it again for a while."
+        elif verdict == "ceded":
+            line = f"🕊️ Peace: **{defender}** ceded {ground} to **{attacker}** at the table."
         elif verdict == "defender_holds":
             line = f"🛡️ **{winner}** holds {ground}. {attacker} may not move on it again for a while."
         else:

@@ -24,11 +24,12 @@ deferred half and not the half that says what was done about it.
   and victory pay in sect contribution, allied sects fight beside their ally, walls that rise and
   fall, truces and occupations, a two-walled siege tick, and a read-only war-front channel per world,
   in a ⚔️ Sect Wars category of its own, with a live card per war (schema 78).
-- **deferred (design)** — *What a war does beyond its ground.* Three things the release deliberately
-  left alone. NPC sects never join each other's wars as allies (only players' sects fight beside an
-  ally); a truce or a peace cannot be sued for, a war ends only on the walls or on morale; and a
-  sect's NPC disciples take no part beyond its politics numbers. Each is a mechanic rather than a
-  wiring, and each waits on the owner.
+- **fixed (v1.24.0)** — *What a war does beyond its ground.* Three things the release's first push left
+  alone, then fixed on the owner's call: the world's own sects fight beside an ally (half their
+  strength, capped, and the world hears them march); a war can be ended in peace - by a Deacon of a
+  warring sect for 100 contribution once it is three days old, or by the world's own sects when
+  morale breaks - on terms the siege sets; and a sect's NPC disciples add to its strength and are
+  named at the siege.
 
 - **fixed (v1.22.0)** — *A better menu layout for all the menus.* Researched and the first three of six
   steps taken on the owner's call: a jump to any system on every multi-system hub panel, the menu's

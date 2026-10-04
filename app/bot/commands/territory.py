@@ -98,8 +98,11 @@ async def war_status(interaction: discord.Interaction) -> None:
         until=int(op.get('occupation_until_game_minute') or 0)
         occupation=f" • occupied {_days_left(until,wt.total_minutes)} more day(s)" if until>wt.total_minutes and op.get('resolution')=='attacker_occupation' else ""
         lines.append(f"\n`#{w['war_id']}` **{w['attacker_key']}** vs **{w['defender_key']}** for **{ground}** • **{w['status']}**{tag}\nSiege **{op.get('siege_progress',0)}%** • walls **{int(w.get('territory_defense') or 0)}** • morale A/D **{op.get('attacker_morale',100)}/{op.get('defender_morale',100)}** • forces A/D **{op.get('attacker_force',0)}/{op.get('defender_force',0)}**{occupation}"+(f" • winner **{op.get('winner_key')}**" if op.get('winner_key') else ""))
+        for ally in (w.get('allies') or []):
+            beside=w['attacker_key'] if ally.get('side')=='attacker' else w['defender_key']
+            lines.append(f"   🤝 **{ally.get('sect_name')}** fights beside {beside}")
         for a in (w.get('recent_actions') or []):
-            who=f"<@{a['user_id']}>" if a.get('user_id') else "the field"
+            who=f"<@{a['user_id']}>" if a.get('user_id') else (str(a.get('sect_name') or '') or "the field")
             lines.append(
                 f"   ↳ {who} — **{str(a.get('tactic','')).title()}** for {a.get('side')} "
                 f"(power {int(a.get('power') or 0)}, siege {int(a.get('siege_delta') or 0):+d}, "
@@ -107,26 +110,32 @@ async def war_status(interaction: discord.Interaction) -> None:
     await reply_long(interaction,"\n".join(lines),ephemeral=False)
 
 
-async def war_front_hub_options(interaction: discord.Interaction, current: str) -> list[HubDynamicOption]:
-    """The active wars this cultivator may fight in, and on which side - the
-    engine's answer (`war.fronts`), so a war the act would refuse is never
-    offered (rc.46)."""
+async def _war_fronts(interaction: discord.Interaction) -> list[dict[str, Any]]:
+    """The engine's answer to which wars this cultivator may fight in, and on
+    which side (`war.fronts`), so no picker offers a war the act would refuse
+    (rc.46). Empty when the engine cannot be asked."""
     try:
         fronts=dict(await ENGINE.action("war.fronts",interaction.user.id,{}) or {})
     except Exception:
         log.warning("Could not read the war fronts for a picker", exc_info=True)
         return []
-    out=[]
-    for f in list(fronts.get('wars') or [])[:25]:
-        ally=" (ally)" if f.get('ally') else ""
-        out.append(HubDynamicOption(
-            label=f"#{int(f['war_id'])} {f.get('territory_name') or f.get('territory_key')} — for {f.get('fights_for')}{ally}"[:100],
-            value=int(f['war_id']),
-            description=(f"{f.get('attacker_key')} vs {f.get('defender_key')} • siege {int(f.get('siege_progress') or 0)}% "
-                         f"• walls {int(f.get('territory_defense') or 0)} • {int(f.get('points_left') or 0)} pts left")[:100],
-            emoji="⚔️",
-        ))
-    return out
+    return [dict(f) for f in list(fronts.get('wars') or [])]
+
+
+def _front_option(f: dict[str, Any]) -> HubDynamicOption:
+    ally=" (ally)" if f.get('ally') else ""
+    return HubDynamicOption(
+        label=f"#{int(f['war_id'])} {f.get('territory_name') or f.get('territory_key')} — for {f.get('fights_for')}{ally}"[:100],
+        value=int(f['war_id']),
+        description=(f"{f.get('attacker_key')} vs {f.get('defender_key')} • siege {int(f.get('siege_progress') or 0)}% "
+                     f"• walls {int(f.get('territory_defense') or 0)} • {int(f.get('points_left') or 0)} pts left")[:100],
+        emoji="⚔️",
+    )
+
+
+async def war_front_hub_options(interaction: discord.Interaction, current: str) -> list[HubDynamicOption]:
+    """The active wars this cultivator may fight in, and on which side."""
+    return [_front_option(f) for f in (await _war_fronts(interaction))[:25]]
 
 
 async def war_front_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[int]]:
@@ -171,7 +180,53 @@ def war_act_text(war_id: int, tactic: str, r: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+async def war_peace_hub_options(interaction: discord.Interaction, current: str) -> list[HubDynamicOption]:
+    """The wars this cultivator's own sect is fighting - an ally has no
+    standing at the table - read off the same engine answer."""
+    return [_front_option(f) for f in (await _war_fronts(interaction)) if not f.get('ally')][:25]
+
+
+async def war_peace_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[int]]:
+    needle=current.casefold().strip()
+    return [app_commands.Choice(name=o.label[:100],value=int(o.value)) for o in await war_peace_hub_options(interaction,current)
+            if not needle or needle in o.label.casefold() or needle==str(o.value)][:25]
+
+
+@registered_group_command(war_group, name="peace", description="Sue for peace in a war your sect is fighting; the terms follow the siege")
+@serialized_user_action
+async def war_peace(interaction: discord.Interaction, war_id: int) -> None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction):return
+    try:
+        e=await ENGINE.authoritative_action("war.peace",interaction.user.id,{"war_id":int(war_id)},action_id=f"discord:{interaction.id}:war.peace"); r=dict(e.get('result') or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
+    await interaction.followup.send(war_peace_text(r),ephemeral=False)
+    # The war front's card draws the verdict (v1.24.0), after the engine agreed.
+    wt=await current_world_time()
+    await refresh_war(interaction.guild,int(war_id),game_minute=wt.total_minutes)
+
+
+def war_peace_text(r: dict[str, Any]) -> str:
+    """The terms the engine made, in its own numbers (v1.24.0)."""
+    ground=r.get('territory_name') or r.get('territory_key') or 'the ground'
+    if r.get('resolution')=='ceded':
+        terms=f"**{r.get('defender_key')}** cedes **{ground}** to **{r.get('attacker_key')}**, and may not move on it again for a while"
+    else:
+        terms=f"**{r.get('defender_key')}** keeps **{ground}**, and **{r.get('attacker_key')}** may not move on it again for a while"
+    return (f"🕊️ **War #{int(r.get('war_id') or 0)} ends in peace**, sued for by **{r.get('sued_by')}** with the siege at "
+            f"**{int(r.get('siege_progress') or 0)}%**: {terms}. Nobody is paid a victory, and the two sects stand warmer for it.\n"
+            f"🏯 It cost you **{int(r.get('cost') or 0)}** sect contribution.")
+
+
 war_act.autocomplete("war_id")(war_front_autocomplete)
+war_peace.autocomplete("war_id")(war_peace_autocomplete)
+register_hub_option_provider(war_peace, "war_id", war_peace_hub_options)
+register_hub_option_hint(
+    war_peace,
+    "war_id",
+    "Your sect is fighting no war. Peace is sued for by a member of a sect at war, at Deacon or above, once the war is a few days old - an ally has no standing at the table. See every war with **/sect → War → Status**.",
+)
 register_hub_option_provider(war_act, "war_id", war_front_hub_options)
 register_hub_option_hint(
     war_act,

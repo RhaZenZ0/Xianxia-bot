@@ -1252,6 +1252,20 @@ type WarSystem struct {
 	// belligerent, and what joining costs their standing with the enemy.
 	AllyMinRelationScore int64 `json:"ally_min_relation_score"`
 	AllyRelationDrop     int64 `json:"ally_relation_drop"`
+	// The world's own sects in a siege the tick fights: what an allied sect
+	// lends, and what a sect's NPC disciples add and how many are named.
+	AllyStrengthPercent int64 `json:"ally_strength_percent"`
+	AllyStrengthCap     int64 `json:"ally_strength_cap"`
+	DisciplesPerPoint   int64 `json:"disciples_per_point"`
+	DiscipleStrengthCap int64 `json:"disciple_strength_cap"`
+	DisciplesAtTheWalls int64 `json:"disciples_at_the_walls"`
+	// Suing for peace: when, who, at what cost, and on what terms.
+	PeaceMinDays      int64 `json:"peace_min_days"`
+	PeaceMinRankLevel int64 `json:"peace_min_rank_level"`
+	PeaceCostPoints   int64 `json:"peace_cost_points"`
+	PeaceCedeSiege    int64 `json:"peace_cede_siege"`
+	PeaceRelationGain int64 `json:"peace_relation_gain"`
+	NPCPeaceMorale    int64 `json:"npc_peace_morale"`
 }
 
 // ForageMaterial is one entry of that roster. Chance is the base percentage

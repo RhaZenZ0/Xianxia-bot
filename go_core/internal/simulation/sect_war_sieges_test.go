@@ -2,6 +2,9 @@ package simulation
 
 import (
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"testing"
 
 	"xianxia/core/internal/game"
@@ -20,7 +23,13 @@ const siegeExtraSchema = `
 CREATE TABLE territory_war_actions(
     action_id INTEGER PRIMARY KEY AUTOINCREMENT, war_id INTEGER NOT NULL, user_id INTEGER, side TEXT NOT NULL, tactic TEXT NOT NULL,
     power INTEGER NOT NULL DEFAULT 0, siege_delta INTEGER NOT NULL DEFAULT 0, morale_delta INTEGER NOT NULL DEFAULT 0,
-    game_minute INTEGER NOT NULL DEFAULT 0, created_at REAL NOT NULL);
+    game_minute INTEGER NOT NULL DEFAULT 0, created_at REAL NOT NULL, sect_name TEXT NOT NULL DEFAULT '');
+CREATE TABLE npc_civilization_state(
+    npc_name TEXT PRIMARY KEY, home_location TEXT NOT NULL DEFAULT '', current_location TEXT NOT NULL DEFAULT '', world_name TEXT NOT NULL DEFAULT '',
+    profession TEXT NOT NULL DEFAULT '', faction TEXT NOT NULL DEFAULT 'Independent', wealth INTEGER NOT NULL DEFAULT 20,
+    influence INTEGER NOT NULL DEFAULT 10, ambition INTEGER NOT NULL DEFAULT 50, realm_index INTEGER NOT NULL DEFAULT 0,
+    phase INTEGER NOT NULL DEFAULT 1, status TEXT NOT NULL DEFAULT 'alive', activity TEXT NOT NULL DEFAULT 'Following established routine',
+    last_game_minute INTEGER NOT NULL DEFAULT 0, updated_at REAL NOT NULL DEFAULT 0);
 CREATE TABLE sect_relations(
     sect_a TEXT NOT NULL, sect_b TEXT NOT NULL, relation_score INTEGER NOT NULL DEFAULT 0, relation_type TEXT NOT NULL DEFAULT 'neutral',
     treaty_status TEXT NOT NULL DEFAULT 'none', updated_at REAL NOT NULL, PRIMARY KEY(sect_a,sect_b));
@@ -129,5 +138,117 @@ func TestAStrongAttackerTakesWeaklyHeldGround(t *testing.T) {
 	// Declaring and ending each cost the two sects standing.
 	if s := i64(simScalar(t, path, `SELECT relation_score FROM sect_relations`)); s >= 0 {
 		t.Fatalf("a war left the two sects at standing %d", s)
+	}
+}
+
+// An allied sect marches beside its ally, once, and its strength tells; a
+// sect's NPC disciples fight for it and are named at the walls (v1.24.0).
+func TestAnAllyMarchesAndTheDisciplesMuster(t *testing.T) {
+	weekOne := func(withHelp bool) (string, int64) {
+		path := siegeDB(t, [3]int64{90, 85, 80}, [3]int64{20, 20, 40}, 30)
+		if withHelp {
+			conn, err := storage.Open(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, sql := range []string{
+				`INSERT INTO sect_politics_state(sect_name,influence,resources,cohesion) VALUES('Sworn Sect',95,95,95)`,
+				`INSERT INTO sect_relations(sect_a,sect_b,relation_score,relation_type,updated_at) VALUES('Holding Sect','Sworn Sect',20,'marriage_pact',0),('Besieging Sect','Sworn Sect',0,'neutral',0)`,
+			} {
+				if _, err := conn.Execute(sql, nil); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for i := 0; i < 25; i++ {
+				if _, err := conn.Execute(`INSERT INTO npc_civilization_state(npc_name,faction) VALUES(?, 'Holding Sect')`, []any{fmt.Sprintf("Disciple %02d", i)}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := conn.Commit(); err != nil {
+				t.Fatal(err)
+			}
+			conn.Close()
+		}
+		conn, err := storage.Open(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := (&Runner{}).advanceWars(conn, 7*minutesPerDay); err != nil {
+			t.Fatal(err)
+		}
+		if err := conn.Commit(); err != nil {
+			t.Fatal(err)
+		}
+		conn.Close()
+		return path, i64(simScalar(t, path, `SELECT siege_progress FROM territory_war_operations`))
+	}
+	_, alone := weekOne(false)
+	path, helped := weekOne(true)
+	if helped >= alone {
+		t.Fatalf("an ally and twenty-five disciples behind the walls left the siege at %d%%, the same week alone reached %d%%", helped, alone)
+	}
+	if n := i64(simScalar(t, path, `SELECT COUNT(*) FROM world_history_events WHERE event_type='territory_war_ally'`)); n != 1 {
+		t.Fatalf("the world heard of the ally marching %d time(s)", n)
+	}
+	if s := i64(simScalar(t, path, `SELECT relation_score FROM sect_relations WHERE sect_a='Besieging Sect' AND sect_b='Sworn Sect'`)); s != -game.WarRules((&Runner{}).World).AllyRelationDrop {
+		t.Fatalf("joining left the ally at standing %d with the enemy", s)
+	}
+	if n := i64(simScalar(t, path, `SELECT COUNT(*) FROM territory_war_actions WHERE tactic='ally' AND sect_name='Sworn Sect'`)); n != 1 {
+		t.Fatalf("the ally's part was written %d time(s)", n)
+	}
+	if n := i64(simScalar(t, path, `SELECT COUNT(*) FROM npc_civilization_state WHERE activity LIKE 'At the siege of The Ford%'`)); n != game.WarRules((&Runner{}).World).DisciplesAtTheWalls {
+		t.Fatalf("%d disciples are named at the walls", n)
+	}
+	// A second week: the ally is already in the war and pays nothing more.
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (&Runner{}).advanceWars(conn, 14*minutesPerDay); err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	conn.Close()
+	if s := i64(simScalar(t, path, `SELECT relation_score FROM sect_relations WHERE sect_a='Besieging Sect' AND sect_b='Sworn Sect'`)); s != -game.WarRules((&Runner{}).World).AllyRelationDrop {
+		t.Fatalf("the ally paid for joining again: standing %d", s)
+	}
+}
+
+// The tick asks the war door for every rule it fights by, rather than keeping
+// its own: a helper's own test passes against a tree nothing calls it from
+// (TestEveryGoodDeedIsPaidWhereItHappens' reason).
+func TestTheSiegeTickAsksTheWarDoor(t *testing.T) {
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "advanced_maintenance.go", nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	called := map[string]bool{}
+	for _, decl := range file.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || (fn.Name.Name != "advanceWars" && fn.Name.Name != "alliesJoin") {
+			continue
+		}
+		ast.Inspect(fn, func(n ast.Node) bool {
+			if call, ok := n.(*ast.CallExpr); ok {
+				if sel, ok := call.Fun.(*ast.SelectorExpr); ok {
+					if pkg, ok := sel.X.(*ast.Ident); ok && pkg.Name == "game" {
+						called[sel.Sel.Name] = true
+					}
+				}
+			}
+			return true
+		})
+	}
+	if len(called) == 0 {
+		t.Fatal("the walk found no game.* call in advanceWars; the gate is broken, not the tree")
+	}
+	for _, rule := range []string{"WarAlliesTx", "WarAllyJoinsTx", "WarAllyStrength", "WarDisciplesTx", "WarDiscipleStrength",
+		"MusterDisciplesTx", "NPCSuesForPeace", "ResolveWarTx", "WarDefenseBlunt"} {
+		if !called[rule] {
+			t.Errorf("the siege tick no longer reaches game.%s", rule)
+		}
 	}
 }
