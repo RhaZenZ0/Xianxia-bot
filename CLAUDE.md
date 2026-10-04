@@ -175,7 +175,7 @@ or above `QUEST_FORGE_MIN_SIGNIFICANCE` (default **80**) — and the whole simul
 at 74, so **no autonomous event has ever been able to reach the Quest Forge**. A disappearance is
 written at 82 and is the first one that can. Resolution is mechanical: the `npc.found` action clears
 it only when the caller is standing where the NPC actually is, and the engine checks that itself
-rather than taking `/talk`'s word for it.
+rather than taking `/talk`'s word for it. Since v1.22.1 an ordinary `/explore` runs the same find (`searchHereTx`, below).
 
 ### Somebody gets there first (`npc_grave_robbing.go`)
 
@@ -6567,6 +6567,23 @@ finds a leaf by a Section's bold label or a button's own label, so it needed no 
 dashboard; it was on `/admin server observability` alone. Player Activity reads `command_usage` over
 the window the bot prunes to, owns the table in `DASHBOARD_SYSTEM_TABLES`, and answers `None` for an
 unreadable count, which the page prints as unknown (the `engine —` footer lesson, v1.0.8).
+
+### An explore finds the missing (`explore_search.go`, v1.22.1)
+
+Asked for in five words: *"Normal explore can find missing npc's."* A disappearance closed one way,
+`/talk` by name while standing where the person is - which asked a searcher to know the answer
+before looking, since the talk picker lists a missing person only where the searcher already stands.
+`searchHereTx` runs inside the explore's own transaction: every `status='missing'` row whose
+`current_location` is the explorer's location, exactly (`npc.found`'s rule, unchanged), is found, and
+every unclaimed grave there is reached. The writes are `markNPCFoundTx` and `claimGraveTx`, pulled
+out of `npc.found` so the conversation path and the explore path are one statement each; `npc.found`
+keeps its own `begin`/commit around them (rc.38). The result carries `found_npcs` and `found_graves`
+and the bot only prints them (`search_lines`), **after** the discovery block, because that block
+assigns `discovery_text` rather than appending - a line added before it would vanish whenever the
+explore also charted a route, and `test_an_explore_finds_the_missing.py` reads the order by AST.
+`explore_search_test.go` drives a real explore through `ApplyWithWorld` against production's DDL and
+reads back on a fresh connection; its drill (the location filter disabled) names the porter missing
+at Ironbanner City and the grave there.
 
 ## Testing conventions
 

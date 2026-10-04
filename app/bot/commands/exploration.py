@@ -271,6 +271,41 @@ def _wilds_lines(location: str) -> str:
     return lines
 
 
+def search_lines(outcome: dict) -> str:
+    """Who an explore found, as the engine reported it (v1.22.1).
+
+    The engine searches the ground: anybody missing where the explorer stands
+    is found, and an unclaimed grave there is reached. This only prints its
+    answer - which place, whose purse and what keepsake are the engine's.
+    """
+    text = ""
+    for row in list(outcome.get("found_npcs") or []):
+        row = dict(row or {})
+        name = str(row.get("npc_name") or "somebody")
+        days = int(row.get("days_missing") or 0)
+        home = str(row.get("home_location") or "")
+        text += (
+            f"\n\n🔎 **You find {name}**, missing from {home or 'home'} for **{days}** day(s). "
+            "Word of where they were goes back the way you came."
+        )
+    for row in list(outcome.get("found_graves") or []):
+        row = dict(row or {})
+        name = str(row.get("npc_name") or "somebody")
+        days = int(row.get("days_missing") or 0)
+        home = str(row.get("home_location") or "")
+        item = str(row.get("keepsake_item") or "")
+        stones = int(row.get("keepsake_stones") or 0)
+        took = [WORLD.item_name(item)] if item else []
+        if stones:
+            took.append(f"{stones} spirit stones")
+        carried = ", ".join(took) if took else "nothing but the fact of it"
+        text += (
+            f"\n\n🪦 **You find {name}**, {days} day(s) after they stopped being anywhere. "
+            f"You take **{carried}**. Word of this can go back to {home or 'their home'}."
+        )
+    return text
+
+
 @registered_root_command(name="explore", description="Explore your current location for events and discoveries", guild=GUILD)
 @serialized_user_action
 async def explore(interaction: discord.Interaction) -> None:
@@ -477,6 +512,8 @@ async def explore(interaction: discord.Interaction) -> None:
         except Exception:
             log.exception("Could not persist structured world-history discovery")
 
+    # After the discovery block, which assigns rather than appends.
+    discovery_text += search_lines(outcome)
     try:
         progressed = await record_quest_progress(interaction.user.id, "explore", amount=1, target=str(c.get("location") or ""), game_minute=wt_discovery.total_minutes)
         await announce_quest_progress(interaction, progressed)

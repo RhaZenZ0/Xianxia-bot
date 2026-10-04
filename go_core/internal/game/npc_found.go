@@ -80,21 +80,41 @@ func npcFound(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw j
 			rollback(conn)
 		}
 	}()
+	out, err := markNPCFoundTx(conn, userID, name, current, home, since, p.GameMinute)
+	if err != nil {
+		return nil, err
+	}
+	if err := conn.Commit(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// markNPCFoundTx is the find itself, inside whatever transaction the caller
+// holds: `npc.found` opens its own, and an ordinary explore (v1.22.1) runs
+// inside the authoritative action's. One statement of what being found writes,
+// so a find by conversation and a find by searching the ground cannot drift.
+// The caller has already established that the searcher stands at `current`.
+func markNPCFoundTx(conn *storage.Conn, userID int64, name, current, home string, since, gameMinute int64) (map[string]any, error) {
 	now := float64(time.Now().UnixNano()) / 1e9
-	if _, err := conn.Execute(`UPDATE npc_civilization_state
+	moved, err := conn.Execute(`UPDATE npc_civilization_state
         SET status='alive',missing_since_game_minute=0,activity='Found, and in no hurry to explain',
             last_game_minute=?,updated_at=?
         WHERE npc_name=? AND status='missing'`,
-		[]any{p.GameMinute, now, name}); err != nil {
+		[]any{gameMinute, now, name})
+	if err != nil {
 		return nil, err
 	}
+	if moved.RowsAffected == 0 {
+		return map[string]any{"found": false, "was_missing": false}, nil
+	}
 	daysGone := int64(0)
-	if since > 0 && p.GameMinute > since {
-		daysGone = (p.GameMinute - since) / 1440
+	if since > 0 && gameMinute > since {
+		daysGone = (gameMinute - since) / 1440
 	}
 	uid := userID
 	if err := recordWorldHistoryTx(conn,
-		fmt.Sprintf("npc_found:%s:%d", name, p.GameMinute),
+		fmt.Sprintf("npc_found:%s:%d", name, gameMinute),
 		"npc_found",
 		name+" is found",
 		fmt.Sprintf("%s was found alive at %s after %d day(s) unaccounted for, and sent word back to %s.",
@@ -102,11 +122,8 @@ func npcFound(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw j
 		foundBySearchSignificance, "public", current, "",
 		"player", fmt.Sprint(userID), fmt.Sprint(userID),
 		"npc", name, name,
-		&uid, name, []string{"npc_found", "search"}, p.GameMinute,
+		&uid, name, []string{"npc_found", "search"}, gameMinute,
 		map[string]any{"days_missing": daysGone, "last_known_home": home}, now); err != nil {
-		return nil, err
-	}
-	if err := conn.Commit(); err != nil {
 		return nil, err
 	}
 	return map[string]any{
@@ -157,7 +174,6 @@ func claimGraveResult(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	if !strings.EqualFold(where, strings.TrimSpace(location)) {
 		return map[string]any{"grave": true, "claimed": false, "elsewhere": true}, nil
 	}
-	now := float64(time.Now().UnixNano()) / 1e9
 	if err := begin(conn); err != nil {
 		return nil, err
 	}
@@ -166,6 +182,26 @@ func claimGraveResult(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 			rollback(conn)
 		}
 	}()
+	out, err := claimGraveTx(conn, catalog, userID, name, where, home, days, item, stones, gameMinute)
+	if err != nil {
+		return nil, err
+	}
+	if claimed, _ := out["claimed"].(bool); !claimed {
+		rollback(conn)
+		return out, nil
+	}
+	if err := conn.Commit(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// claimGraveTx empties a grave inside the caller's transaction - `npc.found`'s
+// own, or an explore's (v1.22.1). The caller has established that the
+// searcher stands at `where`; the guarded UPDATE is what decides who was
+// first, so a claim that moved no row hands nothing over.
+func claimGraveTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, name, where, home string, days int64, item string, stones, gameMinute int64) (map[string]any, error) {
+	now := float64(time.Now().UnixNano()) / 1e9
 	claimed, err := conn.Execute(`UPDATE npc_graves
         SET claimed_by_user_id=?,claimed_game_minute=?,updated_at=?
         WHERE npc_name=? AND claimed_game_minute IS NULL`,
@@ -174,10 +210,7 @@ func claimGraveResult(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		return nil, err
 	}
 	if claimed.RowsAffected == 0 {
-		// Somebody got here between the read above and this write (v1.2.1):
-		// the guard is what decides, and a claim that moved no row hands
-		// nothing over.
-		rollback(conn)
+		// Somebody got here between the read and this write (v1.2.1).
 		return map[string]any{"grave": true, "claimed": false, "already_claimed": true,
 			"npc_name": name, "location": where, "days_missing": days, "home_location": home}, nil
 	}
@@ -205,9 +238,6 @@ func claimGraveResult(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		&uid, name, []string{"npc_grave_found", "search"}, gameMinute,
 		map[string]any{"days_missing": days, "home_location": home, "keepsake_item": item, "keepsake_stones": stones},
 		now); err != nil {
-		return nil, err
-	}
-	if err := conn.Commit(); err != nil {
 		return nil, err
 	}
 	return map[string]any{

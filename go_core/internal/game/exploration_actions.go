@@ -1408,6 +1408,12 @@ func explorationExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if foundShop != "" {
 		discoveredShop = shopDiscoveryView(catalog, foundShop)
 	}
+	// Looking around a place finds whoever went missing here, and the grave
+	// of anybody who died here unreached (v1.22.1, explore_search.go).
+	foundNPCs, foundGraves, err := searchHereTx(conn, catalog, userID, c.Location, p.GameMinute)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
 	enabled, err := unexpectedEventsEnabledTx(conn, p.UnexpectedEventsEnabled)
 	if err != nil {
 		return authoritativeMutation{}, err
@@ -1434,7 +1440,7 @@ func explorationExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if discovered != "" && catalog.Locations[discovered].RoadSite != "" {
 		discoveredSite = roadSiteView(catalog, discovered)
 	}
-	result := map[string]any{"kind": kind, "location": c.Location, "encounter": encounter, "cultivation_awarded": awarded, "spirit_stones": reward.SpiritStones, "items": reward.Items, "insight_xp": insightGranted, "shared_claims": shared, "discovered_location": discovered, "discovered_site": discoveredSite, "discovered_shop": discoveredShop, "site_kind": loc.RoadSite, "surprise": surpriseOut, "event": surpriseOut}
+	result := map[string]any{"kind": kind, "location": c.Location, "encounter": encounter, "cultivation_awarded": awarded, "spirit_stones": reward.SpiritStones, "items": reward.Items, "insight_xp": insightGranted, "shared_claims": shared, "discovered_location": discovered, "discovered_site": discoveredSite, "discovered_shop": discoveredShop, "site_kind": loc.RoadSite, "surprise": surpriseOut, "event": surpriseOut, "found_npcs": foundNPCs, "found_graves": foundGraves}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "exploration", EventType: "exploration_resolved", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 }
 
