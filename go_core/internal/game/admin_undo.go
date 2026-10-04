@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"xianxia/core/internal/storage"
 )
@@ -142,7 +143,22 @@ var reversibleAdminActions = map[string]reverseFunc{
 		default:
 			return nil, fmt.Errorf("cannot undo: unrecognized track %q", fmt.Sprint(snap["track"]))
 		}
-		return []sqlStmt{{`UPDATE ` + table + ` SET progress=? WHERE user_id=? AND realm_index=?`, []any{i64(snap["progress"]), uid, i64(snap["realm_index"])}}}, nil
+		realm := i64(snap["realm_index"])
+		// Since v1.23.1 a snapshot says whether the row existed and carries the
+		// quest state, because 100% fills the quests too. A row the forward
+		// action made is deleted; one from before this release carries no
+		// "existed" and is undone on its progress alone, as it was written.
+		existed, known := snap["existed"].(bool)
+		if known && !existed {
+			return []sqlStmt{{`DELETE FROM ` + table + ` WHERE user_id=? AND realm_index=?`, []any{uid, realm}}}, nil
+		}
+		if _, hasQuests := snap["completed_quests"]; !known || !hasQuests {
+			return []sqlStmt{{`UPDATE ` + table + ` SET progress=? WHERE user_id=? AND realm_index=?`, []any{i64(snap["progress"]), uid, realm}}}, nil
+		}
+		// An upsert, so a redo puts back a row its own undo deleted.
+		return []sqlStmt{{`INSERT INTO ` + table + `(user_id,realm_index,progress,active,quest_index,quest_preparation,completed_quests,discovered_json,updated_at) VALUES(?,?,?,?,?,?,?,?,?)
+			ON CONFLICT(user_id,realm_index) DO UPDATE SET progress=excluded.progress,active=excluded.active,quest_index=excluded.quest_index,quest_preparation=excluded.quest_preparation,completed_quests=excluded.completed_quests,discovered_json=excluded.discovered_json,updated_at=excluded.updated_at`,
+			[]any{uid, realm, i64(snap["progress"]), i64(snap["active"]), i64(snap["quest_index"]), i64(snap["quest_preparation"]), i64(snap["completed_quests"]), fmt.Sprint(snap["discovered_json"]), float64(time.Now().UnixNano()) / 1e9}}}, nil
 	},
 	"admin.player.set_spiritual_root": func(before, after map[string]any, target string, redo bool) ([]sqlStmt, error) {
 		uid, err := parseTargetUserID(target)

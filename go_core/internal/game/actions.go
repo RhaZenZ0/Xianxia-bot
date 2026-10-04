@@ -159,7 +159,7 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 	case "admin.world.spawn_realm":
 		result, err = adminSpawnRealm(conn, req.ActorID, req.Payload)
 	case "admin.player.set_realm_perfection":
-		result, err = adminSetRealmPerfection(conn, req.ActorID, req.Payload)
+		result, err = adminSetRealmPerfection(conn, catalog, req.ActorID, req.Payload)
 	case "admin.player.set_spiritual_root":
 		result, err = adminSetSpiritualRoot(conn, catalog, req.ActorID, req.Payload)
 	case "admin.player.set_bloodline":
@@ -2171,7 +2171,18 @@ func adminSetSect(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (a
 // track for one realm_index. Upserts - the row may not exist yet if the
 // player never started that realm's perfection quests, and forcing the GM
 // to pre-create it first would defeat the purpose of a direct override.
-func adminSetRealmPerfection(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
+// adminSetRealmPerfection sets one realm's perfection progress. Since v1.23.1
+// a progress of 100 is the whole path, not the number alone: the trial's gate
+// is every quest completed *and* progress 100 (perfectionTrialAction), so a
+// lever that wrote the number and nothing else showed a GM a full bar over a
+// trial still refusing "final trial is locked". At 100 every quest is marked
+// completed, every clue is discovered, the preparation is cleared and the path
+// is made active, so the trial opens - unless the realm is already perfected,
+// which keeps its finished path closed. Below 100 the quests are left as they
+// stand. The audit row carries the quest state it replaced, so the undo puts
+// the path back exactly; an audit row from before this release carries only
+// the progress and undoes only the progress, on the terms it was written.
+func adminSetRealmPerfection(conn *storage.Conn, catalog worlddata.Catalog, adminUserID int64, raw json.RawMessage) (any, error) {
 	p, err := decodeMap(raw)
 	if err != nil {
 		return nil, err
@@ -2190,11 +2201,12 @@ func adminSetRealmPerfection(conn *storage.Conn, adminUserID int64, raw json.Raw
 	}
 	track := strings.ToLower(stringField(p, "track"))
 	var table string
+	var sys worlddata.PerfectionSystem
 	switch track {
 	case "cultivation":
-		table = "realm_perfection"
+		table, sys = "realm_perfection", catalog.Perfection
 	case "body":
-		table = "body_realm_perfection"
+		table, sys = "body_realm_perfection", catalog.BodyPerfection
 	default:
 		return nil, errors.New(`track must be "cultivation" or "body"`)
 	}
@@ -2202,6 +2214,10 @@ func adminSetRealmPerfection(conn *storage.Conn, adminUserID int64, raw json.Raw
 		return nil, errors.New("invalid user_id or realm_index (0-31)")
 	}
 	progress = clamp(progress, 0, 100)
+	fill := progress == 100
+	if fill && len(sys.Quests) == 0 {
+		return nil, errors.New("the content file carries no perfection quests for this track, so 100% cannot open a trial")
+	}
 
 	if err := begin(conn); err != nil {
 		return nil, err
@@ -2219,13 +2235,21 @@ func adminSetRealmPerfection(conn *storage.Conn, adminUserID int64, raw json.Raw
 	if charRow == nil {
 		return nil, errors.New("character not found")
 	}
-	beforeRes, err := conn.Execute(`SELECT progress FROM `+table+` WHERE user_id=? AND realm_index=?`, []any{uid, realmIndex})
+	beforeRes, err := conn.Execute(`SELECT progress,active,completed,quest_index,quest_preparation,completed_quests,discovered_json FROM `+table+` WHERE user_id=? AND realm_index=?`, []any{uid, realmIndex})
 	if err != nil {
 		return nil, err
 	}
-	before := int64(0)
+	beforeSnap := map[string]any{"track": track, "realm_index": realmIndex, "progress": int64(0), "existed": false}
+	perfected := false
 	if r := firstRowMap(beforeRes); r != nil {
-		before = storage.ParseInt(r["progress"])
+		beforeSnap["progress"] = storage.ParseInt(r["progress"])
+		beforeSnap["existed"] = true
+		beforeSnap["active"] = storage.ParseInt(r["active"])
+		beforeSnap["quest_index"] = storage.ParseInt(r["quest_index"])
+		beforeSnap["quest_preparation"] = storage.ParseInt(r["quest_preparation"])
+		beforeSnap["completed_quests"] = storage.ParseInt(r["completed_quests"])
+		beforeSnap["discovered_json"] = fmt.Sprint(r["discovered_json"])
+		perfected = storage.ParseInt(r["completed"]) == 1
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
 	if _, err = conn.Execute(`INSERT INTO `+table+`(user_id,realm_index,progress,updated_at) VALUES(?,?,?,?)
@@ -2233,13 +2257,41 @@ func adminSetRealmPerfection(conn *storage.Conn, adminUserID int64, raw json.Raw
 		[]any{uid, realmIndex, progress, now}); err != nil {
 		return nil, err
 	}
-	if err := auditAdmin(conn, adminUserID, "admin.player.set_realm_perfection", fmt.Sprintf("user:%d", uid), map[string]any{"track": track, "realm_index": realmIndex, "progress": before}, map[string]any{"track": track, "realm_index": realmIndex, "progress": progress}, fmt.Sprint(p["reason"])); err != nil {
+	afterSnap := map[string]any{"track": track, "realm_index": realmIndex, "progress": progress}
+	trialOpen := false
+	if fill {
+		quests := int64(len(sys.Quests))
+		clues := []string{}
+		_ = json.Unmarshal([]byte(fmt.Sprint(beforeSnap["discovered_json"])), &clues)
+		for _, q := range sys.Quests {
+			if q.Clue != "" && !containsString(clues, q.Clue) {
+				clues = append(clues, q.Clue)
+			}
+		}
+		dj, _ := json.Marshal(clues)
+		active := int64(1)
+		if perfected {
+			active = storage.ParseInt(beforeSnap["active"])
+		}
+		if _, err = conn.Execute(`UPDATE `+table+` SET active=?,quest_index=?,quest_preparation=0,completed_quests=?,discovered_json=?,updated_at=? WHERE user_id=? AND realm_index=?`,
+			[]any{active, quests, quests, string(dj), now, uid, realmIndex}); err != nil {
+			return nil, err
+		}
+		afterSnap["active"], afterSnap["quest_index"], afterSnap["quest_preparation"] = active, quests, int64(0)
+		afterSnap["completed_quests"], afterSnap["discovered_json"], afterSnap["existed"] = quests, string(dj), true
+		trialOpen = !perfected
+	}
+	if err := auditAdmin(conn, adminUserID, "admin.player.set_realm_perfection", fmt.Sprintf("user:%d", uid), beforeSnap, afterSnap, fmt.Sprint(p["reason"])); err != nil {
 		return nil, err
 	}
 	if err := conn.Commit(); err != nil {
 		return nil, err
 	}
-	return map[string]any{"user_id": uid, "name": charRow["name"], "track": track, "realm_index": realmIndex, "progress": progress}, nil
+	result := map[string]any{"user_id": uid, "name": charRow["name"], "track": track, "realm_index": realmIndex, "progress": progress, "trial_open": trialOpen, "perfected": perfected}
+	if fill {
+		result["completed_quests"] = len(sys.Quests)
+	}
+	return result, nil
 }
 
 // adminSetSpiritualRoot directly edits grade/purity/mutation only - elements,
