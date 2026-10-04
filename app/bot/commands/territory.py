@@ -58,7 +58,7 @@ async def territory_claim(interaction: discord.Interaction) -> None:
     if r.get('war_id'):
         verb="comes back for" if r.get('retake') else "moves on"
         text=(f"⚔️ **Territorial War #{r['war_id']}** begins: **{r.get('attacker_key')}** {verb} **{t['name']}**, "
-              f"held by **{r.get('defender_key')}**. Fight with **/war act**; the war front of this world carries its card.")
+              f"held by **{r.get('defender_key')}**. Fight with **/sect → War → Act**; the war front of this world carries its card.")
     else: text=f"🏯 **{r.get('sect_name','Your sect')}** establishes a recognized claim over **{t['name']}**."
     await interaction.response.send_message(text,ephemeral=False)
     # The war front's card follows the war (v1.24.0), after the engine agreed.
@@ -176,7 +176,7 @@ register_hub_option_provider(war_act, "war_id", war_front_hub_options)
 register_hub_option_hint(
     war_act,
     "war_id",
-    "Your sect is in no war you can fight in. A war begins when a sect member stands on a rival's ground and uses **/territory claim**; a sect allied to one side, by a marriage pact or close standing, may fight beside it. See every war with **/war status**.",
+    "Your sect is in no war you can fight in. A war begins when a sect member stands on a rival's ground and uses **/sect → Territory → Claim**; a sect allied to one side, by a marriage pact or close standing, may fight beside it. See every war with **/sect → War → Status**.",
 )
 
 

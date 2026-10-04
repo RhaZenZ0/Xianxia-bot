@@ -6,8 +6,8 @@ the reason each rule's own release recorded: Setup creates and the slash path
 only binds; an existing channel is moved, not merely rebound (rc.51, rc.59);
 it is gated by the access role, not the presence role (rc.52); the bot allows
 itself before anybody is denied (rc.52); and the read-only overwrite is
-merged, never replaced (v1.0.11). It sits in the World Events category beside
-its world's news, so it needs no category of its own.
+merged, never replaced (v1.0.11). It has a category of its own, ⚔️ Sect Wars,
+which teardown must be able to empty (rc.51).
 
 The card half: `/war act` and a `/territory claim` that opened a war refresh
 the card only after the engine agreed, and the tick refreshes every card after
@@ -88,10 +88,10 @@ class EveryWorldHasAWarFront(unittest.TestCase):
 
 class TheChannelsAreDashboardOwned(unittest.TestCase):
     def test_setup_creates_and_the_slash_path_only_binds(self):
-        self.assertIn("ensure_war_channels(guild, category_name=SERVER_EVENT_CATEGORY, create_missing=create_missing)",
+        self.assertIn("ensure_war_channels(guild, category_name=SERVER_WAR_CATEGORY, create_missing=create_missing)",
                       _body(SETUP, "_run_complete_server_setup"))
         realmhubs = _body(SETUP, "admin_realm_hubs")
-        self.assertIn("ensure_war_channels(guild, category_name=SERVER_EVENT_CATEGORY)", realmhubs)
+        self.assertIn("ensure_war_channels(guild, category_name=SERVER_WAR_CATEGORY)", realmhubs)
         self.assertNotIn("create_missing=True", realmhubs)
 
     def test_an_existing_channel_is_moved_and_gated_by_the_access_role(self):
@@ -122,7 +122,9 @@ class TheRowsAreForgottenAndTheChannelsDeleted(unittest.TestCase):
         clear = _body(CORE, "clear_discord_bindings")
         self.assertIn("DELETE FROM war_channels WHERE guild_id=?", clear)
         self.assertIn("DELETE FROM war_card_messages WHERE guild_id=?", clear)
-        self.assertIn("DB.get_war_channels(guild.id)", _body(SETUP, "teardown_managed_discord_layout"))
+        teardown = _body(SETUP, "teardown_managed_discord_layout")
+        self.assertIn("DB.get_war_channels(guild.id)", teardown)
+        self.assertIn("SERVER_WAR_CATEGORY", teardown)
 
     def test_the_tables_are_in_the_readiness_probe(self):
         from app.database import OPERATIONAL_REQUIRED_TABLES

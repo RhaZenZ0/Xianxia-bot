@@ -22,8 +22,8 @@ deferred half and not the half that says what was done about it.
   hold; a territory's defense was never written; a war act earned nothing; and nothing followed a war
   - no truce, no occupation window, no standing lost, no history of its end. On the owner's asks: act
   and victory pay in sect contribution, allied sects fight beside their ally, walls that rise and
-  fall, truces and occupations, a two-walled siege tick, and a read-only war-front channel per world
-  with a live card per war (schema 78).
+  fall, truces and occupations, a two-walled siege tick, and a read-only war-front channel per world,
+  in a ⚔️ Sect Wars category of its own, with a live card per war (schema 78).
 - **deferred (design)** — *What a war does beyond its ground.* Three things the release deliberately
   left alone. NPC sects never join each other's wars as allies (only players' sects fight beside an
   ally); a truce or a peace cannot be sued for, a war ends only on the walls or on morale; and a

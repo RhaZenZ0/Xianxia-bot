@@ -526,7 +526,7 @@ async def stall_channel(guild: discord.Guild, world: str | None) -> discord.Text
 
 
 async def ensure_war_channels(
-    guild: discord.Guild, *, category_name: str = "\U0001f320 World Events", create_missing: bool = False,
+    guild: discord.Guild, *, category_name: str = "\u2694\ufe0f Sect Wars", create_missing: bool = False,
 ) -> list[dict[str, Any]]:
     """One read-only war-front channel per world (v1.24.0), where the bot keeps
     one live card per sect war (`war_feed.py`).
@@ -536,8 +536,8 @@ async def ensure_war_channels(
     rather than merely rebound (rc.51), it is gated by the realm **access**
     role (a world's wars are news for everyone who has reached it), and it is
     read-only with every overwrite merged (v1.0.11) after the bot has allowed
-    itself (rc.52). It sits in the World Events category beside its world's
-    news feed rather than in a category of its own: a war is a world's news.
+    itself (rc.52). It has a category of its own, ⚔️ Sect Wars, on the owner's
+    call.
     """
     existing = {str(row["world_name"]): row for row in await DB.get_war_channels(guild.id)}
     category = next((item for item in guild.categories if item.name == category_name), None)

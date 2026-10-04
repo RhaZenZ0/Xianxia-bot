@@ -6724,17 +6724,18 @@ ending lower the two sects' `sect_relations` score; both are public history rows
 **Allies are the engine's answer, asked twice and stated once.** `warSideTx` puts a sect's member on
 its own side, or - for a sect allied to exactly one side (`marriage_pact`, or standing of
 `ally_min_relation_score`) - on its ally's; allied to both is a refusal. An ally's first act costs its
-sect `ally_relation_drop` with the enemy. `war.fronts` is the read the `/war act` picker is built from,
+sect `ally_relation_drop` with the enemy. `war.fronts` is the read the War → Act picker is built from,
 calling the same `warSideTx`, so the panel never restates who may fight beside whom (rc.46);
 `test_war_fronts.py` forbids `sect_relations` in the command module. `war_id` left `STILL_TYPED`.
 Bootstrap writes `sect_relations` pairs in map order, so every reader and writer here matches a pair
 either way round.
 
 **The war front** is `stall_channels` again (schema 78): one read-only channel per world, gated by the
-access role, every overwrite merged after the bot allows itself - and placed in 🌠 World Events beside
-the world's news rather than in a category of its own, because a war is a world's news and a tenth
-category would have been one more for the ordering and teardown gates to carry. `war_feed.py` keeps a
-card per war, refreshed by `/war act`, by a claim that opened one, and by `sync_wars` after every tick;
+access role, every overwrite merged after the bot allows itself. The first push placed the fronts in
+🌠 World Events beside the world's news, to spare the ordering and teardown gates a tenth category; the
+owner asked for one, and **⚔️ Sect Wars** sits after World Events in `CATEGORY_ORDER` and in teardown's
+tuple, which `test_war_fronts.py` holds. `war_feed.py` keeps a card per war, refreshed by an act, by a
+claim that opened one, and by `sync_wars` after every tick;
 a war that ends is drawn once with its verdict and then forgotten, so the message stays as the record
 and no later tick edits it. The card rows are keyed on the war, which no player owns, so neither an
 erasure nor a reset sweeps them.
@@ -6744,6 +6745,12 @@ the `territory_state` it is foreign-keyed to, which production always has, and t
 found it - the `npc_consignments` rule. And `war.act`'s 1800 seconds joined `actionCooldowns`
 (`war_action`, no operator key), keeping its raw `INSERT` because the cooldown-roster scanner holds
 that shape.
+
+**CI caught a printed path that names nothing.** The first push told players to use `**/war act**`, and
+`/war` is no slash command: the war and territory groups are pages of the sect hub, reached only as
+`/sect → War → Act`. `test_hint_paths.py` read the bold path out of the channel blurb and refused it -
+the local run had not included that file, which is why the targeted list is chosen by what the change
+*prints* as well as by what it touches.
 
 ## Testing conventions
 

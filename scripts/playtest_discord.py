@@ -671,6 +671,7 @@ async def run(url: str, token: str, db_path: str, shard: tuple[int, int] | None 
         SERVER_EVENT_CATEGORY,
         SERVER_STALL_CATEGORY,
         SERVER_REALM_CATEGORY,
+        SERVER_WAR_CATEGORY,
         SERVER_WORLD_CATEGORY,
     )
     from app.bot.runtime import CULTIVATOR_ROLE_NAME, DB, ENGINE, WORLD
@@ -852,10 +853,10 @@ async def run(url: str, token: str, db_path: str, shard: tuple[int, int] | None 
                 expect(getattr(overwrites.get(access), "send_messages", None) is False
                        and getattr(overwrites.get(live.default_role), "send_messages", None) is False,
                        f"#{market} is not read-only")
-                # v1.24.0: the world's war front, beside its news, read-only too.
+                # v1.24.0: the world's war front, in its own category, read-only too.
                 front = str(hub["war_channel_name"])
                 expect(front in made, f"no war-front channel for {world}")
-                expect(getattr(made[front].category, "name", None) == SERVER_EVENT_CATEGORY,
+                expect(getattr(made[front].category, "name", None) == SERVER_WAR_CATEGORY,
                        f"#{front} sits in {getattr(made[front].category, 'name', None)!r}")
                 front_overwrites = made[front].overwrites or {}
                 expect(getattr(front_overwrites.get(access), "view_channel", None) is True

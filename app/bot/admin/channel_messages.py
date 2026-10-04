@@ -128,11 +128,11 @@ def _xianxia_info_guide_text() -> str:
 
 XIANXIA_INFO_PAGES: dict[str, tuple[str, str]] = {
     "getting_started": ("🌱 Getting Started", "Run `/begin` in `#begin-here`. You are born into one of thirteen households: it teaches you a trade, hands you an heirloom, and gives you the first quest of a chain that walks you out of the door, through the town and the road, and home again. Follow it. `/menu` opens every hub from anywhere, `/commands` lists every slash command, and `/cooldowns` says what is ready and where each ready thing is done."),
-    "server_layout": ("🗺️ The Server", "Nine categories, in the order you read them. **🚪 Start Here** is `#begin-here` and this guide. **📣 Announcements** is `#world-events` for anything global and `#updates` for what changed in the last release. **🌌 Realm Capitals** holds one meeting city per world. **🌠 World Events** holds one news channel per world, where an event's scene and its thread open, and one war front per world with a live card for every sect war fought there. **🏮 Auction Houses** holds the live lot feeds. **🧺 Market Stalls** holds one channel per world with a live card for every cultivator's stall there. **🗺️ Cultivation World** holds the read-only anchors your private threads hang from. **🛠️ Feedback** is `#playtest` and `#bugs`. **🔒 Admin** is the operator's. A capital is visible only while you are standing in it; a world's news, its scenes, its wars, its auction floor and its market stalls are visible once you have reached that world at all."),
+    "server_layout": ("🗺️ The Server", "Ten categories, in the order you read them. **🚪 Start Here** is `#begin-here` and this guide. **📣 Announcements** is `#world-events` for anything global and `#updates` for what changed in the last release. **🌌 Realm Capitals** holds one meeting city per world. **🌠 World Events** holds one news channel per world, where an event's scene and its thread open. **⚔️ Sect Wars** holds one war front per world with a live card for every sect war fought there. **🏮 Auction Houses** holds the live lot feeds. **🧺 Market Stalls** holds one channel per world with a live card for every cultivator's stall there. **🗺️ Cultivation World** holds the read-only anchors your private threads hang from. **🛠️ Feedback** is `#playtest` and `#bugs`. **🔒 Admin** is the operator's. A capital is visible only while you are standing in it; a world's news, its scenes, its wars, its auction floor and its market stalls are visible once you have reached that world at all."),
     "character": ("🧬 Character & Cultivation", "Your household, spiritual root, physique, path, realm, resources, karma, fate and Dao heart are canonical game state. Two ladders run in parallel — qi cultivation and body tempering — and Stage 9 of either opens the optional Perfection path. The AI narrates what has already happened; it cannot change a mechanic, grant a reward, or decide an outcome."),
     "exploration": ("🧭 Exploration & Scenes", "**Where you stand** and **what scene you are in** are separate. Wilderness travel, exploration, foraging and hunting happen in your own private expedition thread under `#expeditions`. Properties and sect abodes use persistent private threads under `#player-homes`. A realm capital is a shared channel you can only see while you are in the city."),
     "world_events": ("🌠 World Events", "The world produces events on its own, and players trigger them by exploring. Each is announced in **its own world's** news channel with a link to its scene thread, and each carries a **site**: a finite number of beasts, herbs, veins, relics and tasks that deplete as people work them. Travel to the place the notice names to take part. What you are *handed* is banded by realm — a new cultivator is not offered a Dragon — but anything the world spawns on its own, you can walk into."),
-    "sects": ("🏯 Sects", "Discover a route, speak with affiliated NPCs, earn a recommendation, pass a sect-specific trial, and join only on a canonical success. Membership brings contribution points, a rank, a private residence, and a side in whatever war the sect is in: every `/war act` earns contribution, the winning side is paid when it ends, and a sect allied to one side may fight beside it. Each world's wars have a live card on its war front."),
+    "sects": ("🏯 Sects", "Discover a route, speak with affiliated NPCs, earn a recommendation, pass a sect-specific trial, and join only on a canonical success. Membership brings contribution points, a rank, a private residence, and a side in whatever war the sect is in: every war act earns contribution, the winning side is paid when it ends, and a sect allied to one side may fight beside it. Each world's wars have a live card on its war front."),
     "professions": ("⚒️ Crafts & Professions", "Four trades: Forging, Alchemy, Inscription, Formation. Your household teaches you one, and the head of the house can qualify you in all four, once, at home. Recipes come from method slips sold in the halls (`/learn`) and from passing a hall keeper's **examination** at the rank you currently hold. Gather with `/forage`, `/mine` and on the hunt rather than buying everything."),
     "properties": ("🏡 Player-Owned Locations", "Properties are real database-backed locations with private threads, facilities and guest permissions. A guest must be invited **and** physically reach the entrance before they gain access. Your birth household is a place worth returning to: contribute to its treasury, be tutored again, run its errands, and cultivate at its hearth."),
     "relationships": ("🤝 NPC Relationships", "Persistent NPC state tracks trust, respect, fear, affection, debt, grudge and encounter history. The world's people live on their own — they travel, court, marry, have children, feud, commit crimes, go missing and die — whether or not anybody is watching. Narration may describe a relationship; it never owns the numbers."),
@@ -390,7 +390,7 @@ DEFAULT_CHANNEL_MESSAGES: dict[str, str] = {
         "\u2694\ufe0f **Mortal World — war front**\n"
         "One card for every war a sect fights over ground in the Mortal World, kept current by the bot: who "
         "besieges what, how high the walls stand, the siege, both sides' morale and the last blows struck, "
-        "and \u2014 when it ends \u2014 who won. A sect member fights with **/war act**; a sect allied to "
+        "and \u2014 when it ends \u2014 who won. A sect member fights with **/sect → War → Act**; a sect allied to "
         "either side, by a marriage pact or close standing, may fight beside it. Each act earns sect "
         "contribution, and the winning side is paid when the war ends.\n"
         "Read-only: the cards are the channel."
@@ -399,7 +399,7 @@ DEFAULT_CHANNEL_MESSAGES: dict[str, str] = {
         "\u2694\ufe0f **Spiritual World — war front**\n"
         "One card for every war a sect fights over ground in the Spiritual World, kept current by the bot: who "
         "besieges what, how high the walls stand, the siege, both sides' morale and the last blows struck, "
-        "and \u2014 when it ends \u2014 who won. A sect member fights with **/war act**; a sect allied to "
+        "and \u2014 when it ends \u2014 who won. A sect member fights with **/sect → War → Act**; a sect allied to "
         "either side, by a marriage pact or close standing, may fight beside it. Each act earns sect "
         "contribution, and the winning side is paid when the war ends.\n"
         "Read-only: the cards are the channel."
@@ -408,7 +408,7 @@ DEFAULT_CHANNEL_MESSAGES: dict[str, str] = {
         "\u2694\ufe0f **Immortal World — war front**\n"
         "One card for every war a sect fights over ground in the Immortal World, kept current by the bot: who "
         "besieges what, how high the walls stand, the siege, both sides' morale and the last blows struck, "
-        "and \u2014 when it ends \u2014 who won. A sect member fights with **/war act**; a sect allied to "
+        "and \u2014 when it ends \u2014 who won. A sect member fights with **/sect → War → Act**; a sect allied to "
         "either side, by a marriage pact or close standing, may fight beside it. Each act earns sect "
         "contribution, and the winning side is paid when the war ends.\n"
         "Read-only: the cards are the channel."
@@ -417,7 +417,7 @@ DEFAULT_CHANNEL_MESSAGES: dict[str, str] = {
         "\u2694\ufe0f **Celestial World — war front**\n"
         "One card for every war a sect fights over ground in the Celestial World, kept current by the bot: who "
         "besieges what, how high the walls stand, the siege, both sides' morale and the last blows struck, "
-        "and \u2014 when it ends \u2014 who won. A sect member fights with **/war act**; a sect allied to "
+        "and \u2014 when it ends \u2014 who won. A sect member fights with **/sect → War → Act**; a sect allied to "
         "either side, by a marriage pact or close standing, may fight beside it. Each act earns sect "
         "contribution, and the winning side is paid when the war ends.\n"
         "Read-only: the cards are the channel."
