@@ -525,6 +525,83 @@ async def stall_channel(guild: discord.Guild, world: str | None) -> discord.Text
     return None
 
 
+async def ensure_war_channels(
+    guild: discord.Guild, *, category_name: str = "\u2694\ufe0f Sect Wars", create_missing: bool = False,
+) -> list[dict[str, Any]]:
+    """One read-only war-front channel per world (v1.24.0), where the bot keeps
+    one live card per sect war (`war_feed.py`).
+
+    `ensure_stall_channels` rule for rule - the /admin slash path only binds
+    and the dashboard's Setup/Repair creates, an existing channel is moved
+    rather than merely rebound (rc.51), it is gated by the realm **access**
+    role (a world's wars are news for everyone who has reached it), and it is
+    read-only with every overwrite merged (v1.0.11) after the bot has allowed
+    itself (rc.52). It has a category of its own, ⚔️ Sect Wars, on the owner's
+    call.
+    """
+    existing = {str(row["world_name"]): row for row in await DB.get_war_channels(guild.id)}
+    category = next((item for item in guild.categories if item.name == category_name), None)
+    me = guild.me
+    can_create = create_missing and bool(me) and me.guild_permissions.manage_channels
+    access_roles = await _ensure_realm_access_roles(guild) if can_create else {}
+    if can_create and category is None:
+        try:
+            category = await guild.create_category(category_name, reason="Xianxia RP war-front setup")
+        except discord.HTTPException:
+            log.exception("Could not create category %s", category_name)
+
+    reason = "Xianxia: a war-front channel is the bot's to write in"
+    for world, hub in REALM_HUBS.items():
+        name = str(hub["war_channel_name"])
+        row = existing.get(world)
+        channel = guild.get_channel(int(row["channel_id"])) if row else None
+        if not isinstance(channel, discord.TextChannel):
+            channel = next((item for item in guild.text_channels if item.name == name), None)
+        if channel is None and can_create:
+            try:
+                channel = await guild.create_text_channel(
+                    name, category=category, topic=str(hub.get("war_topic") or "")[:1024],
+                    reason="Xianxia RP war-front setup",
+                )
+            except discord.HTTPException:
+                log.exception("Could not create war-front channel #%s", name)
+        if channel is None:
+            continue
+        if can_create and category is not None and channel.category_id != category.id:
+            try:
+                await channel.edit(category=category, reason="Xianxia RP war-front setup")
+            except discord.HTTPException:
+                log.exception("Could not move #%s into %s", channel.name, category_name)
+        role = access_roles.get(world)
+        if can_create and role is not None:
+            try:
+                if guild.me is not None:
+                    await merge_overwrite(channel, guild.me, reason=reason, view_channel=True, send_messages=True,
+                                          embed_links=True, read_message_history=True)
+                await merge_overwrite(channel, role, reason=reason, view_channel=True, read_message_history=True,
+                                      send_messages=False)
+                await merge_overwrite(channel, guild.default_role, reason=reason, view_channel=False, send_messages=False)
+            except (discord.Forbidden, discord.HTTPException):
+                log.exception("Could not gate #%s behind %s", channel.name, role.name)
+        await DB.set_war_channel(
+            guild_id=guild.id, world_name=world, channel_id=channel.id,
+            category_id=channel.category_id if channel.category_id is not None else (category.id if category else None),
+        )
+    return await DB.get_war_channels(guild.id)
+
+
+async def war_channel(guild: discord.Guild, world: str | None) -> discord.TextChannel | None:
+    """The war-front channel of one world, or None when none is bound. A war
+    over ground no world carries gets no card rather than a card on somebody
+    else's front."""
+    if not world:
+        return None
+    for row in await DB.get_war_channels(guild.id):
+        if str(row["world_name"]) == world:
+            return await _resolve_text_channel(guild, row.get("channel_id"))
+    return None
+
+
 def world_of_location(location: str | None) -> str | None:
     """Which of the four worlds a place belongs to, or None when nothing knows.
 

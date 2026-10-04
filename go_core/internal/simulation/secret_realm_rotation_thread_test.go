@@ -142,6 +142,11 @@ CREATE TABLE characters(
     attributes_json TEXT NOT NULL,
     created_at REAL NOT NULL,
     updated_at REAL NOT NULL);
+CREATE TABLE territory_state(territory_key TEXT PRIMARY KEY, name TEXT NOT NULL, region TEXT NOT NULL,
+    controller_type TEXT NOT NULL DEFAULT 'neutral', controller_key TEXT NOT NULL DEFAULT '',
+    resource_type TEXT NOT NULL DEFAULT 'mixed', prosperity INTEGER NOT NULL DEFAULT 50,
+    defense INTEGER NOT NULL DEFAULT 50, unrest INTEGER NOT NULL DEFAULT 0,
+    updated_game_minute INTEGER NOT NULL DEFAULT 0, updated_at REAL NOT NULL);
 CREATE TABLE territory_wars(war_id INTEGER PRIMARY KEY AUTOINCREMENT, attacker_key TEXT NOT NULL,
     defender_key TEXT NOT NULL, territory_key TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'active',
     attacker_score INTEGER NOT NULL DEFAULT 0, defender_score INTEGER NOT NULL DEFAULT 0,

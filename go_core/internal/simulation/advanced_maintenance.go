@@ -430,8 +430,22 @@ func (r *Runner) advanceHunters(conn *storage.Conn, gm int64) (int64, error) {
 	return int64(len(rows)), nil
 }
 
+// advanceWars fights every active war a day at a time, from both walls
+// (v1.24.0).
+//
+// It used to strike for one side a tick - the attacker, unless players had
+// pushed the defender's force past the attacker's - and the attacker's morale
+// never moved, so a defender could only hold a siege the world fought on its
+// own if somebody at a keyboard fought for it: every war between two sects
+// with no players in them ended in a fall. Now each day both sides strike with
+// what the sect actually has (`sectWarStrength`), the defender behind its
+// walls and its manor, the attacker carrying whatever force its players have
+// built; whoever wins the day moves the siege or breaks the other's morale,
+// and a besieger far from home tires. Either side can win, and how a war ends
+// is game.ResolveWarTx's, the door war.act uses.
 func (r *Runner) advanceWars(conn *storage.Conn, gm int64) (int64, error) {
 	now := nowFloat()
+	rules := game.WarRules(r.World)
 	// Per world (v1.0.7), read once for all four and looked up per row below:
 	// this sweep asked the one global era before, so an age of the Celestial
 	// World priced a war pressure in a Mortal village.
@@ -439,15 +453,21 @@ func (r *Runner) advanceWars(conn *storage.Conn, gm int64) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	res, err := conn.Execute(`SELECT w.*,o.siege_progress,o.attacker_morale,o.defender_morale,o.attacker_force,o.defender_force,o.last_tick_game_minute FROM territory_wars w LEFT JOIN territory_war_operations o ON o.war_id=w.war_id WHERE w.status='active' ORDER BY w.war_id`, nil)
+	res, err := conn.Execute(`SELECT w.*,o.last_tick_game_minute,COALESCE(t.defense,50) AS territory_defense FROM territory_wars w
+        LEFT JOIN territory_war_operations o ON o.war_id=w.war_id
+        LEFT JOIN territory_state t ON t.territory_key=w.territory_key
+        WHERE w.status='active' ORDER BY w.war_id`, nil)
 	if err != nil {
 		return 0, err
 	}
 	rows := maps(res)
 	changed := int64(0)
 	for _, w := range rows {
+		warID := i64(w["war_id"])
+		territory := fmt.Sprint(w["territory_key"])
+		attacker, defender := fmt.Sprint(w["attacker_key"]), fmt.Sprint(w["defender_key"])
 		// A war is fought somewhere, and a territory key is a location name.
-		wm := r.eraTermFor(byWorld, fmt.Sprint(w["territory_key"]), "war_pressure", .25)
+		wm := r.eraTermFor(byWorld, territory, "war_pressure", .25)
 		last := i64(w["last_tick_game_minute"])
 		if last == 0 {
 			last = i64(w["updated_game_minute"])
@@ -456,81 +476,165 @@ func (r *Runner) advanceWars(conn *storage.Conn, gm int64) (int64, error) {
 		if days <= 0 {
 			continue
 		}
-		if _, err = conn.Execute(`INSERT INTO territory_war_operations(war_id,siege_progress,attacker_morale,defender_morale,attacker_force,defender_force,last_tick_game_minute,winner_key,resolution,occupation_until_game_minute,updated_at) VALUES(?,0,100,100,0,0,?,'','',0,?) ON CONFLICT(war_id) DO NOTHING`, []any{i64(w["war_id"]), gm, now}); err != nil {
+		// Bounded catch-up, the stalls' rule: a clock jumped a long way
+		// forward fights a week, not a year, in one tick.
+		days = min64(days, rules.TickDaysCap)
+		if _, err = conn.Execute(`INSERT INTO territory_war_operations(war_id,siege_progress,attacker_morale,defender_morale,attacker_force,defender_force,last_tick_game_minute,winner_key,resolution,occupation_until_game_minute,updated_at) VALUES(?,0,100,100,0,0,?,'','',0,?) ON CONFLICT(war_id) DO NOTHING`, []any{warID, gm, now}); err != nil {
 			return changed, err
 		}
-		opres, e := conn.Execute(`SELECT * FROM territory_war_operations WHERE war_id=?`, []any{i64(w["war_id"])})
+		opres, e := conn.Execute(`SELECT * FROM territory_war_operations WHERE war_id=?`, []any{warID})
 		if e != nil {
 			return changed, e
 		}
 		op := firstMap(opres)
-		af := max64(1, i64(op["attacker_force"]))
-		df := max64(1, i64(op["defender_force"]))
-		side := "attacker"
-		tactic := "siege"
-		if af < df {
-			side = "defender"
-			tactic = "fortify"
-		}
-		power := max64(1, int64(math.Round(float64(min64(50, days+max64(af, df)/10))*wm)))
 		siege := i64(op["siege_progress"])
 		am := i64(op["attacker_morale"])
 		dm := i64(op["defender_morale"])
-		af = i64(op["attacker_force"])
-		df = i64(op["defender_force"])
-		roll := stablePercent(w["war_id"], 0, side, tactic, gm)
-		impact := max64(2, power/4+roll/15)
-		siegeDelta := int64(0)
-		moraleDelta := -impact
-		if side == "attacker" {
-			af += power
-			siegeDelta = impact + 5
-			dm -= impact / 2
-			siege = min64(100, siege+max64(0, siegeDelta))
-		} else {
-			df += power
-			siegeDelta = -(impact + 4)
-			dm += impact
-			siege = max64(0, siege+siegeDelta)
-		}
-		am = clamp(am, 0, 120)
-		dm = clamp(dm, 0, 120)
-		winner := ""
-		resolution := ""
-		occ := int64(0)
-		if siege >= 100 || dm <= 0 {
-			winner = fmt.Sprint(w["attacker_key"])
-			resolution = "attacker_occupation"
-			occ = gm + 30*minutesPerDay
-		} else if am <= 0 {
-			winner = fmt.Sprint(w["defender_key"])
-			resolution = "defender_holds"
-		}
-		if _, err = conn.Execute(`UPDATE territory_war_operations SET siege_progress=?,attacker_morale=?,defender_morale=?,attacker_force=?,defender_force=?,last_tick_game_minute=?,winner_key=?,resolution=?,occupation_until_game_minute=?,updated_at=? WHERE war_id=?`, []any{siege, am, dm, af, df, gm, winner, resolution, occ, now, i64(w["war_id"])}); err != nil {
+		af := i64(op["attacker_force"])
+		df := i64(op["defender_force"])
+		defense := i64(w["territory_defense"])
+		// Who stands behind each wall (v1.24.0): the sect's own NPC
+		// disciples, and every sect allied to exactly one side, which lends
+		// a share of its own strength and joins the war the first time.
+		aAllies, dAllies := game.WarAlliesTx(conn, r.World, attacker, defender)
+		aAllyStr, err := r.alliesJoin(conn, i64(w["war_id"]), aAllies, "attacker", attacker, defender, territory, gm, now)
+		if err != nil {
 			return changed, err
 		}
-		if _, err = conn.Execute(`INSERT INTO territory_war_actions(war_id,user_id,side,tactic,power,siege_delta,morale_delta,game_minute,created_at) VALUES(?,NULL,?,?,?,?,?,?,?)`, []any{i64(w["war_id"]), side, tactic, power, siegeDelta, moraleDelta, gm, now}); err != nil {
+		dAllyStr, err := r.alliesJoin(conn, i64(w["war_id"]), dAllies, "defender", defender, attacker, territory, gm, now)
+		if err != nil {
 			return changed, err
 		}
-		if _, err = conn.Execute(`UPDATE territory_wars SET attacker_score=?,defender_score=?,updated_game_minute=?,updated_at=? WHERE war_id=?`, []any{af, df, gm, now, i64(w["war_id"])}); err != nil {
+		aStr := sectWarStrength(conn, attacker) + math.Min(5, float64(af)/100) + aAllyStr +
+			game.WarDiscipleStrength(r.World, game.WarDisciplesTx(conn, attacker))
+		dStr := sectWarStrength(conn, defender) + float64(defense)/10 +
+			math.Min(5, float64(game.ManorDefensePower(conn, defender, territory))/6) + math.Min(5, float64(df)/100) + dAllyStr +
+			game.WarDiscipleStrength(r.World, game.WarDisciplesTx(conn, defender))
+		game.MusterDisciplesTx(conn, r.World, attacker, territory, now)
+		game.MusterDisciplesTx(conn, r.World, defender, territory, now)
+		blunt := game.WarDefenseBlunt(rules, defense)
+		aPower, dPower, aSiege, dSiege, aMorale, dMorale := int64(0), int64(0), int64(0), int64(0), int64(0), int64(0)
+		winner, resolution := "", ""
+		for d := int64(1); d <= days; d++ {
+			day := last + d*minutesPerDay
+			a := max64(1, int64(math.Round((aStr+float64(stablePercent(warID, day, "attacker")/25))*wm)))
+			dd := max64(1, int64(math.Round((dStr+float64(stablePercent(warID, day, "defender")/25))*wm)))
+			aPower += a
+			dPower += dd
+			if a > dd {
+				gain := max64(1, (a-dd)*2+2-blunt)
+				siege = min64(100, siege+gain)
+				aSiege += gain
+				dm -= a / 2
+				dMorale -= a / 2
+			} else {
+				loss := (dd - a) + 1
+				siege = max64(0, siege-loss)
+				dSiege -= loss
+				am -= dd / 2
+				aMorale -= dd / 2
+			}
+			am -= rules.WearinessPerDay
+			aMorale -= rules.WearinessPerDay
+			am, dm = clamp(am, 0, 120), clamp(dm, 0, 120)
+			if siege >= 100 || dm <= 0 {
+				winner, resolution = attacker, "attacker_occupation"
+				break
+			}
+			if am <= 0 {
+				winner, resolution = defender, "defender_holds"
+				break
+			}
+		}
+		// A side whose morale has broken sues for peace once the war is old
+		// enough, and the terms follow the siege (v1.24.0).
+		if winner == "" {
+			if who, how, ok := game.NPCSuesForPeace(r.World, attacker, defender, i64(w["created_game_minute"]), gm, siege, am, dm); ok {
+				winner, resolution = who, how
+			}
+		}
+		af += aPower
+		df += dPower
+		if _, err = conn.Execute(`UPDATE territory_war_operations SET siege_progress=?,attacker_morale=?,defender_morale=?,attacker_force=?,defender_force=?,last_tick_game_minute=?,updated_at=? WHERE war_id=?`, []any{siege, am, dm, af, df, gm, now, warID}); err != nil {
+			return changed, err
+		}
+		// One row a side a tick, so the blow-by-blow reads "the field" for
+		// both walls rather than for the besieger alone.
+		for _, row := range []struct {
+			side, tactic, sect   string
+			power, siege, morale int64
+		}{{"attacker", "siege", attacker, aPower, aSiege, aMorale}, {"defender", "fortify", defender, dPower, dSiege, dMorale}} {
+			if err = insertFieldAction(conn, warID, row.side, row.tactic, row.sect, row.power, row.siege, row.morale, gm, now); err != nil {
+				return changed, err
+			}
+		}
+		if _, err = conn.Execute(`UPDATE territory_wars SET attacker_score=?,defender_score=?,updated_game_minute=?,updated_at=? WHERE war_id=?`, []any{af, df, gm, now, warID}); err != nil {
 			return changed, err
 		}
 		if winner != "" {
-			if _, err = conn.Execute(`UPDATE territory_wars SET status='resolved',updated_game_minute=?,updated_at=? WHERE war_id=?`, []any{gm, now, i64(w["war_id"])}); err != nil {
-				return changed, err
-			}
-			if winner == fmt.Sprint(w["attacker_key"]) {
-				_, err = conn.Execute(`UPDATE territory_state SET controller_type='sect',controller_key=?,unrest=MIN(100,unrest+35),updated_game_minute=?,updated_at=? WHERE territory_key=?`, []any{winner, gm, now, fmt.Sprint(w["territory_key"])})
-			} else {
-				_, err = conn.Execute(`UPDATE territory_state SET unrest=MAX(0,unrest-10),updated_game_minute=?,updated_at=? WHERE territory_key=?`, []any{gm, now, fmt.Sprint(w["territory_key"])})
-			}
-			if err != nil {
+			if _, _, err = game.ResolveWarTx(conn, r.World, warID, winner, resolution, gm, now); err != nil {
 				return changed, err
 			}
 		}
 		changed++
 	}
 	return changed, nil
+}
+
+// alliesJoin is what a side's allies lend it on a day of siege, through the
+// war door's rule (game.WarAllyStrength). An ally joining for the first time
+// costs its standing with the enemy and is told to the world
+// (game.WarAllyJoinsTx); every ally's part is written to the blow-by-blow
+// under its own name, so the war card says who marched.
+func (r *Runner) alliesJoin(conn *storage.Conn, warID int64, allies []string, side, beside, enemy, territory string, gm int64, now float64) (float64, error) {
+	if len(allies) == 0 {
+		return 0, nil
+	}
+	strengths := make([]float64, 0, len(allies))
+	for _, ally := range allies {
+		if _, err := game.WarAllyJoinsTx(conn, r.World, warID, ally, beside, enemy, territory, gm, now); err != nil {
+			return 0, err
+		}
+		s := sectWarStrength(conn, ally)
+		strengths = append(strengths, s)
+		if game.WarActionsHaveSect(conn) {
+			if err := insertFieldAction(conn, warID, side, "ally", ally, int64(math.Round(s)), 0, 0, gm, now); err != nil {
+				return 0, err
+			}
+		}
+	}
+	return game.WarAllyStrength(r.World, strengths), nil
+}
+
+// insertFieldAction is one row of the blow-by-blow struck by the field rather
+// than a cultivator, under the sect it was struck for once migration 78 has
+// run.
+func insertFieldAction(conn *storage.Conn, warID int64, side, tactic, sect string, power, siege, morale, gm int64, now float64) error {
+	if game.WarActionsHaveSect(conn) {
+		_, err := conn.Execute(`INSERT INTO territory_war_actions(war_id,user_id,side,tactic,power,siege_delta,morale_delta,game_minute,created_at,sect_name) VALUES(?,NULL,?,?,?,?,?,?,?,?)`, []any{warID, side, tactic, power, siege, morale, gm, now, sect})
+		return err
+	}
+	_, err := conn.Execute(`INSERT INTO territory_war_actions(war_id,user_id,side,tactic,power,siege_delta,morale_delta,game_minute,created_at) VALUES(?,NULL,?,?,?,?,?,?,?)`, []any{warID, side, tactic, power, siege, morale, gm, now})
+	return err
+}
+
+// sectWarStrength is what a sect can put into a day of a siege on its own,
+// read off the politics the sect tick keeps: influence, resources and
+// cohesion, each out of a hundred, to at most ten. A sect with no politics row
+// fights as an ordinary one.
+func sectWarStrength(conn *storage.Conn, sect string) float64 {
+	if !simTableExists(conn, "sect_politics_state") {
+		return 5
+	}
+	res, err := conn.Execute(`SELECT influence,resources,cohesion FROM sect_politics_state WHERE sect_name=?`, []any{sect})
+	if err != nil {
+		return 5
+	}
+	row := firstMap(res)
+	if row == nil {
+		return 5
+	}
+	return float64(i64(row["influence"])+i64(row["resources"])+i64(row["cohesion"])) / 30
 }
 
 func (r *Runner) advanceOccupations(conn *storage.Conn, gm int64) (int64, error) {
@@ -544,7 +648,9 @@ func (r *Runner) advanceOccupations(conn *storage.Conn, gm int64) (int64, error)
 		if _, err = conn.Execute(`UPDATE territory_war_operations SET resolution='attacker_annexed',occupation_until_game_minute=0,last_tick_game_minute=?,updated_at=? WHERE war_id=?`, []any{gm, now, i64(w["war_id"])}); err != nil {
 			return 0, err
 		}
-		if _, err = conn.Execute(`UPDATE territory_state SET controller_type='sect',controller_key=?,unrest=MAX(0,unrest-20),updated_game_minute=?,updated_at=? WHERE territory_key=?`, []any{fmt.Sprint(w["attacker_key"]), gm, now, fmt.Sprint(w["territory_key"])}); err != nil {
+		// Annexation settles the occupier's hold - it never hands the
+		// ground back to somebody who has since lost it (v1.24.0).
+		if _, err = conn.Execute(`UPDATE territory_state SET unrest=MAX(0,unrest-20),updated_game_minute=?,updated_at=? WHERE territory_key=? AND controller_type='sect' AND controller_key=?`, []any{gm, now, fmt.Sprint(w["territory_key"]), fmt.Sprint(w["attacker_key"])}); err != nil {
 			return 0, err
 		}
 	}

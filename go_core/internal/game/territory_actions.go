@@ -108,23 +108,17 @@ func territoryClaimActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	} else if controller == sect {
 		return authoritativeMutation{}, errors.New("your sect already controls that territory")
 	} else {
-		r, e = conn.Execute(`SELECT war_id FROM territory_wars WHERE territory_key=? AND status='active' LIMIT 1`, []any{p.TerritoryKey})
+		// One door for a declaration (v1.24.0): the truce, the active-war
+		// check, the standing between the two sects and the history row are
+		// DeclareWarTx's, shared with the world's own war step.
+		warID, e := DeclareWarTx(conn, catalog, sect, controller, p.TerritoryKey, p.GameMinute, now)
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
-		if firstRowMap(r) != nil {
-			return authoritativeMutation{}, errors.New("an active war already contests that territory")
-		}
-		c, e := conn.Execute(`INSERT INTO territory_wars(attacker_key,defender_key,territory_key,status,created_game_minute,updated_game_minute,created_at,updated_at) VALUES(?,?,?,'active',?,?,?,?)`, []any{sect, controller, p.TerritoryKey, p.GameMinute, p.GameMinute, now, now})
-		if e != nil {
-			return authoritativeMutation{}, e
-		}
-		if e = ensureWarOperationGo(conn, c.LastInsertID, p.GameMinute, now); e != nil {
-			return authoritativeMutation{}, e
-		}
-		out["war_id"] = c.LastInsertID
+		out["war_id"] = warID
 		out["attacker_key"] = sect
 		out["defender_key"] = controller
+		out["retake"] = WarOccupiedFromTx(conn, p.TerritoryKey, p.GameMinute) == sect
 	}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "territory", EventType: "territory.claim", EntityType: "territory", EntityID: p.TerritoryKey, GameMinute: p.GameMinute, Payload: out}}, nil
 }
@@ -153,13 +147,11 @@ func territoryWarActActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 		return authoritativeMutation{}, errors.New("active war not found")
 	}
 	sect := fmt.Sprint(mem["sect_name"])
-	side := ""
-	if sect == fmt.Sprint(war["attacker_key"]) {
-		side = "attacker"
-	} else if sect == fmt.Sprint(war["defender_key"]) {
-		side = "defender"
-	} else {
-		return authoritativeMutation{}, errors.New("your sect is not a belligerent in that war")
+	// A belligerent's own member, or one sworn to a sect allied to exactly
+	// one side (v1.24.0).
+	side, fightsFor, e := warSideTx(conn, catalog, sect, war)
+	if e != nil {
+		return authoritativeMutation{}, e
 	}
 	now := nowSeconds()
 	cdkey := fmt.Sprintf("war_action:%d", p.WarID)
@@ -192,7 +184,8 @@ func territoryWarActActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 		manorBonus = manorDefensePowerGo(conn, sect, fmt.Sprint(war["territory_key"]))
 		power += manorBonus
 	}
-	power = max64(1, int64(math.Round(float64(power)*math.Max(.25, currentEraModifierGo(conn, catalog, fmt.Sprint(war["territory_key"]), "war_pressure", 1)))))
+	territory := fmt.Sprint(war["territory_key"])
+	power = max64(1, int64(math.Round(float64(power)*math.Max(.25, currentEraModifierGo(conn, catalog, territory, "war_pressure", 1)))))
 	if e = ensureWarOperationGo(conn, p.WarID, p.GameMinute, now); e != nil {
 		return authoritativeMutation{}, e
 	}
@@ -228,6 +221,10 @@ func territoryWarActActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 			siegeDelta = impact / 2
 			dm -= impact / 2
 		}
+		// The walls blunt every blow that moves the siege (v1.24.0).
+		if siegeDelta > 0 {
+			siegeDelta = max64(1, siegeDelta-WarDefenseBlunt(warRules(catalog), territoryDefenseTx(conn, territory)))
+		}
 		siege = clamp(siege+max64(0, siegeDelta), 0, 100)
 		moraleDelta = -impact
 	} else {
@@ -256,38 +253,112 @@ func territoryWarActActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	dm = clamp(dm, 0, 120)
 	winner := ""
 	resolution := ""
-	occupation := int64(0)
 	if siege >= 100 || dm <= 0 {
 		winner = fmt.Sprint(war["attacker_key"])
 		resolution = "attacker_occupation"
-		occupation = p.GameMinute + 30*1440
 	} else if am <= 0 {
 		winner = fmt.Sprint(war["defender_key"])
 		resolution = "defender_holds"
 	}
-	_, e = conn.Execute(`UPDATE territory_war_operations SET siege_progress=?,attacker_morale=?,defender_morale=?,attacker_force=?,defender_force=?,last_tick_game_minute=?,winner_key=?,resolution=?,occupation_until_game_minute=?,updated_at=? WHERE war_id=?`, []any{siege, am, dm, af, df, p.GameMinute, winner, resolution, occupation, now, p.WarID})
+	// A defender's fortify raises the walls for good, not only this siege's
+	// numbers (v1.24.0): `territory_state.defense` was written by nothing.
+	defense := territoryDefenseTx(conn, territory)
+	if side == "defender" && p.Tactic == "fortify" {
+		if defense, e = fortifyTerritoryTx(conn, catalog, territory, p.GameMinute, now); e != nil {
+			return authoritativeMutation{}, e
+		}
+	}
+	// An ally's first act in a war costs its sect standing with the enemy,
+	// read before this act's row is written.
+	allyJoined := false
+	if fightsFor != sect {
+		enemy := fmt.Sprint(war["defender_key"])
+		if side == "defender" {
+			enemy = fmt.Sprint(war["attacker_key"])
+		}
+		if allyJoined, e = warAllyJoinsTx(conn, catalog, p.WarID, sect, enemy, now); e != nil {
+			return authoritativeMutation{}, e
+		}
+	}
+	// What the act earns is read before its own row is written, so the cap
+	// counts the acts before this one.
+	points, e := warActPointsTx(conn, catalog, p.WarID, userID)
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	_, e = conn.Execute(`INSERT INTO territory_war_actions(war_id,user_id,side,tactic,power,siege_delta,morale_delta,game_minute,created_at) VALUES(?,?,?,?,?,?,?,?,?)`, []any{p.WarID, userID, side, p.Tactic, power, siegeDelta, moraleDelta, p.GameMinute, now})
+	_, e = conn.Execute(`UPDATE territory_war_operations SET siege_progress=?,attacker_morale=?,defender_morale=?,attacker_force=?,defender_force=?,last_tick_game_minute=?,updated_at=? WHERE war_id=?`, []any{siege, am, dm, af, df, p.GameMinute, now, p.WarID})
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	// The sect the blow was struck for rides with it once migration 78 has
+	// run (v1.24.0), so an ally's sect is told apart from the field's.
+	if warActionsHaveSect(conn) {
+		_, e = conn.Execute(`INSERT INTO territory_war_actions(war_id,user_id,side,tactic,power,siege_delta,morale_delta,game_minute,created_at,sect_name) VALUES(?,?,?,?,?,?,?,?,?,?)`, []any{p.WarID, userID, side, p.Tactic, power, siegeDelta, moraleDelta, p.GameMinute, now, sect})
+	} else {
+		_, e = conn.Execute(`INSERT INTO territory_war_actions(war_id,user_id,side,tactic,power,siege_delta,morale_delta,game_minute,created_at) VALUES(?,?,?,?,?,?,?,?,?)`, []any{p.WarID, userID, side, p.Tactic, power, siegeDelta, moraleDelta, p.GameMinute, now})
+	}
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
 	_, _ = conn.Execute(`UPDATE territory_wars SET attacker_score=?,defender_score=?,updated_game_minute=?,updated_at=? WHERE war_id=?`, []any{af, df, p.GameMinute, now, p.WarID})
-	status := "active"
-	if winner != "" {
-		status = "resolved"
-		_, _ = conn.Execute(`UPDATE territory_wars SET status='resolved',updated_game_minute=?,updated_at=? WHERE war_id=?`, []any{p.GameMinute, now, p.WarID})
-		if winner == fmt.Sprint(war["attacker_key"]) {
-			_, _ = conn.Execute(`UPDATE territory_state SET controller_type='sect',controller_key=?,unrest=MIN(100,unrest+25),updated_game_minute=?,updated_at=? WHERE territory_key=?`, []any{winner, p.GameMinute, now, fmt.Sprint(war["territory_key"])})
+	promoted := ""
+	if points > 0 {
+		if promoted, e = creditSectContributionTx(conn, catalog, userID, points, 0); e != nil {
+			return authoritativeMutation{}, e
 		}
 	}
-	_, e = conn.Execute(`INSERT INTO cooldowns(user_id,action,available_at) VALUES(?,?,?) ON CONFLICT(user_id,action) DO UPDATE SET available_at=excluded.available_at`, []any{userID, cdkey, now + 1800})
+	status := "active"
+	occupation := int64(0)
+	spoils := []WarSpoil{}
+	if winner != "" {
+		var ended bool
+		if spoils, ended, e = ResolveWarTx(conn, catalog, p.WarID, winner, resolution, p.GameMinute, now); e != nil {
+			return authoritativeMutation{}, e
+		}
+		if ended {
+			status = "resolved"
+			defense = territoryDefenseTx(conn, territory)
+			if resolution == "attacker_occupation" {
+				occupation = p.GameMinute + warRules(catalog).OccupationDays*warMinutesPerDay
+			}
+		}
+	}
+	_, e = conn.Execute(`INSERT INTO cooldowns(user_id,action,available_at) VALUES(?,?,?) ON CONFLICT(user_id,action) DO UPDATE SET available_at=excluded.available_at`, []any{userID, cdkey, now + float64(cooldownSecondsFor(cooldownWarAction))})
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	out := map[string]any{"war_id": p.WarID, "status": status, "side": side, "tactic": p.Tactic, "power": power, "manor_defense_bonus": manorBonus, "operations": map[string]any{"siege_progress": siege, "attacker_morale": am, "defender_morale": dm, "attacker_force": af, "defender_force": df, "winner_key": winner, "resolution": resolution, "occupation_until_game_minute": occupation}}
+	victory := int64(0)
+	for _, sp := range spoils {
+		if sp.UserID == userID {
+			victory = sp.Points
+			if sp.Promoted != "" {
+				promoted = sp.Promoted
+			}
+		}
+	}
+	out := map[string]any{"war_id": p.WarID, "status": status, "side": side, "tactic": p.Tactic, "power": power, "manor_defense_bonus": manorBonus,
+		"territory_key": territory, "territory_defense": defense, "fights_for": fightsFor, "ally": fightsFor != sect, "ally_joined": allyJoined, "points": points, "victory_points": victory, "victors_paid": len(spoils), "promoted": promoted,
+		"operations": map[string]any{"siege_progress": siege, "attacker_morale": am, "defender_morale": dm, "attacker_force": af, "defender_force": df, "winner_key": winner, "resolution": resolution, "occupation_until_game_minute": occupation}}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "territory", EventType: "war.act", EntityType: "territory_war", EntityID: fmt.Sprint(p.WarID), GameMinute: p.GameMinute, Payload: out}}, nil
+}
+
+type warPeacePayload struct {
+	WarID      int64 `json:"war_id"`
+	GameMinute int64 `json:"game_minute"`
+}
+
+// territoryWarPeaceActionGo is `war.peace` (v1.24.0); the rule is
+// warPeaceActionGo's.
+func territoryWarPeaceActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+	var p warPeacePayload
+	if e := json.Unmarshal(raw, &p); e != nil {
+		return authoritativeMutation{}, e
+	}
+	out, e := warPeaceActionGo(conn, catalog, userID, p.WarID, p.GameMinute)
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "territory", EventType: "war.peace", EntityType: "territory_war", EntityID: fmt.Sprint(p.WarID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 func caravanDispatchActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p caravanDispatchPayload

@@ -16,6 +16,21 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.24.0)** — *Expand the war system.* Asked for in three words, then a war channel and
+  fighting beside an allied sect were asked for mid-build. Reading the system found four faults: the
+  world's own sieges were fought for the attacker alone, so a defender with no players could never
+  hold; a territory's defense was never written; a war act earned nothing; and nothing followed a war
+  - no truce, no occupation window, no standing lost, no history of its end. On the owner's asks: act
+  and victory pay in sect contribution, allied sects fight beside their ally, walls that rise and
+  fall, truces and occupations, a two-walled siege tick, and a read-only war-front channel per world,
+  in a ⚔️ Sect Wars category of its own, with a live card per war (schema 78).
+- **fixed (v1.24.0)** — *What a war does beyond its ground.* Three things the release's first push left
+  alone, then fixed on the owner's call: the world's own sects fight beside an ally (half their
+  strength, capped, and the world hears them march); a war can be ended in peace - by a Deacon of a
+  warring sect for 100 contribution once it is three days old, or by the world's own sects when
+  morale breaks - on terms the siege sets; and a sect's NPC disciples add to its strength and are
+  named at the siege.
+
 - **fixed (v1.22.0)** — *A better menu layout for all the menus.* Researched and the first three of six
   steps taken on the owner's call: a jump to any system on every multi-system hub panel, the menu's
   tools row (the tutorial's next step pressed, the quest journal, the cooldowns) and Daily buttons
