@@ -6611,7 +6611,10 @@ two realm ladders, the gates, mutations, Laws, flames, sect ranks, trades, items
 presets, each off `content/world.json`. Two are code on the engine side and are held to it by
 `test_the_player_editor_edits_what_the_engine_writes.py`: the trades (`adminProfessions` in Go) and
 the world-crossing gates, which the card used to carry as `[7,15,23]` beside `tribulationGates` and
-now reads off the realm ladder. A value a character holds that the catalogue lacks is offered,
+now reads off the realm ladder. The trades are the one list the dashboard keeps itself
+(`EDITOR_TRADES`): the first version imported `app.rules.progression_systems` for it, and CI's v0.30
+authority gate - the dashboard may import exactly two rules modules - refused it, rightly, so the
+tuple is held equal to Go's `adminProfessions` and to `PROFESSIONS` instead of widening that gate. A value a character holds that the catalogue lacks is offered,
 marked, so saving a card unchanged never changes it. The same file holds every `admin.player.*`
 case the engine dispatches to being mapped or named in `DISCORD_ONLY` with its reason (erase deletes
 threads only the bot can reach; `set_sect_rank` is the sect card's `set_sect`) - five levers the

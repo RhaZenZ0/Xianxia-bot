@@ -29,7 +29,6 @@ from ..ops.http_limits import (
     read_request_head,
     LoginThrottle,
 )
-from ..rules.progression_systems import PROFESSIONS
 from ..rules.worldtime import from_game_minutes
 from ..version import INSTALLED_VERSION
 from ..database.core import COMMAND_USAGE_DAYS, _usage_cutoff_day
@@ -143,6 +142,18 @@ def _aptitude_catalogue() -> dict[str, list[dict[str, str]]]:
     return {"physiques": physiques, "root_grades": grades}
 
 
+# The trades the Trades card offers (v1.23.0). The list is code on both
+# sides - `adminProfessions` in Go, `PROFESSIONS` in app/rules - and the
+# dashboard is allowed exactly two rules imports (test_authority_boundary's
+# v0.30 gate), so it keeps its own tuple, and
+# test_the_player_editor_edits_what_the_engine_writes.py holds it equal to
+# both, so a trade added on either side fails there rather than drifting.
+EDITOR_TRADES = (
+    "Alchemy", "Forging", "Formation", "Inscription", "Foraging", "Mining",
+    "Beast Taming", "Artifact Refining", "Appraisal",
+)
+
+
 @lru_cache(maxsize=1)
 def _editor_catalogue() -> dict[str, Any]:
     """What the Player Editor's progress cards may offer (v1.23.0).
@@ -157,7 +168,7 @@ def _editor_catalogue() -> dict[str, Any]:
     """
     empty: dict[str, Any] = {
         "flames": [], "max_refinement": 0, "spirit_sense_max_stage": 0,
-        "sect_ranks": [], "laws": [], "professions": list(PROFESSIONS),
+        "sect_ranks": [], "laws": [], "professions": list(EDITOR_TRADES),
         "realms": [], "body_realms": [], "tribulation_gates": [], "root_mutations": [],
         "items": [], "storage_presets": [],
     }
@@ -180,7 +191,7 @@ def _editor_catalogue() -> dict[str, Any]:
             for r in ((world.get("sect_system") or {}).get("ranks") or []) if isinstance(r, dict) and r.get("name")
         ],
         "laws": sorted(({"id": str(lid), "name": str((law or {}).get("name") or lid)} for lid, law in laws.items()), key=lambda x: x["name"]),
-        "professions": list(PROFESSIONS),
+        "professions": list(EDITOR_TRADES),
         # The two ladders by index, so a realm is picked by its name.
         "realms": _ladder(world.get("realms")),
         "body_realms": _ladder(world.get("body_realms")),

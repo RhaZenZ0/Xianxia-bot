@@ -78,6 +78,12 @@ class TheVocabulariesAgreeWithTheEngine(unittest.TestCase):
         self.assertEqual(sorted(self.catalogue["professions"]), sorted(names), (
             "the trade picker and adminProfessions disagree, so the editor offers a trade the "
             "engine refuses or hides one it would take"))
+        # The dashboard keeps its own tuple (it may import only two rules
+        # modules), so it is held to the bot's list as well as the engine's.
+        from app.rules.progression_systems import PROFESSIONS
+
+        self.assertEqual(sorted(self.catalogue["professions"]), sorted(PROFESSIONS), (
+            "the dashboard's EDITOR_TRADES and app.rules' PROFESSIONS disagree"))
 
     def test_the_gates_offered_are_the_gates_the_engine_has(self):
         gates = re.search(r"var tribulationGates = map\[int64\]tribulationGate\{(.*)\}\n", self.go)
