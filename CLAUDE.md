@@ -6570,20 +6570,26 @@ unreadable count, which the page prints as unknown (the `engine —` footer less
 
 ### An explore finds the missing (`explore_search.go`, v1.22.1)
 
-Asked for in five words: *"Normal explore can find missing npc's."* A disappearance closed one way,
-`/talk` by name while standing where the person is - which asked a searcher to know the answer
-before looking, since the talk picker lists a missing person only where the searcher already stands.
-`searchHereTx` runs inside the explore's own transaction: every `status='missing'` row whose
-`current_location` is the explorer's location, exactly (`npc.found`'s rule, unchanged), is found, and
-every unclaimed grave there is reached. The writes are `markNPCFoundTx` and `claimGraveTx`, pulled
-out of `npc.found` so the conversation path and the explore path are one statement each; `npc.found`
-keeps its own `begin`/commit around them (rc.38). The result carries `found_npcs` and `found_graves`
-and the bot only prints them (`search_lines`), **after** the discovery block, because that block
-assigns `discovery_text` rather than appending - a line added before it would vanish whenever the
-explore also charted a route, and `test_an_explore_finds_the_missing.py` reads the order by AST.
-`explore_search_test.go` drives a real explore through `ApplyWithWorld` against production's DDL and
-reads back on a fresh connection; its drill (the location filter disabled) names the porter missing
-at Ironbanner City and the grave there.
+Asked for in five words: *"Normal explore can find missing npc's"*, and then *"make it a range"*. A
+disappearance closed one way, `/talk` by name while standing where the person is - which asked a
+searcher to know the answer before looking, since the talk picker lists a missing person only where
+the searcher already stands. `searchHereTx` runs inside the explore's own transaction and finds every
+`status='missing'` row, and reaches every unclaimed grave, anywhere in `exploreSearchArea`: the whole
+city the explorer stands in (a gate is its city, v1.0.9 - and so are its districts, shops and halls)
+and `exploreSearchSteps` (1) steps out from it - the road sites on its legs, its wilds, the cities at
+the far end of its roads, each taken whole; from a road site, both ends of its road. It is read off
+the map the players walk (`canonicalRoadNeighbors`, `roadSitesOnLeg`, `wilds_of`) at the explorer's
+own realm and world, so a search never reaches a place they could not walk to. **`npc.found` keeps
+its exact-place rule on purpose**: speaking to somebody needs them in front of you; looking around
+covers ground. The writes are `markNPCFoundTx` and `claimGraveTx`, pulled out of `npc.found` so the
+two doors are one statement each; `npc.found` keeps its own `begin`/commit around them (rc.38). The
+history row places the find where the person was, not where the explorer stood. The result carries
+`found_npcs` and `found_graves` with each `location`, and the bot only prints them (`search_lines`),
+**after** the discovery block, because that block assigns `discovery_text` rather than appending -
+`test_an_explore_finds_the_missing.py` reads the order by AST. `explore_search_test.go` drives a real
+explore through `ApplyWithWorld` against production's DDL and the shipped map from Greenriver Town;
+its drills move the range to 0 (*"a search from Greenriver Town does not reach Shrine of the Patient
+Ox"*) and to 2 (*"reached Ashenwall City, more than one step out"*).
 
 ## Testing conventions
 

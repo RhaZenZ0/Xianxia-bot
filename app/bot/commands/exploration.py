@@ -274,8 +274,9 @@ def _wilds_lines(location: str) -> str:
 def search_lines(outcome: dict) -> str:
     """Who an explore found, as the engine reported it (v1.22.1).
 
-    The engine searches the ground: anybody missing where the explorer stands
-    is found, and an unclaimed grave there is reached. This only prints its
+    The engine searches the ground around the explorer - their whole city and
+    one step out from it - so anybody missing in that range is found and an
+    unclaimed grave in it is reached, and each line says where. This only prints its
     answer - which place, whose purse and what keepsake are the engine's.
     """
     text = ""
@@ -284,8 +285,10 @@ def search_lines(outcome: dict) -> str:
         name = str(row.get("npc_name") or "somebody")
         days = int(row.get("days_missing") or 0)
         home = str(row.get("home_location") or "")
+        where = str(row.get("location") or "")
         text += (
-            f"\n\n🔎 **You find {name}**, missing from {home or 'home'} for **{days}** day(s). "
+            f"\n\n🔎 **You find {name}**" + (f" at **{where}**" if where else "")
+            + f", missing from {home or 'home'} for **{days}** day(s). "
             "Word of where they were goes back the way you came."
         )
     for row in list(outcome.get("found_graves") or []):
@@ -299,8 +302,9 @@ def search_lines(outcome: dict) -> str:
         if stones:
             took.append(f"{stones} spirit stones")
         carried = ", ".join(took) if took else "nothing but the fact of it"
+        where = str(row.get("location") or "")
         text += (
-            f"\n\n🪦 **You find {name}**, {days} day(s) after they stopped being anywhere. "
+            f"\n\n🪦 **You find {name}**" + (f" at **{where}**" if where else "") + f", {days} day(s) after they stopped being anywhere. "
             f"You take **{carried}**. Word of this can go back to {home or 'their home'}."
         )
     return text

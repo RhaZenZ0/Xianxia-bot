@@ -1408,9 +1408,10 @@ func explorationExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if foundShop != "" {
 		discoveredShop = shopDiscoveryView(catalog, foundShop)
 	}
-	// Looking around a place finds whoever went missing here, and the grave
-	// of anybody who died here unreached (v1.22.1, explore_search.go).
-	foundNPCs, foundGraves, err := searchHereTx(conn, catalog, userID, c.Location, p.GameMinute)
+	// Looking around a place finds whoever went missing within range of it,
+	// and the grave of anybody who died there unreached (v1.22.1,
+	// explore_search.go).
+	foundNPCs, foundGraves, err := searchHereTx(conn, catalog, userID, c.Location, c.accessRealmIndex(), p.GameMinute)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

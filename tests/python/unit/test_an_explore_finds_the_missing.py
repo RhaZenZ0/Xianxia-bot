@@ -1,6 +1,7 @@
 """An ordinary explore finds the missing (v1.22.1).
 
-The engine searches the ground an explore stands on and reports who it found
+The engine searches the ground around an explore - the explorer's whole city and one
+step out from it - and reports who it found
 (`found_npcs`) and which graves it reached (`found_graves`); the Go tests hold
 that half (`explore_search_test.go`). This holds the reply: it prints both,
 and it prints them where the discovery block cannot overwrite them - that
@@ -32,16 +33,19 @@ class TheReplySaysWhoWasFound(unittest.TestCase):
 
     def test_a_found_person_is_named(self):
         text = self._lines({"found_npcs": [
-            {"npc_name": "Lost Herbalist Mei", "days_missing": 12, "home_location": "Moonfen City"}]})
+            {"npc_name": "Lost Herbalist Mei", "days_missing": 12, "home_location": "Moonfen City",
+             "location": "Shrine of the Patient Ox"}]})
         self.assertIn("Lost Herbalist Mei", text)
+        self.assertIn("Shrine of the Patient Ox", text, "a search reaches beyond where you stand, so say where")
         self.assertIn("12", text)
         self.assertIn("Moonfen City", text)
 
     def test_a_grave_names_what_was_carried(self):
         text = self._lines({"found_graves": [
             {"npc_name": "Buried Lu", "days_missing": 64, "home_location": "Moonfen City",
-             "keepsake_item": "spirit_herb", "keepsake_stones": 7}]})
+             "location": "Sunken Bell Ruin", "keepsake_item": "spirit_herb", "keepsake_stones": 7}]})
         self.assertIn("Buried Lu", text)
+        self.assertIn("Sunken Bell Ruin", text)
         self.assertIn("7 spirit stones", text)
 
     def test_nothing_found_says_nothing(self):
