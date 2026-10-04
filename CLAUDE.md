@@ -156,7 +156,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 76; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 77; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -6651,6 +6651,40 @@ this release carries no `existed` and undoes its progress alone, on the terms it
 `perfection_lever_test.go` drives the real trial through the production dispatch on the shipped
 content; its drill (the fill disabled) fails both tracks. The engine playtest now drives the trial on
 every run: where the dice did not allow every quest it holds the lock, then opens it with the lever.
+
+### Two of three, a chain the seeder never moved, and a quest handed over (schema 77, v1.23.2)
+
+On the owner's call the final Perfection trial passes on a majority of its checks - two of the
+shipped three - where every one had to hold. `perfectionTrialsNeeded` is the one statement, read by
+both ladders, and the result carries `passed` and `needed` so the reply says how many held without
+restating the rule. `perfection_majority_test.go` lends the dice and lowers the fixture's attributes
+first: the batch-4 cultivator stands at ~100 in every attribute, so a test that only lent the dice
+held every check whatever was rolled - the first run of it said so.
+
+Reported as *"fix stuck quest doesn't give the next one"*: the GM's Complete had worked, through
+`questProgressTx` and its `follow_on`, and the chain behind it had not. `sync_commission_pool` is
+insert-only, v1.16.0 seeded `realm_road_7` with an empty `follow_on` (the road stopped at the seam),
+and v1.18.0 pointed it at `realm_road_8` in the content with no migration - the class migrations 55
+and 62 each fixed for one chain, missed at a third. Migration 77 re-points it where the seed is still
+exactly the one v1.16.0 wrote, and `test_the_heavens_lead_on.py` holds the migration's seed equal to
+what the seeder writes today. **A chain changed in content is a migration, every time**; the
+catch-up hands the stage over on the player's next action once the row is right. And the lever now
+says why nothing came (`questNextStageNoteTx`, `next_stage` on the result and in the audit row):
+nothing chained, already held, or not an approved giver-less quest in this world - because a working
+lever over a broken chain looked exactly like a broken lever.
+
+**And the GM can hand a quest over** (`admin.player.quest_grant`, the Quests card's *Hand over*).
+The case the screenshot showed was not the seeder: "A Road Toward a Sect" chains to nothing and the
+realm road is handed over only at a crossing, so a player past their crossing held nothing, and both
+existing levers act only on a held quest. An automatic catch-up onto the road was written and
+withdrawn on the owner's call - a GM lever, not a rule. It is `grantOrdinaryQuestTx`, the one door
+every roster uses, so it refuses what that door refuses (already held in any status, not approved, a
+commission), and the picker offers only what it would take (`grantable_quests`, held to the same
+three clauses by `test_a_gm_can_hand_over_the_next_quest.py`). `suggest_next_quest` is the picker's
+default and nothing more: a finished quest's unheld `follow_on`, else the realm-road stage for the
+player's realm when they hold no active stage. A stage for a realm already entered still asks for
+its breakthrough, which the GM then Reports - the lever does not pre-credit it, so what a grant does
+is exactly what a crossing does. Not in `reversibleAdminActions`, beside the other two.
 
 ## Testing conventions
 

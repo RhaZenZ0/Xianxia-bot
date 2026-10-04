@@ -286,6 +286,20 @@ async def run(url: str, token: str, db_path: str) -> Report:
                        "a GM-completed errand is paid like a finished one, standing included", f"{finished}")
         await step(report, "a completed quest cannot be completed again",
                    gm("admin.player.quest_complete", {"user_id": PLAYER, "quest_key": errand_key, "reason": "playtest"}), expect_error="not active")
+        # The third lever (v1.23.2): hand over a quest the player does not
+        # hold - the way on when nothing came next - then finish it, so the
+        # house has no errand outstanding for the steps after this one.
+        await step(report, "a GM cannot hand over a quest the player already holds",
+                   gm("admin.player.quest_grant", {"user_id": PLAYER, "quest_key": errand_key, "reason": "playtest"}), expect_error="already holds")
+        unheld = next((str(e.get("quest_key")) for e in content.data.get("household_errands", {}).get("Forging", [])
+                       if str(e.get("quest_key")) != errand_key), "")
+        handed = await audited("admin.player.quest_grant", {"user_id": PLAYER, "quest_key": unheld, "reason": "playtest"},
+                               name=f"a GM hands over {unheld}")
+        if handed is not None:
+            held_now = {r["quest_key"]: r["status"] for r in await db.list_character_quests(PLAYER)}
+            report.add("PASS" if held_now.get(unheld) == "active" else "FAIL", "the handed-over quest is active", f"{unheld}={held_now.get(unheld)}")
+            await step(report, f"finish {unheld} so no errand is left carried",
+                       gm("admin.player.quest_complete", {"user_id": PLAYER, "quest_key": unheld, "reason": "playtest"}))
     await step(report, "grant a Waymark Talisman", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": "waymark_talisman", "quantity": 1, "reason": "playtest"}))
     marked = await step(report, "a Waymark Talisman takes you back to the mark", act("item.use", PLAYER, {"item_id": "waymark_talisman"}))
     if marked is not None:
@@ -1967,6 +1981,12 @@ async def run(url: str, token: str, db_path: str) -> Report:
                 checks = "; ".join(f"{r.get('name')} {r.get('total')} vs {r.get('tn')}" for r in (tried.get("rolls") or []))
                 report.add("PASS" if len(tried.get("rolls") or []) == 3 else "FAIL", f"the {ladder} trial's three checks, reported",
                            f"success={tried.get('success')} training_loss={tried.get('training_loss')}; {checks}")
+                # Since v1.23.2 the trial passes on a majority of its checks.
+                held = sum(1 for r in (tried.get("rolls") or []) if r.get("success"))
+                report.add("PASS" if tried.get("passed") == held and tried.get("needed") == 2
+                           and bool(tried.get("success")) == (held >= 2) else "FAIL",
+                           f"the {ladder} trial passes on two of its three checks",
+                           f"held={held} passed={tried.get('passed')} needed={tried.get('needed')} success={tried.get('success')}")
                 row = dict(await read_row(PLAYER, 0) or {})
                 report.add("PASS" if bool(row.get("completed")) == bool(tried.get("success")) else "FAIL",
                            f"the {ladder} realm is perfected exactly when the trial passed", f"completed={row.get('completed')} progress={row.get('progress')}")

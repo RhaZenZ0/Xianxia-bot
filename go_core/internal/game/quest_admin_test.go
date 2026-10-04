@@ -141,3 +141,101 @@ func TestTheQuestLeverReachesASnowflake(t *testing.T) {
 		t.Fatalf("stuck is %q for the snowflake", status)
 	}
 }
+
+// When a GM's Complete hands no next stage over, the result says why (v1.23.2):
+// reported as "fix stuck quest doesn't give the next one", where the chain had
+// simply never been re-pointed on that world (migration 77) and the lever,
+// which had worked, showed nothing to tell the two apart.
+func TestAGMCompleteSaysWhyNoNextStageCame(t *testing.T) {
+	for _, tc := range []struct {
+		name, seed, want string
+		holdNext         bool
+	}{
+		{"handed over", `{"follow_on":"next"}`, "handed over next", false},
+		{"nothing chained", `{"follow_on":""}`, "nothing is chained after stuck", false},
+		{"already held", `{"follow_on":"next"}`, "next is already held (completed)", true},
+		{"not in this world", `{"follow_on":"nowhere"}`, "nowhere could not be handed over", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := questAdminDB(t)
+			conn := beginnerConn(t, path)
+			if _, err := conn.Execute(`UPDATE quest_definitions SET seed_json=? WHERE quest_key='stuck'`, []any{tc.seed}); err != nil {
+				t.Fatal(err)
+			}
+			if tc.holdNext {
+				if _, err := conn.Execute(`INSERT INTO character_quests(user_id,quest_key,status,created_at,updated_at) VALUES(42,'next','completed',0,0)`, nil); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := conn.Commit(); err != nil {
+				t.Fatal(err)
+			}
+			out, err := applyAdminRaw(t, path, "admin.player.quest_complete", 1, map[string]any{"user_id": 42, "quest_key": "stuck"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			note, _ := out.Result.(map[string]any)["next_stage"].(string)
+			if !strings.HasPrefix(note, tc.want) {
+				t.Fatalf("next_stage=%q, want it to start %q", note, tc.want)
+			}
+			if rows := auditRows(t, path, "admin.player.quest_complete"); len(rows) != 1 || !strings.Contains(fmt.Sprint(rows[0]["after_json"]), "next_stage") {
+				t.Fatalf("the audit row does not carry the note: %v", rows)
+			}
+		})
+	}
+}
+
+// The GM's third quest lever (v1.23.2): hand a player a quest. Reported from
+// the dashboard: a player who finished "A Road Toward a Sect" held nothing,
+// and Complete and Report act only on a quest already held.
+func TestAGMCanHandAPlayerTheirNextQuest(t *testing.T) {
+	path := questAdminDB(t)
+	conn := beginnerConn(t, path)
+	defineQuest(t, conn, "road_next", "", "")
+	defineQuest(t, conn, "a_commission", "Elder Xue Hong", "")
+	if _, err := conn.Execute(`INSERT INTO quest_definitions(quest_key,title,description,objectives_json,rewards_json,status,giver_npc,seed_json,created_at,updated_at)
+        VALUES('a_draft','Draft','','[]','{}','draft','','{}',0,0)`, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	out, err := applyAdminRaw(t, path, "admin.player.quest_grant", 1, map[string]any{"user_id": 42, "quest_key": "road_next", "reason": "stuck after the sect road"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if granted, _ := out.Result.(map[string]any)["granted"].(bool); !granted {
+		t.Fatalf("result %v", out.Result)
+	}
+	if status, _ := questStatus(t, path, 42, "road_next"); status != "active" {
+		t.Fatalf("road_next is %q after the grant, want active", status)
+	}
+	rows := auditRows(t, path, "admin.player.quest_grant")
+	if len(rows) != 1 || rows[0]["target"] != "user:42 quest:road_next" || rows[0]["reason"] != "stuck after the sect road" {
+		t.Fatalf("audit rows %v", rows)
+	}
+	// The lever is a door the player then walks: the granted quest advances
+	// by the player's own report, as any other quest does.
+	if _, err := applyAdminRaw(t, path, "admin.player.quest_progress", 1, map[string]any{"user_id": 42, "quest_key": "road_next", "objective_type": "cultivate"}); err != nil {
+		t.Fatalf("the granted quest could not be advanced: %v", err)
+	}
+
+	for _, tc := range []struct{ name, key, want string }{
+		{"already held", "road_next", "already holds road_next"},
+		{"a commission", "a_commission", "is a commission"},
+		{"not approved", "a_draft", "not approved"},
+		{"not in this world", "nowhere", "no quest nowhere"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := applyAdminRaw(t, path, "admin.player.quest_grant", 1, map[string]any{"user_id": 42, "quest_key": tc.key}); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("want a refusal naming %q, got %v", tc.want, err)
+			}
+		})
+	}
+	if _, err := applyAdminRaw(t, path, "admin.player.quest_grant", 1, map[string]any{"user_id": 999, "quest_key": "road_next"}); err == nil || !strings.Contains(err.Error(), "no character") {
+		t.Fatalf("a grant to nobody: %v", err)
+	}
+	if got := len(auditRows(t, path, "admin.player.quest_grant")); got != 1 {
+		t.Fatalf("%d audit rows; a refused grant must write none", got)
+	}
+}
