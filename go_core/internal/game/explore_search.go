@@ -11,16 +11,17 @@ package game
 // grave of anybody who died out here and was never reached.
 //
 // A search has a range, where `/talk` does not: speaking to somebody needs them
-// in front of you, while looking around covers ground. The range is the whole
-// city the explorer stands in - a city's gate is that city (v1.0.9), and so
-// are its districts, shops and halls - and `exploreSearchSteps` steps out from
-// it: the road sites on its legs, the wilds beside it, and the cities at the
-// far end of its roads, each again taken whole. It is read off the map the
-// players walk (canonicalRoadNeighbors, roadSitesOnLeg, wilds_of), filtered to
-// the explorer's world and realm, so a search never reaches a place its
-// explorer could not walk to. The engine reads each NPC's own location and
-// holds it to that set; nothing outside it is found. The writes are
-// `markNPCFoundTx` and `claimGraveTx`, the same two statements the
+// in front of you, while looking around covers ground. The range is the
+// surroundings of where the explorer stands, and it stops before the next
+// city. Inside a city - a gate, district, shop or hall is that city (v1.0.9) -
+// it is the whole city, the road sites on the roads leaving it and the wilds
+// beside it. In the wilds of a city it is that same ground. On a road site it
+// is that road: the sites along it, not the cities at either end. It is read
+// off the map the players walk (canonicalRoadNeighbors, roadSitesOnLeg,
+// wilds_of), filtered to the explorer's world and realm, so a search never
+// reaches a place its explorer could not walk to. The engine reads each NPC's
+// own location and holds it to that set; nothing outside it is found. The
+// writes are `markNPCFoundTx` and `claimGraveTx`, the same two statements the
 // conversation path runs, inside the explore's own transaction.
 
 import (
@@ -31,68 +32,48 @@ import (
 	"xianxia/core/internal/worlddata"
 )
 
-// exploreSearchSteps is how many steps out from the explorer's city a search
-// reaches. One is the city's own surroundings and its neighbours.
-const exploreSearchSteps = 1
-
-// exploreSearchArea is every place a search from `here` covers, sorted: the
-// city `here` belongs to and everything that is part of it, then up to
-// exploreSearchSteps steps out, each place reached taken with its whole city.
+// exploreSearchArea is every place a search from `here` covers, sorted (see
+// the file's header for the rule).
 func exploreSearchArea(catalog worlddata.Catalog, here string, realmIndex int64) []string {
 	start, ok := catalog.Locations[here]
 	if !ok || start.Private {
 		return nil
 	}
-	parts := map[string][]string{}
-	wilds := map[string][]string{}
-	for name, loc := range catalog.Locations {
-		if loc.Private || loc.World != start.World || loc.MinRealmIndex > realmIndex {
-			continue
-		}
-		city := cityOf(catalog, name)
-		parts[city] = append(parts[city], name)
-		if loc.WildsOf != "" {
-			wilds[loc.WildsOf] = append(wilds[loc.WildsOf], name)
-		}
-	}
-	reached := map[string]bool{}
-	frontier := []string{cityOf(catalog, here)}
-	reached[frontier[0]] = true
-	for step := 0; step < exploreSearchSteps; step++ {
-		next := []string{}
-		visit := func(place string) {
-			area := cityOf(catalog, place)
-			if area == "" || reached[area] || len(parts[area]) == 0 {
-				return
-			}
-			reached[area] = true
-			next = append(next, area)
-		}
-		for _, area := range frontier {
-			for _, neighbour := range canonicalRoadNeighbors(catalog, area, realmIndex) {
-				visit(neighbour)
-				for _, site := range roadSitesOnLeg(catalog, area, neighbour) {
-					visit(site)
-				}
-			}
-			for _, wild := range wilds[area] {
-				visit(wild)
-			}
-			if a, b, ok := roadSiteEndpoints(catalog, area); ok {
-				visit(a)
-				visit(b)
-			}
-		}
-		sort.Strings(next)
-		frontier = next
-	}
+	seen := map[string]bool{}
 	out := []string{}
-	for area := range reached {
-		out = append(out, parts[area]...)
+	add := func(name string) {
+		loc, ok := catalog.Locations[name]
+		if !ok || seen[name] || loc.Private || loc.World != start.World || loc.MinRealmIndex > realmIndex {
+			return
+		}
+		seen[name] = true
+		out = append(out, name)
 	}
-	if len(out) == 0 {
-		out = append(out, here)
+	if a, b, onRoad := roadSiteEndpoints(catalog, here); onRoad {
+		// On the road: the road, and not the cities it joins.
+		add(here)
+		for _, site := range roadSitesOnLeg(catalog, a, b) {
+			add(site)
+		}
+		sort.Strings(out)
+		return out
 	}
+	city := cityOf(catalog, here)
+	if start.WildsOf != "" {
+		city = start.WildsOf
+	}
+	for _, name := range sortedLocationNames(catalog) {
+		loc := catalog.Locations[name]
+		if cityOf(catalog, name) == city || loc.WildsOf == city {
+			add(name)
+		}
+	}
+	for _, neighbour := range canonicalRoadNeighbors(catalog, city, realmIndex) {
+		for _, site := range roadSitesOnLeg(catalog, city, neighbour) {
+			add(site)
+		}
+	}
+	add(here)
 	sort.Strings(out)
 	return out
 }

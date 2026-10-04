@@ -6574,10 +6574,12 @@ Asked for in five words: *"Normal explore can find missing npc's"*, and then *"m
 disappearance closed one way, `/talk` by name while standing where the person is - which asked a
 searcher to know the answer before looking, since the talk picker lists a missing person only where
 the searcher already stands. `searchHereTx` runs inside the explore's own transaction and finds every
-`status='missing'` row, and reaches every unclaimed grave, anywhere in `exploreSearchArea`: the whole
-city the explorer stands in (a gate is its city, v1.0.9 - and so are its districts, shops and halls)
-and `exploreSearchSteps` (1) steps out from it - the road sites on its legs, its wilds, the cities at
-the far end of its roads, each taken whole; from a road site, both ends of its road. It is read off
+`status='missing'` row, and reaches every unclaimed grave, anywhere in `exploreSearchArea`: the
+surroundings of where the explorer stands, stopping before the next city. Inside a city (a gate is
+its city, v1.0.9 - and so are its districts, shops and halls) that is the whole city, the road sites
+on its roads and its wilds; in the wilds, the same ground; on a road site, that road and not the
+cities at either end. A first version also took in the cities at the far end of every road, and the
+owner narrowed it. It is read off
 the map the players walk (`canonicalRoadNeighbors`, `roadSitesOnLeg`, `wilds_of`) at the explorer's
 own realm and world, so a search never reaches a place they could not walk to. **`npc.found` keeps
 its exact-place rule on purpose**: speaking to somebody needs them in front of you; looking around
@@ -6588,8 +6590,10 @@ history row places the find where the person was, not where the explorer stood. 
 **after** the discovery block, because that block assigns `discovery_text` rather than appending -
 `test_an_explore_finds_the_missing.py` reads the order by AST. `explore_search_test.go` drives a real
 explore through `ApplyWithWorld` against production's DDL and the shipped map from Greenriver Town;
-its drills move the range to 0 (*"a search from Greenriver Town does not reach Shrine of the Patient
-Ox"*) and to 2 (*"reached Ashenwall City, more than one step out"*).
+its drills put the neighbouring cities back (*"a search from Greenriver Town reached Riverguard City;
+it stops before the next city"*) and disable the wilds (*"a city and the wilds beside it are one
+search area"*). That second drill first passed by breaking the build - removing the wilds term left
+`loc` unused - and a `grep` over the output hid the compile error; it is a disabled term now.
 
 ## Testing conventions
 

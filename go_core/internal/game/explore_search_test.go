@@ -8,7 +8,8 @@ import (
 )
 
 // An ordinary explore finds whoever went missing within range of where the
-// explorer stands, and the grave of anybody who died there unreached (v1.22.1).
+// explorer stands, and the grave of anybody who died there unreached (v1.22.1):
+// their city and the road sites and wilds around it, never the next city.
 // None of it is a die: the search compares locations against a set read off
 // the map, so every assertion holds every run. The places are the shipped
 // catalogue's, because the range is a fact about that map: Greenriver Town's
@@ -111,22 +112,22 @@ func names(t *testing.T, v any) []string {
 func TestAnExploreFindsTheMissingWithinRange(t *testing.T) {
 	path, world := exploreSearchWorld(t)
 	result := exploreHere(t, path, world, 1)
-	want := "[Gate Watcher Ren Lost Herbalist Mei Neighbour Lin Shrine Pilgrim An]"
+	want := "[Gate Watcher Ren Lost Herbalist Mei Shrine Pilgrim An]"
 	if got := fmt.Sprint(names(t, result["found_npcs"])); got != want {
-		t.Fatalf("exploring Greenriver Town found %s; want %s - the town, its gate, a shrine on its road and a neighbouring city's gate", got, want)
+		t.Fatalf("exploring Greenriver Town found %s; want %s - the town, its gate and a shrine on its road", got, want)
 	}
 	if got := exploreSearchScalar(t, path, `SELECT status FROM npc_civilization_state WHERE npc_name='Lost Herbalist Mei'`); got != "alive" {
 		t.Fatalf("the find answered and the herbalist is still %q on a fresh read", got)
 	}
-	for name, where := range map[string]string{"Two Roads Gao": "Ashenwall City, two roads off", "Far Porter Wu": "Ironbanner City"} {
+	for name, where := range map[string]string{"Neighbour Lin": "Riverguard City West Gate, the next city", "Two Roads Gao": "Ashenwall City, two roads off", "Far Porter Wu": "Ironbanner City"} {
 		if got := exploreSearchScalar(t, path, `SELECT status FROM npc_civilization_state WHERE npc_name=?`, name); got != "missing" {
 			t.Fatalf("an explore at Greenriver Town found %s at %s, out of range (now %q)", name, where, got)
 		}
 	}
-	if got := exploreSearchScalar(t, path, `SELECT COUNT(*) FROM world_history_events WHERE event_type='npc_found' AND related_user_id=42`); got != "4" {
-		t.Fatalf("the finds left %s npc_found history row(s), want 4", got)
+	if got := exploreSearchScalar(t, path, `SELECT COUNT(*) FROM world_history_events WHERE event_type='npc_found' AND related_user_id=42`); got != "3" {
+		t.Fatalf("the finds left %s npc_found history row(s), want 3", got)
 	}
-	if got := exploreSearchScalar(t, path, `SELECT location FROM world_history_events WHERE event_type='npc_found' AND related_npc_name='Neighbour Lin'`); got != "Riverguard City West Gate" {
+	if got := exploreSearchScalar(t, path, `SELECT location FROM world_history_events WHERE event_type='npc_found' AND related_npc_name='Shrine Pilgrim An'`); got != "Shrine of the Patient Ox" {
 		t.Fatalf("the history places the find at %q; it records where the person was, not where the explorer stood", got)
 	}
 	// A second explore finds nobody: the herbalist is no longer missing.
@@ -155,38 +156,40 @@ func TestAnExploreReachesAGraveWhereItIs(t *testing.T) {
 	}
 }
 
-func TestTheSearchAreaIsTheCityAndOneStepOut(t *testing.T) {
+func TestTheSearchAreaStopsBeforeTheNextCity(t *testing.T) {
 	catalog := districtCatalog(t)
-	fromGate := exploreSearchArea(catalog, "Greenriver Town East Gate", 0)
-	fromTown := exploreSearchArea(catalog, "Greenriver Town", 0)
-	if fmt.Sprint(fromGate) != fmt.Sprint(fromTown) {
+	area := func(here string) map[string]bool {
+		in := map[string]bool{}
+		for _, place := range exploreSearchArea(catalog, here, 0) {
+			in[place] = true
+		}
+		return in
+	}
+	if fmt.Sprint(exploreSearchArea(catalog, "Greenriver Town East Gate", 0)) != fmt.Sprint(exploreSearchArea(catalog, "Greenriver Town", 0)) {
 		t.Fatal("a search from a city's gate covers different ground from one in its street; a gate is its city")
 	}
-	in := map[string]bool{}
-	for _, place := range fromTown {
-		in[place] = true
-	}
-	for _, place := range []string{"Greenriver Town", "Greenriver Apothecary", "Shrine of the Patient Ox", "Sunken Bell Ruin", "Riverguard City", "Riverguard City West Gate", "Azure Crown Imperial City"} {
-		if !in[place] {
+	town := area("Greenriver Town")
+	for _, place := range []string{"Greenriver Town", "Greenriver Town East Gate", "Greenriver Apothecary", "Shrine of the Patient Ox", "Sunken Bell Ruin"} {
+		if !town[place] {
 			t.Fatalf("a search from Greenriver Town does not reach %s", place)
 		}
 	}
-	for _, place := range []string{"Ashenwall City", "Ironbanner City", "Four-Roads Caravan City"} {
-		if in[place] {
-			t.Fatalf("a search from Greenriver Town reached %s, more than one step out", place)
+	for _, place := range []string{"Riverguard City", "Riverguard City West Gate", "Azure Crown Imperial City", "Ashenwall City", "Ironbanner City"} {
+		if town[place] {
+			t.Fatalf("a search from Greenriver Town reached %s; it stops before the next city", place)
 		}
 	}
-	for _, place := range fromTown {
+	for place := range town {
 		if loc := catalog.Locations[place]; loc.Private || loc.World != "Mortal World" {
 			t.Fatalf("a search from Greenriver Town covers %s, which is private or in another world", place)
 		}
 	}
-	fromShrine := exploreSearchArea(catalog, "Shrine of the Patient Ox", 0)
-	got := map[string]bool{}
-	for _, place := range fromShrine {
-		got[place] = true
+	shrine := area("Shrine of the Patient Ox")
+	if !shrine["Shrine of the Patient Ox"] || shrine["Greenriver Town"] || shrine["Riverguard City"] || shrine["Sunken Bell Ruin"] {
+		t.Fatalf("a search from a road site should cover that road and no city or other road: %v", shrine)
 	}
-	if !got["Greenriver Town East Gate"] || !got["Riverguard City"] {
-		t.Fatalf("a search from a road site does not reach both ends of its road: %v", fromShrine)
+	moonfen, marsh := area("Moonfen City"), area("Moonfen Marsh")
+	if !moonfen["Moonfen Marsh"] || !marsh["Moonfen City"] {
+		t.Fatal("a city and the wilds beside it are one search area, searched from either")
 	}
 }

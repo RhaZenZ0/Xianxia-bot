@@ -1,7 +1,7 @@
 """An ordinary explore finds the missing (v1.22.1).
 
-The engine searches the ground around an explore - the explorer's whole city and one
-step out from it - and reports who it found
+The engine searches the ground around an explore - the explorer's whole city and the road
+sites and wilds around it, never the next city - and reports who it found
 (`found_npcs`) and which graves it reached (`found_graves`); the Go tests hold
 that half (`explore_search_test.go`). This holds the reply: it prints both,
 and it prints them where the discovery block cannot overwrite them - that

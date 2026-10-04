@@ -275,8 +275,9 @@ def search_lines(outcome: dict) -> str:
     """Who an explore found, as the engine reported it (v1.22.1).
 
     The engine searches the ground around the explorer - their whole city and
-    one step out from it - so anybody missing in that range is found and an
-    unclaimed grave in it is reached, and each line says where. This only prints its
+    the road sites and wilds around it, stopping before the next city - so
+    anybody missing in that range is found and an unclaimed grave in it is
+    reached, and each line says where. This only prints its
     answer - which place, whose purse and what keepsake are the engine's.
     """
     text = ""
