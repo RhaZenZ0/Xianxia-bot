@@ -225,7 +225,10 @@ var authoritativeQueries = map[string]bool{
 	"stall.board":               true,
 	"stall.status":              true,
 	"flame.status":              true,
-	"spirit_sense.status":       true,
+	// v1.24.0: the active wars a cultivator may fight in and on which side,
+	// so a picker offers only what war.act would take.
+	"war.fronts":          true,
+	"spirit_sense.status": true,
 	// v1.8.0: what a sect member may redeem, at the engine's price.
 	"sect.exchange": true,
 	// v0.30.0: the world-status reads that app/simulation/world.py ran as raw
@@ -890,6 +893,20 @@ func applyAuthoritativeQuery(databasePath, worldPath string, req ActionRequest) 
 			return ActionResponse{}, loadErr
 		}
 		result, qerr := flameStatusQuery(conn, catalog, req.ActorID)
+		if qerr != nil {
+			return ActionResponse{}, qerr
+		}
+		v, _ := eventledger.CurrentActorVersion(conn, req.ActorID)
+		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
+	case "war.fronts":
+		if strings.TrimSpace(worldPath) == "" {
+			return ActionResponse{}, errors.New("world catalog path is required")
+		}
+		catalog, loadErr := worlddata.Load(worldPath)
+		if loadErr != nil {
+			return ActionResponse{}, loadErr
+		}
+		result, qerr := warFrontsQuery(conn, catalog, req.ActorID)
 		if qerr != nil {
 			return ActionResponse{}, qerr
 		}

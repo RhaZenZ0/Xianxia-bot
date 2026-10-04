@@ -1837,11 +1837,20 @@ async def run(url: str, token: str, db_path: str) -> Report:
         report.add("PASS" if war_id and str(contested.get("attacker_key")) == "Crimson Furnace Sect" and str(contested.get("defender_key")) == sect else "FAIL",
                    "a second claim starts a war", f"war={war_id} {contested.get('attacker_key')} vs {contested.get('defender_key')}")
     if war_id:
+        # Which wars a cultivator may fight in, and on which side, is the
+        # engine's answer (v1.24.0): the /war act picker is built from it.
+        fronts = await step(report, "war.fronts for the holder", query("war.fronts", PLAYER, {}))
+        if fronts is not None:
+            mine = [f for f in list(fronts.get("wars") or []) if int(f.get("war_id") or 0) == war_id]
+            report.add("PASS" if mine and str(mine[0].get("side")) == "defender" else "FAIL",
+                       "the holder is offered the war on the defending side", str(mine[0].get("side") if mine else "not offered"))
         for uid, tactic in ((BUYER, "assault"), (PLAYER, "fortify")):
             acted = await step(report, f"war.act {tactic}", act("war.act", uid, {"war_id": war_id, "tactic": tactic}))
             if acted is not None:
                 ops = dict(acted.get("operations") or {})
                 report.add("PASS", "the tactic's roll, reported", f"status={acted.get('status')} siege={ops.get('siege_progress')} morale={ops.get('attacker_morale')}/{ops.get('defender_morale')}")
+                # Fighting pays sect contribution (v1.24.0).
+                report.add("PASS" if int(acted.get("points") or 0) > 0 else "FAIL", "the act earned sect contribution", str(acted.get("points")))
         await either("war.act again waits, or the war is over", act("war.act", PLAYER, {"war_id": war_id, "tactic": "repel"}), "still on cooldown", "active war not found")
     # Both walked to the hills to claim them; the homestead below is founded
     # where its founder stands, and the buyer visits it in the town.

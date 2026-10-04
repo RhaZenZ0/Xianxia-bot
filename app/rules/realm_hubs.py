@@ -5,8 +5,8 @@ from typing import Any, Mapping
 # The four worlds, and the one place they are enumerated. Every per-world loop
 # in the tree reads this: the access and presence roles, the capital channels,
 # which world an auction floor belongs to, and - since v1.0.0-rc.52 - the
-# per-world world-events channels, and since v1.7.0 the per-world market-stalls
-# channels. A fifth world is one entry here, not five
+# per-world world-events channels, since v1.7.0 the per-world market-stalls
+# channels, and since v1.24.0 the per-world war fronts. A fifth world is one entry here, not five
 # edits in five files.
 REALM_HUBS: dict[str, dict[str, Any]] = {
     "Mortal World": {
@@ -25,6 +25,11 @@ REALM_HUBS: dict[str, dict[str, Any]] = {
             "Mortal World market stalls — "
             "one card per open stall in this world, kept current by the bot. Buy from anywhere with /economy → Market Stalls → Buy; goods from farther off cost a little more a road."
         ),
+        "war_channel_name": "mortal-world-war-front",
+        "war_topic": (
+            "Mortal World war front — "
+            "one card per sect war fought in this world, kept current by the bot: who besieges what, the walls, the morale and who won. Fight with /war act; a sect allied to one side may fight beside it."
+        ),
     },
     "Spiritual World": {
         "location": "Spirit Jade Capital",
@@ -41,6 +46,11 @@ REALM_HUBS: dict[str, dict[str, Any]] = {
         "stalls_topic": (
             "Spiritual World market stalls — "
             "one card per open stall in this world, kept current by the bot. Buy from anywhere with /economy → Market Stalls → Buy; goods from farther off cost a little more a road."
+        ),
+        "war_channel_name": "spiritual-world-war-front",
+        "war_topic": (
+            "Spiritual World war front — "
+            "one card per sect war fought in this world, kept current by the bot: who besieges what, the walls, the morale and who won. Fight with /war act; a sect allied to one side may fight beside it."
         ),
     },
     "Immortal World": {
@@ -59,6 +69,11 @@ REALM_HUBS: dict[str, dict[str, Any]] = {
             "Immortal World market stalls — "
             "one card per open stall in this world, kept current by the bot. Buy from anywhere with /economy → Market Stalls → Buy; goods from farther off cost a little more a road."
         ),
+        "war_channel_name": "immortal-world-war-front",
+        "war_topic": (
+            "Immortal World war front — "
+            "one card per sect war fought in this world, kept current by the bot: who besieges what, the walls, the morale and who won. Fight with /war act; a sect allied to one side may fight beside it."
+        ),
     },
     "Celestial World": {
         "location": "Celestial Mandate Palace",
@@ -75,6 +90,11 @@ REALM_HUBS: dict[str, dict[str, Any]] = {
         "stalls_topic": (
             "Celestial World market stalls — "
             "one card per open stall in this world, kept current by the bot. Buy from anywhere with /economy → Market Stalls → Buy; goods from farther off cost a little more a road."
+        ),
+        "war_channel_name": "celestial-world-war-front",
+        "war_topic": (
+            "Celestial World war front — "
+            "one card per sect war fought in this world, kept current by the bot: who besieges what, the walls, the morale and who won. Fight with /war act; a sect allied to one side may fight beside it."
         ),
     },
 }

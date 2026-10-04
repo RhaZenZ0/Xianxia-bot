@@ -74776,5 +74776,24 @@
     "spirit_divisor": 4,
     "min_bonus": 1,
     "max_bonus": 5
+  },
+  "war_system": {
+    "description": "How a war between two sects is fought (v1.24.0). act_points is the sect contribution a member earns for each act in a war their sect fights, up to war_points_cap a war; victory_points is paid once to every member who fought on the winning side. A territory's defense is real: fortify_defense_gain a defender's fortify, defense_cap at most, fall_defense where a fallen territory's walls are left, hold_defense_gain what a held siege adds, and every siege_defense_divisor points of it take one off each attacking blow. A sect that loses an attack may not move on that ground again for truce_days; a territory that falls is occupied for occupation_days, and in that time its former holder may strike back. A declaration costs the two sects declare_relation_drop of their standing and an ending end_relation_drop more. The world's own sieges are fought from both walls, at most tick_days_cap days a tick, and a besieger far from home loses weariness_per_day morale a day. A sect allied to one side - a marriage pact between them, or standing of ally_min_relation_score or more - may send its members to fight on that side; they earn the same act points and share the victory pay, and their sect's standing with the side they fight falls by ally_relation_drop the first time one of them does.",
+    "act_points": 8,
+    "war_points_cap": 80,
+    "victory_points": 120,
+    "truce_days": 30,
+    "occupation_days": 30,
+    "fortify_defense_gain": 2,
+    "defense_cap": 90,
+    "fall_defense": 30,
+    "hold_defense_gain": 10,
+    "siege_defense_divisor": 20,
+    "declare_relation_drop": 15,
+    "end_relation_drop": 10,
+    "tick_days_cap": 7,
+    "weariness_per_day": 1,
+    "ally_min_relation_score": 30,
+    "ally_relation_drop": 5
   }
 }

@@ -852,6 +852,16 @@ async def run(url: str, token: str, db_path: str, shard: tuple[int, int] | None 
                 expect(getattr(overwrites.get(access), "send_messages", None) is False
                        and getattr(overwrites.get(live.default_role), "send_messages", None) is False,
                        f"#{market} is not read-only")
+                # v1.24.0: the world's war front, beside its news, read-only too.
+                front = str(hub["war_channel_name"])
+                expect(front in made, f"no war-front channel for {world}")
+                expect(getattr(made[front].category, "name", None) == SERVER_EVENT_CATEGORY,
+                       f"#{front} sits in {getattr(made[front].category, 'name', None)!r}")
+                front_overwrites = made[front].overwrites or {}
+                expect(getattr(front_overwrites.get(access), "view_channel", None) is True
+                       and getattr(front_overwrites.get(access), "send_messages", None) is False
+                       and getattr(front_overwrites.get(live.default_role), "send_messages", None) is False,
+                       f"#{front} is not a read-only channel for {_realm_access_role_name(world)}")
             auctions = sorted(c.name for c in live.text_channels
                               if getattr(c.category, "name", None) == SERVER_AUCTION_CATEGORY)
             expect(len(auctions) == 9, f"{len(auctions)} auction channels, expected 9: {auctions}")
@@ -859,6 +869,8 @@ async def run(url: str, token: str, db_path: str, shard: tuple[int, int] | None 
             expect(rows == set(REALM_HUBS), f"bound worlds {sorted(rows)}")
             markets = {str(r["world_name"]) for r in await DB.get_stall_channels(guild.id)}
             expect(markets == set(REALM_HUBS), f"bound markets {sorted(markets)}")
+            fronts = {str(r["world_name"]) for r in await DB.get_war_channels(guild.id)}
+            expect(fronts == set(REALM_HUBS), f"bound war fronts {sorted(fronts)}")
 
             # The gate actually closed, not merely "no exception". SimCord gives
             # the bot every permission except administrator, so a channel
