@@ -21,7 +21,8 @@ DASHBOARD_API_VERSION = 2
 # spawn for a recruitment delegation. Since v1.6.0 the NPCs page's Event Casts
 # section reads the cast with both columns; a GM still has no lever over it.
 # Schema 64 (v1.3.5) adds `command_usage`, a presentation counter of command
-# presses per day; the dashboard reads no view over it.
+# presses per day. Since v1.22.0 Player Activity's Most-used commands card
+# reads it, over the window the bot prunes to; a GM has no lever over it.
 # Schema 65 (v1.5.0) adds `player_stalls`, `stall_listings` and `stall_sales`,
 # a cultivator's market stall in a city's street. The dashboard reads no view
 # over them and carries no lever: a GM's erasure and reset already take a
@@ -109,6 +110,10 @@ DASHBOARD_SYSTEM_TABLES = {
     # The NPCs head (v1.6.0). Each page owns the tables it is the dashboard's
     # only full reader of; `npc_civilization_state` and the life tables are
     # read by other views too, but one owner per table is the rule here.
+    # Player Activity's Most-used commands card (v1.22.0).
+    "players": (
+        "command_usage",
+    ),
     "npcs": (
         "world_event_npcs",
     ),

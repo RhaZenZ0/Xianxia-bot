@@ -79,6 +79,12 @@ LAYOUT_HUB_NAMES: set[str] = {
 # (/sect: 25 actions across three subgroups) at 36 and keeps headroom in case
 # Discord ever counts a nested component differently.  Longer pages chunk.
 _LAYOUT_ACTION_LIMIT = 8
+# The compact page (v1.22.0): the first few actions keep a described row each,
+# and the rest are plain buttons in rows of five beneath them, so a page shows
+# every action it holds instead of eight and a More actions button. A described
+# row costs three components and a button one, which is the whole trade.
+_LAYOUT_FEATURED = 3
+_LAYOUT_GRID_ROW = 5
 # A result shown inside the panel (v0.38.1) is one more TextDisplay and one
 # Separator - 38 of 40 with eight action rows - and Discord also caps the
 # text of a Components V2 message at 4,000 characters across its displays:
@@ -240,6 +246,13 @@ class HubPage:
     # qualified name ("sect status", "sect recruitment"), so a prefix claims a
     # whole subgroup. `test_hub_pages.py` holds every leaf to exactly one page.
     only: tuple[str, ...] = ()
+    # The order a player meets these leaves in (v1.22.0): qualified names,
+    # first to last. Unnamed leaves follow in the usual band order. Without
+    # it the order was the band and then the alphabet, so the Cultivate page
+    # read Seclusion Status, Cultivate, Seclusion Start, Breakthrough... - the
+    # thing the page is for second, and its three seclusion buttons apart.
+    # `test_the_menus_say_where_to_go.py` holds every name to a leaf here.
+    order: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -736,6 +749,27 @@ def _claimed_by(item: Any, only: tuple[str, ...]) -> bool:
     return any(qualified == pick or qualified.startswith(f"{pick} ") for pick in only)
 
 
+# Leaf path -> the label a player reads, for the leaves whose command name is
+# not a word (v1.22.0). A label is otherwise the name title-cased, which is
+# right for "explore" and wrong for "npcinfo". The hint resolver still answers
+# to the command name, so a printed path written with the old label resolves.
+LEAF_LABELS: dict[str, str] = {
+    "/daoheart": "Dao Heart",
+    "/specialeffects": "Special Effects",
+    "/npcinfo": "Inspect",
+    "/worldevents": "World Events",
+    "/worldrules": "World Rules",
+    "/spatialkey": "Use a Key",
+    "/manual cultivate_by": "Cultivate By",
+    "/manual list": "Manuals",
+    "/manual study": "Study",
+    "/manual technique": "Technique",
+    "/admin family familyinspect": "Family Inspect",
+    "/admin npc npcinspect": "NPC Inspect",
+    "/admin npc setmissing": "Set Missing",
+}
+
+
 def _leaf_actions(page: HubPage) -> list[HubAction]:
     commands = [c for c in (page.command, *tuple(getattr(page, "extras", ()) or ())) if c is not None]
     if not commands:
@@ -762,16 +796,19 @@ def _leaf_actions(page: HubPage) -> list[HubAction]:
                 command=item,
                 handler=ACTIONS.handler_for(item),
                 path=path,
-                label=(qualified if qualify else str(getattr(item, "name", "Action"))).replace("_", " ").title()[:100],
+                label=LEAF_LABELS.get(path) or (qualified if qualify else str(getattr(item, "name", "Action"))).replace("_", " ").title()[:100],
                 description=str(getattr(item, "description", "Run this action"))[:100],
             )
         )
-    # (band, name, path): band puts the useful actions first, name keeps each
-    # band alphabetical, path is the tiebreaker so nested subgroups that share a
-    # leaf name (/sect has four distinct "status" commands) stay deterministic.
+    # (order, band, name, path): a page's own order first (v1.22.0), then band
+    # puts the useful actions first, name keeps each band alphabetical, path is
+    # the tiebreaker so nested subgroups that share a leaf name (/sect has four
+    # distinct "status" commands) stay deterministic.
+    order = {name: index for index, name in enumerate(tuple(getattr(page, "order", ()) or ()))}
     return sorted(
         actions,
         key=lambda action: (
+            order.get(action.path.lstrip("/"), len(order)),
             _action_rank(getattr(action.command, "name", "")),
             str(getattr(action.command, "name", "")).casefold(),
             action.path,
@@ -2145,11 +2182,44 @@ class HubRefreshButton(discord.ui.Button):
 _LayoutHubBase = discord.ui.LayoutView if LAYOUT_COMPONENTS_AVAILABLE else discord.ui.View
 
 
-# The layout deliberately has NO system dropdown. It carried one at first, but
-# with Prev/Next present the two did the same job, and the select cost a full row
-# to display only the system already named in the page heading above it. Stepping
-# is the only navigation now; the arrows wrap, so the far end of a long hub is one
-# Prev away rather than seventeen Nexts.
+# The system dropdown is back (v1.22.0), and not as the select it once was. The
+# layout carried one at first and lost it because, beside Prev/Next, it showed
+# only the system already named in the page heading. But stepping alone left the
+# middle of a long hub up to four presses away - Economy has nine systems - and
+# that is navigation a player has to count. So the select is a jump, not a
+# heading: it never shows the current system as its value (the heading does
+# that), its placeholder says how many systems there are, and every option says
+# how many actions it holds. The arrows stay for walking a hub in order.
+PAGE_JUMP_PLACEHOLDER = "Jump to a system"
+
+
+class HubLayoutPageSelect(discord.ui.Select):
+    """One tap to any system of the hub (v1.22.0)."""
+
+    def __init__(self, hub_view: "LayoutHubView") -> None:
+        self.hub_view = hub_view
+        pages = list(hub_view.visible_pages())[:25]
+        current = hub_view.page.key if hub_view.page is not None else ""
+        options = []
+        for page in pages:
+            count = len(hub_view.page_actions(page))
+            here = "You are here · " if page.key == current else ""
+            options.append(discord.SelectOption(
+                label=page.label[:100],
+                value=page.key,
+                description=f"{here}{count} action{'s' if count != 1 else ''} · {page.description}"[:100],
+                emoji=_page_emoji(page.key),
+            ))
+        super().__init__(
+            placeholder=f"{PAGE_JUMP_PLACEHOLDER} — {len(pages)} here"[:150],
+            min_values=1, max_values=1, options=options,
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        self.hub_view.page_key = str(self.values[0])
+        self.hub_view.action_offset = 0
+        self.hub_view.rebuild()
+        await interaction.response.edit_message(view=self.hub_view)
 
 
 class HubLayoutActionButton(discord.ui.Button):
@@ -2163,11 +2233,44 @@ class HubLayoutActionButton(discord.ui.Button):
         # nothing at the moment it matters most - the colour warns, the label
         # should say what it is about to do ("Sever", "Disband", "Abandon").
         # Everything else keeps one consistent label so the column stays calm.
-        label = action.label[:20] if style is discord.ButtonStyle.danger else "Open"
-        super().__init__(label=label, style=style)
+        # Since v1.22.0 the calm label is an arrow rather than "Open": the
+        # buttons under the described rows carry their actions' names, and
+        # one of them ("Open" on Market Stalls) would read like every arrow.
+        if style is discord.ButtonStyle.danger:
+            super().__init__(label=action.label[:20], style=style)
+        else:
+            super().__init__(style=style, emoji="▶️")
 
     async def callback(self, interaction: discord.Interaction) -> None:
         await _start_hub_action(interaction, self.hub_view, self.action)
+
+
+class HubLayoutGridButton(discord.ui.Button):
+    """One of the compact page's plain buttons (v1.22.0): the action's own name,
+    its colour, and the press every hub button makes."""
+
+    def __init__(self, hub_view: "LayoutHubView", action: HubAction, *, index: int) -> None:
+        self.hub_view = hub_view
+        self.action = action
+        super().__init__(
+            label=action.label[:80], style=_action_button_style(action, index),
+            emoji=_mapped_action_emoji(action),
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        await _start_hub_action(interaction, self.hub_view, self.action)
+
+
+def _grid_capacity(budget: int) -> int:
+    """How many plain buttons fit in `budget` components: a caption, then rows
+    of at most five, each row one component more than its buttons."""
+    budget -= 1  # the "Also here" caption
+    fits = 0
+    while budget >= 2:
+        row = min(_LAYOUT_GRID_ROW, budget - 1)
+        fits += row
+        budget -= 1 + row
+    return fits
 
 
 class HubLayoutSystemStepButton(discord.ui.Button):
@@ -2208,9 +2311,11 @@ class HubLayoutActionPageButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
+        # The offset walks the plain buttons (v1.22.0); the described rows at
+        # the top of a page stay where they are.
         page = self.hub_view.page
-        total = len(_leaf_actions(page)) if page is not None else 0
-        step_size = max(1, int(getattr(self.hub_view, "row_limit", _LAYOUT_ACTION_LIMIT)))
+        total = max(0, len(self.hub_view.page_actions(page)) - _LAYOUT_FEATURED)
+        step_size = max(1, int(getattr(self.hub_view, "grid_limit", _LAYOUT_ACTION_LIMIT)))
         if total <= step_size:
             await interaction.response.defer()
             return
@@ -2389,7 +2494,8 @@ class LayoutHubView(_LayoutHubBase):
     dropdown, so a player cannot see what a system offers without opening a menu
     and cannot reach anything in fewer than two interactions.  Here each action
     renders as its own Section - emoji, label, description and its own button -
-    and the only surviving dropdown jumps between systems.
+    and the only dropdown jumps between systems (v1.22.0; see
+    `HubLayoutPageSelect` for why it went and came back).
 
     A Components V2 message cannot carry ``content`` or ``embeds``, so the
     classic panel's trick - writing the action's output over the card - is
@@ -2538,17 +2644,16 @@ class LayoutHubView(_LayoutHubBase):
             lines.append(f"{status.name} {value}".strip()[:200])
         return "\n".join(lines)[:900]
 
-    def _page_text(self, page: HubPage, total: int, shown: int) -> str:
+    def _page_text(self, page: HubPage, total: int, span: tuple[int, int] | None) -> str:
         page_index = next(
             (index for index, item in enumerate(self.visible_pages(), 1) if item.key == page.key),
             1,
         )
         total_pages = max(1, len(self.visible_pages()))
-        if total > shown:
-            first = self.action_offset + 1
+        if span is not None:
             meta = (
                 f"-# System {page_index}/{total_pages}  ·  "
-                f"actions {first}-{self.action_offset + shown} of {total}"
+                f"actions {span[0]}-{span[1]} of {total}"
             )
         else:
             meta = (
@@ -2571,13 +2676,22 @@ class LayoutHubView(_LayoutHubBase):
         )
         container.add_item(discord.ui.TextDisplay(self._header_text()))
         result_row = None
+        # The jump (v1.22.0) sits under the header, where a hub's systems are
+        # read from, and only where there is somewhere else to jump to.
+        jump = len(self.visible_pages()) > 1 and not self.expired
+        if jump:
+            jump_row = discord.ui.ActionRow()
+            jump_row.add_item(HubLayoutPageSelect(self))
+            container.add_item(jump_row)
         # Components in the fixed chrome, counted against Discord's cap so
         # the action list shrinks to make room for the result and its
         # buttons rather than the message failing to send: the container,
         # the header, three separators, the page text, the control row and
-        # its five buttons at most; a result adds a separator and a text, and
-        # its row adds one plus its buttons.
-        fixed = 1 + 1 + 3 + 1 + 1 + 5
+        # its buttons (Refresh and Menu, the two arrows on a hub of several
+        # systems, and More actions only when the page pages - counted below),
+        # and the jump's row and select; a result adds a separator and a text,
+        # and its row adds one plus its buttons.
+        fixed = 1 + 1 + 3 + 1 + 1 + (4 if jump else 2) + (2 if jump else 0)
         if self.last_result and not self.expired:
             container.add_item(discord.ui.Separator())
             # `##`, not `###` (v1.0.0-rc.21): the result is the thing the
@@ -2591,9 +2705,6 @@ class LayoutHubView(_LayoutHubBase):
             if result_row is not None:
                 container.add_item(result_row)
                 fixed += 1 + len(list(result_row.children))
-        row_limit = max(1, min(_LAYOUT_ACTION_LIMIT, (_LAYOUT_COMPONENT_CAP - fixed) // 3))
-        self.row_limit = row_limit
-
         page = self.page
         if self.expired:
             container.add_item(discord.ui.Separator())
@@ -2614,23 +2725,46 @@ class LayoutHubView(_LayoutHubBase):
 
         actions = self.page_actions(page)
         total = len(actions)
-        if self.action_offset >= total:
+        # The compact page (v1.22.0): the first actions keep a described row,
+        # the rest are plain buttons sized to whatever the budget has left -
+        # fourteen with nothing else on the card, fewer under a result - and
+        # only what still does not fit is paged with More actions.
+        featured = actions[:_LAYOUT_FEATURED]
+        rest = actions[len(featured):]
+        budget = _LAYOUT_COMPONENT_CAP - fixed - 3 * len(featured)
+        grid_limit = _grid_capacity(budget) if rest else 0
+        if len(rest) > grid_limit:
+            # More actions takes a component of its own.
+            grid_limit = _grid_capacity(budget - 1)
+        if self.action_offset >= len(rest):
             self.action_offset = 0
-        visible = actions[self.action_offset : self.action_offset + row_limit]
+        grid = rest[self.action_offset : self.action_offset + grid_limit]
+        self.grid_limit = max(1, grid_limit)
+        self.row_limit = len(featured) + grid_limit
+        paged = len(rest) > grid_limit
+        span = (
+            (len(featured) + self.action_offset + 1, len(featured) + self.action_offset + len(grid))
+            if paged else None
+        )
 
         container.add_item(discord.ui.Separator())
-        container.add_item(discord.ui.TextDisplay(self._page_text(page, total, len(visible))))
-        if visible:
+        container.add_item(discord.ui.TextDisplay(self._page_text(page, total, span)))
+        if featured:
             container.add_item(discord.ui.Separator())
-        for offset, action in enumerate(visible):
+        for index, action in enumerate(featured):
             container.add_item(
                 discord.ui.Section(
                     discord.ui.TextDisplay(self._action_text(action)),
-                    accessory=HubLayoutActionButton(
-                        self, action, index=self.action_offset + offset
-                    ),
+                    accessory=HubLayoutActionButton(self, action, index=index),
                 )
             )
+        if grid:
+            container.add_item(discord.ui.TextDisplay("-# Also here"))
+            for start in range(0, len(grid), _LAYOUT_GRID_ROW):
+                row = discord.ui.ActionRow()
+                for offset, action in enumerate(grid[start : start + _LAYOUT_GRID_ROW]):
+                    row.add_item(HubLayoutGridButton(self, action, index=len(featured) + start + offset))
+                container.add_item(row)
         container.add_item(discord.ui.Separator())
 
         multi_page = len(self.visible_pages()) > 1
@@ -2644,7 +2778,7 @@ class LayoutHubView(_LayoutHubBase):
         # One "More actions" that wraps: a row holds five buttons, and with
         # Menu on it (v0.40.0) there is no room for a "Fewer" that the wrap
         # makes redundant anyway.
-        if total > row_limit:
+        if paged:
             controls.add_item(HubLayoutActionPageButton(self, direction=1))
         container.add_item(controls)
 

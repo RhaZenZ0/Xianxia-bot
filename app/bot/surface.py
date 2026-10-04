@@ -92,11 +92,15 @@ from .hubs import (
     HubDefinition,
     HubPage,
     HubStatusField,
+    _HINT_PATH_RE,
     _hub_icon,
     _leaf_actions,
+    _panel_refusal,
+    _record_leaf_use,
     _start_hub_action,
     menu_shape,
     open_hub_in_place,
+    suggested_actions,
     panel_timeout,
     register_panel_idle,
     register_hubs,
@@ -201,7 +205,8 @@ if _missing_action_roots:
     raise RuntimeError(f"Command registry lost action roots: {_missing_action_roots}")
 
 def _hub_page(root: str, label: str, description: str, *extra_roots: str,
-              only: tuple[str, ...] = (), key: str | None = None) -> HubPage:
+              only: tuple[str, ...] = (), key: str | None = None,
+              order: tuple[str, ...] = ()) -> HubPage:
     """One page of a hub. Extra roots (v1.0.0-rc.4) are gathered onto the same
     page, so a page can be a thing you are doing rather than one command's
     name; the page keeps the first root's key, which hint paths, the playtest
@@ -210,11 +215,14 @@ def _hub_page(root: str, label: str, description: str, *extra_roots: str,
     `only` (v1.0.0-rc.13) names the leaves this page takes from that root, so
     one large group can be several pages instead of one page four deep in Next
     buttons. A page that takes a subset needs its own `key`, because a key is
-    what the page select and every hint path address a page by."""
+    what the page select and every hint path address a page by.
+
+    `order` (v1.22.0) is the order a player meets the leaves in, first to
+    last; whatever it leaves out follows in band order."""
     return HubPage(
         key=key or root, label=label, description=description, command=_ROOT_ACTIONS[root],
         extras=tuple(_ROOT_ACTIONS[name] for name in extra_roots),
-        only=only,
+        only=only, order=order,
     )
 
 
@@ -277,7 +285,9 @@ _HUB_DEFINITIONS = (
             # pages named after commands became four named after the work:
             # every action is still here, one tap further in at most.
             _hub_page("cultivate", "Cultivate", "Meditate under your stance, choose the stance, bank a realm-gate insight, break through, or close the doors for a seclusion.",
-                      "stance", "insight", "breakthrough", "seclusion"),
+                      "stance", "insight", "breakthrough", "seclusion",
+                      order=("cultivate", "breakthrough", "insight", "stance",
+                             "seclusion start", "seclusion status", "seclusion end")),
             _hub_page("body", "Body", "The parallel body path: temper it, inspect it and break through its stages."),
             _hub_page("dantian", "Qi Body", "The three dantian and the channels that feed them: what you hold, how clean it is, how far you feel.", "meridian"),
             # v1.0.0-rc.8: the ghost road. The page is shown to everyone - the
@@ -291,7 +301,8 @@ _HUB_DEFINITIONS = (
             _hub_page("law", "Laws", "What you comprehend: Law and Dao comprehension, meditation on a Law, and the techniques it unlocks."),
             # `profession` is the Craft hub's - it was listed in both, one
             # handler appearing twice.
-            _hub_page("manual", "Arts", "Manuals and techniques, and the concealment of your aura.", "conceal"),
+            _hub_page("manual", "Arts", "Manuals and techniques, and the concealment of your aura.", "conceal",
+                      order=("manual study", "manual cultivate_by", "manual technique", "manual list", "conceal")),
         ),
     ),
     HubDefinition(
@@ -302,7 +313,8 @@ _HUB_DEFINITIONS = (
             _hub_page("inventory", "Inventory", "View carried items and materials."),
             _hub_page("storage", "Storage", "Inspect, deposit into and withdraw from spatial storage."),
             _hub_page("use", "Use Item", "Consume or activate a carried item."),
-            _hub_page("equipment", "Equipment", "Bind, equip, unequip and repair durable equipment."),
+            _hub_page("equipment", "Equipment", "Bind, equip, unequip and repair durable equipment.",
+                      order=("equipment status", "equipment equip", "equipment unequip", "equipment bind", "equipment repair")),
             _hub_page("artifact", "Artifacts", "Bond and awaken personal artifacts."),
             _hub_page("provenance", "Provenance", "Inspect ownership marks, legality and tracking."),
         ),
@@ -328,7 +340,8 @@ _HUB_DEFINITIONS = (
             # right now - so they answer it together.
             _hub_page("world", "Almanac", "What is true in the world right now: where you are and what you have discovered, the era and the calendar, its rulers, its laws, and the phenomena currently running.",
                       "era", "time", "rulers", "worldrules", "worldevents"),
-            _hub_page("city", "City", "The city you are in: its gates and districts, the commission board, the sect envoys' hall, the rumours and the inn."),
+            _hub_page("city", "City", "The city you are in: its gates and districts, the commission board, the sect envoys' hall, the rumours and the inn.",
+                      order=("city look", "city enter", "city board", "city accept", "city envoys", "city inn", "city rumours")),
             _hub_page("explore", "Act", "What you can do with this place: explore it for events and discoveries, hunt the spirit beasts that range here, or break ore out of its seams.",
                       "hunt", "mine"),
             _hub_page("scene", "Here", "This spot: the running scene and its in-world time, and the region's population, security and named NPC activity.",
@@ -364,8 +377,10 @@ _HUB_DEFINITIONS = (
         description="Wallet, city shops, local markets, black markets, protected auctions, travelling merchants and trade caravans.",
         pages=(
             _hub_page("wallet", "Wallet", "View cultivation currencies."),
-            _hub_page("shop", "City Shops", "The smithy, apothecary and talisman hall of each city: find them by exploring, enter them by travelling, buy and sell inside."),
-            _hub_page("stall", "Market Stalls", "Your own stall in a city's street: standing listings that sell to cultivators and townsfolk while you are away, grown by your homestead's merchant hall."),
+            _hub_page("shop", "City Shops", "The smithy, apothecary and talisman hall of each city: find them by exploring, enter them by travelling, buy and sell inside.",
+                      order=("shop here", "shop browse", "shop buy", "shop sell")),
+            _hub_page("stall", "Market Stalls", "Your own stall in a city's street: standing listings that sell to cultivators and townsfolk while you are away, grown by your homestead's merchant hall.",
+                      order=("stall board", "stall buy", "stall status", "stall open", "stall list", "stall withdraw", "stall close")),
             _hub_page("market", "Local Market", "Buy and sell in the dynamic local economy."),
             _hub_page("blackmarket", "Black Market", "Locate rotating underworld posts and trade forbidden goods."),
             _hub_page("auction", "Auction House", "Browse, list and bid in protected auctions."),
@@ -390,7 +405,9 @@ _HUB_DEFINITIONS = (
         name="beast",
         title="🐉 Beast Hub",
         description="Manage contracted spirit beasts and the active companion.",
-        pages=(_hub_page("beast", "Companions", "Inspect, train, evolve and activate contracted beasts."),),
+        pages=(_hub_page("beast", "Companions", "Inspect, train, evolve and activate contracted beasts.",
+                         order=("beast status", "beast encounters", "beast tame", "beast feed", "beast train",
+                                "beast active", "beast evolve")),),
     ),
     HubDefinition(
         name="sect",
@@ -404,7 +421,10 @@ _HUB_DEFINITIONS = (
                       only=("sect status", "sect roster", "sect politics", "sect address",
                             "sect form", "sect family", "sect shadow")),
             _hub_page("sect", "Recruitment", "Getting in: which sects recruit, who will sponsor you, and the entrance examination.",
-                      key="sect_recruitment", only=("sect recruitment",)),
+                      key="sect_recruitment", only=("sect recruitment",),
+                      order=("sect recruitment info", "sect recruitment recommendation", "sect recruitment trial",
+                             "sect recruitment ascend", "sect recruitment status",
+                             "sect recruitment recommendations", "sect recruitment history")),
             _hub_page("sect", "Discipleship", "Master and disciple: ask, accept, reject, and the bond you already hold.",
                       key="sect_discipleship", only=("sect discipleship",)),
             _hub_page("sect", "Holdings", "What the sect keeps and what you may draw from it: the shared manor, your residence, the treasury, contribution and redemption.",
@@ -424,7 +444,8 @@ _HUB_DEFINITIONS = (
                             "family clan", "family descendants", "family child")),
             _hub_page("family", "Hearth", "What the house gives to somebody standing in it (v1.0.0-rc.32): its support, its coffers, its teaching and its errands.",
                       key="family_hearth",
-                      only=("family support", "family contribute", "family tutor", "family errand", "family lesson")),
+                      only=("family support", "family contribute", "family tutor", "family errand", "family lesson"),
+                      order=("family lesson", "family errand", "family support", "family tutor", "family contribute")),
             _hub_page("family", "House", "The cultivation house you found with other players, as distinct from the household you were born into: its seat order, its invitations and its children.",
                       key="family_house",
                       only=("family house status", "family house found", "family house invite",
@@ -808,7 +829,24 @@ async def _menu_shape(interaction: discord.Interaction) -> dict[str, Any]:
                 break
         if tutorial:
             break
-    return {"hidden_hubs": hidden, "tutorial": tutorial}
+    return {"hidden_hubs": hidden, "tutorial": tutorial, "daily_waits": await _daily_waits(interaction.user.id)}
+
+
+async def _daily_waits(user_id: int) -> dict[str, int]:
+    """The Daily row's waits (v1.22.0), off the cooldown card's own reading."""
+    return await _commands_cooldowns.daily_waits(user_id, DAILY_ACTIONS)
+
+
+def _short_wait(seconds: int) -> str:
+    """A wait short enough for a button: `12m`, `2h`, `1h20m`, and `wait`
+    when the world clock is stopped."""
+    if seconds < 0:
+        return "wait"
+    minutes = max(1, -(-int(seconds) // 60))
+    if minutes < 60:
+        return f"{minutes}m"
+    hours, rest = divmod(minutes, 60)
+    return f"{hours}h{rest}m" if rest else f"{hours}h"
 
 
 class MenuHubButton(discord.ui.Button):
@@ -827,11 +865,19 @@ class MenuDailyButton(discord.ui.Button):
     leaf, so the press is one tap and the result is drawn where a hub's own
     quick button would draw it."""
 
-    def __init__(self, root: str, hub: str, path: str) -> None:
+    def __init__(self, root: str, hub: str, path: str, *, wait: int | None = None) -> None:
         self.root, self.hub, self.path = str(root), str(hub), str(path)
         action = _daily_leaf(self.hub, self.path)
         label = action.label if action is not None else self.root.title()
-        super().__init__(label=label[:20], style=discord.ButtonStyle.success, emoji=_hub_icon_for_leaf(self.root))
+        # A button that is still cooling down says for how long (v1.22.0), so
+        # the row answers "what can I do now" before anybody presses it. It is
+        # still pressable: the engine's refusal says the same, and a panel
+        # opened an hour ago would otherwise hold a dead button.
+        style = discord.ButtonStyle.success
+        if wait is not None:
+            label = f"{label} · {_short_wait(wait)}"
+            style = discord.ButtonStyle.secondary
+        super().__init__(label=label[:30], style=style, emoji=_hub_icon_for_leaf(self.root))
 
     async def callback(self, interaction: discord.Interaction) -> None:
         action = _daily_leaf(self.hub, self.path)
@@ -849,6 +895,71 @@ class MenuDailyButton(discord.ui.Button):
         if page is not None:
             view.page_key = page.key
         await _start_hub_action(interaction, view, action)
+
+
+class MenuNextButton(MenuDailyButton):
+    """The tutorial's next step, pressed (v1.22.0).
+
+    The menu's `🧭 Next:` line named a hub path - "**/world → City → Envoys**" -
+    and left the player to walk it, which is the "I forget where to go"
+    report. This is that path as a button: the same leaf a reply's next-step
+    button resolves (`suggested_actions`), opened and pressed the way a Daily
+    button is."""
+
+    def __init__(self, hub: str, action: HubAction) -> None:
+        super().__init__(str(getattr(action.command, "name", "next")), hub, action.path)
+        self.label = f"Next: {action.label}"[:40]
+        self.style = discord.ButtonStyle.primary
+        self.emoji = "▶️"
+
+
+def _next_step(tutorial: str) -> tuple[str, HubAction] | None:
+    """The hub and leaf the tutorial line names, or None when it names none.
+
+    The hub is the one the printed path names wherever that hub holds the
+    leaf - `/breakthrough` is on two - and otherwise the first hub that does,
+    for a bare root such as `**/hunt**`."""
+    actions = suggested_actions(tutorial)
+    if not actions:
+        return None
+    action = actions[0]
+    match = _HINT_PATH_RE.search(str(tutorial or ""))
+    named = match.group(1) if match else ""
+    if named in _HUB_BY_NAME and _daily_leaf(named, action.path) is not None:
+        return named, action
+    for definition in _HUB_DEFINITIONS:
+        if _daily_leaf(definition.name, action.path) is not None:
+            return definition.name, action
+    return None
+
+
+class MenuCommandButton(discord.ui.Button):
+    """A read the menu reaches without a hub (v1.22.0): the quest journal and
+    the cooldown card were slash commands nothing on the menu opened.
+
+    The same gate the command tree applies: maintenance refuses it, and a
+    closed door does not (both are reads in `seclusion.OPEN_COMMANDS`). The
+    name is passed bare, the way the tree passes it, because a leading slash
+    means a hub leaf to the seclusion gate and every leaf acts."""
+
+    def __init__(self, name: str, label: str, emoji: str) -> None:
+        self.command_name = str(name)
+        super().__init__(label=label, style=discord.ButtonStyle.secondary, emoji=emoji)
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        refusal = await _panel_refusal(interaction.user, self.command_name)
+        if refusal:
+            await interaction.response.send_message(refusal, ephemeral=False)
+            return
+        _record_leaf_use(f"/{self.command_name}")
+        await ACTIONS.root(self.command_name).callback(interaction)
+
+
+# What the menu's tools row opens besides the next step, in order.
+MENU_TOOLS: tuple[tuple[str, str, str], ...] = (
+    ("quests", "Quests", "📜"),
+    ("cooldowns", "Cooldowns", "⏳"),
+)
 
 
 def _hub_icon_for_leaf(root: str) -> str:
@@ -878,6 +989,7 @@ class MenuView(_MenuBase):
     def __init__(
         self, *, owner_id: int, is_admin: bool, owner_name: str = "Cultivator", facts: str = "",
         hidden_hubs: Mapping[str, int] | None = None, tutorial: str = "",
+        daily_waits: Mapping[str, int] | None = None,
     ) -> None:
         super().__init__(timeout=panel_timeout())
         self.owner_id = int(owner_id)
@@ -888,6 +1000,7 @@ class MenuView(_MenuBase):
         # for neither gets the sixteen-hub menu this started from.
         self.hidden_hubs: dict[str, int] = {str(k): int(v) for k, v in dict(hidden_hubs or {}).items()}
         self.tutorial = str(tutorial or "")[:300]
+        self.daily_waits: dict[str, int] = {str(k): int(v) for k, v in dict(daily_waits or {}).items()}
         self.message: discord.Message | None = None
         if not LAYOUT_COMPONENTS_AVAILABLE:
             self.add_item(MenuSelect(is_admin=is_admin))
@@ -902,10 +1015,19 @@ class MenuView(_MenuBase):
         no_character = self.facts.startswith("🌱")
         last = _LAST_HUB.get(self.owner_id)
         if not no_character:
+            # The tools row (v1.22.0), under the line that says what is next:
+            # the next step pressed, the journal, and what is cooling down.
+            tools = discord.ui.ActionRow()
+            step = _next_step(self.tutorial) if self.tutorial else None
+            if step is not None:
+                tools.add_item(MenuNextButton(*step))
+            for name, label, emoji in MENU_TOOLS:
+                tools.add_item(MenuCommandButton(name, label, emoji))
+            container.add_item(tools)
             container.add_item(discord.ui.TextDisplay("**Daily**\n-# one tap each; also **/cultivate**, **/explore**, **/hunt**, **/forage**, **/mine**"))
             daily = discord.ui.ActionRow()
             for root, hub, path in _DAILY_LEAVES:
-                daily.add_item(MenuDailyButton(root, hub, path))
+                daily.add_item(MenuDailyButton(root, hub, path, wait=self.daily_waits.get(root)))
             container.add_item(daily)
         for title, blurb, names in _MENU_GROUPS:
             shown = [name for name in names if name not in self.hidden_hubs]
@@ -1004,6 +1126,7 @@ async def menu(interaction: discord.Interaction) -> None:
     view = MenuView(
         owner_id=member.id, is_admin=bool(is_admin), owner_name=getattr(member, "display_name", str(member)), facts=facts,
         hidden_hubs=shape.get("hidden_hubs"), tutorial=str(shape.get("tutorial") or ""),
+        daily_waits=shape.get("daily_waits"),
     )
     if LAYOUT_COMPONENTS_AVAILABLE:
         await interaction.response.send_message(view=view, ephemeral=False)
@@ -1019,6 +1142,7 @@ async def menu(interaction: discord.Interaction) -> None:
 register_menu_builder(lambda owner_id, is_admin, owner_name, facts="", shape=None: MenuView(
     owner_id=owner_id, is_admin=is_admin, owner_name=owner_name, facts=facts,
     hidden_hubs=(shape or {}).get("hidden_hubs"), tutorial=str((shape or {}).get("tutorial") or ""),
+    daily_waits=(shape or {}).get("daily_waits"),
 ))
 register_menu_facts(_menu_facts)
 register_menu_shape(_menu_shape)

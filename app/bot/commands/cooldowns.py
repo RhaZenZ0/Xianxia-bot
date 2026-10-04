@@ -145,6 +145,34 @@ async def _beast_names(user_id: int, rows: list[dict]) -> dict[str, str]:
         return {}
 
 
+# The cooldown family each daily root waits on, where its name differs.
+_DAILY_FAMILY = {"forage": "alchemy_forage"}
+
+
+async def daily_waits(user_id: int, roots: tuple[str, ...]) -> dict[str, int]:
+    """`root -> seconds still to wait` for the menu's Daily row (v1.22.0).
+
+    The same engine reading this card is drawn from, never a sum done here; a
+    wait on a stopped world clock has no real moment and is `-1`. It never
+    raises: a menu that could not read the cooldowns is the menu it was
+    before, every Daily button green.
+    """
+    try:
+        status = dict(await ENGINE.action("cooldown.status", int(user_id), {}) or {})
+    except Exception as exc:
+        log.warning("Daily waits unavailable for the menu: %s", exc)
+        return {}
+    families = {_DAILY_FAMILY.get(root, root): root for root in roots}
+    out: dict[str, int] = {}
+    for row in status.get("waits") or []:
+        row = dict(row)
+        root = families.get(str(row.get("family") or ""))
+        if root is None or row.get("subject"):
+            continue
+        out[root] = int(row.get("remaining_seconds") or 0) if row.get("scheduled") else -1
+    return out
+
+
 @registered_root_command(
     name="cooldowns",
     description="What you are waiting on, and what you can do right now",
