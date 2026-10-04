@@ -175,7 +175,7 @@ or above `QUEST_FORGE_MIN_SIGNIFICANCE` (default **80**) — and the whole simul
 at 74, so **no autonomous event has ever been able to reach the Quest Forge**. A disappearance is
 written at 82 and is the first one that can. Resolution is mechanical: the `npc.found` action clears
 it only when the caller is standing where the NPC actually is, and the engine checks that itself
-rather than taking `/talk`'s word for it.
+rather than taking `/talk`'s word for it. Since v1.22.1 an ordinary `/explore` runs the same find (`searchHereTx`, below).
 
 ### Somebody gets there first (`npc_grave_robbing.go`)
 
@@ -6567,6 +6567,33 @@ finds a leaf by a Section's bold label or a button's own label, so it needed no 
 dashboard; it was on `/admin server observability` alone. Player Activity reads `command_usage` over
 the window the bot prunes to, owns the table in `DASHBOARD_SYSTEM_TABLES`, and answers `None` for an
 unreadable count, which the page prints as unknown (the `engine —` footer lesson, v1.0.8).
+
+### An explore finds the missing (`explore_search.go`, v1.22.1)
+
+Asked for in five words: *"Normal explore can find missing npc's"*, and then *"make it a range"*. A
+disappearance closed one way, `/talk` by name while standing where the person is - which asked a
+searcher to know the answer before looking, since the talk picker lists a missing person only where
+the searcher already stands. `searchHereTx` runs inside the explore's own transaction and finds every
+`status='missing'` row, and reaches every unclaimed grave, anywhere in `exploreSearchArea`: the
+surroundings of where the explorer stands, stopping before the next city. Inside a city (a gate is
+its city, v1.0.9 - and so are its districts, shops and halls) that is the whole city, the road sites
+on its roads and its wilds; in the wilds, the same ground; on a road site, that road and not the
+cities at either end. A first version also took in the cities at the far end of every road, and the
+owner narrowed it. It is read off
+the map the players walk (`canonicalRoadNeighbors`, `roadSitesOnLeg`, `wilds_of`) at the explorer's
+own realm and world, so a search never reaches a place they could not walk to. **`npc.found` keeps
+its exact-place rule on purpose**: speaking to somebody needs them in front of you; looking around
+covers ground. The writes are `markNPCFoundTx` and `claimGraveTx`, pulled out of `npc.found` so the
+two doors are one statement each; `npc.found` keeps its own `begin`/commit around them (rc.38). The
+history row places the find where the person was, not where the explorer stood. The result carries
+`found_npcs` and `found_graves` with each `location`, and the bot only prints them (`search_lines`),
+**after** the discovery block, because that block assigns `discovery_text` rather than appending -
+`test_an_explore_finds_the_missing.py` reads the order by AST. `explore_search_test.go` drives a real
+explore through `ApplyWithWorld` against production's DDL and the shipped map from Greenriver Town;
+its drills put the neighbouring cities back (*"a search from Greenriver Town reached Riverguard City;
+it stops before the next city"*) and disable the wilds (*"a city and the wilds beside it are one
+search area"*). That second drill first passed by breaking the build - removing the wilds term left
+`loc` unused - and a `grep` over the output hid the compile error; it is a disabled term now.
 
 ## Testing conventions
 
