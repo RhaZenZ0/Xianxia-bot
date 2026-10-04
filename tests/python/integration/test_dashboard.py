@@ -178,6 +178,13 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("equipment_id", detail["equipment"][0])
         self.assertEqual(detail["abode"], {}, "no property is an empty row, not a missing key")
         self.assertEqual(detail["bloodlines"], [])
+        # v1.23.0: the progress cards and the vocabularies their pickers offer.
+        for key in ("sect", "flames", "spirit_sense", "storage", "master", "disciples", "laws", "professions",
+                    "manuals", "editor_catalogue", "aptitude_catalogue"):
+            with self.subTest(key=key):
+                self.assertIn(key, detail)
+        self.assertEqual(detail["master"], {}, "no master is an empty row, not a missing key")
+        self.assertTrue(detail["editor_catalogue"]["laws"], "the Law picker came with nothing to offer")
 
     async def test_player_detail_carries_the_quest_journal_the_quest_levers_act_on(self):
         """The Quests card (v1.4.1) picks the quest and objective a lever needs,

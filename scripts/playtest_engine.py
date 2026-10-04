@@ -2659,6 +2659,34 @@ async def run(url: str, token: str, db_path: str) -> Report:
                    "a fully built sense gives +5 and opens Transcendent", str(sense))
     await step(report, "the realm the earlier sections left, again", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": realm_before[0], "phase": realm_before[1], "reason": "playtest"}))
 
+    # ---- 20z. the Player Editor's progress levers (v1.23.0) ----------------
+    # A trade's rank, a Law's comprehension and a sect member's contribution
+    # had no lever; each is set, read back, refused out of range and undone.
+    await audited("admin.player.set_profession", {"user_id": PLAYER, "profession": "Forging", "level": 3, "xp": 10, "reason": "playtest"})
+    forging = await step(report, "the trade reads back as set", db.get_profession_progress(PLAYER, "Forging"))
+    if forging is not None:
+        report.add("PASS" if int((forging or {}).get("level") or -1) == 3 else "FAIL", "Forging stands at rank 3", str(forging))
+    await step(report, "a full bar below the top rank is refused",
+               gm("admin.player.set_profession", {"user_id": PLAYER, "profession": "Forging", "level": 0, "xp": 60, "reason": "playtest"}),
+               expect_error="xp must be")
+    await audited("admin.audit.undo_last", {"reason": "playtest: undo the trade"})
+    await audited("admin.player.set_law", {"user_id": PLAYER, "law_id": "fire", "comprehension": 35, "reason": "playtest"})
+    laws = await step(report, "the Law reads back as set", db.get_law_progress(PLAYER, "fire"))
+    if laws is not None:
+        report.add("PASS" if laws and int(laws[0].get("comprehension") or 0) == 35 else "FAIL", "Fire Law at 35%", str(laws))
+    await step(report, "a Law the catalogue does not carry is refused",
+               gm("admin.player.set_law", {"user_id": PLAYER, "law_id": "not_a_law", "comprehension": 5, "reason": "playtest"}),
+               expect_error="law_id must be one of")
+    membership = await db.get_sect_membership(PLAYER)
+    if not membership:
+        await step(report, "a sect to hold contribution in", gm("admin.player.set_sect", {"user_id": PLAYER, "sect_name": "Azure Cloud Sect", "rank_name": "Outer Disciple", "rank_level": 10, "reason": "playtest"}))
+    await audited("admin.player.set_sect_contribution", {"user_id": PLAYER, "contribution_points": 250, "contribution_earned": 900, "reason": "playtest"})
+    held = await db.get_sect_membership(PLAYER)
+    report.add("PASS" if int((held or {}).get("contribution_points") or 0) == 250 else "FAIL", "the balance reads back as set", str(held))
+    await audited("admin.audit.undo_last", {"reason": "playtest: undo the contribution"})
+    if not membership:
+        await step(report, "and out of it again", gm("admin.player.set_sect", {"user_id": PLAYER, "remove": True, "reason": "playtest"}))
+
     # ---- 21. samsara, and what the hands remember (v1.0.0-rc.32) -------------
     # Last, because it ends the character. The trades this life practised go
     # into its record before the wipe, and a fresh rebirth remembers nothing

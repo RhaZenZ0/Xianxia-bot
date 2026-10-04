@@ -74,6 +74,10 @@ func parseNPCTarget(target string) (string, error) {
 // faithful, total reversal - not because the action is "safe" in some looser
 // sense.
 var reversibleAdminActions = map[string]reverseFunc{
+	// The Player Editor's three progress levers (v1.23.0); admin_player_progress.go.
+	"admin.player.set_profession":        reverseSetProfession,
+	"admin.player.set_law":               reverseSetLaw,
+	"admin.player.set_sect_contribution": reverseSetSectContribution,
 	"admin.player.karma": func(before, after map[string]any, target string, redo bool) ([]sqlStmt, error) {
 		uid, err := parseTargetUserID(target)
 		if err != nil {

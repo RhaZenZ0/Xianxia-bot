@@ -1078,7 +1078,7 @@ func TestAdminSetRealmPerfectionUpsertsClampsAndValidatesTrack(t *testing.T) {
 
 func TestAdminSetSpiritualRootUpsertsValidatesGradeAndLeavesOtherFieldsAlone(t *testing.T) {
 	path := setupAdminDB(t)
-	applyAdmin(t, path, "admin.player.set_spiritual_root", map[string]any{"user_id": 42, "grade": "Heaven", "purity": 80, "mutation": "Phoenix Blood", "reason": "story reward"})
+	applyAdmin(t, path, "admin.player.set_spiritual_root", map[string]any{"user_id": 42, "grade": "Heaven", "purity": 80, "mutation": "heavenly_flame", "reason": "story reward"})
 	if got := fmt.Sprint(scalar(t, path, "SELECT grade FROM character_spiritual_roots WHERE user_id=42")); got != "Heaven" {
 		t.Fatalf("grade=%q, want Heaven", got)
 	}

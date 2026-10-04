@@ -154,9 +154,18 @@ class TheBrowserKeepsNoCopyOfTheLadder(unittest.TestCase):
             "the tree"))
 
     def test_both_pickers_are_built_from_what_the_server_sent(self):
-        self.assertIn("aptitude_catalogue", self.body, (
+        # The variable, not the word (v1.23.0). This gate asked only that the
+        # body name `aptitude_catalogue`, and for twelve releases the body read
+        # it off `d` - the /api/admin snapshot, which never sends one - so the
+        # grade picker held only the current grade and the physique picker
+        # said the catalogue was unavailable on every server, with this test
+        # green. `p` is the /api/player response; `d` is not.
+        self.assertTrue("p.aptitude_catalogue" in self.body, (
             "loadPlayerEditor does not read the catalogue /api/player sends it, so its pickers "
             "are built from something else"))
+        self.assertFalse("d.aptitude_catalogue" in self.body, (
+            "loadPlayerEditor reads the catalogue off the /api/admin snapshot, which never "
+            "carries one, so every picker falls back to the character's current value"))
         for source in ("root_grades", "physiques"):
             self.assertIn(source, self.body, f"the {source} picker is not fed from the catalogue")
 

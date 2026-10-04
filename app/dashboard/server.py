@@ -29,6 +29,7 @@ from ..ops.http_limits import (
     read_request_head,
     LoginThrottle,
 )
+from ..rules.progression_systems import PROFESSIONS
 from ..rules.worldtime import from_game_minutes
 from ..version import INSTALLED_VERSION
 from ..database.core import COMMAND_USAGE_DAYS, _usage_cutoff_day
@@ -140,6 +141,89 @@ def _aptitude_catalogue() -> dict[str, list[dict[str, str]]]:
         if str((rung or {}).get("name") or "")
     ]
     return {"physiques": physiques, "root_grades": grades}
+
+
+@lru_cache(maxsize=1)
+def _editor_catalogue() -> dict[str, Any]:
+    """What the Player Editor's progress cards may offer (v1.23.0).
+
+    Each picker is built from the content file the engine reads, for the
+    reason `_aptitude_catalogue` gives: a picker built from a copy offers what
+    the engine will refuse the day the two disagree (rc.46). `professions` is
+    the trades the engine advances, held equal to Go's `adminProfessions` by
+    test_the_player_editor_edits_what_the_engine_writes.py, because a trade
+    list is code there and not content. An unreadable file answers empty
+    lists, and each card says it has nothing to offer.
+    """
+    empty: dict[str, Any] = {
+        "flames": [], "max_refinement": 0, "spirit_sense_max_stage": 0,
+        "sect_ranks": [], "laws": [], "professions": list(PROFESSIONS),
+        "realms": [], "body_realms": [], "tribulation_gates": [], "root_mutations": [],
+        "items": [], "storage_presets": [],
+    }
+    try:
+        world = json.loads((ROOT / "content" / "world.json").read_text(encoding="utf-8"))
+    except Exception:
+        log.warning("Could not load content/world.json for the editor catalogue", exc_info=True)
+        return empty
+    flame_system = world.get("flame_system") or {}
+    flames = flame_system.get("flames") or {}
+    sense = world.get("spirit_sense_system") or {}
+    laws = (world.get("law_system") or {}).get("laws") or {}
+    return {
+        "flames": [{"id": str(fid), "name": str((f or {}).get("name") or fid)} for fid, f in sorted(flames.items())],
+        "max_refinement": int(flame_system.get("max_refinement") or 0),
+        "spirit_sense_max_stage": int(sense.get("max_stage") or 0),
+        # The ladder in its own order: a rank is an order, as a root grade is.
+        "sect_ranks": [
+            {"name": str(r.get("name")), "level": int(r.get("level") or 0)}
+            for r in ((world.get("sect_system") or {}).get("ranks") or []) if isinstance(r, dict) and r.get("name")
+        ],
+        "laws": sorted(({"id": str(lid), "name": str((law or {}).get("name") or lid)} for lid, law in laws.items()), key=lambda x: x["name"]),
+        "professions": list(PROFESSIONS),
+        # The two ladders by index, so a realm is picked by its name.
+        "realms": _ladder(world.get("realms")),
+        "body_realms": _ladder(world.get("body_realms")),
+        # A world-crossing gate is the last realm of a world that has one
+        # above it. Read off the ladder rather than written here: the card used
+        # to carry [7,15,23] as a literal beside the engine's own map, and
+        # test_the_player_editor_edits_what_the_engine_writes.py holds the two.
+        "tribulation_gates": [
+            {"realm": i, "from": str(here.get("world") or ""), "to": str(nxt.get("world") or "")}
+            for i, (here, nxt) in enumerate(zip(world.get("realms") or [], (world.get("realms") or [])[1:]))
+            if isinstance(here, dict) and isinstance(nxt, dict) and here.get("world") != nxt.get("world")
+        ],
+        # Stored and read by id (rootCompatibility, loadEffectModifiers).
+        "root_mutations": sorted(
+            ({"id": str(mid), "name": str((m or {}).get("name") or mid)}
+             for mid, m in ((world.get("spiritual_root_system") or {}).get("mutations") or {}).items()),
+            key=lambda x: x["name"],
+        ),
+        "items": sorted(
+            ({"id": str(iid), "name": str((it or {}).get("name") or iid)} for iid, it in (world.get("items") or {}).items()),
+            key=lambda x: x["name"],
+        ),
+        # Every storage container the content authors, so a grant is one of
+        # them rather than a container nothing else in the world describes.
+        # The id is the one `storage.upgrade` stores for the same item.
+        "storage_presets": sorted(
+            (
+                {"container_id": str(((it or {}).get("storage_upgrade") or {}).get("container_id") or iid), "name": str((it or {}).get("name") or iid),
+                 "grade": str(((it or {}).get("storage_upgrade") or {}).get("grade") or ""),
+                 "slot_capacity": int(((it or {}).get("storage_upgrade") or {}).get("slot_capacity") or 0),
+                 "living_space": bool(((it or {}).get("storage_upgrade") or {}).get("living_space"))}
+                for iid, it in (world.get("items") or {}).items() if isinstance((it or {}).get("storage_upgrade"), dict)
+            ),
+            key=lambda x: x["slot_capacity"],
+        ),
+    }
+
+
+def _ladder(rows: Any) -> list[dict[str, Any]]:
+    return [
+        {"index": i, "name": str((r or {}).get("name") or i), "world": str((r or {}).get("world") or "")}
+        for i, r in enumerate(rows or []) if isinstance(r, dict)
+    ]
 
 
 def _base_currencies() -> list[str]:
@@ -1605,6 +1689,32 @@ class ReadOnlyDashboardStore:
                    WHERE q.user_id=? ORDER BY q.status='active' DESC,q.updated_at DESC LIMIT 60""",
                 (one,),
             )
+            # The progress cards (v1.23.0): each read is the row its lever
+            # writes, and every table is read only if it exists, because a
+            # table added by a later migration is absent in the window before
+            # db-init migrates and the editor must still draw.
+            membership = await self._fetchall_if_table(db, "sect_membership", "SELECT * FROM sect_membership WHERE user_id=?", (one,))
+            flames = await self._fetchall_if_table(db, "character_flames", "SELECT flame_id,refinement,bound FROM character_flames WHERE user_id=? ORDER BY bound DESC,flame_id", (one,))
+            sense_rows = await self._fetchall_if_table(db, "character_spirit_sense", "SELECT stage,progress FROM character_spirit_sense WHERE user_id=?", (one,))
+            storage_rows = await self._fetchall_if_table(db, "storage_containers", "SELECT container_id,name,grade,slot_capacity,living_space FROM storage_containers WHERE user_id=?", (one,))
+            storage_used = await self._fetchall_if_table(db, "storage_inventory", "SELECT COUNT(*) AS used FROM storage_inventory WHERE user_id=? AND quantity>0", (one,))
+            master_rows = await self._fetchall_if_table(
+                db, "sect_lineage",
+                "SELECT l.*,c.name AS master_name FROM sect_lineage l LEFT JOIN characters c ON c.user_id=l.master_user_id WHERE l.disciple_user_id=?",
+                (one,),
+            )
+            disciples = await self._fetchall_if_table(
+                db, "sect_lineage",
+                "SELECT l.disciple_user_id,c.name FROM sect_lineage l LEFT JOIN characters c ON c.user_id=l.disciple_user_id WHERE l.master_user_id=? ORDER BY c.name",
+                (one,),
+            )
+            laws = await self._fetchall_if_table(db, "law_progress", "SELECT law_id,comprehension,insights FROM law_progress WHERE user_id=? ORDER BY comprehension DESC,law_id", (one,))
+            professions = await self._fetchall_if_table(db, "profession_progress", "SELECT profession,level,xp,successes,failures FROM profession_progress WHERE user_id=? ORDER BY level DESC,profession", (one,))
+            manuals = await self._fetchall_if_table(db, "character_manuals", "SELECT manual_id,mastery,practice FROM character_manuals WHERE user_id=? ORDER BY mastery DESC,manual_id", (one,))
+            sense = sense_rows[0] if sense_rows else {}
+            storage_row = dict(storage_rows[0]) if storage_rows else {}
+            if storage_row:
+                storage_row["used"] = int((storage_used[0] if storage_used else {}).get("used") or 0)
             detail = {
                 "player": row, "inventory": inventory, "cooldowns": cooldowns, "scene": scene or {}, "conditions": conditions,
                 "wallets": wallets, "root": root or {}, "bloodlines": bloodlines, "physique": physique or {},
@@ -1612,6 +1722,10 @@ class ReadOnlyDashboardStore:
                 "tribulations": tribulations, "perfection": perfection, "beasts": beasts, "equipment": equipment,
                 "abode": abode or {}, "guests": guests, "alchemy": alchemy or {}, "fate": fate or {},
                 "quests": quest_journal(quest_rows),
+                "sect": membership[0] if membership else {}, "flames": flames, "spirit_sense": sense,
+                "storage": storage_row, "master": master_rows[0] if master_rows else {}, "disciples": disciples,
+                "laws": laws, "professions": professions, "manuals": manuals,
+                "editor_catalogue": _editor_catalogue(),
             }
         # Outside the query session on purpose: this one is an HTTP round trip
         # to the engine, and a read session held open across it is a session
@@ -2504,6 +2618,17 @@ class AdminDashboardController:
         "player.remove_equipment": "admin.player.remove_equipment",
         "player.set_abode_access": "admin.player.set_abode_access",
         "player.set_moderation": "admin.player.set_moderation",
+        # v1.23.0: the levers the engine already had and no dashboard card
+        # drove (Discord reached some of them), and the three it gained for
+        # the editor. Each audits inside the engine transaction.
+        "player.grant_flame": "admin.player.grant_flame",
+        "player.set_spirit_sense": "admin.player.set_spirit_sense",
+        "player.set_master": "admin.player.set_master",
+        "player.master_attention": "admin.player.master_attention",
+        "player.grant_storage": "admin.player.grant_storage",
+        "player.set_profession": "admin.player.set_profession",
+        "player.set_law": "admin.player.set_law",
+        "player.set_sect_contribution": "admin.player.set_sect_contribution",
         "audit.undo_last": "admin.audit.undo_last",
         # Trades (v1.0.0-rc.2): void an open offer between cultivators. It
         # moves nothing - an offer never did - and audits in the engine.
