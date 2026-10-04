@@ -43,8 +43,8 @@ func TestAFullPerfectionBarOpensTheFinalTrial(t *testing.T) {
 			if quests != 7 {
 				t.Fatalf("completed_quests=%d after 100%%, want all 7", quests)
 			}
-			if clues := storage.ParseInt(actionScalar(t, path, "SELECT json_array_length(discovered_json) FROM "+tc.table+" WHERE user_id=42 AND realm_index=0")); clues == 0 {
-				t.Fatalf("no clue was recorded; a completed quest has always left its clue")
+			if clues := storage.ParseInt(actionScalar(t, path, "SELECT json_array_length(discovered_json) FROM "+tc.table+" WHERE user_id=42 AND realm_index=0")); clues != quests {
+				t.Fatalf("%d clue(s) recorded for %d quests; a completed quest has always left its clue, and the shipped quests each carry one", clues, quests)
 			}
 			if _, err := batch4ApplyErr(path, world, tc.trialOp, 42, 3, map[string]any{}); err != nil {
 				t.Fatalf("the bar is full and every quest marked done, and the trial still refused: %v", err)
