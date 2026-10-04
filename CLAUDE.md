@@ -6632,6 +6632,26 @@ The cards sit under six `<h2>` groups, which `sectionize` turns into tabs. The `
 root-ladder gate caught in the storage card's fallback was a storage grade, not a rung - the
 vocabulary collision v1.0.11 already names - and the fallback went rather than an allowlist entry.
 
+### A full bar is the whole path (v1.23.1)
+
+Asked for as *"if we set the perfect stage to 100% all quests need to be done and open the final
+trial"*. rc.37 wrote it down as a fact about the harness: the trial's gate is
+`completed_quests == len(quests) and progress == 100`, and `admin.player.set_realm_perfection`
+wrote `progress` alone, so a GM who filled the bar saw it full over a trial answering *"final trial
+is locked"* - a lever whose number was a promise the gate did not keep. At 100 it now writes the
+whole path: `quest_index` and `completed_quests` to the content's quest count, every quest's clue
+into `discovered_json`, the preparation cleared and `active=1`, so a path nobody started opens too.
+**A perfected realm is not reopened** (`completed=1` keeps its `active`), because the trial pays a
+permanent qi and vitality rise and a second pass would be a second reward. Below 100 the quests are
+left alone: a part-full bar says nothing about which quests were done.
+
+The audit row carries the quest state and whether the row existed, so the undo deletes a row the
+lever made and upserts the rest (a redo puts back a row its own undo deleted). A row written before
+this release carries no `existed` and undoes its progress alone, on the terms it was written.
+`perfection_lever_test.go` drives the real trial through the production dispatch on the shipped
+content; its drill (the fill disabled) fails both tracks. The engine playtest now drives the trial on
+every run: where the dice did not allow every quest it holds the lock, then opens it with the lever.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

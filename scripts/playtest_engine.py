@@ -1950,6 +1950,17 @@ async def run(url: str, token: str, db_path: str) -> Report:
             row = dict(await read_row(PLAYER, 0) or {})
         report.add("PASS" if int(row.get("training_progress") or 0) >= 20 else "FAIL",
                    f"{train_op} fills the {ladder} path's twenty points of training", f"training_progress={row.get('training_progress')} after {sessions} session(s)")
+        if not (int(row.get("completed_quests") or 0) >= 7 and int(row.get("progress") or 0) >= 100):
+            await step(report, f"{prefix}trial is locked until the dice allow every quest ({completed} of 7 passed)",
+                       trial({}), expect_error="final trial is locked")
+            # Since v1.23.1 the GM's 100% is the whole path, so the trial is
+            # driven whatever the dice allowed the quests.
+            opened = await step(report, f"admin.player.set_realm_perfection at 100% opens the {ladder} trial",
+                                gm("admin.player.set_realm_perfection", {"user_id": PLAYER, "track": "body" if body else "cultivation",
+                                                                        "realm_index": 0, "progress": 100, "reason": "playtest"}))
+            row = dict(await read_row(PLAYER, 0) or {})
+            report.add("PASS" if opened is not None and opened.get("trial_open") and int(row.get("completed_quests") or 0) == 7 else "FAIL",
+                       f"a full {ladder} bar marks every quest done", f"trial_open={(opened or {}).get('trial_open')} completed_quests={row.get('completed_quests')}")
         if int(row.get("completed_quests") or 0) >= 7 and int(row.get("progress") or 0) >= 100:
             tried = await step(report, f"{prefix}trial", trial({}))
             if tried is not None:
@@ -1959,9 +1970,6 @@ async def run(url: str, token: str, db_path: str) -> Report:
                 row = dict(await read_row(PLAYER, 0) or {})
                 report.add("PASS" if bool(row.get("completed")) == bool(tried.get("success")) else "FAIL",
                            f"the {ladder} realm is perfected exactly when the trial passed", f"completed={row.get('completed')} progress={row.get('progress')}")
-        else:
-            await step(report, f"{prefix}trial is locked until the dice allow every quest ({completed} of 7 passed)",
-                       trial({}), expect_error="final trial is locked")
         ended = await step(report, f"{prefix}abandon", act("perfection.body_abandon", PLAYER, {}) if body else act("perfection.abandon", PLAYER, {}))
         if ended is not None:
             report.add("PASS" if bool(ended.get("abandoned")) != bool(row.get("completed")) else "FAIL",
