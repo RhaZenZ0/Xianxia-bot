@@ -864,6 +864,11 @@ async def perfect_trial(interaction: discord.Interaction, path: app_commands.Cho
     lines = [spec.trial_heading]
     for row in result.get("rolls", []):
         lines.append(f"{row.get('name','Trial')}: {roll_line(SimpleNamespace(**dict(row)))}")
+    if result.get("passed") is not None and result.get("needed") is not None:
+        lines.append(
+            f"**{int(result['passed'])} of {len(result.get('rolls', []))}** checks held "
+            f"— **{int(result['needed'])}** needed."
+        )
     if bool(result.get("success")):
         lines.append(f"\n★ **PERFECT {spec.realm_name(c).upper()} ACHIEVED**\n{spec.reward_line}")
     else:

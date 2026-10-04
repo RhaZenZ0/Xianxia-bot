@@ -124,6 +124,8 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 		result, err = adminQuestProgress(conn, catalog, req.ActorID, req.Payload)
 	case "admin.player.quest_complete":
 		result, err = adminQuestComplete(conn, catalog, req.ActorID, req.Payload)
+	case "admin.player.quest_grant":
+		result, err = adminQuestGrant(conn, req.ActorID, req.Payload)
 	case "admin.player.set_realm":
 		result, err = adminSetRealm(conn, req.ActorID, req.Payload)
 	case "admin.player.set_resource_caps":

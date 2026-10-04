@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 76
+SCHEMA_VERSION = 77
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -3225,6 +3225,23 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
         # their own world. The content is re-banded; a running world's pool is
         # insert-only and is moved here. See `_commission_band_statements`.
         _commission_band_statements(),
+    ),
+    (
+        77,
+        "the_heavens_lead_on",
+        (
+            # v1.23.2: v1.16.0 seeded `realm_road_7` ("the heavens") with an
+            # empty `follow_on`, because the road stopped at the seam; v1.18.0
+            # carried it through the upper worlds and pointed the stage at
+            # `realm_road_8` in the content - but the seeding is insert-only, so
+            # on a world running since v1.16.0 finishing it, by play or by the
+            # GM's Complete, handed nothing over. Re-pointed only where the
+            # chain is still the empty one it was seeded with (migration 55's
+            # rule: a GM's edit is obeyed). Somebody who already finished it is
+            # caught up on their next action (`catchUpBeginnerPathTx`).
+            """UPDATE quest_definitions SET seed_json='{"follow_on": "realm_road_8", "realm_index": 7}'
+                WHERE quest_key='realm_road_7' AND seed_json='{"follow_on": "", "realm_index": 7}'""",
+        ),
     ),
 )
 

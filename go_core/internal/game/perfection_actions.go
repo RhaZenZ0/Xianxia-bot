@@ -282,7 +282,7 @@ func perfectionTrialAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 		return authoritativeMutation{}, fmt.Errorf("cooldown active: %d seconds", remaining)
 	}
 	rolls := []map[string]any{}
-	success := true
+	passed := 0
 	for _, t := range sys.FinalTrials {
 		attr, err := canonicalAttribute(conn, catalog, userID, p.GameMinute, t.Attribute)
 		if err != nil {
@@ -295,10 +295,12 @@ func perfectionTrialAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 		r["name"] = t.Name
 		r["attribute"] = t.Attribute
 		rolls = append(rolls, r)
-		if !r["success"].(bool) {
-			success = false
+		if r["success"].(bool) {
+			passed++
 		}
 	}
+	needed := perfectionTrialsNeeded(len(sys.FinalTrials))
+	success := passed >= needed
 	now := float64(time.Now().UnixNano()) / 1e9
 	loss := int64(0)
 	if success {
@@ -327,8 +329,19 @@ func perfectionTrialAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 			return authoritativeMutation{}, err
 		}
 	}
-	result := map[string]any{"body": body, "success": success, "rolls": rolls, "training_loss": loss, "realm_index": realm}
+	result := map[string]any{"body": body, "success": success, "rolls": rolls, "training_loss": loss, "realm_index": realm, "passed": passed, "needed": needed}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "perfection", EventType: "perfection_final_trial", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
+}
+
+// perfectionTrialsNeeded is how many of the final trial's checks must hold
+// (v1.23.2, on the owner's call): a majority, so two of the shipped three. It
+// was every one of them, and a cultivator who held two checks at 90% odds was
+// failed by the third. One statement, read by both the realm and the body path.
+func perfectionTrialsNeeded(checks int) int {
+	if checks <= 0 {
+		return 0
+	}
+	return checks/2 + 1
 }
 
 func perfectionAbandonAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage, body bool) (authoritativeMutation, error) {

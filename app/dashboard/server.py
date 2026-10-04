@@ -100,6 +100,46 @@ def quest_journal(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return journal
 
 
+def _seed(raw: Any) -> dict[str, Any]:
+    try:
+        decoded = json.loads(raw or "{}")
+    except (TypeError, ValueError):
+        return {}
+    return decoded if isinstance(decoded, dict) else {}
+
+
+def grantable_quests(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The quests the grant lever may hand this player (v1.23.2), as the picker
+    draws them: the realm road in realm order first, because that is the road
+    a stuck player is most often missing, then everything else by source."""
+    out = [{"quest_key": r.get("quest_key"), "title": r.get("title") or r.get("quest_key"),
+            "source_key": r.get("source_key") or "", "realm_index": _seed(r.get("seed_json")).get("realm_index")}
+           for r in rows]
+    return sorted(out, key=lambda q: (q["source_key"] != "realm_road", int(q["realm_index"] or 0), q["source_key"], str(q["quest_key"])))
+
+
+def suggest_next_quest(held: list[dict[str, Any]], grantable: list[dict[str, Any]], realm_index: int) -> str:
+    """Which quest the grant picker starts on (v1.23.2). Only a default for the
+    GM to accept or change - the engine decides what may be handed over.
+
+    The `follow_on` of a quest the player finished and was never given; else,
+    when they hold no active realm-road stage, the stage written for the realm
+    they stand in (the road is otherwise handed over only at the crossing, so
+    somebody already past it was never put on it); else nothing."""
+    offered = {str(r.get("quest_key")): r for r in grantable}
+    for row in held:
+        if str(row.get("status")) == "completed":
+            nxt = str(_seed(row.get("seed_json")).get("follow_on") or "")
+            if nxt in offered:
+                return nxt
+    if any(str(r.get("quest_key", "")).startswith("realm_road_") and str(r.get("status")) == "active" for r in held):
+        return ""
+    for key, row in offered.items():
+        if row.get("source_key") == "realm_road" and _seed(row.get("seed_json")).get("realm_index") == realm_index:
+            return key
+    return ""
+
+
 @lru_cache(maxsize=1)
 def _aptitude_catalogue() -> dict[str, list[dict[str, str]]]:
     """What the Player Editor's two aptitude cards may offer (v1.0.11).
@@ -1695,9 +1735,21 @@ class ReadOnlyDashboardStore:
             quest_rows = await self._fetchall(
                 db,
                 """SELECT q.quest_key,q.status,q.progress_json,q.commission,q.terms_json,
-                          d.title,d.objectives_json
+                          d.title,d.objectives_json,d.seed_json
                    FROM character_quests q LEFT JOIN quest_definitions d ON d.quest_key=q.quest_key
                    WHERE q.user_id=? ORDER BY q.status='active' DESC,q.updated_at DESC LIMIT 60""",
+                (one,),
+            )
+            # The grant lever (v1.23.2): every quest the engine's door would
+            # hand over - approved, no giver, not held in any status - so the
+            # picker never offers what `admin.player.quest_grant` refuses.
+            grantable_rows = await self._fetchall(
+                db,
+                """SELECT d.quest_key,d.title,COALESCE(d.source_key,'') AS source_key,COALESCE(d.seed_json,'') AS seed_json
+                   FROM quest_definitions d
+                   WHERE d.status='approved' AND COALESCE(d.giver_npc,'')=''
+                     AND NOT EXISTS (SELECT 1 FROM character_quests q WHERE q.user_id=? AND q.quest_key=d.quest_key)
+                   ORDER BY d.source_key,d.quest_key LIMIT 400""",
                 (one,),
             )
             # The progress cards (v1.23.0): each read is the row its lever
@@ -1733,6 +1785,8 @@ class ReadOnlyDashboardStore:
                 "tribulations": tribulations, "perfection": perfection, "beasts": beasts, "equipment": equipment,
                 "abode": abode or {}, "guests": guests, "alchemy": alchemy or {}, "fate": fate or {},
                 "quests": quest_journal(quest_rows),
+                "grantable_quests": grantable_quests(grantable_rows),
+                "suggested_quest": suggest_next_quest(quest_rows, grantable_rows, int((row or {}).get("realm_index") or 0)),
                 "sect": membership[0] if membership else {}, "flames": flames, "spirit_sense": sense,
                 "storage": storage_row, "master": master_rows[0] if master_rows else {}, "disciples": disciples,
                 "laws": laws, "professions": professions, "manuals": manuals,
@@ -2573,6 +2627,7 @@ class AdminDashboardController:
         "player.karma": "admin.player.karma",
         "player.quest_progress": "admin.player.quest_progress",
         "player.quest_complete": "admin.player.quest_complete",
+        "player.quest_grant": "admin.player.quest_grant",
         "player.fate": "admin.player.fate",
         "player.teleport": "admin.player.teleport",
         "player.revive": "admin.player.revive",
