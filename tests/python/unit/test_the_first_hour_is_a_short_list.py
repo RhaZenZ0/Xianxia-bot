@@ -215,8 +215,9 @@ class TheMenuDrawsTheShape(unittest.TestCase):
         view = hubs._MENU_BUILDER(owner_id=7, is_admin=False, owner_name="T", facts="📍 **Greenriver Town**", shape=shape)
         buttons, texts = _walk(view)
         labels = [b.label for b in buttons]
-        # Fourteen hubs and the daily five (v1.3.2).
-        self.assertEqual(len(labels), 14 + len(surface.DAILY_ACTIONS), labels)
+        # Fourteen hubs, the daily five (v1.3.2) and the tools row (v1.22.0);
+        # this tutorial line names no path, so there is no Next button.
+        self.assertEqual(len(labels), 14 + len(surface.DAILY_ACTIONS) + len(surface.MENU_TOOLS), labels)
         self.assertNotIn("Combat", labels)
         self.assertNotIn("Abode", labels)
         joined = "\n".join(texts)
@@ -230,7 +231,7 @@ class TheMenuDrawsTheShape(unittest.TestCase):
         surface, hubs = _modules()
         surface._LAST_HUB.pop(7, None)
         buttons, texts = _walk(hubs._MENU_BUILDER(owner_id=7, is_admin=False, owner_name="T", facts="x"))
-        self.assertEqual(len(buttons), 16 + len(surface.DAILY_ACTIONS))
+        self.assertEqual(len(buttons), 16 + len(surface.DAILY_ACTIONS) + len(surface.MENU_TOOLS))
         self.assertNotIn("/locked", "\n".join(texts))
 
     def test_both_doors_into_the_menu_ask_the_one_provider(self):
@@ -251,6 +252,7 @@ class TheMenuDrawsTheShape(unittest.TestCase):
         definition = {"title": "Iron from the Seam", "source_key": "beginner_path"}
         interaction = SimpleNamespace(user=SimpleNamespace(id=7))
         with patch.object(surface.DB, "get_character", AsyncMock(return_value={"realm_index": 0})), \
+             patch.object(surface, "_daily_waits", AsyncMock(return_value={})), \
              patch.object(surface.DB, "list_character_quests", AsyncMock(return_value=rows)), \
              patch.object(surface.QUESTS, "definition", AsyncMock(return_value=definition)):
             shape = asyncio.run(surface._menu_shape(interaction))

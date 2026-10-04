@@ -31,6 +31,7 @@ from ..ops.http_limits import (
 )
 from ..rules.worldtime import from_game_minutes
 from ..version import INSTALLED_VERSION
+from ..database.core import COMMAND_USAGE_DAYS, _usage_cutoff_day
 from ..database.remote import GoDatabaseTransport, RemoteDatabaseError
 from ..ops.game_engine import GameEngineClient, GameEngineError
 
@@ -1489,7 +1490,46 @@ class ReadOnlyDashboardStore:
                    FROM scene_history s LEFT JOIN characters c ON c.user_id=s.user_id WHERE s.user_id IS NOT NULL
                    GROUP BY s.user_id,c.name ORDER BY last_scene_at DESC LIMIT 100""",
             )
-            return {"players": rows, "recent_actions": actions, "scene_activity": scenes}
+            return {"players": rows, "recent_actions": actions, "scene_activity": scenes,
+                    **await self._command_usage(db)}
+
+    # How many commands the Most-used card lists. The bot's Discord card shows
+    # ten; a page has room for the long tail a GM is looking for.
+    COMMAND_USAGE_SHOWN = 50
+
+    async def _command_usage(self, db: Any) -> dict[str, Any]:
+        """The Most-used commands card (v1.22.0): presses per command path over
+        the window the bot prunes to, most used first.
+
+        The same table and the same window as `/admin server observability`,
+        and the same rule about failure: an unreadable count is `None`, which
+        the page prints as unknown, never an empty list a GM would read as
+        "nobody plays". A count reorders nothing anywhere (v1.3.5)."""
+        out: dict[str, Any] = {"command_usage_days": COMMAND_USAGE_DAYS}
+        try:
+            cutoff = _usage_cutoff_day(COMMAND_USAGE_DAYS)
+            rows = await self._fetchall(
+                db,
+                """SELECT path, SUM(presses) AS presses, COUNT(DISTINCT day) AS days_used, MAX(day) AS last_day
+                   FROM command_usage WHERE day>=? GROUP BY path ORDER BY presses DESC, path LIMIT ?""",
+                (cutoff, self.COMMAND_USAGE_SHOWN),
+            )
+            totals = await self._fetchall(
+                db,
+                "SELECT COALESCE(SUM(presses),0) AS presses, COUNT(DISTINCT path) AS paths FROM command_usage WHERE day>=?",
+                (cutoff,),
+            )
+        except Exception as exc:
+            log.warning("Could not read the command counts for the dashboard: %s", exc)
+            out.update(command_usage=None, command_usage_error=f"{type(exc).__name__}: {exc}")
+            return out
+        total = dict(totals[0]) if totals else {}
+        out.update(
+            command_usage=rows,
+            command_usage_total=int(total.get("presses") or 0),
+            command_usage_paths=int(total.get("paths") or 0),
+        )
+        return out
 
     async def player_detail(self, user_id: int) -> dict[str, Any]:
         """Full character sheet + inventory for one player, mirroring npc_detail's

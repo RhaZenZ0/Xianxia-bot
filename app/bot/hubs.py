@@ -240,6 +240,13 @@ class HubPage:
     # qualified name ("sect status", "sect recruitment"), so a prefix claims a
     # whole subgroup. `test_hub_pages.py` holds every leaf to exactly one page.
     only: tuple[str, ...] = ()
+    # The order a player meets these leaves in (v1.22.0): qualified names,
+    # first to last. Unnamed leaves follow in the usual band order. Without
+    # it the order was the band and then the alphabet, so the Cultivate page
+    # read Seclusion Status, Cultivate, Seclusion Start, Breakthrough... - the
+    # thing the page is for second, and its three seclusion buttons apart.
+    # `test_the_menus_say_where_to_go.py` holds every name to a leaf here.
+    order: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -736,6 +743,27 @@ def _claimed_by(item: Any, only: tuple[str, ...]) -> bool:
     return any(qualified == pick or qualified.startswith(f"{pick} ") for pick in only)
 
 
+# Leaf path -> the label a player reads, for the leaves whose command name is
+# not a word (v1.22.0). A label is otherwise the name title-cased, which is
+# right for "explore" and wrong for "npcinfo". The hint resolver still answers
+# to the command name, so a printed path written with the old label resolves.
+LEAF_LABELS: dict[str, str] = {
+    "/daoheart": "Dao Heart",
+    "/specialeffects": "Special Effects",
+    "/npcinfo": "Inspect",
+    "/worldevents": "World Events",
+    "/worldrules": "World Rules",
+    "/spatialkey": "Use a Key",
+    "/manual cultivate_by": "Cultivate By",
+    "/manual list": "Manuals",
+    "/manual study": "Study",
+    "/manual technique": "Technique",
+    "/admin family familyinspect": "Family Inspect",
+    "/admin npc npcinspect": "NPC Inspect",
+    "/admin npc setmissing": "Set Missing",
+}
+
+
 def _leaf_actions(page: HubPage) -> list[HubAction]:
     commands = [c for c in (page.command, *tuple(getattr(page, "extras", ()) or ())) if c is not None]
     if not commands:
@@ -762,16 +790,19 @@ def _leaf_actions(page: HubPage) -> list[HubAction]:
                 command=item,
                 handler=ACTIONS.handler_for(item),
                 path=path,
-                label=(qualified if qualify else str(getattr(item, "name", "Action"))).replace("_", " ").title()[:100],
+                label=LEAF_LABELS.get(path) or (qualified if qualify else str(getattr(item, "name", "Action"))).replace("_", " ").title()[:100],
                 description=str(getattr(item, "description", "Run this action"))[:100],
             )
         )
-    # (band, name, path): band puts the useful actions first, name keeps each
-    # band alphabetical, path is the tiebreaker so nested subgroups that share a
-    # leaf name (/sect has four distinct "status" commands) stay deterministic.
+    # (order, band, name, path): a page's own order first (v1.22.0), then band
+    # puts the useful actions first, name keeps each band alphabetical, path is
+    # the tiebreaker so nested subgroups that share a leaf name (/sect has four
+    # distinct "status" commands) stay deterministic.
+    order = {name: index for index, name in enumerate(tuple(getattr(page, "order", ()) or ()))}
     return sorted(
         actions,
         key=lambda action: (
+            order.get(action.path.lstrip("/"), len(order)),
             _action_rank(getattr(action.command, "name", "")),
             str(getattr(action.command, "name", "")).casefold(),
             action.path,
@@ -2145,11 +2176,44 @@ class HubRefreshButton(discord.ui.Button):
 _LayoutHubBase = discord.ui.LayoutView if LAYOUT_COMPONENTS_AVAILABLE else discord.ui.View
 
 
-# The layout deliberately has NO system dropdown. It carried one at first, but
-# with Prev/Next present the two did the same job, and the select cost a full row
-# to display only the system already named in the page heading above it. Stepping
-# is the only navigation now; the arrows wrap, so the far end of a long hub is one
-# Prev away rather than seventeen Nexts.
+# The system dropdown is back (v1.22.0), and not as the select it once was. The
+# layout carried one at first and lost it because, beside Prev/Next, it showed
+# only the system already named in the page heading. But stepping alone left the
+# middle of a long hub up to four presses away - Economy has nine systems - and
+# that is navigation a player has to count. So the select is a jump, not a
+# heading: it never shows the current system as its value (the heading does
+# that), its placeholder says how many systems there are, and every option says
+# how many actions it holds. The arrows stay for walking a hub in order.
+PAGE_JUMP_PLACEHOLDER = "Jump to a system"
+
+
+class HubLayoutPageSelect(discord.ui.Select):
+    """One tap to any system of the hub (v1.22.0)."""
+
+    def __init__(self, hub_view: "LayoutHubView") -> None:
+        self.hub_view = hub_view
+        pages = list(hub_view.visible_pages())[:25]
+        current = hub_view.page.key if hub_view.page is not None else ""
+        options = []
+        for page in pages:
+            count = len(hub_view.page_actions(page))
+            here = "You are here · " if page.key == current else ""
+            options.append(discord.SelectOption(
+                label=page.label[:100],
+                value=page.key,
+                description=f"{here}{count} action{'s' if count != 1 else ''} · {page.description}"[:100],
+                emoji=_page_emoji(page.key),
+            ))
+        super().__init__(
+            placeholder=f"{PAGE_JUMP_PLACEHOLDER} — {len(pages)} here"[:150],
+            min_values=1, max_values=1, options=options,
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        self.hub_view.page_key = str(self.values[0])
+        self.hub_view.action_offset = 0
+        self.hub_view.rebuild()
+        await interaction.response.edit_message(view=self.hub_view)
 
 
 class HubLayoutActionButton(discord.ui.Button):
@@ -2389,7 +2453,8 @@ class LayoutHubView(_LayoutHubBase):
     dropdown, so a player cannot see what a system offers without opening a menu
     and cannot reach anything in fewer than two interactions.  Here each action
     renders as its own Section - emoji, label, description and its own button -
-    and the only surviving dropdown jumps between systems.
+    and the only dropdown jumps between systems (v1.22.0; see
+    `HubLayoutPageSelect` for why it went and came back).
 
     A Components V2 message cannot carry ``content`` or ``embeds``, so the
     classic panel's trick - writing the action's output over the card - is
@@ -2571,13 +2636,20 @@ class LayoutHubView(_LayoutHubBase):
         )
         container.add_item(discord.ui.TextDisplay(self._header_text()))
         result_row = None
+        # The jump (v1.22.0) sits under the header, where a hub's systems are
+        # read from, and only where there is somewhere else to jump to.
+        jump = len(self.visible_pages()) > 1 and not self.expired
+        if jump:
+            jump_row = discord.ui.ActionRow()
+            jump_row.add_item(HubLayoutPageSelect(self))
+            container.add_item(jump_row)
         # Components in the fixed chrome, counted against Discord's cap so
         # the action list shrinks to make room for the result and its
         # buttons rather than the message failing to send: the container,
         # the header, three separators, the page text, the control row and
-        # its five buttons at most; a result adds a separator and a text, and
-        # its row adds one plus its buttons.
-        fixed = 1 + 1 + 3 + 1 + 1 + 5
+        # its five buttons at most, and the jump's row and select; a result
+        # adds a separator and a text, and its row adds one plus its buttons.
+        fixed = 1 + 1 + 3 + 1 + 1 + 5 + (2 if jump else 0)
         if self.last_result and not self.expired:
             container.add_item(discord.ui.Separator())
             # `##`, not `###` (v1.0.0-rc.21): the result is the thing the

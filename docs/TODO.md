@@ -16,6 +16,22 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.22.0)** — *A better menu layout for all the menus.* Researched and the first three of six
+  steps taken on the owner's call: a jump to any system on every multi-system hub panel, the menu's
+  tools row (the tutorial's next step pressed, the quest journal, the cooldowns) and Daily buttons
+  that say how long they are still cooling down, readable labels for the leaves named like code, and
+  a hand-set order on nine pages. Asked in the same session, the GM dashboard's Player Activity page
+  shows the most-used commands.
+- **deferred (design)** — *The rest of the menu layout.* Three steps of the same research wait on the
+  owner, and on the dashboard's new Most-used commands card for what players actually press:
+  a compact page (two or three described actions, the rest as rows of plain buttons, no More
+  actions); folding the seven one-action pages (Inventory, Use Item and Provenance into one Bag
+  page, Wallet into the Economy header, General Crafting into Alchemy); and sixteen hubs to twelve
+  (Ascension into Cultivation, NPCs into World, Combat and Secret Realms into Adventure, Abode and
+  Inner World into Home). The last renames printed hub paths - about 38 `/ascend`, 19 `/realm`,
+  5 `/npc` and 5 `/innerworld` in content and code - so it needs a migration of the quest terms
+  players already hold, the way migration 61 did, and a re-authored curriculum roster.
+
 - **fixed (v1.20.0)** — *Body cultivation is too slow.* Asked for by the owner. Measured: body stages
   cost 14-22% more than qi stages at the same realm, no body pill was sold or craftable, and every
   qi-path multiplier skips the body. On the owner's call: Bone-Tempering and Iron-Blood pills beside

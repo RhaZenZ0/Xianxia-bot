@@ -6519,6 +6519,43 @@ words - a decision in `docs/TODO.md`, not a gap. **The ordering drill stayed gre
 fixture**, because the ready recipes already sorted first by name (rc.53's lesson): the fixture
 carries an alphabetically-first recipe above the rank now, and the drill fails.
 
+### The menus say where to go (v1.22.0)
+
+Asked as *"research a better menu layout for all the menus"*, then the first three of six steps on
+the owner's call; `docs/TODO.md` holds the other three.
+
+**The jump came back, as a jump.** The layout hub once carried a system select and lost it, because
+beside Prev/Next it only showed the system the heading already named - and the class docstring kept
+claiming the dropdown for releases after. Stepping alone left the middle of nine-system Economy four
+presses away. `HubLayoutPageSelect` never shows the current system as its value (the heading does),
+says in its placeholder how many systems there are and in each option how many actions it holds, and
+costs two of the forty components, which still leaves eight action rows. The Discord harness reads
+it off `PANEL_JUMP_PLACEHOLDER` and skips it when answering a leaf's input steps, because a leaf's
+result is often drawn into the panel and the first select there would change page mid-sweep.
+
+**The menu presses the next step.** `MenuNextButton` resolves the tutorial line through
+`suggested_actions`, the resolver a reply's next-step buttons already use, and is a `MenuDailyButton`
+so it presses the one way a menu press does: open the hub, then `_start_hub_action`. The hub is the
+one the printed path names wherever that hub holds the leaf (`/breakthrough` is on two).
+`MenuCommandButton` reaches `/quests` and `/cooldowns`, which no hub held; it asks `_panel_refusal`
+with the bare command name, the way the command tree does, because to the seclusion gate a leading
+slash means a hub leaf and every leaf acts. The worst case - admin, Back, a Next button, every hub
+shown - is exactly forty components, and a test builds it.
+
+**The Daily row reads the engine's cooldown reading.** `cooldowns.daily_waits` is in the module that
+already draws the cooldown card, because `test_bot_package` forbids `surface.py` the engine client;
+it never raises, so a menu that cannot read the cooldowns is the green menu it was before.
+
+**A label override and a page's order are both lists a typo would silently defeat**, which is
+`only`'s failure mode, so `LEAF_LABELS` must name live leaves and every `order` name must be a leaf
+of its page. The hint resolver still answers to the command name, so a path printed with an old
+label still resolves.
+
+**The Most-used commands card had only ever been Discord's.** The research said it was on the web
+dashboard; it was on `/admin server observability` alone. Player Activity reads `command_usage` over
+the window the bot prunes to, owns the table in `DASHBOARD_SYSTEM_TABLES`, and answers `None` for an
+unreadable count, which the page prints as unknown (the `engine —` footer lesson, v1.0.8).
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

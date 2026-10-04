@@ -209,6 +209,13 @@ def section_button(components: Any, label: str) -> str | None:
     return None
 
 
+# The hub panel's own system jump (v1.22.0), the one select a panel carries
+# that is never an input step: a leaf's result is often drawn into the panel
+# itself, and taking the first select there would change page mid-sweep.
+# `test_the_menus_say_where_to_go.py` holds it equal to `hubs.PAGE_JUMP_PLACEHOLDER`.
+PANEL_JUMP_PLACEHOLDER = "Jump to a system"
+
+
 def select_by_placeholder(components: Any, prefix: str) -> dict[str, Any] | None:
     """The first live select whose placeholder starts with `prefix`.
 
@@ -222,7 +229,10 @@ def select_by_placeholder(components: Any, prefix: str) -> dict[str, Any] | None
     for node in _walk(components):
         if node.get("disabled"):
             continue
-        if node.get("type") in (3, 5, 6, 7, 8) and str(node.get("placeholder") or "").startswith(prefix):
+        placeholder = str(node.get("placeholder") or "")
+        if placeholder.startswith(PANEL_JUMP_PLACEHOLDER) and not prefix.startswith(PANEL_JUMP_PLACEHOLDER):
+            continue
+        if node.get("type") in (3, 5, 6, 7, 8) and placeholder.startswith(prefix):
             return node
     return None
 
