@@ -413,7 +413,7 @@ class EventSceneView(CardView):
                 action_id=f"discord:{interaction.id}:world_event.act:{self.event_key}:{action_key}",
             )
         except GameEngineError as exc:
-            await interaction.response.send_message(f"Event action failed: {exc}",ephemeral=False); return
+            await interaction.response.send_message(f"Event action failed: {_explain_engine_error(exc)}",ephemeral=False); return
         outcome=dict(envelope.get("result") or {})
         if action_key=="withdraw":
             await interaction.response.send_message("↩️ You withdraw from active involvement. The event continues without forcing another action from you.",ephemeral=False); return

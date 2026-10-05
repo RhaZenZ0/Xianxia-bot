@@ -508,6 +508,47 @@ async def menu_facts(interaction: discord.Interaction) -> str:
         return ""
 
 
+# Buttons for the paths a message outside any panel names (v1.27.0): the quest
+# journal prints each quest's next door and is a message of its own, so there
+# is no hub view to press a leaf in. `surface.py` registers the factory - it
+# owns the hubs and the menu's open-and-press button - and anything below it
+# asks here.
+_PATH_BUTTONS: Any = None
+
+
+def register_path_buttons(factory: Any) -> None:
+    global _PATH_BUTTONS
+    _PATH_BUTTONS = factory
+
+
+def path_buttons(text: str) -> list[Any]:
+    """The open-and-press buttons the text's printed paths earn, or none when
+    nothing is registered or the factory fails: a reply never fails on its
+    buttons."""
+    if not callable(_PATH_BUTTONS):
+        return []
+    try:
+        return list(_PATH_BUTTONS(text) or [])
+    except Exception:
+        log.exception("Path buttons unavailable")
+        return []
+
+
+# Tree commands a printed path may name that are neither a hub nor a hub leaf
+# (v1.27.0): `/quests`, `/cooldowns`, `/locked`, `/tribute`, `/action`... A
+# reply printing `**/quests**` earned no next-step button, because
+# `_hint_action` only knew hubs and their leaves. `surface.py` registers one
+# action per such root, its path the bare name - which is how the command tree
+# hands a name to the panel gate, so a read like `/quests` stays open behind a
+# closed door exactly as the slash command does.
+_ROOT_HINT_ACTIONS: dict[str, "HubAction"] = {}
+
+
+def register_root_hint_actions(actions: Mapping[str, "HubAction"]) -> None:
+    _ROOT_HINT_ACTIONS.clear()
+    _ROOT_HINT_ACTIONS.update({str(name).casefold(): action for name, action in actions.items()})
+
+
 def _hint_action(hub_name: str, steps: Sequence[str]) -> "HubAction | None":
     """The action a printed hint path names: `/world → City → Look` is the
     hub world, its page labelled City, its action labelled Look; a bare
@@ -523,6 +564,12 @@ def _hint_action(hub_name: str, steps: Sequence[str]) -> "HubAction | None":
         direct = next((action for action in leaves if action.path.casefold() == f"/{name}"), None)
         if direct is not None:
             return direct
+        # A tree command that is no hub leaf (`**/quests**`, `**/cooldowns**`,
+        # v1.27.0): thirty-seven printed paths named one and earned no button.
+        # Asked before the bare-name match below, which answered `/quests`
+        # with the GM's `/admin world quests` - the one leaf named "quests".
+        if name in _ROOT_HINT_ACTIONS:
+            return _ROOT_HINT_ACTIONS[name]
         # `/forage` is the root of the leaf `alchemy forage`: a group leaf
         # answers to its bare name only when exactly one carries it.
         named = [action for action in leaves if str(getattr(action.command, "name", "")).casefold() == name]
@@ -1464,7 +1511,7 @@ async def _invoke_action(
         else:
             await interaction.followup.send(refusal, ephemeral=False)
         return
-    _record_leaf_use(action.path)
+    _record_leaf_use(action.path if action.path.startswith("/") else f"/{action.path}")
     proxy = HubInteractionProxy(
         interaction, hub_view, command_override=action.command, supplied_options=supplied
     )
@@ -1979,7 +2026,11 @@ async def _present_input_step(
             message = f"ℹ️ **{action.label}** — nothing to choose from right now."
             if hint:
                 message += f"\n{hint}"
-            await _step_reply(interaction, hub_view, message)
+            # The hint says where to go (`**/beast → Companions → Tame**`);
+            # since v1.27.0 the place it names is a button under it, as it is
+            # under a result. It was the one reply that printed a path and
+            # never earned the button.
+            await _step_reply(interaction, hub_view, message, HubNextStepView.for_text(hub_view, hint))
         return
 
     # Collect a compact run of genuinely free-form values in one modal, stopping
@@ -2070,6 +2121,39 @@ class HubConfirmButton(discord.ui.Button):
             await interaction.response.edit_message(content=f"**{self.action.label}** — cancelled.", view=None)
             return
         await _start_hub_action(interaction, self.hub_view, self.action, confirmed=True)
+
+
+class HubNextStepButton(discord.ui.Button):
+    """A next step an input step's text named (v1.27.0)."""
+
+    def __init__(self, hub_view: Any, action: HubAction, *, index: int) -> None:
+        self.hub_view = hub_view
+        self.action = action
+        style = discord.ButtonStyle.primary if index == 0 else discord.ButtonStyle.secondary
+        super().__init__(label=action.label[:20], style=style, emoji=_mapped_action_emoji(action))
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        await _start_hub_action(interaction, self.hub_view, self.action)
+
+
+class HubNextStepView(discord.ui.View):
+    """The buttons under a step that names where to go instead (v1.27.0): an
+    empty picker's hint. `for_text` answers None when the text names nothing,
+    so a step that prints no path is sent as it always was."""
+
+    def __init__(self, hub_view: Any, actions: Sequence[HubAction]) -> None:
+        super().__init__(timeout=120)
+        self.hub_view = hub_view
+        for index, action in enumerate(list(actions)[:_LAYOUT_RESULT_ACTION_LIMIT]):
+            self.add_item(HubNextStepButton(hub_view, action, index=index))
+
+    @classmethod
+    def for_text(cls, hub_view: Any, text: str) -> "HubNextStepView | None":
+        actions = suggested_actions(text)
+        return cls(hub_view, actions) if actions else None
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        return await self.hub_view.interaction_check(interaction)
 
 
 class HubConfirmView(discord.ui.View):
@@ -2729,6 +2813,21 @@ class LayoutHubView(_LayoutHubBase):
 
         actions = self.page_actions(page)
         total = len(actions)
+        # The way past a padlock (v1.27.0). A lock line says what a door asks
+        # for and where to get it (a bold hub path, like a reply's hint); that
+        # place is a button here, as it is under a result. Only
+        # while no result is showing, which has its own next steps and takes
+        # the same room on the card.
+        lock_row = None
+        if not (self.last_result and result_row is not None):
+            shut = set(getattr(self, "hidden_paths", None) or {}) | set(getattr(self, "unlocks_at", None) or {})
+            drawn = {x.path for x in actions}
+            lock_actions = [a for a in suggested_actions(self.locked_lines(page)) if a.path not in drawn and a.path not in shut]
+            if lock_actions:
+                lock_row = discord.ui.ActionRow()
+                for index, action in enumerate(lock_actions):
+                    lock_row.add_item(HubResultActionButton(self, action, index=index + 1))
+                fixed += 1 + len(lock_actions)
         # The compact page (v1.22.0): the first actions keep a described row,
         # the rest are plain buttons sized to whatever the budget has left -
         # fourteen with nothing else on the card, fewer under a result - and
@@ -2753,6 +2852,8 @@ class LayoutHubView(_LayoutHubBase):
 
         container.add_item(discord.ui.Separator())
         container.add_item(discord.ui.TextDisplay(self._page_text(page, total, span)))
+        if lock_row is not None:
+            container.add_item(lock_row)
         if featured:
             container.add_item(discord.ui.Separator())
         for index, action in enumerate(featured):

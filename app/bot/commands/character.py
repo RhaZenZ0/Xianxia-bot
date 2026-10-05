@@ -21,12 +21,13 @@ from ...rules.birthfamily import family_tier_name, karma_description, karma_labe
 from ...rules.fate import fate_label
 from ...ops.game_engine import GameEngineError
 from ...simulation import MINUTES_PER_DAY
+from ...rules.quests import labelled_objective
 from ...rules.worldtime import MINUTES_PER_YEAR
 from ..cards import Card, CardView, card_view
 from ..channels import configured_begin_channel
 from ..character_state import current_effect_modifiers
 from ..formatting import human_duration, player_property_emoji, player_property_facility_lines
-from ..hubs import register_confirm_note
+from ..hubs import path_buttons, register_confirm_note
 from ..locations import objective_line_suffix
 from ..registry import registered_group_command, registered_root_command
 from ..runtime import (
@@ -89,7 +90,7 @@ async def begin(interaction: discord.Interaction) -> None:
             action_id=f"discord:{interaction.id}:character.family_options",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ Could not generate canonical birth families: {exc}", ephemeral=True)
+        await interaction.response.send_message(f"❌ Could not generate canonical birth families: {_explain_engine_error(exc)}", ephemeral=True)
         return
     offer_result = dict(offer_envelope.get("result") or {})
     families = [dict(row) for row in offer_result.get("families", [])]
@@ -363,7 +364,7 @@ async def _player_dashboard_card(user_id: int, *, guild_id: int | None, page: st
                 for obj in list(dict(row.get("terms") or {}).get("objectives") or definition.get("objectives") or []):
                     cur = int(progress.get(str(obj["id"]), 0)); req = max(1, int(obj.get("count",1)))
                     where = await objective_line_suffix(int(user_id), c, obj, cur >= req)
-                    parts.append(f"{'✅' if cur >= req else '▫️'} {obj.get('label',obj['id'])} **{cur}/{req}**{where}")
+                    parts.append(f"{'✅' if cur >= req else '▫️'} {obj.get('label',obj['id']) if cur >= req else labelled_objective(obj)} **{cur}/{req}**{where}")
                 embed.add_field(name=f"📜 {definition.get('title', row['quest_key'])}", value="\n".join(parts) or "In progress", inline=False)
         else:
             embed.add_field(name="Active Quests", value="None", inline=False)
@@ -468,12 +469,17 @@ class AbandonCommissionOpenButton(discord.ui.Button):
 
 
 class QuestDashboardView(discord.ui.View):
-    def __init__(self, user_id: int, available: list[dict], held: dict | None = None) -> None:
+    def __init__(self, user_id: int, available: list[dict], held: dict | None = None, next_text: str = "") -> None:
         super().__init__(timeout=300)
         if available:
             self.add_item(QuestAcceptSelect(user_id, available))
         if held:
             self.add_item(AbandonCommissionOpenButton(user_id, held))
+        # Each active quest's next door as a button (v1.27.0): the journal
+        # printed the path and was the one place the menu's Next could not
+        # reach, being a message of its own rather than a panel.
+        for item in path_buttons(next_text):
+            self.add_item(item)
 
 
 @registered_root_command(name="quests", description="View and accept objective-driven quests", guild=GUILD)
@@ -486,6 +492,7 @@ async def quests_command(interaction: discord.Interaction) -> None:
     held = await COMMISSIONS.held(interaction.user.id)
     wt = await current_world_time()
     lines = ["📜 **Quest Journal**"]
+    next_doors: list[str] = []
     catalog = await QUESTS.visible_catalog(interaction.user.id)
     if active:
         for row in active[:10]:
@@ -496,13 +503,18 @@ async def quests_command(interaction: discord.Interaction) -> None:
             # whatever the definition says today. Falling back to the definition
             # covers rows taken before terms were pinned.
             pinned = dict(row.get("terms") or {})
+            door = ""
             for obj in list(pinned.get("objectives") or definition.get("objectives") or []):
                 cur=int(progress.get(str(obj["id"]),0)); req=max(1,int(obj.get("count",1)))
                 # Somebody to speak with says where they are now (v1.8.3):
                 # the tick walks townsfolk about, and the pickers only offer
                 # who is in the room.
                 where = await objective_line_suffix(interaction.user.id, c, obj, cur >= req)
-                objectives.append(f"{'✅' if cur >= req else '▫️'} {obj.get('label',obj['id'])} {cur}/{req}{where}")
+                objectives.append(f"{'✅' if cur >= req else '▫️'} {obj.get('label',obj['id']) if cur >= req else labelled_objective(obj)} {cur}/{req}{where}")
+                if cur < req and not door:
+                    door = labelled_objective(obj)
+            if door:
+                next_doors.append(door)
             title = definition.get("title", row["quest_key"])
             # A commission is marked, and carries its clock: a deadline you
             # cannot see is a deadline you will miss.
@@ -523,13 +535,15 @@ async def quests_command(interaction: discord.Interaction) -> None:
         # `next_objective_label`: a journal that confirms and points nowhere is
         # the thing the beginner path was built to stop.
         lines.append("\n-# Nothing to accept here. Quests come to you: a commission from the "
-                     "person who wants it done, an errand from your household, an examination "
-                     "from your trade's hall, and the next step of a path from the one you just finished.")
+                     "person who wants it done (**/world → City → Board**), an errand from your household "
+                     "(**/family → Hearth → Errand**), an examination from your trade's hall "
+                     "(**/craft → Profession → Profession Exam**), and the next step of a path from the one you just finished.")
     if held:
         lines.append("\n-# Commissions come from the people who give them. "
                      "Abandoning one costs the same standing as failing it.")
     await interaction.response.send_message(
-        "\n".join(lines), view=QuestDashboardView(interaction.user.id, available, held), ephemeral=False)
+        "\n".join(lines), view=QuestDashboardView(interaction.user.id, available, held,
+                                                 "\n".join(next_doors)), ephemeral=False)
 
 
 @registered_root_command(name="inventory", description="View your items and materials", guild=GUILD)
@@ -899,7 +913,7 @@ async def afterlife_status(interaction:discord.Interaction)->None:
             "lifecycle.samsara_status",interaction.user.id,{"minutes_per_year":MINUTES_PER_YEAR},
         ) or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"No reincarnation path is currently recorded for this soul. ({exc})",ephemeral=False);return
+        await interaction.response.send_message(f"No reincarnation path is currently recorded for this soul. ({_explain_engine_error(exc)})",ephemeral=False);return
     old_family=await DB.get_birth_family(interaction.user.id) or {}
     progress=min(1.0,float(state.get('samsara_years_elapsed',0))/max(1.0,float(state.get('samsara_years_target',1))))
     passed=int(int(state.get('samsara_lives_count',0))*progress)
@@ -954,7 +968,7 @@ async def reincarnate(interaction:discord.Interaction,name:str,path:str,gender:a
             "lifecycle.samsara_status",interaction.user.id,{"minutes_per_year":MINUTES_PER_YEAR},
         ) or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"No Samsara cycle is recorded for this soul. ({exc})",ephemeral=False);return
+        await interaction.response.send_message(f"No Samsara cycle is recorded for this soul. ({_explain_engine_error(exc)})",ephemeral=False);return
     if not state.get("ready"):
         await interaction.response.send_message(
             f"☸️ Your soul is still turning through Samsara.\n"

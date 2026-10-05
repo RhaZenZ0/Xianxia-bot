@@ -576,7 +576,7 @@ func characterResetAction(conn *storage.Conn, userID int64, _ json.RawMessage) (
 	if c.LifeStatus != "alive" {
 		return authoritativeMutation{}, errors.New(
 			"this incarnation is already dead, and the road from here is Samsara - " +
-				"use /character → Samsara")
+				"use **/character → Samsara**")
 	}
 	incarnation, err := characterIncarnationCountTx(conn, userID)
 	if err != nil {

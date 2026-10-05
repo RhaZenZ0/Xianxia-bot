@@ -60,9 +60,9 @@ def next_objective_label(objectives: Any, progress: Any) -> str:
         except (TypeError, ValueError):
             current = 0
         if current < required:
-            label = str(objective.get("label") or "").strip()
-            if not label:
+            if not str(objective.get("label") or "").strip():
                 return ""
+            label = labelled_objective(objective)
             if required > 1:
                 return f"{label} ({current}/{required})"
             return label
@@ -398,6 +398,55 @@ OBJECTIVE_TYPES: dict[str, dict[str, Any]] = {
     "law_technique": {"target": "law_technique", "label": "Manifest {target}", "untargeted": "Manifest a Law technique"},
     "personal_world": {"target": None, "label": "", "untargeted": "Stabilize a personal world"},
 }
+# Where each objective is done (v1.27.0). A label written by hand names its
+# door (`**/world → City → Envoys**`), and a panel draws that as a button; 375
+# of the 524 objective labels in the content file - every commission - and every
+# label the Forge builds from the templates above named none, so "Speak with
+# Bo Tan" and "Explore Ashenwall City" left the player to find the command.
+# `labelled_objective` appends the path to a label that carries none; a label
+# that already names one is left as written. `test_every_objective_says_where`
+# holds each type here and every path to one a panel resolves.
+OBJECTIVE_PATHS: dict[str, str] = {
+    "explore": "**/world → Act → Explore**",
+    "talk": "**/npc → People → Talk**",
+    "scene_action": "**/action**",
+    "sect_discovery": "**/world → City → Envoys**",
+    "sect_trial": "**/sect → Recruitment → Trial**",
+    "cultivate": "**/cultivate**",
+    "travel": "**/travel → Destinations → Go**",
+    "combat_win": "**/hunt**",
+    "craft": "**/craft → General Crafting → Craft**",
+    "trade": "**/economy → City Shops → Buy**",
+    "gather": "**/forage**",
+    "breakthrough": "**/breakthrough**",
+    "flame_capture": "**/craft → Flames → Capture**",
+    "raid_win": "**/combat → Boss Raids → Start**",
+    "black_market": "**/economy → Black Market → Buy**",
+    "perfection_start": "**/ascend → Perfection → Start**",
+    "realm_enter": "**/realm → Secret Realms → Enter**",
+    "tribulation_cleared": "**/ascend → Tribulation / Ascension → Attempt**",
+    "return_home": "**/family → Enter**",
+    "family_lesson": "**/family → Hearth → Lesson**",
+    "ascension_gate": "**/ascend → Tribulation / Ascension → Gate**",
+    "world_cross": "**/travel → Teleportation Arrays → Use**",
+    "profession_exam": "**/craft → Profession → Profession Exam**",
+    "law_comprehend": "**/cultivation → Laws → Comprehend**",
+    "law_technique": "**/cultivation → Laws → Technique**",
+    "personal_world": "**/innerworld → Personal World → Create**",
+}
+
+
+def labelled_objective(objective: Any) -> str:
+    """An objective's label with the place it is done, unless it names one."""
+    if not isinstance(objective, dict):
+        return ""
+    label = str(objective.get("label") or objective.get("id") or "").strip()
+    path = OBJECTIVE_PATHS.get(str(objective.get("type") or ""), "")
+    if not label or not path or "**/" in label:
+        return label
+    return f"{label} - {path}"
+
+
 SCENE_ACTION_KEYS = ("observe", "investigate", "influence", "stealth", "physical", "qi", "resolve", "aid")
 REWARD_KEYS = ("insight_xp", "spirit_stones", "items")
 # What a household errand may pay besides those (v1.0.0-rc.32): standing with

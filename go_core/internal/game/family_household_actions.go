@@ -170,7 +170,7 @@ func returnToWaymarkTx(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	_ = json.Unmarshal([]byte(fmt.Sprint(r[4])), &meta)
 	mark := strings.TrimSpace(meta.ReturnLocation)
 	if mark == "" || mark == locationKey || mark == strings.TrimSpace(fmt.Sprint(r[3])) {
-		return nil, errors.New("there is no mark to return to: you walked here, and the road back is the door (/family → Leave)")
+		return nil, errors.New("there is no mark to return to: you walked here, and the road back is the door: **/family → Leave**")
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
 	if _, err = moveCharacterTx(conn, catalog, userID, mark, now); err != nil {

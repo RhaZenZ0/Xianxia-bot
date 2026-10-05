@@ -12,6 +12,7 @@ from ..formatting import roll_line
 from ..hubs import HubDynamicOption, register_hub_option_hint, register_hub_option_provider
 from ..registry import registered_group_command
 from ..runtime import (
+    _explain_engine_error,
     DB,
     ENGINE,
     WORLD,
@@ -112,7 +113,7 @@ async def beast_tame(interaction: discord.Interaction, encounter_id: int) -> Non
             action_id=f"discord:{interaction.id}:beast.tame",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(str(exc), ephemeral=False)
+        await interaction.followup.send(_explain_engine_error(exc), ephemeral=False)
         return
 
     resolved = dict(envelope.get("result") or {})
@@ -155,7 +156,7 @@ async def beast_feed(interaction: discord.Interaction, beast_id: int, food: app_
             action_id=f"discord:{interaction.id}:beast.feed",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(str(exc), ephemeral=False)
+        await interaction.followup.send(_explain_engine_error(exc), ephemeral=False)
         return
 
     updated = dict(envelope.get("result") or {})
@@ -180,7 +181,7 @@ async def beast_train(interaction: discord.Interaction, beast_id: int) -> None:
             action_id=f"discord:{interaction.id}:beast.train",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(str(exc), ephemeral=False)
+        await interaction.followup.send(_explain_engine_error(exc), ephemeral=False)
         return
 
     resolved = dict(envelope.get("result") or {})
@@ -213,7 +214,7 @@ async def beast_evolve(interaction: discord.Interaction, beast_id: int) -> None:
             action_id=f"discord:{interaction.id}:beast.evolve",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"Evolution failed: {exc}", ephemeral=False)
+        await interaction.followup.send(f"Evolution failed: {_explain_engine_error(exc)}", ephemeral=False)
         return
     resolved = dict(envelope.get("result") or {})
     row = dict(resolved.get("beast") or {})
@@ -240,7 +241,7 @@ async def beast_active(interaction: discord.Interaction, beast_id: int) -> None:
             action_id=f"discord:{interaction.id}:beast.active",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(str(exc), ephemeral=False)
+        await interaction.followup.send(_explain_engine_error(exc), ephemeral=False)
         return
     # The engine answers with the beast's own row; the bonus is read off it.
     row = dict((envelope or {}).get("result") or {})
@@ -361,5 +362,6 @@ for _command in (beast_feed, beast_train, beast_evolve):
 register_hub_option_hint(
     beast_active,
     "beast_id",
-    "There is no other beast to make active: your only companion is already fighting beside you, or you have none yet.",
+    "There is no other beast to make active: your only companion is already fighting beside you, or you have none yet - "
+    "see them on **/beast → Companions → Status**.",
 )

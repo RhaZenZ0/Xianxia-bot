@@ -217,6 +217,27 @@ def _explain_engine_error(exc: Exception) -> str:
         minutes = int(lesson.group("minutes"))
         hours = max(1, -(-minutes // 60))
         text = f"⏳ The head of the house has said what there was to say today — ask again in **{hours} in-world hour{'s' if hours != 1 else ''}**."
+    # Refusals that name another system say where it is (v1.27.0): each was
+    # true and left the player to find the place on their own. The path is
+    # bold so a panel turns it into a button. Inline, like the waits above,
+    # so the function stays pure for the tests that exec it.
+    for needle, hint in (
+        ("travel there first", "**/travel → Destinations → Go**"),
+        ("travel to either first", "**/travel → Destinations → Go**"),
+        ("not inside a shop", "**/economy → City Shops → Here** names this city's shops; walk in with **/world → City → Enter**"),
+        ("must be inside an auction house", "**/economy → Auction House → Enter**"),
+        ("not inside a registered auction house", "**/economy → Auction House → Enter**"),
+        ("required beast food is not carried", "gather herbs with **/forage** or hunt for cores with **/hunt**"),
+        ("below evolution requirement", "raise its loyalty with **/beast → Companions → Feed** or **/beast → Companions → Train**"),
+        ("beast cores: missing", "beast cores come from **/hunt**"),
+        ("not enough sect contribution points", "earn more with **/sect → Holdings → Contribute** or your sect's work on **/world → City → Board**"),
+        ("not in an active party", "**/combat → Party → Create**"),
+        ("repair requires", "dig Spirit Iron with **/mine** or buy it with **/economy → City Shops → Buy**"),
+        ("no flame burns here", "**/craft → Flames → Status** names where each world's flame burns"),
+    ):
+        if needle in text and "**/" not in text:
+            text += f"\n→ {hint}"
+            break
     if "private residence or personal world" in text:
         # Spell these the way a player can actually reach them. The individual
         # gameplay commands are not registered with Discord - only the 16 hub

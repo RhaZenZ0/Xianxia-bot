@@ -93,6 +93,7 @@ from .hubs import (
     HubPage,
     HubStatusField,
     _HINT_PATH_RE,
+    _hint_action,
     _hub_icon,
     _leaf_actions,
     _panel_refusal,
@@ -112,6 +113,8 @@ from .hubs import (
     register_not_yet_unlocked,
     register_realm_namer,
     register_panel_gate,
+    register_root_hint_actions,
+    register_path_buttons,
     send_hub,
 )
 from .locations import here_summary
@@ -924,18 +927,48 @@ def _next_step(tutorial: str) -> tuple[str, HubAction] | None:
     The hub is the one the printed path names wherever that hub holds the
     leaf - `/breakthrough` is on two - and otherwise the first hub that does,
     for a bare root such as `**/hunt**`."""
-    actions = suggested_actions(tutorial)
-    if not actions:
-        return None
-    action = actions[0]
-    match = _HINT_PATH_RE.search(str(tutorial or ""))
-    named = match.group(1) if match else ""
-    if named in _HUB_BY_NAME and _daily_leaf(named, action.path) is not None:
-        return named, action
-    for definition in _HUB_DEFINITIONS:
-        if _daily_leaf(definition.name, action.path) is not None:
-            return definition.name, action
-    return None
+    steps = _next_steps(tutorial, limit=1)
+    return steps[0] if steps else None
+
+
+def _next_steps(text: str, *, limit: int = 3) -> list[tuple[str, HubAction]]:
+    """Every hub and leaf the text's printed paths name, in order (v1.27.0)."""
+    out: list[tuple[str, HubAction]] = []
+    for match in _HINT_PATH_RE.finditer(str(text or "")):
+        actions = suggested_actions(match.group(0))
+        if not actions:
+            continue
+        action = actions[0]
+        named = match.group(1)
+        hub = named if named in _HUB_BY_NAME and _daily_leaf(named, action.path) is not None else next(
+            (d.name for d in _HUB_DEFINITIONS if _daily_leaf(d.name, action.path) is not None), None)
+        if hub is None or any(found.path == action.path for _, found in out):
+            continue
+        out.append((hub, action))
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _path_buttons(text: str) -> list[discord.ui.Item]:
+    """The journal's next doors as buttons (v1.27.0): each opens its hub in
+    place and presses the leaf, as the menu's Next does; a tree command such
+    as `**/cooldowns**` is the menu's own command button."""
+    out: list[discord.ui.Item] = []
+    for hub, action in _next_steps(text):
+        button = MenuNextButton(hub, action)
+        button.label = action.label[:40]
+        button.style = discord.ButtonStyle.primary if not out else discord.ButtonStyle.secondary
+        out.append(button)
+    for match in _HINT_PATH_RE.finditer(str(text or "")):
+        name = match.group(1)
+        if len(out) >= 3 or (match.group(2) or "").strip() or name in _HUB_BY_NAME:
+            continue
+        action = _hint_action(name, [])
+        if action is not None and not action.path.startswith("/") and not any(
+                getattr(item, "command_name", "") == name for item in out):
+            out.append(MenuCommandButton(name, action.label, "▶️"))
+    return out[:3]
 
 
 class MenuCommandButton(discord.ui.Button):
@@ -1351,10 +1384,10 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
         if row and int(row.get("active") or 0) and not int(row.get("completed") or 0):
             under_way = True
     if not under_way:
-        shut["perfection_path"] = "no Perfection path is under way — Start one at stage 9"
+        shut["perfection_path"] = "no Perfection path is under way — begin one at stage 9 with **/ascend → Perfection → Start**"
     membership = await DB.get_sect_membership(uid)
     if not membership:
-        shut["sect_member"] = "you are in no sect — see Recruitment"
+        shut["sect_member"] = "you are in no sect — see **/sect → Recruitment → Info**"
         shut["sect_ascent"] = "the way up is a member's — join a sect first"
     else:
         shut["sect_outsider"] = "you already belong to a sect"
@@ -1379,9 +1412,9 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
     if membership:
         npc_master = await DB.get_npc_master(uid)
         if npc_master or await DB.get_master(uid):
-            shut["sect_has_master"] = "you already have a master — Leave the bond first"
+            shut["sect_has_master"] = "you already have a master — leave the bond first with **/sect → Discipleship → Leave**"
         if not npc_master:
-            shut["sect_npc_master"] = "only a master among the sect's own people teaches — Npcmaster asks one"
+            shut["sect_npc_master"] = "only a master among the sect's own people teaches — ask one with **/sect → Discipleship → Npcmaster**"
         rung = WORLD.next_promotion_rung(rank_level)
         earned = int(membership.get("contribution_earned") or 0)
         if not rung:
@@ -1390,11 +1423,11 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
             shut["sect_promote"] = f"{WORLD.sect_rank_name(rung[0])} asks {rung[1]} contribution earned; you have earned {earned}"
     abode = await DB.get_abode(uid)
     if not abode:
-        shut["abode"] = "you have no property yet — Establish one"
+        shut["abode"] = "you have no property yet — found one with **/abode → Property → Establish**"
     else:
         shut["abode_owner"] = "you already hold a property"
     if not await DB.get_personal_world(uid):
-        shut["innerworld"] = "you have no personal world yet — Create one"
+        shut["innerworld"] = "you have no personal world yet — make one with **/innerworld → Personal World → Create**"
     else:
         shut["innerworld_owner"] = "your personal world already exists"
     if PERSONAL_WORLD_FLOOR > 0 or PERSONAL_WORLD_LAW > 0:
@@ -1405,9 +1438,9 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
                 f"a personal world asks for {WORLD.realm_name(PERSONAL_WORLD_FLOOR)} and Space Law at {PERSONAL_WORLD_LAW}%; "
                 f"you stand at {WORLD.realm_name(realm)} with Space Law at {comprehension}%")
     if not await DB.get_spirit_beasts(uid):
-        shut["beast"] = "no beast is contracted yet — Tame one"
+        shut["beast"] = "no beast is contracted yet — tame one with **/beast → Companions → Tame**"
     if not await DB.get_player_family_membership(uid):
-        shut["house_member"] = "you belong to no house — Found one or answer an invitation"
+        shut["house_member"] = "you belong to no house — found one with **/family → House → Found** or answer an invitation"
     else:
         shut["house_outsider"] = "you already sit in a house"
     legacy = await DB.get_soul_legacy(uid)
@@ -1420,12 +1453,12 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
         access = max(realm, body_realm)
         if access < STALL_MIN_REALM_INDEX:
             shut["stall_open"] = f"a stall asks for {WORLD.realm_name(STALL_MIN_REALM_INDEX)}; you stand at {WORLD.realm_name(access)}"
-        shut["stall_keeper"] = "you keep no stall yet — Open one in a city's street"
+        shut["stall_keeper"] = "you keep no stall yet — open one in a city's street with **/economy → Market Stalls → Open**"
     else:
         shut["stall_open"] = f"you already keep {stall.get('name')} in {stall.get('city')}"
         stall_city = str(stall.get("city") or "")
         if stall_city and _city_of(here) != stall_city:
-            shut["stall_elsewhere"] = f"your stall stands in {stall_city}; travel there to tend it"
+            shut["stall_elsewhere"] = f"your stall stands in {stall_city}; travel there with **/travel → Destinations → Go** to tend it"
     hidden: dict[str, str] = {}
     for gate, reason in shut.items():
         hidden.update(_action_paths(reason, *PROGRESSION_GATES[gate]))
@@ -1435,7 +1468,7 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
         base = str(abode.get("base_location") or "")
         if here != base:
             why = ("you are already inside" if here == str(abode.get("location_key") or "")
-                   else f"your property stands at {base}; travel there")
+                   else f"your property stands at {base}; travel there with **/travel → Destinations → Go**")
             hidden.update(_action_paths(why, "abode enter"))
     return hidden
 
@@ -1574,11 +1607,11 @@ async def _location_hidden_actions(interaction: discord.Interaction, c: dict) ->
         shut["private_room"] = f"you are inside {description}; step out with {command}"
     if not _shop_at(here):
         if any(str(shop.get("city") or "") == city for shop in WORLD.shops.values()):
-            shut["shop_counter"] = f"asked for inside a shop — find {city}'s with Here, then /travel in"
+            shut["shop_counter"] = f"asked for inside a shop — find {city}'s with **/economy → City Shops → Here**, then walk in with **/world → City → Enter**"
         else:
-            shut["shop_counter"] = "no shops here; travel to a city and find one with Here"
+            shut["shop_counter"] = "no shops here; travel to a city with **/travel → Destinations → Go** and find one with **/economy → City Shops → Here**"
     if WORLD.auction_house_at(here) is None:
-        shut["auction_floor"] = "asked for on an auction floor — step inside one with Enter"
+        shut["auction_floor"] = "asked for on an auction floor — step inside one with **/economy → Auction House → Enter**"
     if not _auction_entrance_here(here):
         shut["auction_door"] = ("step out of the shop first" if place.get("shop") and not place.get("road_site")
                                 else "no auction house opens onto this street")
@@ -1606,7 +1639,7 @@ async def _location_hidden_actions(interaction: discord.Interaction, c: dict) ->
     if not any(str(realm.get("location") or "") == here for realm in WORLD.secret_realms.values()):
         shut["realm_entrance"] = "no secret realm opens here"
     if not _public_sect_gate_here(here):
-        shut["sect_gate"] = "the entrance trial is sat at a sect's gate — /world → City → Envoys names them"
+        shut["sect_gate"] = "the entrance trial is sat at a sect's gate — **/world → City → Envoys** names them"
     if not any(boss_lair(boss, WORLD.secret_realms)[0] == here for boss in BOSS_TEMPLATES.values()):
         shut["boss_lair"] = "no great beast keeps its lair here"
     shop = WORLD.shops.get(_shop_at(here)) or {}
@@ -1614,7 +1647,7 @@ async def _location_hidden_actions(interaction: discord.Interaction, c: dict) ->
         shut["exam_hall"] = "an examination is sat inside a hall of its trade"
     flames = dict((WORLD.data.get("flame_system") or {}).get("flames") or {})
     if not any(str(f.get("location") or "") == here for f in flames.values()):
-        shut["flame_source"] = "a flame is captured where it burns, at a world's forge terraces — /craft → Flames → Status names them"
+        shut["flame_source"] = "a flame is captured where it burns, at a world's forge terraces — **/craft → Flames → Status** names them"
     if here.startswith("birth_family:"):
         shut["property_ground"] = "a property is founded outside the household you were born into; step out into the town first"
     elif here.startswith(("abode:", "sect_abode:", "personal_world:")) or WORLD.auction_house_at(here) is not None:
@@ -1638,7 +1671,7 @@ async def _location_hidden_actions(interaction: discord.Interaction, c: dict) ->
     if not await _black_market_post_here(here):
         shut["black_market_post"] = "no black-market trading post is open here"
     if not await _array_departs_here(here):
-        shut["array_here"] = "no teleportation array stands here — /array list names the ones the world has"
+        shut["array_here"] = "no teleportation array stands here — **/travel → Teleportation Arrays → List** names the ones the world has"
     hidden: dict[str, str] = {}
     for gate, reason in shut.items():
         hidden.update(_action_paths(reason, *LOCATION_GATES[gate]))
@@ -1898,6 +1931,27 @@ def _tree_command(name: str) -> Any:
     one (v1.7.4: `/stall`), else the bound root. `ACTIONS.root` knows no
     groups, which is why the tuple could only ever name roots."""
     return _GROUP_ACTION_ROOTS.get(name) or ACTIONS.root(name)
+
+
+def _root_hint_actions() -> dict[str, HubAction]:
+    """The tree roots a printed `**/quests**` resolves to (v1.27.0): every one
+    that is a bound root rather than a hub, a group or a hub leaf. Its path is
+    the bare name, the way the command tree passes it to the panel gate."""
+    hubs = set(_HUB_BY_NAME) | {"admin"}
+    out: dict[str, HubAction] = {}
+    for name in TREE_COMMANDS:
+        if name in hubs or name in _GROUP_ACTION_ROOTS or name in DAILY_ACTIONS:
+            continue
+        command = ACTIONS.root(name)
+        out[name] = HubAction(
+            command=command, handler=ACTIONS.handler_for(command), path=name,
+            label=name.replace("_", " ").title(), description=str(getattr(command, "description", "") or ""),
+        )
+    return out
+
+
+register_root_hint_actions(_root_hint_actions())
+register_path_buttons(_path_buttons)
 
 
 def register_command_surface(client: XianxiaBot) -> None:

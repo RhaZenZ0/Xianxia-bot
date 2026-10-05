@@ -81,7 +81,7 @@ func checkPlayerSeclusionTx(conn *storage.Conn, catalog worlddata.Catalog, userI
 		}
 		return nil
 	}
-	return fmt.Errorf("you are in closed-door %s seclusion; %s. Use /cultivation → Cultivate → Seclusion End to emerge early",
+	return fmt.Errorf("you are in closed-door %s seclusion; %s. Use **/cultivation → Cultivate → Seclusion End** to emerge early",
 		firstNonempty(fmt.Sprint(row["mode"]), "qi"), seclusionRemainingPhrase(row, gameMinute))
 }
 

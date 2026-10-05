@@ -16,7 +16,7 @@ from ..character_state import announce_quest_progress, record_quest_progress
 from ..formatting import human_duration, roll_line
 from ..hubs import register_hub_option_hint
 from ..registry import registered_group_command
-from ..runtime import ENGINE, SETTINGS, WORLD, current_world_time, require_character, serialized_user_action
+from ..runtime import _explain_engine_error, ENGINE, SETTINGS, WORLD, current_world_time, require_character, serialized_user_action
 
 # ---------------- Secret Realm commands ----------------
 secret_group = app_commands.Group(name="secretrealm", description="Enter and explore temporary hidden realms")
@@ -30,7 +30,7 @@ async def secret_status(interaction: discord.Interaction) -> None:
     try:
         envelope = await ENGINE.action("secret_realm.status", interaction.user.id, {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"Secret-realm status could not be read: {exc}", ephemeral=False)
+        await interaction.response.send_message(f"Secret-realm status could not be read: {_explain_engine_error(exc)}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     if bool(result.get("active")):
@@ -95,7 +95,7 @@ async def secret_enter(interaction: discord.Interaction, realm: str) -> None:
             action_id=f"discord:{interaction.id}:secret_realm.enter",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"You cannot enter that secret realm: {exc}", ephemeral=False)
+        await interaction.followup.send(f"You cannot enter that secret realm: {_explain_engine_error(exc)}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     # The realm road's sixth stage asks for the Sword Grave (v1.16.0):
@@ -167,7 +167,7 @@ async def secret_explore(interaction: discord.Interaction) -> None:
             action_id=f"discord:{interaction.id}:secret_realm.explore",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"The secret realm resists your attempt: {exc}", ephemeral=False)
+        await interaction.followup.send(f"The secret realm resists your attempt: {_explain_engine_error(exc)}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     room = dict(result.get("room") or {})
@@ -236,7 +236,7 @@ async def secret_leave(interaction: discord.Interaction) -> None:
             action_id=f"discord:{interaction.id}:secret_realm.leave",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"You cannot leave the secret realm cleanly: {exc}", ephemeral=False)
+        await interaction.followup.send(f"You cannot leave the secret realm cleanly: {_explain_engine_error(exc)}", ephemeral=False)
         return
     left = bool(dict(envelope.get("result") or {}).get("left"))
     message = (

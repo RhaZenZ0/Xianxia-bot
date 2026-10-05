@@ -9,7 +9,7 @@ from ...ops.game_engine import GameEngineError
 from ...rules.progression_systems import profession_rank
 from ..hubs import register_hub_option_hint
 from ..registry import registered_group_command
-from ..runtime import DB, ENGINE, WORLD, require_character, reply_long, serialized_user_action
+from ..runtime import _explain_engine_error, DB, ENGINE, WORLD, require_character, reply_long, serialized_user_action
 
 
 artifact_group = app_commands.Group(
@@ -51,7 +51,7 @@ async def artifact_bond(interaction: discord.Interaction, item: str) -> None:
             action_id=f"discord:{interaction.id}:artifact.bond",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(str(exc), ephemeral=False)
+        await interaction.followup.send(_explain_engine_error(exc), ephemeral=False)
         return
 
     resolved = dict(envelope.get("result") or {})
@@ -103,7 +103,7 @@ async def artifact_awaken(interaction: discord.Interaction, item: str, spirit_na
             action_id=f"discord:{interaction.id}:artifact.awaken",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(str(exc), ephemeral=False)
+        await interaction.followup.send(_explain_engine_error(exc), ephemeral=False)
         return
     resolved = dict(envelope.get("result") or {})
     artifact = dict(resolved.get("artifact") or {})
