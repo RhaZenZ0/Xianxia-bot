@@ -6872,6 +6872,166 @@ refused it), and a known part of a city is a known city.
 A bare `**/travel**` hint now lands on the Destinations page's first leaf, Cities; the arrival line
 that said *"Step in with /travel"* names City → Enter, the door built for it.
 
+### Every place a reply names is a button (v1.27.0)
+
+Asked as "missing system links" and then "interlinked systems". Three read-only audits, checked
+again against v1.26.0, found the same shape in three places: a system that names another and gives
+no way to reach it, a system that writes something another should read and nothing connects them,
+and a rule the engine states at one door and not its sibling.
+
+**One rule each for where a door is.** `OBJECTIVE_PATHS` in `app/rules/quests.py` is where every
+objective type is done, and `labelled_objective` appends it to a label that names no door of its
+own - 375 commission labels and every Forge draft named none, and nothing about the 375 was edited.
+`_hint_action` answers a bare tree command (`**/quests**`) from `register_root_hint_actions`, whose
+path is the bare name so the panel gate treats it exactly as the command tree does; it is asked
+*before* the bare-name leaf match, which had answered `/quests` with the GM's `/admin world quests`.
+`HubNextStepView` puts an empty picker's hint path under it; a panel's padlock reasons are
+`suggested_actions` too, drawn as a row when no result is showing, never for a door that is itself
+shut. `path_buttons` (registered by `surface`) is the same for a message outside any panel - the
+quest journal. And `_explain_engine_error` appends a door to a known refusal that names another
+system, inline so the tests that exec it still can. `test_every_refusal_is_explained.py` holds
+every `except GameEngineError` in the commands to pass through it; `test_hint_paths.py` now scans
+production Go too, because an engine string that prints a path reaches a player through the
+explainer like any reply.
+
+**A world event's sect effect has a place.** `ApplyEventSectEffectTx` is the one statement both the
+player-triggered and the autonomous event call; `EventSectTargetsTx` answers the sect whose home is
+the event's city, else the sect holding the ground, else the public sects of its world, and nobody
+for a place the catalogue does not carry. The unscoped `UPDATE` it replaces had drained every sect in
+four worlds for one village's invasion.
+
+**A reader keyed on names no writer produces is decoration.** The Forge and RAG read
+`war_started`/`war_resolved`; the engine writes `territory_war`, `territory_war_resolved`,
+`territory_war_ally` and `territory_claimed`. `WAR_HISTORY_EVENT_ACTIONS` is the one table both
+read, and `test_the_wars_reach_the_forge.py` reads the event types off the Go source, so the next war
+row fails there the day it is written. The declaration rose from 78 to the Forge's floor of 80.
+
+**The rest is a rule found at a second site.** The war step now asks `game.SectsAlliedTx` and the
+attacker's world before it moves (claims always stayed in their world); a player's neutral claim
+writes the `territory_claimed` row the NPC claim always did, through `RecordTerritoryClaimedTx`; an
+artifact bond counts only while `artifactStillHeldTx` finds the artifact carried at any grade or
+bound as equipment; and the merchant and market buys report `trade` like the shops. The dashboard's
+`table()` renders every column keyed on a known name field through `linkedCell`, and one
+document-level click handler opens a player or an NPC from anywhere.
+
+**Decided against, with the reason.** `abode.focus` on Defense or Storage applies no effect, by the
+rc.36 design written above `abodeFacilityEffects`; `world_history_events.world_name` is read by no
+reader, so filling it was left out.
+
+### What was built and read by nothing (v1.28.0)
+
+The second release of the interlinks work: things a player built, trained or earned that no rule
+read. Each now has one reader, named once, and a gate on the class where there is a class.
+
+**Six reputations had writers and no reader.** `standingTx` and `standingBonus`
+(`reputation_readers.go`) are the one read, and each key is read by the rule its name is about: the
+sect's circle (`sectCircleKey`: Orthodox Society, or Demonic Circles for a demonic sect) on the
+entrance trial's TN, `craft_hall:<trade>` on the examination fee, Heavenly Recognition on the
+tribulation's judgment wave, Martial Society on a duel's attack, Merciful Reputation on a defeat's
+fatal chance (`defeatFatalChance`, the one statement both defeat paths ask), Demonic Circles and the
+hidden sect's membership on the black market's door. `TestEveryReputationIsReadSomewhere` reads every
+literal key `adjustReputationTx` is handed by AST and requires a `standingTx` reader for it; a key a
+writer names from a variable (a sect's own name, a household's) has its own reader and is not its
+business.
+
+**A surrender was free and atoning was not.** `SettleBountyTx` is what ending a pursuit costs:
+`crimeRestitutionFine` (the one statement `crime.atone` now asks too) for a surrender, half again
+with karma and Orthodox standing lost for a capture, taken from the purse as far as it reaches and
+never refused - a surrender a poor fugitive could not afford would be a fight they were made to keep
+losing, and a capture the tick cannot settle would end it.
+
+**The rest is one reader each.** `PropertyDefenseLevelTx` slows a capture inside the fugitive's own
+property (pressure still builds: the hunter waits at the gate); `propertyStorageSlotsTx` adds a
+property's Storage to a deposit's room, and `Database.get_storage` shows the same number
+(`PROPERTY_STORAGE_SLOTS_PER_LEVEL`, held equal to the Go); `beastIntelligenceBonus` joins
+`combatCompanionBonus`, whose display twin `companion_bonus` takes the fourth argument; the hunt adds
+`combat_bonus` effects and `huntCompanionBonusTx`; a built spirit-sense stage adds to `/sense`;
+`sectInfluenceWarPower` rides a war act and `masterAttentionInsight` a disciple's realm crossing; a
+neutral claim pays one war act's contribution. And `recommendationTermsTx` is the sponsor's whole
+roll, named term by term in the result, so the bot prints the engine's terms instead of computing
+its own - the family influence and karmic leaning it printed for releases were never rolled.
+
+**Six objective types** (`beast_tame`, `beast_evolve`, `flame_refine`, `spirit_settle`,
+`perfection_complete`, `abode_upgrade`) are reported after the engine agreed and before the reply,
+each with its `OBJECTIVE_PATHS` door.
+
+**Fixtures carried the old shape.** Four Go tests declared `sect_membership` without the
+contribution columns production has added since rc.17 and v1.8.0, so the claim's first contribution
+credit failed on them - the fixture rule this file already states, met at the change that needed it.
+
+### The world and its players answer each other (v1.29.0)
+
+The third release of the interlinks work: places where the world wrote a number and nothing in the
+world read it back. Each is one reader, and the class gates are AST call-site gates, because a
+helper's own test passes against a tree nothing calls it from.
+
+**A sect's ground, its war and its members.** `territoryTribute` stocks a sect's treasury with a lot
+of each held territory's resource a week, scaled by the city's `civilization_regions` prosperity and
+unrest (`territoryLots`); `warPoliticsOutcomeTx` moves both sects' influence and resources when
+`ResolveWarTx` ends a war by anything but peace; `sectResourcesFromContributionTx` turns a member's
+credited points into sect resources (a point for 25, at most three a credit), inside
+`creditSectContributionTx`, the one door points come in by; and `sectRecruitmentEagernessTx` lowers
+the trial's TN by a sect's recruitment pressure above 50. `ManorGroundTakenTx` is asked by every
+manor reader (`manorCultivationMultiplier`, `canonicalCraftManorBonus`, `seclusionEnvironmentGo`), so
+a manor lends nothing while a rival holds its city.
+
+**Trade moves the cities.** `CaravanArrivedTx` is what an arrival does, called by the player's settle
+and by the tick alike: cargo into the destination market's supply, a prosperity nudge, and the toll
+into the destination controller's resources. `CaravanSecurityRisk` adds the origin's insecurity to
+the run. `market.trade` nudges its city as every other sale does, and the town's stall shoppers buy
+at `stallChanceAtProsperity`.
+
+**The era reaches the NPC simulation.** `eraChance` is the one statement: five NPC rolls (sect claims
+and wars on `war_pressure`, crimes on `crime_pressure`, beast hunts on `beast_encounter_rate`,
+breakthroughs on `cultivation_gain`) ask the era of the world they are rolled in, through
+`eraModifiersOrNone`, which answers nothing rather than an error on a database with no era table - a
+tick must never fail over an era read. `TestEveryNPCRollAsksItsEra` reads each key by AST.
+
+**A killing is one statement.** `MarkKillingTx` is the region-and-sect half of a player's kill,
+pulled out of `combat_aftermath.go`, and the world's own killings call it through `markNPCKilling` at
+severity 1 (a robbery that ends in a body and a settled feud), never failing the tick. The region's
+`security` was moved by every killing and read by nothing; `insecurity` adds it to NPC crime and
+`CaravanSecurityRisk` to a caravan. And a player's kill reads the dead's kin (`kinOfTx`: spouse,
+living children, disciples) **before** `ReleaseNPCBondsTx`, which widows the spouse and so takes the
+name off the row the read needs; `TestAKillReadsTheKinBeforeTheWidowing` holds the order.
+
+**The household reads its clan.** `family.simulate` drew a year from ten fixed events while
+`martial_clan_relations` held the household's real treaties and feuds and `martial_clan_branches`
+its branches' shares. `householdWorldTermsTx` adds both to each year, capped so the world shapes a
+year without deciding it.
+
+### A home says what is in it (`property.overview`, v1.30.0)
+
+Asked as *"an update on player (sect) abode - show what is there"*. `/abode status` and the sect
+residence's status printed each facility's level and nothing else, while what a level is worth lived
+in rules the card could not see, and three of those rules wrote the same number out by hand: the
+cultivation chamber's `1.05 + 0.05 x level` in the hand-sat session and both retreats, and a
+workshop's `level * 2` in the craft, the forage garden and the beast pen.
+
+`property.overview` is one read (on `authoritativeQueries`) answering both homes from helpers the
+rules call: `homeCultivationMult`, `abodeArrayMultiplier`, `abodeFacilityRollBonus`,
+`propertyStorageSlotsPerLevel`, `PropertyWardShare` (the bounty tick), `stallSlotsAndFee`, and the two
+upgrade costs the upgrade actions charge (`homesteadUpgradeCost`, `residenceUpgradeCost`). Each room
+answers what it does now, what the next level adds, its cost, and for a residence what the next
+level still asks (the rank cap or the cultivation floor, the two gates the upgrade checks).
+`TestTheOverviewSaysWhatEachRoomDoes` holds the numbers to the helpers and
+`TestEveryHomeRuleAsksTheOverviewsHelpers` holds each rule site to its helper by AST, because a
+helper's own test passes against a tree nothing calls it from; its drill (the beast pen's
+`level * 2` put back) names the function.
+
+The bot only says the numbers (`facility_does_text`, `property_overview_lines`): a key the engine
+does not send says nothing, so the card cannot promise a number no rule reads. `home_overview` never
+raises, and a card whose read fails prints the level-only list it always did.
+
+**The playtest's idle-panel step failed three runs in a row from v1.28.0, and it was the harness.**
+The step jumps the clock past one panel's timeout, and SimCord walks that jump timer by timer; every
+other view left behind with a timeout of its own wakes inside it, and one that wakes a hair short of
+its deadline sleeps the remainder again - rc.35's "wake near enough to count as runnable", a settle
+that never completes. v1.27.0 added a 120-second next-step view under every empty picker, which made
+it near-certain. The step now said only "the panel still takes presses" because a jump that gave up
+both tries fell through silently; it says "the clock jump never landed" now, and
+`stop_every_view_but` stops every view but the panel under test before the jump.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

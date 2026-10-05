@@ -16,6 +16,25 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.27.0)** — *Missing system links.* Three read-only audits, re-checked against v1.26.0.
+  Navigation: every objective type has a door (`OBJECTIVE_PATHS`), bare tree commands, empty pickers,
+  padlock reasons and engine refusals earn buttons, forty-eight handlers that printed the engine's bare
+  words go through `_explain_engine_error`, the journal draws each quest's next door, and dashboard
+  names open their records. Engine: a world event's sect effect is scoped to its city's or world's
+  sects, war history reaches the Forge and RAG, the war step spares allies and other worlds, a
+  player's claim is told to the world, and an artifact bond needs the artifact.
+- **fixed (v1.28.0)** — *Built things that did nothing.* A homestead's Defensive Formation and
+  Storage, beast intelligence, the spirit sense in `/sense`, the hunting musk and the beast in the hunt,
+  six reputations no rule read, sect influence and master attention each have a reader; a bounty
+  surrender and capture cost restitution; a sponsor rolls the household and karma; six objective types.
+- **fixed (v1.30.0)** — *A home says what is in it.* The homestead's and the sect residence's
+  status list every facility with what it does at its level, what the next level adds and costs,
+  and what it still asks, read through `property.overview` off the helpers the rules use.
+- **fixed (v1.29.0)** — *The world's feedback.* Held territory stocks its sect's treasury, a war's
+  end and a member's contribution move the sect, recruitment pressure eases the trial, a manor under a
+  rival's banner lends nothing, caravans and market trades move their cities, era terms reach five NPC
+  rolls, the world's own killings mark their region and sect, a slain NPC's kin remember the killer,
+  and a household's year reads its real relations and branches.
 - **fixed (v1.24.0)** — *Expand the war system.* Asked for in three words, then a war channel and
   fighting beside an allied sect were asked for mid-build. Reading the system found four faults: the
   world's own sieges were fought for the attacker alone, so a defender with no players could never

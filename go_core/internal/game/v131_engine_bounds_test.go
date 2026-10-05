@@ -161,7 +161,7 @@ func TestACommissionIsTakenFromItsGiversCity(t *testing.T) {
 func TestATerritoryIsClaimedFromItsGround(t *testing.T) {
 	path := setupBatch4AuthorityDB(t)
 	world := batch4WorldPath(t)
-	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS sect_membership(user_id INTEGER PRIMARY KEY,sect_name TEXT NOT NULL,rank_name TEXT NOT NULL DEFAULT 'Disciple',rank_level INTEGER NOT NULL DEFAULT 0,joined_at REAL NOT NULL)`)
+	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS sect_membership(user_id INTEGER PRIMARY KEY,sect_name TEXT NOT NULL,rank_name TEXT NOT NULL DEFAULT 'Disciple',rank_level INTEGER NOT NULL DEFAULT 0,joined_at REAL NOT NULL,contribution_points INTEGER NOT NULL DEFAULT 0,influence INTEGER NOT NULL DEFAULT 0,contribution_earned INTEGER NOT NULL DEFAULT 0)`)
 	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS territory_state(territory_key TEXT PRIMARY KEY, name TEXT NOT NULL, region TEXT NOT NULL, controller_type TEXT NOT NULL DEFAULT 'neutral', controller_key TEXT NOT NULL DEFAULT '', resource_type TEXT NOT NULL DEFAULT 'mixed', prosperity INTEGER NOT NULL DEFAULT 50, defense INTEGER NOT NULL DEFAULT 50, unrest INTEGER NOT NULL DEFAULT 0, updated_game_minute INTEGER NOT NULL DEFAULT 0, updated_at REAL NOT NULL)`)
 	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS territory_wars(war_id INTEGER PRIMARY KEY AUTOINCREMENT, attacker_key TEXT NOT NULL, defender_key TEXT NOT NULL, territory_key TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'active', started_game_minute INTEGER NOT NULL DEFAULT 0, operations_json TEXT NOT NULL DEFAULT '{}', created_at REAL NOT NULL, updated_at REAL NOT NULL)`)
 	batch4Exec(t, path, `INSERT INTO sect_membership(user_id,sect_name,rank_name,rank_level,joined_at) VALUES(42,'Azure Cloud Sect','Deacon',40,0)`)

@@ -137,12 +137,15 @@ func eraCultivationMultiplier(conn *storage.Conn, world string) (string, float64
 	return name, mult, nil
 }
 
-func manorCultivationMultiplier(conn *storage.Conn, userID int64, location string) (string, float64, error) {
-	res, err := conn.Execute(`SELECT m.name,m.base_location,m.qi_array_level FROM sect_membership sm JOIN sect_manors m ON m.sect_name=sm.sect_name WHERE sm.user_id=?`, []any{userID})
+func manorCultivationMultiplier(conn *storage.Conn, catalog worlddata.Catalog, userID int64, location string) (string, float64, error) {
+	res, err := conn.Execute(`SELECT m.name,m.base_location,m.qi_array_level,m.sect_name FROM sect_membership sm JOIN sect_manors m ON m.sect_name=sm.sect_name WHERE sm.user_id=?`, []any{userID})
 	if err != nil {
 		return "", 1, err
 	}
 	if len(res.Rows) == 0 || fmt.Sprint(res.Rows[0][1]) != location {
+		return "", 1, nil
+	}
+	if ManorGroundTakenTx(conn, catalog, fmt.Sprint(res.Rows[0][3]), location) {
 		return "", 1, nil
 	}
 	level := storage.ParseInt(res.Rows[0][2])
@@ -344,7 +347,7 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	manorMult := 1.0
 	storm := int64(0)
 	if !body {
-		manorName, manorMult, err = manorCultivationMultiplier(conn, userID, c.Location)
+		manorName, manorMult, err = manorCultivationMultiplier(conn, catalog, userID, c.Location)
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
@@ -569,6 +572,13 @@ func awakenSoulMemoryGo(conn *storage.Conn, userID, amount int64, now float64) (
 	}
 	return map[string]any{"memory_seed": seed, "awakened_memory": aw}, nil
 }
+
+// masterAttentionInsight is the insight a disciple is taught on crossing a
+// realm: a point for every 20 attention, at most 15.
+func masterAttentionInsight(attention int64) int64 {
+	return minI64(15, maxI64(0, attention)/20)
+}
+
 func rewardMasterGo(conn *storage.Conn, catalog worlddata.Catalog, disciple int64, realmChanged bool, now float64) (map[string]any, error) {
 	att, contrib, influence, xp := int64(2), int64(1), int64(0), int64(3)
 	if realmChanged {
@@ -596,6 +606,23 @@ func rewardMasterGo(conn *storage.Conn, catalog worlddata.Catalog, disciple int6
 	out := map[string]any{"master_user_id": mid, "master_name": name, "attention": att, "contribution": contrib, "influence": influence, "insight_xp": xp}
 	if eligible != "" {
 		out["master_eligible_for"] = eligible
+	}
+	// A master's attention is what they pass down (v1.28.0): the disciple's
+	// cultivation and donations have raised it since the lineage was written,
+	// and only the sect card read it. A disciple crossing a realm is taught
+	// what that attention has built - a point of insight for every 20.
+	if realmChanged {
+		taught := int64(0)
+		if r, e := conn.Execute(`SELECT attention FROM sect_lineage WHERE disciple_user_id=?`, []any{disciple}); e == nil && len(r.Rows) > 0 {
+			taught = masterAttentionInsight(storage.ParseInt(r.Rows[0][0]))
+		}
+		if taught > 0 {
+			granted, e := grantInsightXPTx(conn, disciple, taught, now)
+			if e != nil {
+				return nil, e
+			}
+			out["disciple_insight_xp"] = granted
+		}
 	}
 	return out, nil
 }

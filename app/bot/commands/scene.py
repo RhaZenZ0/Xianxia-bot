@@ -26,6 +26,7 @@ from ..formatting import roll_line
 from ..locations import DEAD, _location_is_visible, current_npc_location, local_npc_autocomplete, npc_whereabouts, npcs_present
 from ..registry import EVENT_HANDLERS, registered_group_command, registered_root_command
 from ..runtime import (
+    _explain_engine_error,
     DB,
     ENGINE,
     WORLD,
@@ -410,7 +411,7 @@ async def _resolve_scene_action(
             action_id=f"discord:{interaction.id}:scene.action:{action_key}",
         )
     except GameEngineError as exc:
-        await reply_long(interaction, f"Scene action could not be resolved: {exc}", ephemeral=False)
+        await reply_long(interaction, f"Scene action could not be resolved: {_explain_engine_error(exc)}", ephemeral=False)
         return
     mechanics = dict(envelope.get("result") or {})
     attribute = str(mechanics.get("attribute") or profile["attribute"])

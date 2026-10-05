@@ -274,7 +274,7 @@ func DeclareWarTx(conn *storage.Conn, catalog worlddata.Catalog, attacker, defen
 		summary = fmt.Sprintf("%s has come back for %s, taken from it by %s. The occupation is contested.", attacker, name, defender)
 	}
 	if err = recordWorldHistoryTx(conn, fmt.Sprintf("sect_war:%s:%s:%d", attacker, territory, gm), "territory_war",
-		attacker+" declares on "+defender, summary, 78, "public", territory, attacker,
+		attacker+" declares on "+defender, summary, 80, "public", territory, attacker,
 		"faction", attacker, attacker, "faction", defender, defender, nil, "",
 		[]string{"territory", "war", territory}, gm, map[string]any{"war_id": ins.LastInsertID, "retake": retake}, now); err != nil {
 		return 0, err
@@ -361,6 +361,15 @@ func ResolveWarTx(conn *storage.Conn, catalog worlddata.Catalog, warID int64, wi
 	loser := defender
 	if winner == defender {
 		loser = attacker
+	}
+	// What a war's end does to the two sects (v1.29.0): a sect that wins a war
+	// is stronger for it and one that loses is weaker, and nothing said so -
+	// `sect_politics_state` only ever fed a war's strength, never heard how it
+	// went. A peace moves neither; a cession is a loss taken at the table.
+	if resolution != "peace" && winner != "" {
+		if err = warPoliticsOutcomeTx(conn, winner, loser, now); err != nil {
+			return nil, false, err
+		}
 	}
 	name := territoryName(conn, territory)
 	title := winner + " takes " + name
@@ -581,4 +590,24 @@ func warActPointsLeftTx(conn *storage.Conn, catalog worlddata.Catalog, warID, us
 		return 0, err
 	}
 	return max64(0, rules.WarPointsCap-i64(firstRowMap(r)["n"])*rules.ActPoints), nil
+}
+
+// warPoliticsWinnerGain and warPoliticsLoserLoss are what a war's end moves on
+// each side's `sect_politics_state` influence and resources (v1.29.0).
+const (
+	warPoliticsWinnerGain = int64(5)
+	warPoliticsLoserLoss  = int64(5)
+)
+
+func warPoliticsOutcomeTx(conn *storage.Conn, winner, loser string, now float64) error {
+	if !tableExistsTx(conn, "sect_politics_state") || winner == loser {
+		return nil
+	}
+	if _, err := conn.Execute(`UPDATE sect_politics_state SET influence=MIN(100,influence+?),resources=MIN(100,resources+?),updated_at=? WHERE sect_name=?`,
+		[]any{warPoliticsWinnerGain, warPoliticsWinnerGain, now, winner}); err != nil {
+		return err
+	}
+	_, err := conn.Execute(`UPDATE sect_politics_state SET influence=MAX(0,influence-?),resources=MAX(0,resources-?),updated_at=? WHERE sect_name=?`,
+		[]any{warPoliticsLoserLoss, warPoliticsLoserLoss, now, loser})
+	return err
 }

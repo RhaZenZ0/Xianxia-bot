@@ -12,7 +12,7 @@ import discord
 from discord import app_commands
 
 from ...ops.game_engine import GameEngineError
-from ..formatting import player_property_emoji, player_property_facility_lines, player_property_unbuilt
+from ..formatting import player_property_emoji, player_property_facility_lines, player_property_unbuilt, property_overview_lines
 from ..pickers import usable_item_autocomplete
 from ..registry import registered_group_command, registered_root_command
 from ..character_state import record_quest_progress, announce_quest_progress
@@ -53,25 +53,43 @@ async def abode_establish(interaction:discord.Interaction,name:str)->None:
     )
 
 
-@registered_group_command(abode_group, name="status",description="Inspect your player-owned property, facilities and guest access")
+async def home_overview(user_id: int) -> dict[str, Any] | None:
+    """`property.overview` for one cultivator, or None when the engine does
+    not answer (v1.30.0). It never raises: a status card that cannot say what
+    a room does still says the room is there, the way it always has."""
+    try:
+        return dict(await ENGINE.action("property.overview", user_id, {}) or {})
+    except Exception:
+        log.exception("property.overview unavailable for %s", user_id)
+        return None
+
+
+@registered_group_command(abode_group, name="status",description="See what your home holds: each facility, what it does, and what the next level adds")
 async def abode_status(interaction:discord.Interaction)->None:
     c=await require_character(interaction)
     if not c:return
     a=await DB.get_abode(interaction.user.id)
     if not a:
         await interaction.response.send_message("You do not own a player property yet. Use **/abode → Establish**.",ephemeral=False);return
+    await interaction.response.defer(ephemeral=False)
     guests=await DB.get_abode_guests(interaction.user.id)
     thread_text=f"<#{a['thread_id']}>" if a.get('thread_id') else "not created"
-    facilities=" • ".join(player_property_facility_lines(a)) or "No developed facilities"
-    unbuilt=player_property_unbuilt(a)
-    await interaction.response.send_message(
+    overview=await home_overview(interaction.user.id)
+    home=(overview or {}).get("homestead") or None
+    if home:
+        # What each room does and what the next level adds, off the engine's
+        # own numbers (v1.30.0); the level-only list is the fallback.
+        body="\n".join(f"• {line}" for line in property_overview_lines(home, currency_name=WORLD.currency_name))
+    else:
+        facilities=" • ".join(player_property_facility_lines(a)) or "No developed facilities"
+        unbuilt=player_property_unbuilt(a)
+        body=f"Facilities: {facilities}" + (f"\nNot yet built: {', '.join(unbuilt)}" if unbuilt else "")
+    await reply_long(interaction,
         f"{player_property_emoji(a)} **{a['name']} — {player_property_label(a)}**\n"
-        f"Entrance: **{a['base_location']}** • Grade: **{a['grade']}**\n"
-        f"Facilities: {facilities}\n"
-        + (f"Not yet built: {', '.join(unbuilt)}\n" if unbuilt else "")
-        + f"Invited guests: **{len(guests)}**\n"
-        f"Private location thread: {thread_text}\n\n"
-        "The Discord thread is the scene for the property; the world location remains authoritative for entering and leaving.",
+        f"Entrance: **{a['base_location']}** • Grade: **{a['grade']}** • Invited guests: **{len(guests)}**\n"
+        f"{body}\n"
+        "A facility is built or raised with **/abode → Upgrade**; Focus grants a room's effect for a while.\n"
+        f"Private location thread: {thread_text}",
         ephemeral=False,
     )
 
@@ -191,10 +209,12 @@ async def abode_upgrade(interaction:discord.Interaction,facility:app_commands.Ch
     label=PLAYER_PROPERTY_FACILITY_LABELS.get(facility.value,facility.value.replace('_',' ').title())
     level=int(result.get('level',0) or 0)
     cost=f" for **{result.get('cost','?')}** {WORLD.currency_name(str(result.get('currency','')))}" if result.get('cost') is not None else ""
+    progressed=await record_quest_progress(interaction.user.id,"abode_upgrade",game_minute=wt.total_minutes)
     if level<=1:
         await interaction.followup.send(f"🏡 You build a **{label}**{cost}.",ephemeral=False)
     else:
         await interaction.followup.send(f"🏡 **{label}** raised to level **{level}**{cost}.",ephemeral=False)
+    await announce_quest_progress(interaction,progressed)
 
 
 @registered_group_command(abode_group, name="focus",description="Use a developed property facility for a temporary specialization effect or scene benefit")

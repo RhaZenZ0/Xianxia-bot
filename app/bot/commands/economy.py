@@ -487,6 +487,7 @@ async def merchant_buy(interaction:discord.Interaction,merchant:str,item:str,qua
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    await _report_trade(interaction,str(result.get("item_id") or item))
     where="by the roadside" if bool(result.get("on_the_road")) else f"at {result.get('whereabouts')}"
     where+=" from the shop" if str(result.get("source"))=="wares" else " from the floor finds"
     await interaction.followup.send(
@@ -1161,8 +1162,14 @@ async def _black_market_access(user_id:int, character:dict[str,Any]) -> tuple[st
     alignment = ""
     if membership:
         alignment = str((WORLD.sects.get(str(membership.get("sect_name"))) or {}).get("alignment", ""))
+    circles = next((int(r.get("score",0)) for r in reps if str(r.get("faction_key","")).casefold()=="demonic circles"), 0)
+    try:
+        initiate = await DB.is_hidden_sect_initiate(user_id)
+    except Exception:
+        initiate = False
     reason = black_market_access_reason(
-        karma=int(character.get("karma_score",0)), underworld_reputation=underworld, sect_alignment=alignment
+        karma=int(character.get("karma_score",0)), underworld_reputation=underworld, sect_alignment=alignment,
+        hidden_initiate=initiate, demonic_circles=circles,
     )
     return reason, underworld, alignment
 
@@ -1414,6 +1421,7 @@ async def market_buy_command(interaction:discord.Interaction,item:str,quantity:a
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    await _report_trade(interaction,item)
     await interaction.followup.send(format_trade_receipt(icon="🪙",verb="Bought",item_label=WORLD.item_name(item),quantity=int(quantity),result=result,currency_name=WORLD.currency_name),ephemeral=False)
 
 
@@ -1434,6 +1442,7 @@ async def market_sell_command(interaction:discord.Interaction,item:str,quantity:
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    await _report_trade(interaction,item)
     await interaction.followup.send(format_trade_receipt(icon="🪙",verb="Sold",item_label=WORLD.item_name(item),quantity=int(quantity),result=result,currency_name=WORLD.currency_name),ephemeral=False)
 
 

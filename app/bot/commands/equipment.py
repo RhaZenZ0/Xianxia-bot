@@ -261,18 +261,19 @@ register_hub_option_hint(
 register_hub_option_hint(
     equipment_equip,
     "equipment_id",
-    "Equip works on **bound** equipment, not on carried items. Run **Bind** on a carried "
-    "weapon or armour first — or everything you have bound is already equipped.",
+    "Equip works on **bound** equipment, not on carried items. Bind a carried weapon or armour "
+    "first with **/items → Equipment → Bind** — or everything you have bound is already equipped.",
 )
 register_hub_option_hint(
     equipment_unequip,
     "equipment_id",
-    "Nothing is equipped right now, so there is nothing to remove.",
+    "Nothing is equipped right now, so there is nothing to remove. Put something on with "
+    "**/items → Equipment → Equip**.",
 )
 register_hub_option_hint(
     equipment_repair,
     "equipment_id",
-    "You have no bound equipment to repair. Run **Bind** on a carried item first.",
+    "You have no bound equipment to repair. Bind a carried item first with **/items → Equipment → Bind**.",
 )
 
 

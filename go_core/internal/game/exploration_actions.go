@@ -773,6 +773,10 @@ func canonicalRoadNeighbors(catalog worlddata.Catalog, current string, realmInde
 // cityOf resolves a location to the city it belongs to (v0.36.0): a gate,
 // a district, a shop or an auction hall answers its city; anywhere else
 // answers itself.
+// CityOf is cityOf for the simulation package: which city a place is part of
+// (v1.29.0, for the street a crime's chance reads security off).
+func CityOf(catalog worlddata.Catalog, location string) string { return cityOf(catalog, location) }
+
 func cityOf(catalog worlddata.Catalog, location string) string {
 	if loc, ok := catalog.Locations[location]; ok && loc.OutsideLocation != "" && (loc.District != "" || loc.Shop != "" || loc.AuctionHouse != "") {
 		return loc.OutsideLocation
@@ -1263,7 +1267,7 @@ func activateUnexpectedEventTx(conn *storage.Conn, catalog worlddata.Catalog, us
 			if err != nil {
 				return nil, err
 			}
-			impacts, effectErr := applyWorldEventEffectTx(conn, event.ID, event.Title, c.Location, gameMinute, event.Severity, event.WorldEffect, now)
+			impacts, effectErr := applyWorldEventEffectTx(conn, catalog, event.ID, event.Title, c.Location, gameMinute, event.Severity, event.WorldEffect, now)
 			if effectErr != nil {
 				return nil, effectErr
 			}
@@ -1891,6 +1895,20 @@ func RollHuntQuarry(realmIndex int64) (HuntQuarry, error) {
 	return HuntQuarry{Name: b.Name, TN: b.TN, Rank: b.Rank, Loot: loot, Stones: b.Stones, Cultivation: b.Cultivation}, nil
 }
 
+// huntCompanionBonusTx is combatCompanionBonus for a hunt, and 0 when the
+// tables a fixture or a fresh world lacks are not there - a hunt must not
+// refuse over a companion it does not have.
+func huntCompanionBonusTx(conn *storage.Conn, userID int64) int64 {
+	if !tableExistsTx(conn, "spirit_beasts") || !tableExistsTx(conn, "artifact_bonds") {
+		return 0
+	}
+	bonus, err := combatCompanionBonus(conn, userID)
+	if err != nil {
+		return 0
+	}
+	return bonus
+}
+
 func explorationHuntAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p huntPayload
 	if err := json.Unmarshal(raw, &p); err != nil {
@@ -1950,7 +1968,17 @@ func explorationHuntAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	if c.RealmIndex == c.BodyRealmIndex && c.Phase == c.BodyPhase {
 		dual = 1
 	}
-	roll, err := rollCheck(agility+body+1+dual+siteBonus, beast.TN)
+	// What a fight is fought with, a hunt is too (v1.28.0): an effect that
+	// steadies a cultivator in battle - the Thousand Beast Valley's hunting
+	// musk carries `combat_bonus` and says beasts misjudge its wearer - and a
+	// companion beast at their side. Both were read by a battle and by no
+	// hunt, though the hunt is the fight most cultivators have every day.
+	huntEdge, err := canonicalAdditiveEffectBonus(conn, catalog, userID, c.Location, p.GameMinute, "combat_bonus")
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	companion := huntCompanionBonusTx(conn, userID)
+	roll, err := rollCheck(agility+body+1+dual+siteBonus+huntEdge+companion, beast.TN)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -2028,6 +2056,6 @@ func explorationHuntAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 		}
 	}
 	beastOut := map[string]any{"name": beast.Name, "tn": beast.TN, "taming_tn": beast.TamingTN, "rank": beast.Rank, "element": beast.Element, "temperament": beast.Temperament, "bloodline": beast.Bloodline, "intelligence": beast.Intelligence, "loot": beast.Loot, "stones": beast.Stones, "cultivation": beast.Cultivation}
-	result := map[string]any{"beast": beastOut, "roll": roll, "success": roll["success"], "cultivation_awarded": awarded, "bonded_beast": bonded, "wild_encounter": wild, "site_kind": siteKind, "site_bonus": siteBonus, "body_tempered": bodyTempered}
+	result := map[string]any{"beast": beastOut, "roll": roll, "success": roll["success"], "cultivation_awarded": awarded, "bonded_beast": bonded, "wild_encounter": wild, "site_kind": siteKind, "site_bonus": siteBonus, "hunt_edge": huntEdge, "companion_bonus": companion, "body_tempered": bodyTempered}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "exploration", EventType: "hunt_resolved", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 }

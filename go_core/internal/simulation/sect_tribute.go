@@ -134,7 +134,91 @@ func (r *Runner) sectTribute(conn *storage.Conn, steps int64) (int64, error) {
 			stocked += moved
 		}
 	}
+	held, err := r.territoryTribute(conn, steps, limit, now)
+	if err != nil {
+		return stocked, err
+	}
+	return stocked + held, nil
+}
+
+// territoryResourceRefs is what a held place yields, by the `resource_type`
+// its seeding read off its description. A "mixed" place yields the one of the
+// three its name picks, so a sect holding several does not stock everything
+// from each.
+var territoryResourceRefs = map[string]string{"spirit_herbs": "@herb", "ore": "@ore", "beast_grounds": "@core"}
+
+// territoryTribute is what held ground pays its sect (v1.29.0). A territory's
+// `resource_type` was worked out at seeding so that "wars, resource control
+// and caravans" had a canonical map, and nothing read it: holding a place,
+// winning it in a war or claiming it at all stocked nothing. Each place a sect
+// holds now sends one lot a week of what it yields, one more where the city is
+// prospering (75 or above) and one less where the ground is restless (unrest
+// 50 or above), through the same storehouse cap the disciples' tribute meets.
+// The material is resolved in the world the place stands in.
+func (r *Runner) territoryTribute(conn *storage.Conn, steps, limit int64, now float64) (int64, error) {
+	if !simTableExists(conn, "territory_state") {
+		return 0, nil
+	}
+	res, err := conn.Execute(`SELECT territory_key,controller_key,resource_type,unrest FROM territory_state
+        WHERE controller_type='sect' AND controller_key<>'' ORDER BY controller_key,territory_key`, nil)
+	if err != nil {
+		return 0, err
+	}
+	stocked := int64(0)
+	for _, row := range res.Rows {
+		key, sect, kind := fmt.Sprint(row[0]), fmt.Sprint(row[1]), fmt.Sprint(row[2])
+		ref, ok := territoryResourceRefs[kind]
+		if !ok {
+			refs := []string{"@herb", "@ore", "@core"}
+			ref = refs[int(hash64(key)%uint64(len(refs)))]
+		}
+		loc, known := r.World.Locations[key]
+		if !known || loc.World == "" {
+			continue
+		}
+		itemID := r.World.EventSites.Material(loc.World, ref)
+		if itemID == "" {
+			continue
+		}
+		if _, _, ok := game.ItemDef(r.World, itemID); !ok {
+			continue
+		}
+		lots := territoryLots(r.territoryProsperity(conn, key), i64(row[3]))
+		if lots <= 0 {
+			continue
+		}
+		moved, err := stockSectTreasury(conn, sect, itemID, lots*max1(min64(steps, 4)), limit, now)
+		if err != nil {
+			return stocked, err
+		}
+		stocked += moved
+	}
 	return stocked, nil
+}
+
+// territoryLots is how many lots a held place sends a week.
+func territoryLots(prosperity, unrest int64) int64 {
+	lots := int64(1)
+	if prosperity >= 75 {
+		lots++
+	}
+	if unrest >= 50 {
+		lots--
+	}
+	return lots
+}
+
+// territoryProsperity is the city's prosperity off `civilization_regions` -
+// the live number shops and stalls move - and 50 where there is none.
+func (r *Runner) territoryProsperity(conn *storage.Conn, location string) int64 {
+	if !simTableExists(conn, "civilization_regions") {
+		return 50
+	}
+	res, err := conn.Execute(`SELECT prosperity FROM civilization_regions WHERE location=?`, []any{location})
+	if err != nil || len(res.Rows) == 0 {
+		return 50
+	}
+	return i64(res.Rows[0][0])
 }
 
 // sectResources is every sect's resource level, read once rather than per row.

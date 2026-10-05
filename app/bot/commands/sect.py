@@ -55,7 +55,6 @@ from ...rules.sect_manor import (
     manor_upgrade_cost,
 )
 from ...rules.sect_recruitment import (
-    recommendation_modifier,
     recruitment_definition,
     trial_modifier,
     trial_profile,
@@ -63,7 +62,8 @@ from ...rules.sect_recruitment import (
 from ..registry import registered_group_command
 from ..locations import DEAD, current_npc_location, npc_whereabouts, npcs_present
 from ..character_state import record_quest_progress, announce_quest_progress
-from ..formatting import player_property_facility_lines, player_property_unbuilt
+from ..formatting import player_property_facility_lines, player_property_unbuilt, property_overview_lines
+from .abode import home_overview
 from ..services import PLAYER_PROPERTY_FACILITY_LABELS, QUESTS, SIM
 from ..threads import ensure_sect_abode_record, ensure_sect_abode_thread_for
 from ..runtime import (
@@ -415,17 +415,20 @@ async def sect_recruitment_recommendation(interaction: discord.Interaction, npc:
     # v1.1.0: a "speak with them first" check stood here and never fired -
     # `get_npc_memory` answers a sentence, never "", for somebody you have not
     # met - and it is gone rather than fixed: asking is the conversation.
-    family=await DB.get_birth_family(interaction.user.id); reps=await DB.get_reputations(interaction.user.id); rep=next((int(x.get('score',0)) for x in reps if str(x.get('faction_key'))==sect_name),0)
-    _,notes=recommendation_modifier(c,faction_reputation=rep,family=family,sect_alignment=str(WORLD.sects[sect_name].get('alignment','Neutral')))
     # Whom the sponsor speaks for and the gate their word reveals are the
     # engine's (v1.1.0): it used to write whatever `location` this sent onto
     # the travel list, where a road-less place is an instant jump.
     try:
-        e=await ENGINE.authoritative_action("sect.recruitment.recommendation",interaction.user.id,{"npc_name":npc,"details":{"modifier_notes":notes}},action_id=f"discord:{interaction.id}:sect.recruitment.recommendation"); r=dict(e.get('result') or {})
+        e=await ENGINE.authoritative_action("sect.recruitment.recommendation",interaction.user.id,{"npc_name":npc},action_id=f"discord:{interaction.id}:sect.recruitment.recommendation"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
         await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
     sect_name=str(r.get('sect_name') or sect_name); gate=str(r.get('gate') or '')
     roll=dict(r.get('roll') or {}); roll_text=f"2d10 {int(roll.get('modifier',0)):+d} = **{int(roll.get('total',0))}** vs TN **{int(roll.get('tn',0))}**"
+    # What the sponsor weighed, as the engine rolled it (v1.28.0): these were
+    # computed here and printed as terms the engine never rolled.
+    terms=[t for t in list(r.get('terms') or []) if isinstance(t,dict) and int(t.get('value') or 0)]
+    if terms:
+        roll_text+="\n-# "+" · ".join(f"{t.get('name')} {int(t.get('value') or 0):+d}" for t in terms)
     if r.get('success'):
         lines=[f"📜 **{npc}** puts their name to you for the **{sect_name}**: **+{int(r.get('recommendation_bonus',0))} on both entrance-trial rolls**."]
         seat=str(r.get('seat') or '')
@@ -898,14 +901,21 @@ async def sect_abode(interaction: discord.Interaction, action: app_commands.Choi
     abode = await ensure_sect_abode_record(interaction.user.id, c, membership)
     thread = await ensure_sect_abode_thread_for(interaction.guild, interaction.user, abode) if interaction.guild else None
     if action.value == "status":
-        facilities = " • ".join(player_property_facility_lines(abode, SECT_ABODE_FACILITY_KEYS)) or "No developed facilities"
-        unbuilt = player_property_unbuilt(abode, SECT_ABODE_FACILITY_KEYS)
-        await respond(interaction, 
+        overview = await home_overview(interaction.user.id)
+        residence = (overview or {}).get("residence") or None
+        if residence:
+            # What each room does, what the next level adds and what it still
+            # asks of rank and stage, off the engine's numbers (v1.30.0).
+            facilities_text = "\n".join(f"• {line}" for line in property_overview_lines(residence, currency_name=WORLD.currency_name)) + "\n"
+        else:
+            facilities = " • ".join(player_property_facility_lines(abode, SECT_ABODE_FACILITY_KEYS)) or "No developed facilities"
+            unbuilt = player_property_unbuilt(abode, SECT_ABODE_FACILITY_KEYS)
+            facilities_text = f"Facilities: {facilities}\n" + (f"Not yet built: {', '.join(unbuilt)}\n" if unbuilt else "")
+        await reply_long(interaction, 
             f"🏯 **{abode['name']}**\nSect: **{abode['sect_name']}** • Rank: **{membership.get('rank_name', 'Disciple')}**\n"
             f"Sect gate: **{abode['base_location']}**\n"
             f"Current location: **{await character_location_display(c)}**\n"
-            f"Facilities: {facilities}\n"
-            + (f"Not yet built: {', '.join(unbuilt)}\n" if unbuilt else "")
+            + facilities_text
             + f"Contribution points: **{int(membership.get('contribution_points', 0) or 0)}** - a facility is built or raised with "
             "**/sect → Holdings → Abode** and **Build or raise a facility**; the sect caps each level by your rank and stage.\n"
             + (f"Private scene: {thread.mention}" if thread else "⚠️ Private scene thread is unavailable; repair the base channels."),

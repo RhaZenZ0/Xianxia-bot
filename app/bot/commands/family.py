@@ -167,7 +167,7 @@ async def birth_family_enter(interaction: discord.Interaction) -> None:
             action_id=f"discord:{interaction.id}:family.household.enter",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ Could not enter the household: {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ Could not enter the household: {_explain_engine_error(exc)}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     thread = await ensure_birth_family_household_thread(interaction, fam)
@@ -215,7 +215,7 @@ async def birth_family_leave(interaction: discord.Interaction) -> None:
             action_id=f"discord:{interaction.id}:family.household.leave",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ Could not leave the household: {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ Could not leave the household: {_explain_engine_error(exc)}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     if interaction.guild is not None and household_row:

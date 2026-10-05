@@ -74,8 +74,12 @@ class TheTwinsReadTheEnginesExpressions(unittest.TestCase):
 
     def test_a_beast_adds_half_its_rank_its_stage_a_point_per_forty_loyalty_and_its_milestones(self):
         source = _squash(_go("combat_actions.go"))
-        self.assertIn("SELECTrank,evolution_stage,loyaltyFROMspirit_beasts", source)
-        self.assertIn("bonus+=i64(r.Rows[0][0])/2+i64(r.Rows[0][1])+i64(r.Rows[0][2])/40+beastMilestoneBonus(i64(r.Rows[0][0]))", source)
+        self.assertIn("SELECTrank,evolution_stage,loyalty,intelligenceFROMspirit_beasts", source)
+        self.assertIn("bonus+=i64(r.Rows[0][0])/2+i64(r.Rows[0][1])+i64(r.Rows[0][2])/40+beastMilestoneBonus(i64(r.Rows[0][0]))+beastIntelligenceBonus(i64(r.Rows[0][3]))", source)
+        self.assertIn("funcbeastIntelligenceBonus(intelligenceint64)int64{returnminI64(beastIntelligenceCap,maxI64(0,intelligence)/25)}", source)
+        self.assertIn("constbeastIntelligenceCap=int64(4)", source)
+        self.assertEqual(companion_bonus(0, 0, 0, 80), 3)
+        self.assertEqual(companion_bonus(0, 0, 0, 1000), 4)
         milestone = _squash(_go("beast_artifact_actions.go"))
         self.assertIn("funcbeastMilestoneBonus(rankint64)int64{ifrank<10{return0}return2*(rank/10)}", milestone)
         self.assertEqual(companion_bonus(5, 2, 79), 2 + 2 + 1)

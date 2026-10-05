@@ -42,9 +42,8 @@ func (r *Runner) npcSectWars(conn *storage.Conn, steps, gm int64) (int64, error)
 	if err != nil {
 		return 0, err
 	}
-	if int64(roll) >= min64(48, warDeclareChance*max1(min64(3, steps))) {
-		return 0, nil
-	}
+	// The roll is read against the attacker's own age of the world below
+	// (v1.29.0), once it is known who is looking outward.
 
 	// Who is looking outward. Ordered, because map order must not decide who
 	// goes to war.
@@ -64,6 +63,12 @@ func (r *Runner) npcSectWars(conn *storage.Conn, steps, gm int64) (int64, error)
 		return 0, err
 	}
 	attacker := candidates[pick]
+	byWorld := r.eraModifiersOrNone(conn)
+	// "Hundred Sects Strife - open territorial war" made sieges fiercer and
+	// no sect any readier to start one (v1.29.0).
+	if int64(roll) >= min64(48, r.eraChance(byWorld, game.SectHome(r.World, attacker), "war_pressure", warDeclareChance*max1(min64(3, steps)))) {
+		return 0, nil
+	}
 
 	// What it wants: somebody else's ground, weakly held, not already contested.
 	targets, err := conn.Execute(`SELECT t.territory_key,t.controller_key FROM territory_state t
@@ -78,10 +83,24 @@ func (r *Runner) npcSectWars(conn *storage.Conn, steps, gm int64) (int64, error)
 	// restated (v1.24.0); and ground taken from this sect and still under
 	// occupation is where it looks first - an occupation is the window to
 	// win it back.
+	//
+	// And two things a sect does not do (v1.27.0): move on ground an ally
+	// holds - a marriage pact or a standing high enough to fight beside each
+	// other, game.SectsAlliedTx's rule - and march into another world. Claims
+	// have always stayed in a sect's own world; the war step had no such rule,
+	// so a Mortal sect could declare on Celestial ground and two sects bound
+	// by marriage could besiege each other.
+	home := r.sectWorld(attacker)
 	open, retakes := [][]any{}, [][]any{}
 	for _, row := range targets.Rows {
 		key := fmt.Sprint(row[0])
 		if game.WarTruceUntilTx(conn, r.World, attacker, key, gm) > 0 {
+			continue
+		}
+		if game.SectsAlliedTx(conn, r.World, attacker, fmt.Sprint(row[1])) {
+			continue
+		}
+		if loc, ok := r.World.Locations[key]; ok && home != "" && loc.World != home {
 			continue
 		}
 		open = append(open, row)

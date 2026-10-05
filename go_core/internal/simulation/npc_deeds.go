@@ -188,6 +188,7 @@ func (r *Runner) npcCrimes(conn *storage.Conn, gm int64) (int64, int64, int64, e
 		atLocation[person.location] = append(atLocation[person.location], person)
 	}
 	contraband := contrabandItems(r.World)
+	byWorld := r.eraModifiersOrNone(conn)
 	now := nowFloat()
 	committed, witnessed, fatal := int64(0), int64(0), int64(0)
 	for _, criminal := range people {
@@ -203,6 +204,10 @@ func (r *Runner) npcCrimes(conn *storage.Conn, gm int64) (int64, int64, int64, e
 		default:
 			continue
 		}
+		// The age of the world and the safety of the street (v1.29.0): a
+		// hungry era puts more of the desperate on the road, and a place
+		// whose security has fallen is a place it pays to rob.
+		chance = r.eraChance(byWorld, criminal.location, "crime_pressure", chance) + r.insecurity(conn, criminal.location)
 		roll, err := gamerng.Intn(100)
 		if err != nil {
 			return committed, witnessed, fatal, err
@@ -308,6 +313,7 @@ func (r *Runner) npcCrimes(conn *storage.Conn, gm int64) (int64, int64, int64, e
 				// is not, and the summary is what says which.
 				r.recordDeed(conn, "npc_killing", fmt.Sprintf("npc_robbery_death:%s:%s:%d", criminal.name, victim.name, gm),
 					title, summary, "public", victim.location, victim.world, criminal.name, victim.name, 72, gm, now)
+				r.markNPCKilling(conn, victim.name, victim.location, victim.name+" was robbed and killed, and the streets feel it.", gm, now)
 				fatal++
 				committed++
 				if err := r.setActivity(conn, criminal.name, "Keeping out of sight", gm, now); err != nil {
@@ -409,6 +415,7 @@ func (r *Runner) npcBeastHunts(conn *storage.Conn, gm int64) (int64, int64, int6
 	if err != nil {
 		return 0, 0, 0, err
 	}
+	byWorld := r.eraModifiersOrNone(conn)
 	now := nowFloat()
 	hunted, took, died := int64(0), int64(0), int64(0)
 	for _, hunter := range people {
@@ -422,7 +429,8 @@ func (r *Runner) npcBeastHunts(conn *storage.Conn, gm int64) (int64, int64, int6
 		if err != nil {
 			return hunted, took, died, err
 		}
-		if int64(roll) >= huntChance {
+		// A beast tide is a season for hunters (v1.29.0).
+		if int64(roll) >= r.eraChance(byWorld, hunter.location, "beast_encounter_rate", huntChance) {
 			continue
 		}
 		quarry, err := game.RollHuntQuarry(hunter.realmIndex)
@@ -515,3 +523,43 @@ func sortedKeys(m map[string]int64) []string {
 	sort.Strings(out)
 	return out
 }
+
+// insecurity is what a place's fallen security adds to a crime's chance
+// (v1.29.0): a point for every ten below 50, and nothing at 50 or above.
+// `civilization_regions.security` was moved by every killing and read by no
+// rule that decided anything.
+func (r *Runner) insecurity(conn *storage.Conn, location string) int64 {
+	if !simTableExists(conn, "civilization_regions") {
+		return 0
+	}
+	// The place itself and the city it is part of: a killing marks the
+	// district it happened in, and a city's own row is what the street reads.
+	out := int64(0)
+	for _, place := range []string{location, game.CityOf(r.World, location)} {
+		res, err := conn.Execute(`SELECT security FROM civilization_regions WHERE location=?`, []any{place})
+		if err != nil || len(res.Rows) == 0 {
+			continue
+		}
+		out = max64(out, max64(0, 50-i64(res.Rows[0][0]))/10)
+	}
+	return out
+}
+
+// markNPCKilling is a death at the world's own hands marking the place it
+// happened and the sect the dead belonged to, through the one statement a
+// player's kill uses (game.MarkKillingTx), at severity 1 (v1.29.0). It never
+// fails the tick: one system's error ends the whole tick (rc.28), and a region
+// left unmarked is not worth every batch ordered after this one.
+func (r *Runner) markNPCKilling(conn *storage.Conn, victim, location, text string, gm int64, now float64) {
+	profession, faction := "", ""
+	if res, err := conn.Execute(`SELECT profession,faction FROM npc_civilization_state WHERE npc_name=?`, []any{victim}); err == nil && len(res.Rows) > 0 {
+		profession, faction = fmt.Sprint(res.Rows[0][0]), fmt.Sprint(res.Rows[0][1])
+	}
+	_, _ = game.MarkKillingTx(conn, location, victim, profession, faction, npcKillingSeverity, text, gm, now)
+}
+
+// npcKillingSeverity is how hard a death at the world's own hands marks its
+// region and sect: one, against a player's kill at the victim's own weight
+// (at least one and up to five). A world that kills its own people every week
+// must not drain a region the way a cultivator's spree does.
+const npcKillingSeverity = 1

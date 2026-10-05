@@ -6,6 +6,8 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any, Iterable
 
+from app.rules.quests import WAR_HISTORY_EVENT_ACTIONS
+
 
 # Deliberately small stop-list. Xianxia terms such as qi, dao, sect, soul and
 # core are useful retrieval keys and therefore are NOT treated as stop words.
@@ -307,7 +309,7 @@ class MemoryRAGRetriever:
             if _mentioned(query_text, str(row.get(field) or "")):
                 mention_bonus = max(mention_bonus, 0.5)
         event_type = str(row.get("event_type") or "")
-        type_bonus = 0.25 if event_type in {
+        type_bonus = 0.25 if event_type in WAR_HISTORY_EVENT_ACTIONS or event_type in {
             "death", "war_started", "war_resolved", "marriage", "alliance", "betrayal",
             "leadership_change", "location_destroyed", "major_battle", "inheritance",
             "ascension", "blood_feud", "discovery", "friendship", "discipleship",

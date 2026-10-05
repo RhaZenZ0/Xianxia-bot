@@ -104,7 +104,7 @@ func (r *Runner) npcSectClaims(conn *storage.Conn, steps, gm int64) (int64, erro
 			homeOf[home] = name
 		}
 	}
-	chance := min64(60, claimChance*max1(min64(3, steps)))
+	byWorld := r.eraModifiersOrNone(conn)
 	claimed := int64(0)
 	now := nowFloat()
 	for _, row := range res.Rows {
@@ -112,6 +112,8 @@ func (r *Runner) npcSectClaims(conn *storage.Conn, steps, gm int64) (int64, erro
 		if int64(len(held[sect])) >= claimCap(influence) {
 			continue
 		}
+		// An age of open war is an age of claims (v1.29.0).
+		chance := min64(60, r.eraChance(byWorld, game.SectHome(r.World, sect), "war_pressure", claimChance*max1(min64(3, steps))))
 		roll, err := gamerng.Intn(100)
 		if err != nil {
 			return claimed, err
@@ -224,28 +226,8 @@ func (r *Runner) wholePlace(location string) string {
 	return location
 }
 
-// recordTerritoryClaimed puts a claim where the world can hear about it -
-// quieter than a war (60 against 78), because nobody was driven off.
-// The event is public; gm is the game minute and now is Unix time in seconds.
-// Repeated claims for the same sect, territory, and game minute are ignored.
-// A missing history table or any database error is silently ignored.
+// recordTerritoryClaimed is game.RecordTerritoryClaimedTx, the one statement
+// of a claim's history row - a player's claim writes the same one (v1.27.0).
 func (r *Runner) recordTerritoryClaimed(conn *storage.Conn, sect, territory string, gm int64, now float64) {
-	if !simTableExists(conn, "world_history_events") {
-		return
-	}
-	world := ""
-	if loc, ok := r.World.Locations[territory]; ok {
-		world = loc.World
-	}
-	title := sect + " claims " + territory
-	summary := fmt.Sprintf("%s has raised its banners over %s, which answered to no sect before.", sect, territory)
-	source := fmt.Sprintf("sect_claim:%s:%s:%d", sect, territory, gm)
-	_, _ = conn.Execute(`INSERT INTO world_history_events(
-        source_key,event_type,title,summary,significance,visibility,location,world_name,faction,
-        actor_type,actor_key,actor_name,target_type,target_key,target_name,related_user_id,
-        related_npc_name,tags,game_minute,metadata_json,created_at,updated_at)
-        VALUES(?,?,?,?,?, 'public', ?,?,?, 'faction',?,?, 'territory',?,?, NULL,'',?,?,?,?,?)
-        ON CONFLICT(source_key) DO NOTHING`,
-		[]any{source, "territory_claimed", title, summary, 60, territory, world, sect,
-			sect, sect, territory, territory, "territory claim " + territory, gm, "{}", now, now})
+	game.RecordTerritoryClaimedTx(conn, r.World, sect, territory, gm, now)
 }

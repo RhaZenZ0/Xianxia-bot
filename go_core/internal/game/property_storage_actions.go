@@ -113,7 +113,7 @@ func storageMoveActionGo(conn *storage.Conn, userID int64, raw json.RawMessage, 
 			if e != nil {
 				return authoritativeMutation{}, e
 			}
-			if i64(firstRowMap(r)["n"]) >= i64(container["slot_capacity"]) {
+			if i64(firstRowMap(r)["n"]) >= i64(container["slot_capacity"])+propertyStorageSlotsTx(conn, userID) {
 				return authoritativeMutation{}, errors.New("spatial storage has no free item slots")
 			}
 		}
@@ -444,18 +444,11 @@ func abodeUpgradeActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 		return authoritativeMutation{}, errors.New("you do not own a player property")
 	}
 	current := i64(a[col])
-	maxlvl := i64(catalog.AbodeSystem["max_level"])
-	if maxlvl <= 0 {
-		maxlvl = 9
-	}
+	maxlvl := homesteadMaxLevel(catalog)
 	if current >= maxlvl {
 		return authoritativeMutation{}, errors.New("that facility is already at maximum level")
 	}
-	base := i64(catalog.AbodeSystem["upgrade_base_cost"])
-	if base <= 0 {
-		base = 100
-	}
-	cost := base * (current + 1) * (current + 1)
+	cost := homesteadUpgradeCost(catalog, current)
 	// Charged in the money of the world the cultivator stands in (v1.2.1).
 	// `abode_system.currency` names the Mortal stone, and a homestead may be
 	// founded in any world, so the fixed id refused every upgrade above the
@@ -494,6 +487,30 @@ var abodeFacilityEffects = map[string]string{
 	"alchemy":     "alchemy_inspiration",
 	"forge":       "forge_inspiration",
 	"formation":   "formation_inspiration",
+}
+
+// propertyStorageSlotsPerLevel is what each level of a property's Storage
+// facility adds to the cultivator's spatial storage (v1.28.0). The homestead's
+// `storage_level` and the sect residence's were built and raised - for stones
+// and for contribution - and read by no rule: a storehouse that stored
+// nothing. Both count, because a cultivator may hold one of each.
+const propertyStorageSlotsPerLevel = int64(10)
+
+// propertyStorageSlotsTx is the extra stacks a cultivator's properties hold.
+// A missing table or column is a property that adds nothing, never an error:
+// a deposit must not refuse over a storehouse.
+func propertyStorageSlotsTx(conn *storage.Conn, userID int64) int64 {
+	total := int64(0)
+	for _, table := range []string{"cave_abodes", "sect_abodes"} {
+		if ok, err := tableHasColumns(conn, table, "storage_level", "user_id"); err != nil || !ok {
+			continue
+		}
+		r, err := conn.Execute(fmt.Sprintf(`SELECT COALESCE(MAX(storage_level),0) FROM %s WHERE user_id=?`, table), []any{userID})
+		if err == nil && len(r.Rows) > 0 {
+			total += maxI64(0, storage.ParseInt(r.Rows[0][0])) * propertyStorageSlotsPerLevel
+		}
+	}
+	return total
 }
 
 func abodeFocusActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {

@@ -1941,6 +1941,20 @@ async def run(url: str, token: str, db_path: str) -> Report:
     furnished = await step(report, "abode.upgrade the alchemy room", act("abode.upgrade", PLAYER, {"facility": "alchemy"}))
     if furnished is not None:
         report.add("PASS" if int(furnished.get("level") or 0) == 1 and int(furnished.get("cost") or 0) == 100 else "FAIL", "level 1 costs a hundred stones", f"level={furnished.get('level')} cost={furnished.get('cost')}")
+    # What a home holds (v1.30.0): one read answers both homes from the helpers
+    # the rules call, so the alchemy room just built is worth what a craft
+    # under it is given, and the next level costs what the upgrade charges.
+    overview = await step(report, "property.overview reads both homes", query("property.overview", PLAYER, {}))
+    if overview is not None:
+        rooms = {f.get("key"): f for f in ((overview.get("homestead") or {}).get("facilities") or [])}
+        furnace = rooms.get("alchemy") or {}
+        report.add("PASS" if int(furnace.get("level") or 0) == 1 and int((furnace.get("does") or {}).get("craft_bonus") or 0) == 2
+                   and int(furnace.get("next_cost") or 0) == 400 else "FAIL",
+                   "the furnace says what it gives and what the next level costs",
+                   f"level={furnace.get('level')} does={furnace.get('does')} next_cost={furnace.get('next_cost')}")
+        residence = overview.get("residence") or {}
+        report.add("PASS" if residence.get("facilities") else "FAIL", "the sect residence is read beside it",
+                   f"{residence.get('name')}: {len(residence.get('facilities') or [])} facilities")
     await step(report, "abode.enter", act("abode.enter", PLAYER, {}))
     focused = await step(report, "abode.focus the cultivation chamber", act("abode.focus", PLAYER, {"facility": "cultivation"}))
     if focused is not None:

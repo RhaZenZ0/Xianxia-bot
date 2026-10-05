@@ -219,7 +219,10 @@ var authoritativeQueries = map[string]bool{
 	// v1.0.13: what one account has spent of its restart allowance, for the
 	// two GM surfaces that ask. Like the rotation it is not an actor's own
 	// view - the payload names whom it is about.
-	"character.reset_status":    true,
+	"character.reset_status": true,
+	// v1.30.0: what a cultivator's homestead and sect residence hold, what each
+	// facility does at its level, and what the next level adds and costs.
+	"property.overview":         true,
 	"exploration.event.status":  true,
 	"exploration.travel_status": true,
 	"merchant.status":           true,
@@ -842,6 +845,20 @@ func applyAuthoritativeQuery(databasePath, worldPath string, req ActionRequest) 
 		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
 	case "exploration.travel_status":
 		result, qerr := travelStatusQuery(conn, req.ActorID)
+		if qerr != nil {
+			return ActionResponse{}, qerr
+		}
+		v, _ := eventledger.CurrentActorVersion(conn, req.ActorID)
+		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
+	case "property.overview":
+		if strings.TrimSpace(worldPath) == "" {
+			return ActionResponse{}, errors.New("world catalog path is required")
+		}
+		catalog, loadErr := worlddata.Load(worldPath)
+		if loadErr != nil {
+			return ActionResponse{}, loadErr
+		}
+		result, qerr := propertyOverviewQuery(conn, catalog, req.ActorID)
 		if qerr != nil {
 			return ActionResponse{}, qerr
 		}

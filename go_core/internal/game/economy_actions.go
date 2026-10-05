@@ -381,6 +381,18 @@ func blackMarketAuthorized(conn *storage.Conn, catalog worlddata.Catalog, userID
 			return "demonic sect", rep, nil
 		}
 	}
+	// Two more doors a broker knows (v1.28.0): an initiate of the hidden sect,
+	// whose membership is not `sect_membership` and so was never asked, and a
+	// cultivator the Demonic Circles already count as one of theirs.
+	if tableExistsTx(conn, "hidden_sect_membership") {
+		h, err := conn.Execute(`SELECT 1 FROM hidden_sect_membership WHERE user_id=? AND status='active' LIMIT 1`, []any{userID})
+		if err == nil && len(h.Rows) > 0 {
+			return "hidden sect", rep, nil
+		}
+	}
+	if standingTx(conn, userID, "Demonic Circles") >= blackMarketTrustReputation {
+		return "demonic circles", rep, nil
+	}
 	return "", rep, nil
 }
 
@@ -622,6 +634,12 @@ func marketTradeAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 			return authoritativeMutation{}, err
 		}
 	}
+	// A market counter is trade like any shelf (v1.29.0): it moved the
+	// market's own supply and demand and was the one sale in the game that
+	// left the city's prosperity where it was.
+	if err := nudgeCityProsperityTx(conn, catalog, p.Location, 1); err != nil {
+		return authoritativeMutation{}, err
+	}
 	out := map[string]any{"item_id": p.ItemID, "quantity": p.Quantity, "unit_price": unit, "total": total, "currency_id": currency, "buy": p.Buy, "balance": bal}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "economy", EventType: "market.trade", EntityType: "market", EntityID: p.Location, GameMinute: p.GameMinute, Payload: out}}, nil
 }
@@ -669,6 +687,7 @@ func bountyHunterActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 		return authoritativeMutation{}, errors.New("active bounty hunter pursuit not found")
 	}
 	now := nowSeconds()
+	var surrenderSettlement map[string]any
 	if p.Action == "surrender" {
 		_, err = conn.Execute(`UPDATE bounty_hunter_pursuits SET status='surrendered',capture_progress=100,updated_game_minute=?,updated_at=? WHERE pursuit_id=?`, []any{p.GameMinute, now, p.PursuitID})
 		if err != nil {
@@ -682,6 +701,12 @@ func bountyHunterActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
+		// A surrender pays the restitution atoning would have (v1.28.0).
+		settlement, err := SettleBountyTx(conn, catalog, userID, i64(hunt["bounty_id"]), false, now)
+		if err != nil {
+			return authoritativeMutation{}, err
+		}
+		surrenderSettlement = settlement
 	} else {
 		c, err := characterLocationPower(conn, userID)
 		if err != nil {
@@ -747,6 +772,9 @@ func bountyHunterActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 		return authoritativeMutation{}, err
 	}
 	out := firstRowMap(final)
+	if surrenderSettlement != nil {
+		out["settlement"] = surrenderSettlement
+	}
 	// Say what is giving them away. A rule the player cannot see is the fault
 	// this one was written to fix - `tracking_strength` spent five releases
 	// being printed as a number that decided nothing.

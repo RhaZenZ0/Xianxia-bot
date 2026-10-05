@@ -195,7 +195,7 @@ class ExplorationEventView(CardView):
                 action_id=f"discord:{interaction.id}:{operation}:{action}",
             )
         except GameEngineError as exc:
-            await interaction.followup.send(f"That event action could not proceed: {exc}", ephemeral=False)
+            await interaction.followup.send(f"That event action could not proceed: {_explain_engine_error(exc)}", ephemeral=False)
             return
         result = dict(envelope.get("result") or {})
         self.event = dict(result.get("event") or self.event)
@@ -247,7 +247,7 @@ class ExplorationEventView(CardView):
                 {"event_id": str(self.event.get("event_id") or "")},
             )
         except GameEngineError as exc:
-            await interaction.response.send_message(f"Could not refresh the event: {exc}", ephemeral=False)
+            await interaction.response.send_message(f"Could not refresh the event: {_explain_engine_error(exc)}", ephemeral=False)
             return
         self.event = dict(status or self.event)
         self._sync_buttons()
@@ -1366,7 +1366,7 @@ async def alchemy_forage(interaction: discord.Interaction) -> None:
             action_id=f"discord:{interaction.id}:forage.resolve",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"Foraging could not resolve: {exc}", ephemeral=False)
+        await interaction.response.send_message(f"Foraging could not resolve: {_explain_engine_error(exc)}", ephemeral=False)
         return
     resolved = dict(envelope.get("result") or {})
     result = SimpleNamespace(**resolved)
@@ -1543,7 +1543,7 @@ async def realmhub_go(interaction:discord.Interaction,world:str)->None:
             action_id=f"discord:{interaction.id}:exploration.travel.hub",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"Realm-capital travel failed: {exc}",ephemeral=False);return
+        await interaction.response.send_message(f"Realm-capital travel failed: {_explain_engine_error(exc)}",ephemeral=False);return
     result=dict(envelope.get("result") or {})
     # Hub travel is instant: put the capital's presence role on now so the
     # channel appears before the reply does (v0.21.6).
@@ -2223,7 +2223,7 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
         preview = dict(await ENGINE.action(
             "exploration.travel_preview", interaction.user.id, {"destination": destination, "mode": "known"}) or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"Travel failed: {exc}", ephemeral=False)
+        await interaction.followup.send(f"Travel failed: {_explain_engine_error(exc)}", ephemeral=False)
         return
     if not preview.get("road_connection"):
         await _travel_now(interaction, c, destination)
@@ -2320,7 +2320,7 @@ async def _travel_now(interaction: discord.Interaction, c: dict[str, Any], desti
             action_id=f"discord:{interaction.id}:exploration.travel",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"Travel failed: {exc}",ephemeral=False)
+        await interaction.followup.send(f"Travel failed: {_explain_engine_error(exc)}",ephemeral=False)
         return
     result=dict(envelope.get("result") or {})
     desc=str(result.get("description") or "")
@@ -2503,7 +2503,7 @@ async def travel_status(interaction: discord.Interaction) -> None:
         # the full envelope) - the query's own fields are the top level here.
         result = dict(await ENGINE.action("exploration.travel_status", interaction.user.id, {}) or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"Travel status could not be read: {exc}", ephemeral=False)
+        await interaction.response.send_message(f"Travel status could not be read: {_explain_engine_error(exc)}", ephemeral=False)
         return
     if not bool(result.get("traveling")):
         await interaction.response.send_message(

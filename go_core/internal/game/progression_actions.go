@@ -401,11 +401,15 @@ func tribulationAttemptAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	// A Soul Cultivator's heart is stiller (v1.13.0): the path's term on the
 	// wave the heart demon comes from, and on no other.
 	stillHeart := heartWaveBonus(catalog, characterPathTx(conn, userID))
+	// The heavens remember who has already passed their judgment (v1.28.0):
+	// every tribulation survived pays Heavenly Recognition, and the wave that
+	// weighs a cultivator against the heavens is where it is worth something.
+	recognised := standingBonus(standingTx(conn, userID, "Heavenly Recognition"), heavenlyRecognitionPer, heavenlyRecognitionCap)
 	defs := []struct {
 		Name         string
 		Modifier, TN int64
 		Condition    string
-	}{{"Heavenly Lightning", maxI64(body, will) + prep, base, "meridian_damage"}, {"Heart Tribulation", will + insight/2 + prep + heartCalm/heartDemonResistanceScale + stillHeart, base + 1, "heart_demon"}, {"Void & Karma Rejection", spirit + will/2 + prep + karmaMod, base + 2, "soul_wound"}}
+	}{{"Heavenly Lightning", maxI64(body, will) + prep, base, "meridian_damage"}, {"Heart Tribulation", will + insight/2 + prep + heartCalm/heartDemonResistanceScale + stillHeart, base + 1, "heart_demon"}, {"Void & Karma Rejection", spirit + will/2 + prep + karmaMod + recognised, base + 2, "soul_wound"}}
 	waves := []map[string]any{}
 	successes := int64(0)
 	for _, d := range defs {

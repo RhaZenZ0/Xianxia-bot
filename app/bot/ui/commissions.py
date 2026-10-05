@@ -22,6 +22,7 @@ import discord
 from ...ops.game_engine import GameEngineError
 from ...rules import commissions as rules
 from ...rules import worldtime
+from ...rules.quests import labelled_objective
 from ..runtime import _explain_engine_error, current_world_time, log
 from ..services import COMMISSIONS
 
@@ -46,7 +47,7 @@ def offer_card(offer: Any, *, item_names: dict[str, str] | None = None) -> str:
     definition = dict(offer.definition or {})
     hidden = rules.rewards_are_hidden(definition)
     terms = rules.variant_terms(definition)
-    objectives = [str(o.get("label") or o.get("id") or "") for o in definition.get("objectives") or []]
+    objectives = [labelled_objective(o) for o in definition.get("objectives") or [] if isinstance(o, dict)]
     lines = [f"📜 **Commission: {definition.get('title', '')}**"]
     if str(definition.get("requires_sect") or ""):
         if rules.open_to_outsiders(definition):

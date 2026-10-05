@@ -108,6 +108,21 @@ func territoryClaimActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 		}
 		out["claimed"] = true
 		out["controller_key"] = sect
+		RecordTerritoryClaimedTx(conn, catalog, sect, p.TerritoryKey, p.GameMinute, now)
+		// A banner raised is work done for the sect, paid as one war act is
+		// (v1.28.0): a claim earned nothing, so the member who took the ground
+		// was worse off than one who fought over it.
+		points := warRules(catalog).ActPoints
+		if points > 0 {
+			promoted, e := creditSectContributionTx(conn, catalog, userID, points, 0)
+			if e != nil {
+				return authoritativeMutation{}, e
+			}
+			out["contribution"] = points
+			if promoted != "" {
+				out["eligible_for"] = promoted
+			}
+		}
 	} else if controller == sect {
 		return authoritativeMutation{}, errors.New("your sect already controls that territory")
 	} else {
@@ -190,6 +205,10 @@ func territoryWarActActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 		manorBonus = manorDefensePowerGo(conn, sect, fmt.Sprint(war["territory_key"]))
 		power += manorBonus
 	}
+	// A member the sect listens to carries more of it into a war (v1.28.0):
+	// every point of contribution raised `sect_membership.influence`, and the
+	// sect card printed it under Internal Politics, and no rule read it.
+	power += sectInfluenceWarPower(i64(mem["influence"]))
 	territory := fmt.Sprint(war["territory_key"])
 	power = max64(1, int64(math.Round(float64(power)*math.Max(.25, currentEraModifierGo(conn, catalog, territory, "war_pressure", 1)))))
 	if e = ensureWarOperationGo(conn, p.WarID, p.GameMinute, now); e != nil {
@@ -537,7 +556,7 @@ func caravanSettleActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID
 		legacySafe := tax == 0 && escort == 0 && conceal == 0 && !smuggle
 		effective := int64(0)
 		if !legacySafe {
-			effective = clamp(int64(math.Round(float64(i64(data["risk"])+map[bool]int64{true: 20, false: 0}[smuggle]-escort*2-conceal)*eraRisk)), 0, 95)
+			effective = clamp(int64(math.Round(float64(i64(data["risk"])+CaravanSecurityRisk(conn, catalog, fmt.Sprint(data["origin"]))+map[bool]int64{true: 20, false: 0}[smuggle]-escort*2-conceal)*eraRisk)), 0, 95)
 		}
 		roll := stablePercentGo(data["caravan_id"], data["origin"], data["destination"], data["depart_game_minute"])
 		intercepted := roll < effective
@@ -569,6 +588,9 @@ func caravanSettleActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID
 				return authoritativeMutation{}, e
 			}
 		}
+		if e = CaravanArrivedTx(conn, catalog, fmt.Sprint(data["destination"]), cargo, toll, seized, now); e != nil {
+			return authoritativeMutation{}, e
+		}
 		_, _ = conn.Execute(`UPDATE caravans SET status=?,updated_at=? WHERE caravan_id=?`, []any{outcome, now, i64(data["caravan_id"])})
 		lossj, _ := json.Marshal(map[string]any{"percent": loss})
 		_, _ = conn.Execute(`UPDATE caravan_operations SET toll_paid=?,intercepted=?,seized=?,payout_final=?,losses_json=?,outcome=?,resolved_game_minute=?,updated_at=? WHERE caravan_id=?`, []any{toll, boolInt(intercepted), boolInt(seized), final, string(lossj), outcome, p.GameMinute, now, i64(data["caravan_id"])})
@@ -578,4 +600,64 @@ func caravanSettleActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID
 	}
 	result := map[string]any{"resolved": resolved, "count": len(resolved)}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "caravan", EventType: "caravan.settle", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
+}
+
+// RecordTerritoryClaimedTx puts a claim on neutral ground where the world can
+// hear about it - quieter than a war (60 against 80), because nobody was
+// driven off. It is the one statement of that row: the world's own sects
+// (`npcSectClaims`) had one and a player's `territory.claim` wrote none, so a
+// player could raise a banner the world never heard of (v1.27.0). The source
+// key is per sect, place and minute, so a repeat is ignored; a missing history
+// table or a write error is ignored too, because a claim must never fail over
+// its rumour.
+func RecordTerritoryClaimedTx(conn *storage.Conn, catalog worlddata.Catalog, sect, territory string, gm int64, now float64) {
+	if !tableExistsTx(conn, "world_history_events") {
+		return
+	}
+	world := ""
+	if loc, ok := catalog.Locations[territory]; ok {
+		world = loc.World
+	}
+	title := sect + " claims " + territory
+	summary := fmt.Sprintf("%s has raised its banners over %s, which answered to no sect before.", sect, territory)
+	source := fmt.Sprintf("sect_claim:%s:%s:%d", sect, territory, gm)
+	_, _ = conn.Execute(`INSERT INTO world_history_events(
+        source_key,event_type,title,summary,significance,visibility,location,world_name,faction,
+        actor_type,actor_key,actor_name,target_type,target_key,target_name,related_user_id,
+        related_npc_name,tags,game_minute,metadata_json,created_at,updated_at)
+        VALUES(?,?,?,?,?, 'public', ?,?,?, 'faction',?,?, 'territory',?,?, NULL,'',?,?,?,?,?)
+        ON CONFLICT(source_key) DO NOTHING`,
+		[]any{source, "territory_claimed", title, summary, 60, territory, world, sect,
+			sect, sect, territory, territory, "territory claim " + territory, gm, "{}", now, now})
+}
+
+// sectInfluenceWarPower is what a member's institutional influence adds to a
+// war act's power: a point for every 20, at most three (v1.28.0).
+func sectInfluenceWarPower(influence int64) int64 {
+	return minI64(3, maxI64(0, influence)/20)
+}
+
+// ManorGroundTakenTx says whether a rival sect holds the ground a sect's
+// manor stands on (v1.29.0). The manor's cultivation array, its craft halls
+// and its seclusion chambers asked only whether a member stood at
+// `base_location`, so a sect whose base had been annexed in a war kept every
+// bonus of a manor standing under somebody else's banner. The ground is the
+// manor's city, cityOf's rule, as a territory is; neutral ground, or ground
+// nobody has a row for, is still the sect's to use.
+func ManorGroundTakenTx(conn *storage.Conn, catalog worlddata.Catalog, sect, base string) bool {
+	if sect == "" || !tableExistsTx(conn, "territory_state") {
+		return false
+	}
+	r, err := conn.Execute(`SELECT 1 FROM territory_state WHERE territory_key IN (?,?) AND controller_type='sect' AND controller_key NOT IN ('',?) LIMIT 1`,
+		[]any{base, cityOf(catalog, base), sect})
+	return err == nil && len(r.Rows) > 0
+}
+
+// manorSectTx is the sect a member belongs to, "" for none.
+func manorSectTx(conn *storage.Conn, userID int64) string {
+	r, err := conn.Execute(`SELECT sect_name FROM sect_membership WHERE user_id=?`, []any{userID})
+	if err != nil || len(r.Rows) == 0 {
+		return ""
+	}
+	return fmt.Sprint(r.Rows[0][0])
 }
