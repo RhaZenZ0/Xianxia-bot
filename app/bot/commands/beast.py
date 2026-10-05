@@ -127,7 +127,7 @@ async def beast_tame(interaction: discord.Interaction, encounter_id: int) -> Non
         active_line = " It becomes your active companion." if beast.get("active") else ""
         # Recorded once the engine has made the contract, told after the
         # reply (v1.28.0).
-        progressed = await record_quest_progress(interaction.user.id, "beast_tame", game_minute=(await current_world_time()).total_minutes)
+        progressed = await record_quest_progress(interaction.user.id, "beast_tame")
         await interaction.followup.send(
             f"🐉 **Spirit-Beast Bond — {species}**\n{roll_line(result)}\n"
             f"The beast accepts an **equality contract** at loyalty **{beast.get('loyalty', 30)}**.{active_line}\n"
@@ -224,7 +224,7 @@ async def beast_evolve(interaction: discord.Interaction, beast_id: int) -> None:
     resolved = dict(envelope.get("result") or {})
     row = dict(resolved.get("beast") or {})
     beast_progress = dict(resolved.get("profession_progress") or {})
-    progressed = await record_quest_progress(interaction.user.id, "beast_evolve", game_minute=(await current_world_time()).total_minutes)
+    progressed = await record_quest_progress(interaction.user.id, "beast_evolve")
     await interaction.followup.send(
         f"🧬 **{row['name']} evolves.** Evolution Stage **{row['evolution_stage']}**, Rank **{row['rank']}**. The strain reduces loyalty to **{row['loyalty']}**.\n"
         f"🪢 Beast Taming: **{profession_rank(int(beast_progress.get('level', 0)), 'Beast Taming')}** Lv.{int(beast_progress.get('level', 0))}.",

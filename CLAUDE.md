@@ -6918,6 +6918,47 @@ document-level click handler opens a player or an NPC from anywhere.
 rc.36 design written above `abodeFacilityEffects`; `world_history_events.world_name` is read by no
 reader, so filling it was left out.
 
+### What was built and read by nothing (v1.28.0)
+
+The second release of the interlinks work: things a player built, trained or earned that no rule
+read. Each now has one reader, named once, and a gate on the class where there is a class.
+
+**Six reputations had writers and no reader.** `standingTx` and `standingBonus`
+(`reputation_readers.go`) are the one read, and each key is read by the rule its name is about: the
+sect's circle (`sectCircleKey`: Orthodox Society, or Demonic Circles for a demonic sect) on the
+entrance trial's TN, `craft_hall:<trade>` on the examination fee, Heavenly Recognition on the
+tribulation's judgment wave, Martial Society on a duel's attack, Merciful Reputation on a defeat's
+fatal chance (`defeatFatalChance`, the one statement both defeat paths ask), Demonic Circles and the
+hidden sect's membership on the black market's door. `TestEveryReputationIsReadSomewhere` reads every
+literal key `adjustReputationTx` is handed by AST and requires a `standingTx` reader for it; a key a
+writer names from a variable (a sect's own name, a household's) has its own reader and is not its
+business.
+
+**A surrender was free and atoning was not.** `SettleBountyTx` is what ending a pursuit costs:
+`crimeRestitutionFine` (the one statement `crime.atone` now asks too) for a surrender, half again
+with karma and Orthodox standing lost for a capture, taken from the purse as far as it reaches and
+never refused - a surrender a poor fugitive could not afford would be a fight they were made to keep
+losing, and a capture the tick cannot settle would end it.
+
+**The rest is one reader each.** `PropertyDefenseLevelTx` slows a capture inside the fugitive's own
+property (pressure still builds: the hunter waits at the gate); `propertyStorageSlotsTx` adds a
+property's Storage to a deposit's room, and `Database.get_storage` shows the same number
+(`PROPERTY_STORAGE_SLOTS_PER_LEVEL`, held equal to the Go); `beastIntelligenceBonus` joins
+`combatCompanionBonus`, whose display twin `companion_bonus` takes the fourth argument; the hunt adds
+`combat_bonus` effects and `huntCompanionBonusTx`; a built spirit-sense stage adds to `/sense`;
+`sectInfluenceWarPower` rides a war act and `masterAttentionInsight` a disciple's realm crossing; a
+neutral claim pays one war act's contribution. And `recommendationTermsTx` is the sponsor's whole
+roll, named term by term in the result, so the bot prints the engine's terms instead of computing
+its own - the family influence and karmic leaning it printed for releases were never rolled.
+
+**Six objective types** (`beast_tame`, `beast_evolve`, `flame_refine`, `spirit_settle`,
+`perfection_complete`, `abode_upgrade`) are reported after the engine agreed and before the reply,
+each with its `OBJECTIVE_PATHS` door.
+
+**Fixtures carried the old shape.** Four Go tests declared `sect_membership` without the
+contribution columns production has added since rc.17 and v1.8.0, so the claim's first contribution
+credit failed on them - the fixture rule this file already states, met at the change that needed it.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

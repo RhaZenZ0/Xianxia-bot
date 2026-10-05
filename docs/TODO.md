@@ -23,13 +23,13 @@ deferred half and not the half that says what was done about it.
   names open their records. Engine: a world event's sect effect is scoped to its city's or world's
   sects, war history reaches the Forge and RAG, the war step spares allies and other worlds, a
   player's claim is told to the world, and an artifact bond needs the artifact.
-- **deferred (scheduled: v1.28.0, v1.29.0)** — *The rest of the interlinks.* Built things that do nothing (a
-  homestead's Defense and Storage, beast intelligence, the spirit sense in `/sense`, the hunting musk
-  and the beast in the hunt, six reputations no rule reads, sect influence and master attention, a
-  bounty surrender that costs nothing) and the world's feedback (held territory paying, contribution
+- **fixed (v1.28.0)** — *Built things that did nothing.* A homestead's Defensive Formation and
+  Storage, beast intelligence, the spirit sense in `/sense`, the hunting musk and the beast in the hunt,
+  six reputations no rule read, sect influence and master attention each have a reader; a bounty
+  surrender and capture cost restitution; a sponsor rolls the household and karma; six objective types.
+- **deferred (scheduled: v1.29.0)** — *The world's feedback.* Held territory paying, contribution
   strengthening a sect, era terms in the NPC simulation, NPC deaths marking a region, recruitment
-  pressure in the trial, trade moving markets, a slain NPC's kin, the household's real relations).
-  On the owner's call, the next two releases.
+  pressure in the trial, trade moving markets, a slain NPC's kin, the household's real relations.
 - **fixed (v1.24.0)** — *Expand the war system.* Asked for in three words, then a war channel and
   fighting beside an allied sect were asked for mid-build. Reading the system found four faults: the
   world's own sieges were fought for the attacker alone, so a defender with no players could never
