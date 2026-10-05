@@ -982,3 +982,14 @@ deferred half and not the half that says what was done about it.
   numbers into a second table. Moving those six definitions into `content/world.json` (an
   `array_effect` block on each disk, read by both sides) would let the menu print them; it is a
   content move of its own, so it waits for the owner's word.
+- **fixed (v1.25.0)** — *A sect's doors by rank, its people, NPC masters and promotion by asking.*
+  The owner's calls: a member sees only the doors their rank may use (the engine refuses below it
+  too); each sect keeps a hall of about twenty-five NPCs; a member may take one as a master
+  (breakthrough +1, insight on a realm crossing, ×1.05 cultivation, the sect's next art once a life)
+  and is raised a rank by their master or an Elder once their contribution reaches it; and a player
+  master gives their disciple +1 on every trade roll and ×1.05 cultivation, where before a player bond
+  gave the disciple nothing.
+- **deferred (decision)** — *Registry NPCs cannot sponsor a sect recommendation.* `resolveRecommenderTx`
+  accepts catalogue NPCs and a running event's cast only, so a sect's generated Elders - who now stand
+  at its gate - cannot vouch for an applicant. Whether they should is a decision about how open the
+  door into a sect is, not a wiring.

@@ -89,8 +89,8 @@ type seclusionCarried struct {
 	ElementRelation string
 	Root            float64
 	RootGrade       string
-	// An NPC master's guidance (v1.25.0): a bond holds for a retreat's whole
-	// length, so a retreat carries it.
+	// A master's guidance (v1.25.0), NPC or player: a bond holds for a
+	// retreat's whole length, so a retreat carries it.
 	Master     float64
 	MasterName string
 }
@@ -109,7 +109,7 @@ func (s seclusionCarried) product() float64 {
 // way soulCultivationMultGo already answers 1 for a soul nobody has recorded.
 func loadSeclusionCarried(conn *storage.Conn, catalog worlddata.Catalog, userID, gameMinute int64, mode string) seclusionCarried {
 	out := seclusionCarried{Effect: 1, Era: 1, Manual: 1, Element: 1, Root: 1, Master: 1}
-	out.Master, out.MasterName = npcMasterCultivationMultTx(conn, catalog, userID)
+	out.Master, out.MasterName = masterCultivationMultTx(conn, catalog, userID)
 	// loadAptitudes errors outright on a character with no spiritual-root row,
 	// which is why it is tolerated here rather than propagated.
 	bundle, rootErr := loadAptitudes(conn, userID)

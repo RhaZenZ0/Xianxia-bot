@@ -156,7 +156,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 78; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 79; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -6384,6 +6384,11 @@ what is held back, and `_curriculum_opened` answers every leaf of the sect hub f
 side. The engine sets no realm floor on any sect action, so nothing opened is a button that only
 refuses; `PROGRESSION_GATES` still hides the manor below its ranks.
 
+**v1.25.0 reversed half of this, on the owner's call**: *"it should only show what you can do at your
+sect ranks."* The realm curriculum still steps aside for a member - that is what `_curriculum_opened`
+is - but every door above a member's rank is padlocked now, and refused by the engine too (see "A
+sect's doors open by rank" below).
+
 **`/locked` asks the panels' provider now**, not the pure helper: what is shut depends on more than
 the realm, and the provider is where that is decided. `test_the_curriculum_opens_as_you_cultivate`
 had held `/locked` to calling `locked_leaves` - the spelling of "one statement of what is shut" -
@@ -6769,6 +6774,63 @@ and its drill (the peace call replaced) names `game.NPCSuesForPeace`.
 `/sect → War → Act`. `test_hint_paths.py` read the bold path out of the channel blurb and refused it -
 the local run had not included that file, which is why the targeted list is chosen by what the change
 *prints* as well as by what it touches.
+
+### A sect's doors open by rank, and a sect has its people (schema 79, v1.25.0)
+
+Three asks in one message: a member sees only what their rank lets them do; a player can take an NPC
+master; a rank is granted by an NPC; and *"populate the sect"*. They are one feature, because each
+sect had one or two named people and so there was nobody to be a master or to grant a rank.
+
+**Rank floors are one table, keyed by operation.** `sect_system.rank_floors` names the rank an
+engine operation asks (`discipleship.resolve` 20, `territory.claim` 30, `war.act` 30), read by
+`requireSectRankTx` in Go and by `SECT_RANK_FLOORS`/`RANK_FLOOR_LEAVES` in `surface.py`, whose padlock
+opens with the engine's own phrase - `test_sect_doors_follow_rank.py` holds the two to the same words.
+The manor's ranks keep their own keys and v1.24.0's `war.peace` keeps `war_system.peace_min_rank_level`;
+the panel padlocks peace off that key too (`WAR_PEACE_RANK`), because a second statement of a rank the
+content already holds is the rc.39 fault. An absent floor is no gate, the homestead's rule.
+`TestEveryRankFloorIsReadAtItsOperation` refuses a key no production call reads - a padlocked door
+the engine opens. The merge with v1.24.0 found its own war tests seating fighters at rank 0: a fixture
+written before a rule is a fixture the rule fails, and they are Core Disciples now.
+
+**A sect keeps its hall** (`simulation/sect_population.go`), a step of the weekly `sects` tick before
+anybody swears in or walks out: `sect_system.population` is about twenty-five (1/3/5/7/9 from Sect
+Master down), realms offset from the sect's world floor, Elders and the Master at `game.SectGate`, the
+rest at `game.SectHome`. A member is the `npcMaturation` shape - a registry row of origin `sect`, then
+the two simulation rows and the mind row - and from then an ordinary NPC. Names are surname + given
+name from two content lists by a hash of sect, rank and slot, because the event cast's 24-name pool
+would have run dry. **The total is capped as well as each rank**: a promotion leaves a hole below, and
+filling every hole would grow a sect by one each time anybody was raised. No chronicle line is written
+per member - three hundred "takes their place" rows would bury every rumour page. Two faults fell out
+of it. `nextSectRank` sent any rank off its ladder to the *first* rung, so the work that should have
+become a Sect Master's influence demoted them to Outer Disciple; an unranked NPC takes the first rung
+and an unknown rank now stays. And `DB.list_registered_npcs_at` read `npc_registry.location`, which
+nothing moves once a simulation row exists (`MoveRegisteredNPCTx` has no callers) - harmless for a
+household's relatives, who never leave, wrong for three hundred people who travel; it answers from the
+simulation row now, the order `current_npc_location` keeps. Tribute is one lot per **six** living
+members (was two), so a full hall stocks about what a well-recruited sect did.
+
+**An NPC master is its own table** (`npc_mentorships`, schema 79), because `sect_lineage` foreign-keys
+both ids to `characters`. `discipleship.npc_request` takes no roll: one of the member's sect, alive,
+standing with them, above them in cultivation, at `npc_master.min_rank_level` and under
+`max_disciples`. A player holds a player master or an NPC master, never both; `discipleship.leave`
+severs either; `ReleaseNPCBondsTx`, the one door every death path uses, ends a dead master's bonds.
+The gifts are content and each is applied where it happens, held by
+`TestEveryMasterGiftIsAppliedWhereItHappens` because a helper's own test passes against a tree nothing
+calls it from: a `master` term in `breakthroughModifier` (so the odds and the roll agree), insight on a
+qi realm crossing through `grantInsightXPTx`, a cultivation term in `cultivationTrain` and in
+`loadSeclusionCarried` (a bond holds for a retreat's whole length), and `sect.master.teach` once per
+life off `event_log`, handing over the sect's next manual through `sectEntryManual`.
+
+**A player master gives too** (`sect_system.player_master`, on the owner's call): +1 on every craft,
+forage and dig in every trade (`masterTradeBonusTx`, beside the household tradition) and the same ×1.05
+cultivation on both paths (`masterCultivationMultTx`, which answers whichever master the disciple has).
+Until now every reward of a player bond ran to the master (`rewardMasterGo`).
+
+**A rank is granted by asking** (`sect.promote`). `creditSectContributionTx` no longer promotes: it
+reports when a credit carries the lifetime count across the next rung (`eligible_for`), and the member
+asks their master or any of the sect's people at `promoter_rank_level` standing with them, whose rank
+is above the rung. A master is not exempt from that last clause - a Core Disciple master cannot raise
+anybody to Core. The pickers offer only people who would be heard (rc.46), off the same content.
 
 ## Testing conventions
 

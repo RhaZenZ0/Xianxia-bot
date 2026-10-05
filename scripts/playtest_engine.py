@@ -1823,6 +1823,43 @@ async def run(url: str, token: str, db_path: str) -> Report:
         severed = await step(report, "discipleship.leave", act("discipleship.leave", BUYER, {}))
         if severed is not None:
             report.add("PASS" if severed.get("severed") else "FAIL", "the disciple leaves", str(severed.get("severed")))
+    # The sect's own people (v1.25.0). `sect_politics` was forced above, so the
+    # hall is full; one of its Elders is walked to the buyer - somebody away
+    # from home keeps no schedule, so the leg is the same at every hour - and
+    # the buyer is set at realm 0 so the elder stands above them.
+    hall = [dict(r) for r in (await db.get_sect_npc_roster(sect) or [])]
+    report.add("PASS" if len(hall) >= 25 else "FAIL", "the sect keeps its hall", f"{len(hall)} people")
+    elder = next((r for r in hall if str(r.get("sect_rank")) == "Elder"), None)
+    if elder is None:
+        report.add("FAIL", "an Elder to ask", "the hall has none")
+    else:
+        elder_name = str(elder["name"])
+        buyer_before = dict(await db.get_character(BUYER) or {})
+        elder_home = str((dict(await query("npc.status", PLAYER, {"npc_name": elder_name}) or {})).get("current_location") or "")
+        here = str(buyer_before.get("location") or town)
+        await step(report, "the buyer at realm 0", gm("admin.player.set_realm", {"user_id": BUYER, "realm_index": 0, "phase": 1, "reason": "playtest: a junior disciple"}))
+        await audited("admin.npc.relocate", {"npc_name": elder_name, "location": here, "reason": "playtest: an elder asked in person"}, name="admin.npc.relocate an Elder to the buyer")
+        bonded = await step(report, "discipleship.npc_request", act("discipleship.npc_request", BUYER, {"npc_name": elder_name}))
+        if bonded is not None:
+            report.add("PASS" if str(bonded.get("master_npc_name")) == elder_name else "FAIL", "the Elder takes the disciple", str(bonded.get("master_npc_name")))
+        await step(report, "sect.master.teach below the rank is refused", act("sect.master.teach", BUYER, {}), expect_error="teaches the sect's arts to")
+        await step(report, "sect.promote short of the points is refused", act("sect.promote", BUYER, {"npc_name": elder_name}), expect_error="contribution earned")
+        inner = content.next_promotion_rung(10)
+        await audited("admin.player.set_sect_contribution", {"user_id": BUYER, "contribution_points": 0, "contribution_earned": int(inner[1]) if inner else 600, "reason": "playtest: earned the rung"})
+        promoted = await step(report, "sect.promote by the Elder", act("sect.promote", BUYER, {"npc_name": elder_name}))
+        if promoted is not None:
+            report.add("PASS" if str(promoted.get("promoted_to")) == "Inner Disciple" and str(promoted.get("granted_by")) == elder_name else "FAIL",
+                       "an Elder grants the rank", f"{promoted.get('promoted_to')} by {promoted.get('granted_by')}")
+        taught = await step(report, "sect.master.teach", act("sect.master.teach", BUYER, {}))
+        if taught is not None:
+            report.add("PASS" if taught.get("manual_id") else "FAIL", "the master teaches the sect's art", str(taught.get("name")))
+        await step(report, "sect.master.teach twice is refused", act("sect.master.teach", BUYER, {}), expect_error="already taught you")
+        left = await step(report, "discipleship.leave an NPC master", act("discipleship.leave", BUYER, {}))
+        if left is not None:
+            report.add("PASS" if str(left.get("master_npc_name")) == elder_name else "FAIL", "the NPC bond is severed", str(left.get("master_npc_name")))
+        if elder_home:
+            await audited("admin.npc.relocate", {"npc_name": elder_name, "location": elder_home, "reason": "playtest: home again"}, name="admin.npc.relocate the Elder home")
+        await step(report, "the buyer's realm is put back", gm("admin.player.set_realm", {"user_id": BUYER, "realm_index": int(buyer_before.get("realm_index") or 0), "phase": int(buyer_before.get("phase") or 1), "reason": "playtest"}))
     # A territory is claimed standing in its region (v1.3.1); both claims were
     # made from the town and refused (v1.7.1).
     await step(report, "to the hills to claim them", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Cloudspine Foothills", "reason": "playtest"}))
@@ -1831,6 +1868,10 @@ async def run(url: str, token: str, db_path: str) -> Report:
         report.add("PASS" if claimed.get("claimed") else "FAIL", "a neutral territory is claimed", str(claimed.get("controller_key")))
     await audited("admin.player.set_sect", {"user_id": BUYER, "sect_name": "Crimson Furnace Sect", "rank_name": "Outer Disciple", "rank_level": 10, "reason": "playtest"}, name="admin.player.set_sect the buyer into the Crimson Furnace")
     await step(report, "the buyer to the hills to contest them", gm("admin.player.teleport", {"user_id": BUYER, "location": "Cloudspine Foothills", "reason": "playtest"}))
+    # A sect's doors follow its ranks (v1.25.0): an Outer Disciple claims no
+    # territory, a Core Disciple does.
+    await step(report, "territory.claim by an Outer Disciple is refused", act("territory.claim", BUYER, {"territory_key": "Cloudspine Foothills"}), expect_error="asks for Core Disciple")
+    await audited("admin.player.set_sect_rank", {"user_id": BUYER, "rank_name": "Core Disciple", "rank_level": 30, "reason": "playtest"}, name="admin.player.set_sect_rank the buyer to Core Disciple")
     contested = await step(report, "territory.claim the hills for a second sect", act("territory.claim", BUYER, {"territory_key": "Cloudspine Foothills"}))
     war_id = int((contested or {}).get("war_id") or 0)
     if contested is not None:

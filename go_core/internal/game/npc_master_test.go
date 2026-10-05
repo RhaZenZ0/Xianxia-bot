@@ -301,14 +301,17 @@ func TestPromotionNeedsTheMigratedTableOnlyForAMaster(t *testing.T) {
 // reason).
 func TestEveryMasterGiftIsAppliedWhereItHappens(t *testing.T) {
 	want := map[string][]string{
-		"cultivationTrain":        {"npcMasterCultivationMultTx"},
-		"loadSeclusionCarried":    {"npcMasterCultivationMultTx"},
+		"cultivationTrain":        {"masterCultivationMultTx"},
+		"loadSeclusionCarried":    {"masterCultivationMultTx"},
 		"cultivationBreakthrough": {"npcMasterBreakthroughBonusTx", "npcMasterRealmInsightTx"},
 		"cultivationStatusQuery":  {"npcMasterBreakthroughBonusTx"},
+		"craftResolveAction":      {"masterTradeBonusTx"},
+		"forageResolveAction":     {"masterTradeBonusTx"},
+		"explorationMineAction":   {"masterTradeBonusTx"},
 	}
 	found := map[string]map[string]bool{}
 	fset := token.NewFileSet()
-	for _, file := range []string{"cultivation_actions.go", "root_worth.go", "cultivation_stance.go"} {
+	for _, file := range []string{"cultivation_actions.go", "root_worth.go", "cultivation_stance.go", "crafting_actions.go", "mining.go"} {
 		parsed, err := parser.ParseFile(fset, file, nil, 0)
 		if err != nil {
 			t.Fatalf("%s: %v", file, err)
@@ -342,5 +345,47 @@ func TestEveryMasterGiftIsAppliedWhereItHappens(t *testing.T) {
 				t.Errorf("%s does not call %s: an NPC master's gift is not applied there", fn, call)
 			}
 		}
+	}
+}
+
+// A player master teaches their disciple in every trade and steadies their
+// cultivation on both paths (v1.25.0, on the owner's call): until then every
+// reward of a player bond ran to the master and the disciple got nothing.
+func TestAPlayerMasterTeachesEveryTradeAndSteadiesTheCultivation(t *testing.T) {
+	path := npcMasterDB(t, "Outer Disciple", 10, 0)
+	catalog := crossingCatalog(t)
+	rule := playerMasterRuleGo(catalog)
+	if rule.TradeRollBonus <= 0 || rule.CultivationMult <= 1 {
+		t.Fatalf("the shipped player_master gives nothing (%+v); the test needs both gifts", rule)
+	}
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if bonus, _ := masterTradeBonusTx(conn, catalog, 42); bonus != 0 {
+		t.Fatalf("a member with no master was taught %+d", bonus)
+	}
+	if _, err := conn.Execute(`INSERT INTO sect_lineage(disciple_user_id,master_user_id,accepted_at) VALUES(42,43,0)`, nil); err != nil {
+		t.Fatal(err)
+	}
+	bonus, name := masterTradeBonusTx(conn, catalog, 42)
+	if bonus != rule.TradeRollBonus || name != "Target Test" {
+		t.Fatalf("a player master taught %+d as %q, want %+d from Target Test", bonus, name, rule.TradeRollBonus)
+	}
+	if mult, who := masterCultivationMultTx(conn, catalog, 42); mult != rule.CultivationMult || who != "Target Test" {
+		t.Fatalf("a player master's cultivation term is %v from %q", mult, who)
+	}
+	for _, mode := range []string{"qi", "body"} {
+		if carried := loadSeclusionCarried(conn, catalog, 42, 10, mode); carried.Master != rule.CultivationMult {
+			t.Fatalf("a %s retreat carried the player master as %v", mode, carried.Master)
+		}
+	}
+	// A dead master teaches nobody.
+	if _, err := conn.Execute(`UPDATE characters SET life_status='dead' WHERE user_id=43`, nil); err != nil {
+		t.Fatal(err)
+	}
+	if bonus, _ := masterTradeBonusTx(conn, catalog, 42); bonus != 0 {
+		t.Fatalf("a dead player master still taught %+d", bonus)
 	}
 }

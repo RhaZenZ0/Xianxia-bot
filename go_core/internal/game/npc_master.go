@@ -166,6 +166,68 @@ func npcMasterCultivationMultTx(conn *storage.Conn, catalog worlddata.Catalog, u
 	return rule.CultivationMult, name
 }
 
+// playerMasterRule is `sect_system.player_master` (v1.25.0, on the owner's
+// call): a master who is another player teaches their disciple in every trade
+// and steadies their cultivation. Until then a player master gave the disciple
+// nothing at all - every reward ran the other way (`rewardMasterGo`).
+type playerMasterRule struct {
+	TradeRollBonus  int64
+	CultivationMult float64
+}
+
+func playerMasterRuleGo(c worlddata.Catalog) playerMasterRule {
+	raw, _ := c.SectSystem["player_master"].(map[string]any)
+	rule := playerMasterRule{TradeRollBonus: maxI64(0, i64(raw["trade_roll_bonus"])), CultivationMult: 1}
+	if v, ok := raw["cultivation_mult"].(float64); ok && v > 0 {
+		rule.CultivationMult = v
+	}
+	return rule
+}
+
+// livingPlayerMasterTx is the player who is this player's master, if their
+// character still lives: (0, "") otherwise.
+func livingPlayerMasterTx(conn *storage.Conn, userID int64) (int64, string) {
+	if !tableExistsTx(conn, "sect_lineage") {
+		return 0, ""
+	}
+	r, err := conn.Execute(`SELECT c.user_id,c.name FROM sect_lineage l JOIN characters c ON c.user_id=l.master_user_id
+        WHERE l.disciple_user_id=? AND c.life_status='alive'`, []any{userID})
+	if err != nil || len(r.Rows) == 0 {
+		return 0, ""
+	}
+	return i64(r.Rows[0][0]), fmt.Sprint(r.Rows[0][1])
+}
+
+// masterTradeBonusTx is a player master's teaching on a trade roll - craft,
+// forage and dig alike, whichever trade - with the master's name.
+func masterTradeBonusTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (int64, string) {
+	rule := playerMasterRuleGo(catalog)
+	if rule.TradeRollBonus <= 0 {
+		return 0, ""
+	}
+	if id, name := livingPlayerMasterTx(conn, userID); id > 0 {
+		return rule.TradeRollBonus, name
+	}
+	return 0, ""
+}
+
+// masterCultivationMultTx is whichever master the disciple has - one of the
+// sect's people or another player, never both - as a term on cultivation, for
+// the qi path and the body path alike; 1 without one.
+func masterCultivationMultTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (float64, string) {
+	if mult, name := npcMasterCultivationMultTx(conn, catalog, userID); name != "" {
+		return mult, name
+	}
+	rule := playerMasterRuleGo(catalog)
+	if rule.CultivationMult == 1 {
+		return 1, ""
+	}
+	if id, name := livingPlayerMasterTx(conn, userID); id > 0 {
+		return rule.CultivationMult, name
+	}
+	return 1, ""
+}
+
 // npcMasterRealmInsightTx pays the disciple insight on a qi realm crossing
 // while their master lives, through the one insight door.
 func npcMasterRealmInsightTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, now float64) (map[string]any, error) {

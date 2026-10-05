@@ -85,9 +85,9 @@ async def cultivate(interaction: discord.Interaction) -> None:
     if float(result.get("root_mult", 1)) != 1.0:
         extra += (f"\n🌿 **{result.get('root_grade') or 'Common'}** spiritual root: "
                   f"**x{float(result['root_mult']):.2f}** cultivation efficiency.")
-    # An NPC master's guidance (v1.25.0), named by the engine with its term.
+    # A master's guidance (v1.25.0), NPC or player, named by the engine with its term.
     if float(result.get("master_mult", 1) or 1) != 1.0:
-        extra += f"\n🎓 Your master **{result.get('master_npc_name')}** guides the session: **x{float(result['master_mult']):.2f}**."
+        extra += f"\n🎓 Your master **{result.get('master_name')}** guides the session: **x{float(result['master_mult']):.2f}**."
     if float(result.get("manual_mult", 1)) != 1.0:
         chosen = "you practise" if result.get("manual_chosen") else "the best method you have learned"
         extra += f"\n📖 **{result.get('manual_name')}** ({result.get('manual_grade')} grade, {chosen}): **x{float(result['manual_mult']):.2f}**."

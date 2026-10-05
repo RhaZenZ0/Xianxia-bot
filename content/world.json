@@ -32197,6 +32197,10 @@
         "Ziyan",
         "Zhuo"
       ]
+    },
+    "player_master": {
+      "trade_roll_bonus": 1,
+      "cultivation_mult": 1.05
     }
   },
   "sects": {

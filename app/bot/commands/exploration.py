@@ -741,6 +741,9 @@ async def mine(interaction: discord.Interaction) -> None:
     family_bonus = int(resolved.get("family_bonus", 0))
     family_trade = str(resolved.get("family_trade") or "Forging")
     bonus_bits = f" • Household {family_trade.lower()} lore **+{family_bonus}**" if family_bonus else ""
+    # A player master's teaching (v1.25.0), named by the engine with its bonus.
+    if int(resolved.get("master_trade_bonus", 0)):
+        bonus_bits += f" • Taught by {resolved.get('master_name')} **+{int(resolved['master_trade_bonus'])}**"
     rank_line = (
         f"\n⛏️ Mining: **{profession_rank(level, 'Mining')}** Lv.{level} "
         f"• XP {int(mine_progress.get('xp', 0))}/{profession_xp_needed(level)}"
@@ -1115,6 +1118,8 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str, craft_all
             # The Immortal World's job (v1.17.0): the grandmasters' court, named
             # by the engine with its bonus.
             (f"🏛️ {resolved.get('place') or 'The ground'}", int(resolved.get("place_bonus", 0))),
+            # A player master's teaching (v1.25.0), in every trade.
+            (f"🎓 Taught by {resolved.get('master_name') or 'your master'}", int(resolved.get("master_trade_bonus", 0))),
         )
         if value
     ]
@@ -1380,6 +1385,7 @@ async def alchemy_forage(interaction: discord.Interaction) -> None:
         f"{(' • Household herb lore **+'+str(inherited_forage_bonus)+'**') if inherited_forage_bonus else ''}"
         f"{(' • Property herb garden **+'+str(garden_bonus)+'**') if garden_bonus else ''}"
         f"{(' • A past life’s hands **+'+str(craft_echo)+'**') if craft_echo else ''}"
+        f"{(' • Taught by '+str(resolved.get('master_name'))+' **+'+str(int(resolved.get('master_trade_bonus') or 0))+'**') if int(resolved.get('master_trade_bonus') or 0) else ''}"
     )
     if not success:
         await interaction.response.send_message(

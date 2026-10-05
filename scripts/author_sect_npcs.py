@@ -11,6 +11,9 @@ Three blocks under `sect_system`, on the owner's calls:
   asked, how many players they take, what they give (a breakthrough term, insight
   on a realm crossing, a cultivation term, and the sect's next manual from a rank),
   and the rank from which an NPC grants a promotion without being your master.
+* `player_master` - what a master who is another player gives their disciple,
+  on the owner's call: +1 on every trade roll (craft, forage, dig) and the same
+  x1.05 on cultivation an NPC master gives, on the qi path and the body path.
 * `population` - how many of each rank a sect keeps (about twenty-five), how far
   above the sect's world floor each rank stands, and which ranks keep the gate.
   The engine tops a sect up to this each politics tick; catalogue members count.
@@ -43,6 +46,8 @@ NPC_MASTER = {
     "teach_rank_level": 20,
     "promoter_rank_level": 50,
 }
+
+PLAYER_MASTER = {"trade_roll_bonus": 1, "cultivation_mult": 1.05}
 
 POPULATION = {
     "ranks": {"Sect Master": 1, "Elder": 3, "Core Disciple": 5, "Inner Disciple": 7, "Outer Disciple": 9},
@@ -102,6 +107,7 @@ def main() -> None:
             raise SystemExit(f"npc_master.{key}: {NPC_MASTER[key]} is not a rank level")
     system["rank_floors"] = RANK_FLOORS
     system["npc_master"] = NPC_MASTER
+    system["player_master"] = PLAYER_MASTER
     system["population"] = POPULATION
     system["tribute"]["disciples_per_lot"] = DISCIPLES_PER_LOT
     PATH.write_text(json.dumps(w, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
