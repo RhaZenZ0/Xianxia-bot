@@ -7000,6 +7000,38 @@ name off the row the read needs; `TestAKillReadsTheKinBeforeTheWidowing` holds t
 its branches' shares. `householdWorldTermsTx` adds both to each year, capped so the world shapes a
 year without deciding it.
 
+### A home says what is in it (`property.overview`, v1.30.0)
+
+Asked as *"an update on player (sect) abode - show what is there"*. `/abode status` and the sect
+residence's status printed each facility's level and nothing else, while what a level is worth lived
+in rules the card could not see, and three of those rules wrote the same number out by hand: the
+cultivation chamber's `1.05 + 0.05 x level` in the hand-sat session and both retreats, and a
+workshop's `level * 2` in the craft, the forage garden and the beast pen.
+
+`property.overview` is one read (on `authoritativeQueries`) answering both homes from helpers the
+rules call: `homeCultivationMult`, `abodeArrayMultiplier`, `abodeFacilityRollBonus`,
+`propertyStorageSlotsPerLevel`, `PropertyWardShare` (the bounty tick), `stallSlotsAndFee`, and the two
+upgrade costs the upgrade actions charge (`homesteadUpgradeCost`, `residenceUpgradeCost`). Each room
+answers what it does now, what the next level adds, its cost, and for a residence what the next
+level still asks (the rank cap or the cultivation floor, the two gates the upgrade checks).
+`TestTheOverviewSaysWhatEachRoomDoes` holds the numbers to the helpers and
+`TestEveryHomeRuleAsksTheOverviewsHelpers` holds each rule site to its helper by AST, because a
+helper's own test passes against a tree nothing calls it from; its drill (the beast pen's
+`level * 2` put back) names the function.
+
+The bot only says the numbers (`facility_does_text`, `property_overview_lines`): a key the engine
+does not send says nothing, so the card cannot promise a number no rule reads. `home_overview` never
+raises, and a card whose read fails prints the level-only list it always did.
+
+**The playtest's idle-panel step failed three runs in a row from v1.28.0, and it was the harness.**
+The step jumps the clock past one panel's timeout, and SimCord walks that jump timer by timer; every
+other view left behind with a timeout of its own wakes inside it, and one that wakes a hair short of
+its deadline sleeps the remainder again - rc.35's "wake near enough to count as runnable", a settle
+that never completes. v1.27.0 added a 120-second next-step view under every empty picker, which made
+it near-certain. The step now said only "the panel still takes presses" because a jump that gave up
+both tries fell through silently; it says "the clock jump never landed" now, and
+`stop_every_view_but` stops every view but the panel under test before the jump.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

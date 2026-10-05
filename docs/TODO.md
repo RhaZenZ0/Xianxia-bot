@@ -27,6 +27,9 @@ deferred half and not the half that says what was done about it.
   Storage, beast intelligence, the spirit sense in `/sense`, the hunting musk and the beast in the hunt,
   six reputations no rule read, sect influence and master attention each have a reader; a bounty
   surrender and capture cost restitution; a sponsor rolls the household and karma; six objective types.
+- **fixed (v1.30.0)** — *A home says what is in it.* The homestead's and the sect residence's
+  status list every facility with what it does at its level, what the next level adds and costs,
+  and what it still asks, read through `property.overview` off the helpers the rules use.
 - **fixed (v1.29.0)** — *The world's feedback.* Held territory stocks its sect's treasury, a war's
   end and a member's contribution move the sect, recruitment pressure eases the trial, a manor under a
   rival's banner lends nothing, caravans and market trades move their cities, era terms reach five NPC
