@@ -213,25 +213,25 @@ var authoritativeQueries = map[string]bool{
 	// v1.0.0: the rotation on its own, for the GM dashboard, which is not an
 	// actor and wants the whole schedule rather than one cultivator's view.
 	"secret_realm.rotation": true,
+	// v1.26.0: the trip before it is taken - the route, the toll and the risk,
+	// through the planner exploration.travel itself walks.
+	"exploration.travel_preview": true,
 	// v1.0.13: what one account has spent of its restart allowance, for the
 	// two GM surfaces that ask. Like the rotation it is not an actor's own
 	// view - the payload names whom it is about.
 	"character.reset_status":    true,
 	"exploration.event.status":  true,
 	"exploration.travel_status": true,
-	// v1.26.0: the trip before it is taken - the route, the toll and the risk,
-	// through the planner exploration.travel itself walks.
-	"exploration.travel_preview": true,
-	"merchant.status":            true,
-	"trade.status":               true,
-	"cultivation.status":         true,
-	"qi.status":                  true,
-	"ghost.status":               true,
-	"shop.here":                  true,
-	"shop.browse":                true,
-	"stall.board":                true,
-	"stall.status":               true,
-	"flame.status":               true,
+	"merchant.status":           true,
+	"trade.status":              true,
+	"cultivation.status":        true,
+	"qi.status":                 true,
+	"ghost.status":              true,
+	"shop.here":                 true,
+	"shop.browse":               true,
+	"stall.board":               true,
+	"stall.status":              true,
+	"flame.status":              true,
 	// v1.24.0: the active wars a cultivator may fight in and on which side,
 	// so a picker offers only what war.act would take.
 	"war.fronts":          true,

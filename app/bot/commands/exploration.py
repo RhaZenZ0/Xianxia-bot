@@ -2268,7 +2268,7 @@ class TravelPreviewView(CardView):
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if int(interaction.user.id) != self.user_id:
-            await interaction.response.send_message("This is somebody else's road.", ephemeral=True)
+            await interaction.response.send_message("This is somebody else's road.", ephemeral=False)
             return False
         return True
 
@@ -2304,6 +2304,10 @@ async def _travel_confirmed(interaction: discord.Interaction, destination: str, 
 
 async def _travel_now(interaction: discord.Interaction, c: dict[str, Any], destination: str) -> None:
     """The journey itself, after the response has been answered."""
+    # Both callers have answered by now (Go defers, the preview's Go edits
+    # the card); the guard makes the ack unconditional for anyone else.
+    if not interaction.response.is_done():
+        await interaction.response.defer(thinking=True)
     undiscovered_image_locations = {
         location
         for location in LOCATION_DISCOVERY_IMAGES
