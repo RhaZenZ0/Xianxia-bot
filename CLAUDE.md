@@ -6807,7 +6807,11 @@ and an unknown rank now stays. And `DB.list_registered_npcs_at` read `npc_regist
 nothing moves once a simulation row exists (`MoveRegisteredNPCTx` has no callers) - harmless for a
 household's relatives, who never leave, wrong for three hundred people who travel; it answers from the
 simulation row now, the order `current_npc_location` keeps. Tribute is one lot per **six** living
-members (was two), so a full hall stocks about what a well-recruited sect did.
+members (was two), so a full hall stocks about what a well-recruited sect did. **Joining has no cap**
+(on the owner's call): `npcSectChanges` used to take at most twelve moves a tick from the first 120
+candidates, and now every willing independent gets their roll; walking out keeps the cap of twelve.
+The hall's own top-up still stops at its target, so joiners grow a sect past it and a sect that loses
+members is refilled.
 
 **An NPC master is its own table** (`npc_mentorships`, schema 79), because `sect_lineage` foreign-keys
 both ids to `characters`. `discipleship.npc_request` takes no roll: one of the member's sect, alive,

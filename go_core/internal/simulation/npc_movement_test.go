@@ -215,8 +215,10 @@ func TestASectUnderRecruitmentPressureActuallyRecruits(t *testing.T) {
 	if err := conn.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 40; i++ {
-		addNPC(t, path, fmt.Sprintf("Rootless %02d", i), "Greenriver Town", "Greenriver Town",
+	// More than the 120 candidates the query used to read, and more than the
+	// 12 a tick it used to take: joining has no cap (v1.25.0).
+	for i := 0; i < 150; i++ {
+		addNPC(t, path, fmt.Sprintf("Rootless %03d", i), "Greenriver Town", "Greenriver Town",
 			"Mortal World", "Wandering Cultivator", 80, "Independent")
 	}
 	conn2, err := storage.Open(path)
@@ -231,8 +233,8 @@ func TestASectUnderRecruitmentPressureActuallyRecruits(t *testing.T) {
 	if err := conn2.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	if joined != sectChangeCap {
-		t.Fatalf("a sect at 95 recruitment pressure with forty willing cultivators took %d, want the cap of %d", joined, sectChangeCap)
+	if joined != 150 {
+		t.Fatalf("a sect at 95 recruitment pressure with 150 willing cultivators took %d, want every one: joining has no cap", joined)
 	}
 	if left != 0 {
 		t.Errorf("a sect at 80 cohesion lost %d members", left)
