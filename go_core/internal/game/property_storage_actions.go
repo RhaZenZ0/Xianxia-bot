@@ -480,13 +480,40 @@ func abodeUpgradeActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 // then fell through to "" - the action succeeded and applied nothing. That is
 // also why `craftEffectStat`'s "formation_bonus" was a stat no rule could
 // ever grant, leaving Formation and Inscription crafts structurally at
-// effect_bonus 0 while Alchemy and Forging got +2. The other five facilities
-// grant no effect by design (v1.0.0-rc.36).
+// effect_bonus 0 while Alchemy and Forging got +2.
+//
+// The other five granted nothing by design from rc.36 to v1.30.0, and the
+// focus picker offered all nine, so focusing the Defensive Formation, the
+// storehouse, the herb garden, the beast pen or the merchant hall spent the
+// press and did nothing. Every room grants an effect now (v1.31.0), each made
+// of stats a rule already reads, and TestEveryFacilityFocusGrantsAnEffect
+// holds every facility on both homes' rosters to an entry here.
 var abodeFacilityEffects = map[string]string{
 	"cultivation": "abode_cultivation_focus",
 	"alchemy":     "alchemy_inspiration",
 	"forge":       "forge_inspiration",
 	"formation":   "formation_inspiration",
+	"defense":     "abode_ward_focus",
+	"storage":     "abode_storehouse_focus",
+	"herb_garden": "abode_garden_focus",
+	"beast_pen":   "abode_pen_focus",
+	"merchant":    "abode_merchant_focus",
+}
+
+// abodeFocusRealMinutes is how long a focus lasts, in real minutes (v1.31.0,
+// on the owner's call: four real hours, then one before the next). It was 240
+// *game* minutes, which is one real hour at the shipped scale and a different
+// length at every other. `active_effects` keeps only a game-minute deadline,
+// so the span is converted at the scale the focus was taken at
+// (abodeFocusGameMinutes); a GM changing the rate mid-focus moves its end.
+const abodeFocusRealMinutes = int64(240)
+
+// abodeFocusGameMinutes is a focus's span on the world clock at `scale`: four
+// real hours' worth. A stopped clock (scale 0) is held at one game minute a
+// real minute, so the effect is never written already over; it lasts until
+// the clock moves, which is what a stopped clock means.
+func abodeFocusGameMinutes(scale int64) int64 {
+	return abodeFocusRealMinutes * max64(1, scale)
 }
 
 // propertyStorageSlotsPerLevel is what each level of a property's Storage
@@ -550,6 +577,14 @@ func abodeFocusActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	}
 	effectID := abodeFacilityEffects[p.Facility]
 	out := map[string]any{"facility": p.Facility, "level": lvl, "effect_id": effectID}
+	now := nowSeconds()
+	// One wait across every room of both homes: the four hours of the focus
+	// and one more (cooldownAbodeFocus). A refused focus spends nothing.
+	if remaining, cdErr := cooldownRemaining(conn, userID, cooldownAbodeFocus, now); cdErr != nil {
+		return authoritativeMutation{}, cdErr
+	} else if remaining > 0 {
+		return authoritativeMutation{}, fmt.Errorf("home focus cooldown remaining: %d", remaining)
+	}
 	if effectID != "" {
 		// Through the one door, and refusing (v1.0.0-rc.58). This was a bare
 		// map index: an id the catalogue does not carry yielded a nil map,
@@ -563,16 +598,26 @@ func abodeFocusActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID in
 			return authoritativeMutation{}, fmt.Errorf(
 				"the %s facility names effect %q, which the catalogue does not carry", p.Facility, effectID)
 		}
+		clock, _, clockErr := loadCanonicalWorldClock(conn, now)
+		if clockErr != nil {
+			return authoritativeMutation{}, clockErr
+		}
+		span := abodeFocusGameMinutes(clock.Scale)
 		enc, _ := json.Marshal(effect)
 		name := effectName
 		if name == "" {
 			name = p.Facility
 		}
-		if _, e = conn.Execute(`INSERT INTO active_effects(user_id,effect_key,name,source_type,source_id,effect_json,stacks,starts_game_minute,ends_game_minute,created_at) VALUES(?,?,?,?,?,?,1,?,?,?) ON CONFLICT(user_id,effect_key,source_type,source_id) DO UPDATE SET name=excluded.name,effect_json=excluded.effect_json,stacks=1,starts_game_minute=excluded.starts_game_minute,ends_game_minute=excluded.ends_game_minute,created_at=excluded.created_at`, []any{userID, effectID, name, "abode", fmt.Sprint(a["user_id"]), string(enc), p.GameMinute, p.GameMinute + 240, nowSeconds()}); e != nil {
+		if _, e = conn.Execute(`INSERT INTO active_effects(user_id,effect_key,name,source_type,source_id,effect_json,stacks,starts_game_minute,ends_game_minute,created_at) VALUES(?,?,?,?,?,?,1,?,?,?) ON CONFLICT(user_id,effect_key,source_type,source_id) DO UPDATE SET name=excluded.name,effect_json=excluded.effect_json,stacks=1,starts_game_minute=excluded.starts_game_minute,ends_game_minute=excluded.ends_game_minute,created_at=excluded.created_at`, []any{userID, effectID, name, "abode", fmt.Sprint(a["user_id"]), string(enc), p.GameMinute, p.GameMinute + span, now}); e != nil {
+			return authoritativeMutation{}, e
+		}
+		if e = setCooldown(conn, userID, cooldownAbodeFocus, cooldownSecondsFor(cooldownAbodeFocus), now); e != nil {
 			return authoritativeMutation{}, e
 		}
 		out["effect_name"] = name
-		out["duration_game_minutes"] = int64(240)
+		out["duration_game_minutes"] = span
+		out["duration_real_minutes"] = abodeFocusRealMinutes
+		out["next_focus_unix"] = int64(now) + cooldownSecondsFor(cooldownAbodeFocus)
 	}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "property", EventType: "abode.focus", EntityType: "abode", EntityID: fmt.Sprint(a["location_key"]), GameMinute: p.GameMinute, Payload: out}}, nil
 }

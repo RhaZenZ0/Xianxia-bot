@@ -1959,9 +1959,16 @@ async def run(url: str, token: str, db_path: str) -> Report:
     focused = await step(report, "abode.focus the cultivation chamber", act("abode.focus", PLAYER, {"facility": "cultivation"}))
     if focused is not None:
         report.add("PASS" if focused.get("effect_id") else "FAIL", "the chamber grants an effect", str(focused.get("effect_name")))
-    stored = await step(report, "abode.focus the storage", act("abode.focus", PLAYER, {"facility": "storage"}))
+        # v1.31.0: four real hours, then one more before the next focus.
+        report.add("PASS" if int(focused.get("duration_real_minutes") or 0) == 240 else "FAIL",
+                   "a focus lasts four real hours", str(focused.get("duration_real_minutes")))
+    await step(report, "a second focus inside the wait is refused",
+               act("abode.focus", PLAYER, {"facility": "storage"}), expect_error="home focus cooldown")
+    # Every room grants a focus since v1.31.0; the storehouse granted nothing before.
+    stored = await step(report, "abode.focus the storage once the wait is cleared", act_free("abode.focus", PLAYER, {"facility": "storage"}))
     if stored is not None:
-        report.add("PASS" if not stored.get("effect_id") else "FAIL", "storage is a room, not an effect", str(stored.get("effect_id")))
+        report.add("PASS" if stored.get("effect_id") == "abode_storehouse_focus" else "FAIL",
+                   "the storehouse grants its focus", str(stored.get("effect_name")))
     await step(report, "abode.leave", act("abode.leave", PLAYER, {}))
     await audited("admin.player.set_sect_rank", {"user_id": PLAYER, "rank_name": "Outer Disciple", "rank_level": 10, "reason": "playtest"}, name="admin.player.set_sect_rank back to Outer Disciple")
 

@@ -148,11 +148,33 @@ func recordWorldHistoryTx(conn *storage.Conn, sourceKey, eventType, title, summa
 	if relatedUserID != nil {
 		uid = *relatedUserID
 	}
+	world := historyWorldTx(conn, location)
 	_, err := conn.Execute(`INSERT INTO world_history_events(source_key,event_type,title,summary,significance,visibility,location,world_name,faction,actor_type,actor_key,actor_name,target_type,target_key,target_name,related_user_id,related_npc_name,tags,game_minute,metadata_json,created_at,updated_at)
         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(source_key) DO UPDATE SET event_type=excluded.event_type,title=excluded.title,summary=excluded.summary,significance=excluded.significance,visibility=excluded.visibility,location=excluded.location,faction=excluded.faction,actor_type=excluded.actor_type,actor_key=excluded.actor_key,actor_name=excluded.actor_name,target_type=excluded.target_type,target_key=excluded.target_key,target_name=excluded.target_name,related_user_id=excluded.related_user_id,related_npc_name=excluded.related_npc_name,tags=excluded.tags,game_minute=excluded.game_minute,metadata_json=excluded.metadata_json,updated_at=excluded.updated_at`,
-		[]any{sourceKey, eventType, title, summary, significance, visibility, location, "", faction, actorType, actorKey, actorName, targetType, targetKey, targetName, uid, relatedNPCName, tagText, gameMinute, string(enc), now, now})
+		[]any{sourceKey, eventType, title, summary, significance, visibility, location, world, faction, actorType, actorKey, actorName, targetType, targetKey, targetName, uid, relatedNPCName, tagText, gameMinute, string(enc), now, now})
 	return err
+}
+
+// historyWorldTx is the world a history row's place stands in, read off the
+// engine's own content table (v1.31.0). Every simulation writer passed its
+// world, and this one - the door nineteen player-side rows go through - wrote
+// an empty string; nothing read the column, so nothing noticed, and the
+// narrator's recall reads it now. A place the catalogue does not carry (a
+// household, an inner world, an abode) is left empty rather than given the
+// Mortal World: being indoors is not being in any world's public news (rc.52's
+// rule). A missing table is empty too, never an error - a history row must
+// never fail the action it records.
+func historyWorldTx(conn *storage.Conn, location string) string {
+	location = strings.TrimSpace(location)
+	if location == "" || !tableExistsTx(conn, "content_locations") {
+		return ""
+	}
+	res, err := conn.Execute(`SELECT COALESCE(world,'') FROM content_locations WHERE name=?`, []any{location})
+	if err != nil || len(res.Rows) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(fmt.Sprint(res.Rows[0][0]))
 }
 
 // EventSectTargetsTx is which sects a world event's `sect` effect reaches

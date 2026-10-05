@@ -279,6 +279,26 @@ func applyCombatAftermathTx(conn *storage.Conn, userID int64, b battleRow, outco
 	return combatAftermathResult{Impacts: impacts}, nil
 }
 
+// beastDeathSecurityDrop is what a beast's kill takes off a region's security:
+// the security term of the lightest killing (MarkKillingTx at severity one).
+const beastDeathSecurityDrop = int64(2)
+
+// MarkBeastDeathTx is what a hunter killed by a beast does to the place it
+// happened (v1.31.0, on the owner's call): the region is less safe, and that is
+// all. Nobody did the killing, so no sect is blamed, no grudge is borne and the
+// market is not shaken - the unrest and the trade disruption MarkKillingTx
+// writes are about a culprit, and a beast is not one. Security is read by NPC
+// crime and a caravan's risk (v1.29.0), so the next tick feels it. A missing
+// table marks nothing and never fails the tick.
+func MarkBeastDeathTx(conn *storage.Conn, location string, gameMinute int64, now float64) error {
+	if strings.TrimSpace(location) == "" || !tableExistsTx(conn, "civilization_regions") {
+		return nil
+	}
+	_, err := conn.Execute(`UPDATE civilization_regions SET security=MAX(0,security-?),last_game_minute=?,updated_at=? WHERE location=?`,
+		[]any{beastDeathSecurityDrop, gameMinute, now, location})
+	return err
+}
+
 // MarkKillingTx is what a killing does to the place it happened and the sect
 // the dead belonged to: the region's security, unrest and prosperity, its
 // market's supply (twice over for a trader), and the sect's influence,

@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"testing"
 
+	"xianxia/core/internal/gamerng"
+
 	"xianxia/core/internal/worlddata"
 )
 
@@ -103,6 +105,28 @@ func TestTheWorldsOwnKillingsLeaveAMark(t *testing.T) {
 		if !marked {
 			t.Errorf("%s (%s) kills somebody and marks neither their region nor their sect", fn, file)
 		}
+	}
+}
+
+// v1.31.0: a hunter killed by a beast lowers the region's security and moves
+// nothing else - nobody did the killing.
+func TestABeastsKillMakesThePlaceLessSafe(t *testing.T) {
+	defer gamerng.UseRoller(func(int) int { return 0 })()
+	path := setupSimulationDB(t, npcDeedsSchema+`
+CREATE TABLE IF NOT EXISTS civilization_regions(location TEXT PRIMARY KEY,world_name TEXT,population INTEGER,prosperity INTEGER,security INTEGER,spirit_resources INTEGER,food_supply INTEGER,migration_pressure INTEGER,unrest INTEGER,last_game_minute INTEGER,updated_at REAL);
+INSERT INTO civilization_regions(location,world_name,population,prosperity,security,spirit_resources,food_supply,migration_pressure,unrest,last_game_minute,updated_at)
+VALUES('Greenriver Town','Mortal World',100,50,50,50,50,0,10,0,0);`)
+	r := deedsRunner()
+	addPerson(t, path, "Hunter Gao", "Greenriver Town", "trapper", 10, 50, 0)
+	if _, _, died := runHunts(t, path, r, 300); died != 1 {
+		t.Fatalf("the trapper died %d time(s); the first hunt should have been the last", died)
+	}
+	if got := deedScalar(t, path, `SELECT security FROM civilization_regions WHERE location='Greenriver Town'`); got != 48 {
+		t.Fatalf("a beast killed a hunter and the town's security is %d, want 48", got)
+	}
+	if unrest, prosperity := deedScalar(t, path, `SELECT unrest FROM civilization_regions WHERE location='Greenriver Town'`),
+		deedScalar(t, path, `SELECT prosperity FROM civilization_regions WHERE location='Greenriver Town'`); unrest != 10 || prosperity != 50 {
+		t.Fatalf("a beast's kill moved unrest to %d and prosperity to %d; nobody did it", unrest, prosperity)
 	}
 }
 

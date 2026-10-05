@@ -34223,6 +34223,113 @@
           "value": 2
         }
       ]
+    },
+    "abode_ward_focus": {
+      "name": "Warded Repose",
+      "category": "Home",
+      "description": "Resting inside your own defensive formation steadies the hand and keeps a way out in mind.",
+      "tags": [
+        "home",
+        "defense"
+      ],
+      "severity": 1,
+      "modifiers": [
+        {
+          "stat": "combat_bonus",
+          "operation": "add",
+          "value": 1
+        },
+        {
+          "stat": "escape_bonus",
+          "operation": "add",
+          "value": 2
+        }
+      ]
+    },
+    "abode_storehouse_focus": {
+      "name": "Ordered Stores",
+      "category": "Home",
+      "description": "An afternoon setting the storehouse in order leaves the mind sorted and quick to notice what is out of place.",
+      "tags": [
+        "home",
+        "storage"
+      ],
+      "severity": 1,
+      "modifiers": [
+        {
+          "stat": "insight",
+          "operation": "add",
+          "value": 1
+        },
+        {
+          "stat": "sense_precision",
+          "operation": "add",
+          "value": 2
+        }
+      ]
+    },
+    "abode_garden_focus": {
+      "name": "Verdant Attunement",
+      "category": "Home",
+      "description": "Tending your own herb beds tunes the senses to living medicine and the body to cleansing it.",
+      "tags": [
+        "home",
+        "herb_garden",
+        "alchemy"
+      ],
+      "severity": 1,
+      "modifiers": [
+        {
+          "stat": "alchemy_bonus",
+          "operation": "add",
+          "value": 1
+        },
+        {
+          "stat": "detox_power",
+          "operation": "add",
+          "value": 10
+        }
+      ]
+    },
+    "abode_pen_focus": {
+      "name": "Beast-Bond Calm",
+      "category": "Home",
+      "description": "Time among your own beasts settles your bearing; wild things read you as one who keeps them.",
+      "tags": [
+        "home",
+        "beast_pen",
+        "beast"
+      ],
+      "severity": 1,
+      "modifiers": [
+        {
+          "stat": "presence",
+          "operation": "add",
+          "value": 1
+        },
+        {
+          "stat": "spirit",
+          "operation": "add",
+          "value": 1
+        }
+      ]
+    },
+    "abode_merchant_focus": {
+      "name": "Host's Bearing",
+      "category": "Home",
+      "description": "Receiving guests in your own merchant hall lends you the ease of someone who is used to being listened to.",
+      "tags": [
+        "home",
+        "merchant"
+      ],
+      "severity": 1,
+      "modifiers": [
+        {
+          "stat": "presence",
+          "operation": "add",
+          "value": 2
+        }
+      ]
     }
   },
   "teleport_arrays": {
