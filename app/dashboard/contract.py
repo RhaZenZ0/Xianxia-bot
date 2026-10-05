@@ -46,7 +46,9 @@ DASHBOARD_API_VERSION = 2
 # banked intent: a column on a table the Player Editor already reads, no table.
 # Schema 73 (v1.14.0) rewrites characters.attributes_json to the base the
 # engine grows from; no table, and no column the dashboard reads changes shape.
-DASHBOARD_REVIEWED_SCHEMA_VERSION = 77
+# Schema 78 (v1.24.0) adds `npc_mentorships`, a player's master among the
+# sect's own people: read-only on Members & Lineage beside the player lineage.
+DASHBOARD_REVIEWED_SCHEMA_VERSION = 78
 
 DASHBOARD_GET_API_PATHS = frozenset({
     "/api/overview", "/api/capabilities", "/api/timeline", "/api/npcs", "/api/npc",
@@ -135,7 +137,7 @@ DASHBOARD_SYSTEM_TABLES = {
         "sect_politics_state", "sect_factions", "sect_relations", "sect_politics_events",
     ),
     "sect_members": (
-        "sect_membership", "sect_lineage", "disciple_requests",
+        "sect_membership", "sect_lineage", "disciple_requests", "npc_mentorships",
     ),
     "sect_recruitment": (
         "sect_recruitment_attempts", "sect_recommendations", "character_sect_discoveries",

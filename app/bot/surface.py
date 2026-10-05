@@ -419,7 +419,7 @@ _HUB_DEFINITIONS = (
             # to say they were there. Four pages, each a thing you came to do.
             _hub_page("sect", "Sect", "Your membership and where you stand in it: rank, roster, politics, the martial family and how it addresses you.",
                       only=("sect status", "sect roster", "sect politics", "sect address",
-                            "sect form", "sect family", "sect shadow")),
+                            "sect form", "sect family", "sect shadow", "sect promote")),
             _hub_page("sect", "Recruitment", "Getting in: which sects recruit, who will sponsor you, and the entrance examination.",
                       key="sect_recruitment", only=("sect recruitment",),
                       order=("sect recruitment info", "sect recruitment recommendation", "sect recruitment trial",
@@ -1209,6 +1209,20 @@ STALL_MIN_REALM_INDEX = int((WORLD.data.get("stall_system") or {}).get("min_real
 HOMESTEAD_FOUNDING_RANK = int((WORLD.data.get("abode_system") or {}).get("founding_rank_level") or 0)
 MANOR_FOUNDING_RANK = int((WORLD.data.get("sect_abode_system") or {}).get("manor_founding_rank_level") or 0)
 MANOR_CONSTRUCTION_RANK = int((WORLD.data.get("sect_abode_system") or {}).get("manor_construction_rank_level") or 0)
+# The sect rank each act asks (v1.24.0), keyed by the engine operation the way
+# `sect_system.rank_floors` is, with the phrase the engine's refusal opens with
+# (`requireSectRankTx`) and the leaves it hides. v1.19.4 opened every sect leaf
+# to any member, and the owner's call is that a member sees what their rank
+# lets them do; the realm curriculum still steps aside for a member.
+SECT_RANK_FLOORS: dict[str, int] = {
+    str(op): int(level or 0)
+    for op, level in ((WORLD.data.get("sect_system") or {}).get("rank_floors") or {}).items()
+}
+RANK_FLOOR_LEAVES: dict[str, tuple[str, tuple[str, ...]]] = {
+    "discipleship.resolve": ("taking a disciple", ("sect discipleship accept", "sect discipleship reject")),
+    "territory.claim": ("claiming territory for your sect", ("territory claim",)),
+    "war.act": ("fighting in your sect's war", ("war act",)),
+}
 PERSONAL_WORLD_FLOOR = int((WORLD.data.get("personal_world_system") or {}).get("min_realm_index") or 0)
 PERSONAL_WORLD_LAW = int((WORLD.data.get("personal_world_system") or {}).get("space_law_comprehension") or 0)
 PROGRESSION_GATES: dict[str, tuple[str, ...]] = {
@@ -1227,7 +1241,16 @@ PROGRESSION_GATES: dict[str, tuple[str, ...]] = {
     "perfection_path": ("perfect quest", "perfect clues", "perfect trial", "perfect abandon"),
     "sect_member": ("sect roster", "sect politics", "sect address", "sect family", "sect shadow",
                     "sect manor establish", "sect manor upgrade", "sect abode", "sect treasury", "sect contribute", "sect redeem",
-                    "sect discipleship request", "sect discipleship accept", "sect discipleship reject", "sect discipleship leave"),
+                    "sect discipleship request", "sect discipleship accept", "sect discipleship reject", "sect discipleship leave",
+                    "sect promote", "sect discipleship npcmaster", "sect discipleship teach"),
+    # The sect's own people (v1.24.0): a member with a master asks no other,
+    # Teach is a master's among the sect's people, and Promote is drawn when the
+    # contribution reaches the next rung - each anticipating the engine's
+    # refusal (`npcMasterRequestAction`, `sectMasterTeachAction`,
+    # `sectPromoteAction`) with its reason.
+    "sect_has_master": ("sect discipleship npcmaster", "sect discipleship request"),
+    "sect_npc_master": ("sect discipleship teach",),
+    "sect_promote": ("sect promote",),
     "sect_outsider": ("sect recruitment recommendation", "sect recruitment trial"),
     # The way up into an allied sect (v1.18.0): a member's door, drawn at the
     # gate of the sect `ascends_to` names, at that world's floor. Each refusal
@@ -1261,6 +1284,8 @@ PROGRESSION_GATES: dict[str, tuple[str, ...]] = {
     "stall_open": ("stall open",),
     "samsara": ("family ancestry", "family legacy", "family investigate", "family quest", "family claim", "family conflict"),
 }
+# One gate per rank floor (v1.24.0), named for the operation it anticipates.
+PROGRESSION_GATES.update({f"sect_rank:{op}": leaves for op, (_what, leaves) in RANK_FLOOR_LEAVES.items()})
 
 
 def _sect_ascent_refusal(sect: str, here: str, realm: int) -> str:
@@ -1336,6 +1361,22 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
         shut["manor_founder"] = f"establishing the sect manor asks for {WORLD.sect_rank_name(MANOR_FOUNDING_RANK)}; {held}"
     if membership and MANOR_CONSTRUCTION_RANK > 0 and rank_level < MANOR_CONSTRUCTION_RANK:
         shut["manor_builder"] = f"directing manor construction asks for {WORLD.sect_rank_name(MANOR_CONSTRUCTION_RANK)}; {held}"
+    for op, (what, _leaves) in RANK_FLOOR_LEAVES.items():
+        floor = SECT_RANK_FLOORS.get(op, 0)
+        if floor > 0 and rank_level < floor:
+            shut[f"sect_rank:{op}"] = f"{what} asks for {WORLD.sect_rank_name(floor)}; {held}"
+    if membership:
+        npc_master = await DB.get_npc_master(uid)
+        if npc_master or await DB.get_master(uid):
+            shut["sect_has_master"] = "you already have a master — Leave the bond first"
+        if not npc_master:
+            shut["sect_npc_master"] = "only a master among the sect's own people teaches — Npcmaster asks one"
+        rung = WORLD.next_promotion_rung(rank_level)
+        earned = int(membership.get("contribution_earned") or 0)
+        if not rung:
+            shut["sect_promote"] = f"no rank above {membership.get('rank_name')} is granted for contribution"
+        elif earned < rung[1]:
+            shut["sect_promote"] = f"{WORLD.sect_rank_name(rung[0])} asks {rung[1]} contribution earned; you have earned {earned}"
     abode = await DB.get_abode(uid)
     if not abode:
         shut["abode"] = "you have no property yet — Establish one"

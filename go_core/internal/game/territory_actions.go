@@ -76,6 +76,9 @@ func territoryClaimActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if mem == nil {
 		return authoritativeMutation{}, errors.New("sect membership is required")
 	}
+	if e := requireSectRankTx(catalog, mem, "territory.claim", "claiming territory for your sect"); e != nil {
+		return authoritativeMutation{}, e
+	}
 	sect := fmt.Sprint(mem["sect_name"])
 	r, e := conn.Execute(`SELECT * FROM territory_state WHERE territory_key=?`, []any{p.TerritoryKey})
 	if e != nil {
@@ -143,6 +146,9 @@ func territoryWarActActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	}
 	if mem == nil {
 		return authoritativeMutation{}, errors.New("sect membership is required")
+	}
+	if e := requireSectRankTx(catalog, mem, "war.act", "fighting in your sect's war"); e != nil {
+		return authoritativeMutation{}, e
 	}
 	r, e := conn.Execute(`SELECT * FROM territory_wars WHERE war_id=? AND status='active'`, []any{p.WarID})
 	if e != nil {

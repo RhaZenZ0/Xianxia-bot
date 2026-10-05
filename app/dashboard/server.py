@@ -1416,7 +1416,19 @@ class ReadOnlyDashboardStore:
                    LEFT JOIN characters m ON m.user_id=r.master_user_id
                    ORDER BY (r.status='pending') DESC,r.created_at DESC LIMIT 200""",
             )
-            return {"members": members, "by_sect": by_sect, "lineage": lineage, "requests": requests}
+            # A player's master may be one of the sect's own people (v1.24.0).
+            npc_lineage = await self._fetchall_if_table(
+                db,
+                "npc_mentorships",
+                """SELECT m.disciple_user_id,m.master_npc_name,m.sect_name,m.accepted_game_minute,m.attention,
+                          d.name AS disciple_name,l.sect_rank AS master_rank,c.status AS master_status
+                   FROM npc_mentorships m
+                   LEFT JOIN characters d ON d.user_id=m.disciple_user_id
+                   LEFT JOIN npc_life_state l ON l.npc_name=m.master_npc_name
+                   LEFT JOIN npc_civilization_state c ON c.npc_name=m.master_npc_name
+                   ORDER BY m.sect_name,m.master_npc_name,d.name""",
+            )
+            return {"members": members, "by_sect": by_sect, "lineage": lineage, "requests": requests, "npc_lineage": npc_lineage}
 
     async def sect_recruitment(self) -> dict[str, Any]:
         async with self._connect() as db:

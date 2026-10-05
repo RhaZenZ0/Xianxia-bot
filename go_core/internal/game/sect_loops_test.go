@@ -189,10 +189,14 @@ func TestADemotionSurvivesTheNextCredit(t *testing.T) {
 	if rank := i64(memberRow(t, conn, 1)["rank_level"]); rank != 10 {
 		t.Fatalf("a demoted member was put back to rank %d by the next credit", rank)
 	}
-	// And a credit that does carry a count over a rung still promotes.
-	setEarned(t, conn, 1, core.Earned-1)
-	if promoted, _ := creditSectContributionTx(conn, catalog, 1, 1, 0); promoted != "Core Disciple" {
-		t.Fatalf("a credit across the Core rung promoted to %q", promoted)
+	// A credit that carries the count over a rung makes the member eligible
+	// for the rung above where they stand (v1.24.0) and still moves no rank.
+	setEarned(t, conn, 1, catalog.SectExchange().Promotion[0].Earned-1)
+	if eligible, _ := creditSectContributionTx(conn, catalog, 1, 1, 0); eligible != "Inner Disciple" {
+		t.Fatalf("a credit across the Inner rung made the member eligible for %q", eligible)
+	}
+	if rank := i64(memberRow(t, conn, 1)["rank_level"]); rank != 10 {
+		t.Fatalf("a credit moved the rank to %d", rank)
 	}
 }
 

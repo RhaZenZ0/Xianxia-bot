@@ -374,6 +374,42 @@ class World:
                 return str(rank.get("name") or f"rank {level}")
         return f"rank {level}"
 
+    def sect_rank_level(self, name: str) -> int:
+        """The level of a rank name on `sect_system.ranks` (v1.24.0), the
+        display twin of the engine's `sectRankLevelByName`; 0 for a name the
+        ladder does not carry."""
+        wanted = str(name or "").strip().casefold()
+        for rank in self.sect_system.get("ranks", []):
+            if str(rank.get("name") or "").strip().casefold() == wanted:
+                return int(rank.get("level") or 0)
+        return 0
+
+    def next_promotion_rung(self, rank_level: int) -> tuple[int, int] | None:
+        """The lowest rung of `sect_system.exchange.promotion` above a rank:
+        (rank level, lifetime contribution it asks), or None when the ladder
+        reaches nothing higher - the display twin of `nextPromotionRung`."""
+        best: tuple[int, int] | None = None
+        for rung in (self.sect_system.get("exchange") or {}).get("promotion", []):
+            level, earned = int(rung.get("rank_level") or 0), int(rung.get("earned") or 0)
+            if level > int(rank_level) and (best is None or level < best[0]):
+                best = (level, earned)
+        return best
+
+    def npc_master_rule(self) -> dict[str, Any]:
+        """`sect_system.npc_master` (v1.24.0), what one of a sect's own people
+        is as a master; an absent key is 0 (or 1 for the multiplier), the
+        engine's `npcMasterRuleGo`."""
+        raw = self.sect_system.get("npc_master") or {}
+        return {
+            "min_rank_level": int(raw.get("min_rank_level") or 0),
+            "max_disciples": int(raw.get("max_disciples") or 0),
+            "breakthrough_bonus": int(raw.get("breakthrough_bonus") or 0),
+            "insight_on_realm": int(raw.get("insight_on_realm") or 0),
+            "cultivation_mult": float(raw.get("cultivation_mult") or 1),
+            "teach_rank_level": int(raw.get("teach_rank_level") or 0),
+            "promoter_rank_level": int(raw.get("promoter_rank_level") or 0),
+        }
+
     def npc_location_at(self, npc_name: str, period: str) -> str | None:
         npc = self.npcs.get(npc_name)
         if not npc:

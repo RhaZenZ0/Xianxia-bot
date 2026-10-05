@@ -310,12 +310,13 @@ func cultivationInsightAction(conn *storage.Conn, catalog worlddata.Catalog, use
 // breakthroughModifier is the one place the breakthrough bonus is composed,
 // so the odds shown before the roll and the roll itself cannot disagree.
 // `place` is the ground's own term (v1.17.0): the heaven-reading altar's
-// bonus on its stone, nothing anywhere else.
-func breakthroughModifier(c mechanicsCharacter, mods resolvedModifiers, body bool, perfectBonus, resonance, innate, place int64) int64 {
+// bonus on its stone, nothing anywhere else. `master` is an NPC master's help
+// (v1.24.0), on both paths.
+func breakthroughModifier(c mechanicsCharacter, mods resolvedModifiers, body bool, perfectBonus, resonance, innate, place, master int64) int64 {
 	if body {
-		return mods.value(c.Attributes["body"], "body") + maxI64(1, mods.value(c.Attributes["will"], "will")/2) + 2 + perfectBonus + resonance + innate + place
+		return mods.value(c.Attributes["body"], "body") + maxI64(1, mods.value(c.Attributes["will"], "will")/2) + 2 + perfectBonus + resonance + innate + place + master
 	}
-	return mods.value(c.Attributes["will"], "will") + 2 + perfectBonus + resonance + innate + place
+	return mods.value(c.Attributes["will"], "will") + 2 + perfectBonus + resonance + innate + place + master
 }
 
 // breakthroughOdds is the chance in a hundred that 2d10 plus the modifier
@@ -342,7 +343,7 @@ func breakthroughOdds(modifier, tn int64) int64 {
 
 // cultivationOddsResult is the breakthrough as it stands before any roll:
 // target, modifier, chance, and the movers that make the modifier.
-func cultivationOddsResult(c mechanicsCharacter, catalog worlddata.Catalog, mods resolvedModifiers, body bool, perfect bool) map[string]any {
+func cultivationOddsResult(c mechanicsCharacter, catalog worlddata.Catalog, mods resolvedModifiers, body bool, perfect bool, master int64, masterName string) map[string]any {
 	realms := catalog.Realms
 	realm, phase := c.RealmIndex, c.Phase
 	if body {
@@ -359,7 +360,7 @@ func cultivationOddsResult(c mechanicsCharacter, catalog worlddata.Catalog, mods
 	resonance := dualCheckBonus(c)
 	innate := int64(math.Round(mods.Add["breakthrough_bonus"]))
 	placeName, place := breakthroughPlaceBonus(catalog, c.Location)
-	modifier := breakthroughModifier(c, mods, body, perfectBonus, resonance, innate, place)
+	modifier := breakthroughModifier(c, mods, body, perfectBonus, resonance, innate, place, master)
 	tn := breakthroughTN(realms, realm, phase)
 	movers := []map[string]any{}
 	if body {
@@ -380,6 +381,9 @@ func cultivationOddsResult(c mechanicsCharacter, catalog worlddata.Catalog, mods
 	}
 	if place != 0 {
 		movers = append(movers, map[string]any{"label": placeName, "value": place})
+	}
+	if master != 0 {
+		movers = append(movers, map[string]any{"label": "Your master " + masterName, "value": master})
 	}
 	return map[string]any{"tn": tn, "modifier": modifier, "probability": breakthroughOdds(modifier, tn), "movers": movers, "stage_nine": phase == 9, "place": placeName, "place_bonus": place}
 }
@@ -479,7 +483,8 @@ func cultivationStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if err != nil {
 		return nil, err
 	}
-	odds := cultivationOddsResult(c, catalog, mods, false, perfect)
+	masterBonus, masterName := npcMasterBreakthroughBonusTx(conn, catalog, userID)
+	odds := cultivationOddsResult(c, catalog, mods, false, perfect, masterBonus, masterName)
 	result := map[string]any{
 		"realm_index": c.RealmIndex, "realm": realmName(catalog.Realms, c.RealmIndex), "stage": c.Phase, "world": realmWorld(catalog.Realms, c.RealmIndex),
 		"cultivation": c.Cultivation, "cost": cost, "ready": c.Cultivation >= cost,
@@ -528,7 +533,7 @@ func cultivationStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 		result["body_cultivation"] = c.BodyCultivation
 		result["body_cost"] = bodyCost
 		result["body_ready"] = c.BodyCultivation >= bodyCost
-		result["body_odds"] = cultivationOddsResult(c, catalog, mods, true, bodyPerfect)
+		result["body_odds"] = cultivationOddsResult(c, catalog, mods, true, bodyPerfect, masterBonus, masterName)
 	}
 	return result, nil
 }
