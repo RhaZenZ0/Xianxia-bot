@@ -238,9 +238,7 @@ func homesteadFacilities(catalog worlddata.Catalog) []string {
 		}
 	}
 	if len(out) == 0 {
-		for _, key := range []string{"cultivation", "alchemy", "forge", "formation", "defense", "storage", "herb_garden", "beast_pen", "merchant"} {
-			out = append(out, key)
-		}
+		out = append(out, "cultivation", "alchemy", "forge", "formation", "defense", "storage", "herb_garden", "beast_pen", "merchant")
 	}
 	return out
 }
