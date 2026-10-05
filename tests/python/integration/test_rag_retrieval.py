@@ -295,6 +295,62 @@ class WorldHistoryRetrievalTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertNotIn("GM-only betrayal", ctx.text)
 
+    async def test_another_worlds_public_news_is_not_recalled(self):
+        """v1.31.0: a world's public news is that world's. A Celestial siege is
+        not recalled in a Mortal town; the player's own deed is, wherever it was,
+        and a row whose world nothing can say is kept."""
+        celestial = next(name for name, loc in self.world.locations.items() if loc.get("world") == "Celestial World")
+        await self.db.record_world_history_event(
+            event_type="territory_war", title="Siege of the far heavens",
+            summary="A siege of the far heavens shook a celestial wall.",
+            significance=90, visibility="public", location=celestial, game_minute=1000, source_key="test:world:far",
+        )
+        await self.db.record_world_history_event(
+            event_type="ascension", title="Zi Dian among the far heavens",
+            summary="Zi Dian walked a siege of the far heavens and came home.",
+            significance=90, visibility="public", location=celestial, actor_type="player", actor_key="9101",
+            related_user_id=9101, game_minute=1000, source_key="test:world:own",
+        )
+        await self.db.record_world_history_event(
+            event_type="household", title="A household of the far heavens",
+            summary="A household kept a siege of the far heavens in its stories.",
+            significance=90, visibility="public", location="birth_family:3", game_minute=1000, source_key="test:world:none",
+        )
+        char = await self.db.get_character(9101)
+        ctx = await self.rag.retrieve(
+            char, query_text="siege of the far heavens", game_minute=1100,
+            location="Greenriver Town", known_manuals=[], max_chars=4000,
+        )
+        self.assertNotIn("Siege of the far heavens", ctx.text)
+        self.assertIn("Zi Dian among the far heavens", ctx.text)
+        self.assertIn("A household of the far heavens", ctx.text)
+        there = await self.rag.retrieve(
+            char, query_text="siege of the far heavens", game_minute=1100,
+            location=celestial, known_manuals=[], max_chars=4000,
+        )
+        self.assertIn("Siege of the far heavens", there.text)
+
+    async def test_a_history_row_names_its_world(self):
+        """v1.31.0: a caller that names no world gets the one its place stands
+        in, off content_locations; a place no world carries stays empty."""
+        async with self.db._connect() as db:
+            await db.execute("UPDATE content_locations SET world=? WHERE name=?", ("Mortal World", "Greenriver Town"))
+            await db.commit()
+        row = await self.db.record_world_history_event(
+            event_type="leadership_change", title="t", summary="s", location="Greenriver Town",
+            source_key="test:world:fill",
+        )
+        self.assertEqual(row["world_name"], "Mortal World")
+        row = await self.db.record_world_history_event(
+            event_type="household", title="t", summary="s", location="birth_family:3", source_key="test:world:empty",
+        )
+        self.assertEqual(row["world_name"], "")
+        row = await self.db.record_world_history_event(
+            event_type="leadership_change", title="t", summary="s", location="Greenriver Town",
+            world_name="Spiritual World", source_key="test:world:given",
+        )
+        self.assertEqual(row["world_name"], "Spiritual World")
+
 
 if __name__ == "__main__":
     unittest.main()

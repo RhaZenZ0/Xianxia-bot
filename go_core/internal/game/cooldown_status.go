@@ -32,6 +32,7 @@ const (
 	gateGhostPath
 	gatePerfection
 	gateBodyPerfection
+	gateHome
 )
 
 // cooldownFamily is one family of cooldown rows. A flat family writes exactly
@@ -63,6 +64,8 @@ var cooldownFamilies = []cooldownFamily{
 	{Family: "ghost_harvest", Key: "ghost_harvest", Gate: gateGhostPath},
 	{Family: "ghost_appease", Key: "ghost_appease", Gate: gateGhostPath},
 	{Family: "dao_dual_cultivation", Key: "dao_dual_cultivation"},
+	// Only somebody with a home has a room to focus (v1.31.0).
+	{Family: "abode_focus", Key: "abode_focus", Gate: gateHome},
 
 	// Composite families are listed only while a row exists. There is no
 	// "ready now" line for them: the world holds more manuals than a card can
@@ -167,6 +170,12 @@ func cooldownGateOpen(conn *storage.Conn, catalog worlddata.Catalog, c mechanics
 		return len(res.Rows) > 0, nil
 	case gateBodyPerfection:
 		res, err := optionalRows(conn, `SELECT 1 FROM body_realm_perfection WHERE user_id=? AND active=1 LIMIT 1`, []any{userID})
+		if err != nil {
+			return false, err
+		}
+		return len(res.Rows) > 0, nil
+	case gateHome:
+		res, err := optionalRows(conn, `SELECT 1 FROM cave_abodes WHERE user_id=? LIMIT 1`, []any{userID})
 		if err != nil {
 			return false, err
 		}

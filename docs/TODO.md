@@ -27,6 +27,18 @@ deferred half and not the half that says what was done about it.
   Storage, beast intelligence, the spirit sense in `/sense`, the hunting musk and the beast in the hunt,
   six reputations no rule read, sect influence and master attention each have a reader; a bounty
   surrender and capture cost restitution; a sponsor rolls the household and karma; six objective types.
+- **fixed (v1.31.0)** — *What v1.27–v1.30 left alone.* Focusing the Defensive Formation, the
+  storehouse, the herb garden, the beast pen or the merchant hall granted nothing; every room has an
+  effect now, made of stats a rule reads, and a focus lasts four real hours with one more before the
+  next (on the owner's call; it was four world hours). `world_history_events.world_name` was never
+  written by the engine's history door and read by nothing; it is filled from `content_locations`
+  and the narrator's recall leaves out another world's public news. A hunter killed by a beast marks
+  the region's security, and nothing else, because nobody did the killing.
+- **deferred (design)** — *A focus's end moves if the world's rate changes mid-focus.* `active_effects`
+  keeps only a game-minute deadline, so the four real hours are converted at the scale the focus was
+  taken at; a GM changing the rate during one stretches or shortens it, and at a stopped clock it lasts
+  until the clock moves. A real-time column would fix it for this one effect at a schema change; it is
+  left until a second effect wants a real-time end.
 - **fixed (v1.30.0)** — *A home says what is in it.* The homestead's and the sect residence's
   status list every facility with what it does at its level, what the next level adds and costs,
   and what it still asks, read through `property.overview` off the helpers the rules use.

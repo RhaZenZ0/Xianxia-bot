@@ -243,6 +243,20 @@ class MemoryRAGRetriever:
         self._canon_cache = TTLCache(ttl_seconds=canon_cache_seconds, max_entries=256)
         self._history_cache = TTLCache(ttl_seconds=max(query_cache_seconds, 6.0), max_entries=384)
 
+    def _world_of(self, location: str) -> str:
+        """The world a place stands in, or ``""`` when the catalogue cannot say.
+
+        This is what ``world_history_events.world_name`` is written from, and it
+        is how a row written before v1.31.0 (when the engine's history door left
+        the column empty) still resolves. Never the Mortal World by default: a
+        household or an inner world is in no world's news (rc.52's rule)."""
+        locations = getattr(self.world, "locations", None) or {}
+        try:
+            entry = locations.get(str(location or "").strip()) or {}
+        except AttributeError:
+            return ""
+        return str(entry.get("world") or "").strip() if isinstance(entry, dict) else ""
+
     @staticmethod
     def _memory_score(row: dict[str, Any], *, query_text: str, location: str, game_minute: int) -> float:
         # FTS bm25 is lower-is-better. Convert it to a modest relevance bonus
@@ -262,11 +276,24 @@ class MemoryRAGRetriever:
     @staticmethod
     def _history_allowed(
         row: dict[str, Any], *, user_id: int, focus_npc: str, known_factions: set[str],
+        viewer_world: str = "", row_world: str = "",
     ) -> bool:
         visibility = str(row.get("visibility") or "public").strip().lower()
         if visibility == "hidden":
             return False
         if visibility == "public":
+            # A world's public news is that world's (v1.31.0): a siege in the
+            # Celestial World is not something a Mortal village talks about.
+            # The player's own deeds travel with them, and a row whose world
+            # nothing can say (a household, an older row about an unknown place)
+            # is kept, because "no world" is not "another world".
+            if viewer_world and row_world and row_world != viewer_world:
+                uid = str(int(user_id))
+                return (
+                    int(row.get("related_user_id") or 0) == int(user_id)
+                    or str(row.get("actor_key") or "").strip() == uid
+                    or str(row.get("target_key") or "").strip() == uid
+                )
             return True
         if visibility == "faction":
             faction = str(row.get("faction") or "").casefold().strip()
@@ -493,10 +520,13 @@ class MemoryRAGRetriever:
         else:
             history_candidates = list(cached_history)
 
+        viewer_world = self._world_of(location)
         allowed_history = [
             row for row in history_candidates
             if self._history_allowed(
                 row, user_id=user_id, focus_npc=focus_npc, known_factions=known_faction_set,
+                viewer_world=viewer_world,
+                row_world=str(row.get("world_name") or "").strip() or self._world_of(str(row.get("location") or "")),
             )
         ]
         ranked_history = sorted(

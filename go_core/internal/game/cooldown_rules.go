@@ -44,6 +44,9 @@ const (
 	// One act per war per member (v1.24.0: the 1800 seconds war.act wrote
 	// as a literal beside this table for releases after it existed).
 	cooldownWarAction = "war_action"
+	// One focus of a home's room at a time (v1.31.0): the four real hours a
+	// focus lasts (abodeFocusRealMinutes) and one more before the next.
+	cooldownAbodeFocus = "abode_focus"
 )
 
 // cultivateWaitMinutes is the pace of the whole game: a session is a share of
@@ -118,6 +121,7 @@ var actionCooldowns = map[string]cooldownRule{
 	cooldownGhostHarvest: {15, ""},
 	cooldownGhostAppease: {60, ""},
 	cooldownWarAction:    {30, ""},
+	cooldownAbodeFocus:   {abodeFocusRealMinutes + 60, ""},
 }
 
 // cooldownSecondsFor is how long the wait is, now. An unknown action is an

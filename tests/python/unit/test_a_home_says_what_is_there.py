@@ -63,6 +63,34 @@ class TheCardSaysTheEnginesNumbers(unittest.TestCase):
             {"facilities": [{"key": "forge", "level": 0, "max_level": 9, "does": {"craft_bonus": 2}}]})[0].split("not built")[1])
 
 
+class AFocusSaysWhatItGave(unittest.TestCase):
+    """v1.31.0: every room grants a focus, and the reply says what, for how long
+    and when the next opens - from the engine's result, never a number of its own."""
+
+    EFFECT = {"modifiers": [{"stat": "combat_bonus", "operation": "add", "value": 1},
+                            {"stat": "escape_bonus", "operation": "add", "value": 2}]}
+
+    def test_the_reply_names_the_effect_its_numbers_and_the_wait(self) -> None:
+        line = _formatting().focus_reply(
+            {"effect_name": "Warded Repose", "duration_real_minutes": 240, "next_focus_unix": 1700000000},
+            "Defensive Formation", self.EFFECT)
+        self.assertIn("gain **Warded Repose**", line)
+        self.assertIn("for **4h**", line)
+        self.assertIn("<t:1700000000:R>", line)
+        self.assertIn("+2", line)
+
+    def test_a_field_the_engine_did_not_send_is_not_said(self) -> None:
+        line = _formatting().focus_reply({"effect_name": "Warded Repose"}, "Defensive Formation", {})
+        self.assertNotIn("for **", line)
+        self.assertNotIn("<t:", line)
+
+    def test_the_focus_reply_restates_no_duration(self) -> None:
+        source = (BOT / "formatting.py").read_text(encoding="utf-8")
+        fn = next(n for n in ast.walk(ast.parse(source)) if isinstance(n, ast.FunctionDef) and n.name == "focus_reply")
+        numbers = {c.value for c in ast.walk(fn) if isinstance(c, ast.Constant) and isinstance(c.value, int)}
+        self.assertFalse(numbers & {240, 300, 4, 5}, f"focus_reply spells a duration of its own: {numbers}")
+
+
 def _calls(source: str, function: str) -> set[str]:
     tree = ast.parse(source)
     for node in ast.walk(tree):

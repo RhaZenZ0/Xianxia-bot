@@ -493,6 +493,9 @@ func (r *Runner) npcBeastHunts(conn *storage.Conn, gm int64) (int64, int64, int6
 			if err := game.ReleaseNPCBondsTx(conn, hunter.name, gm, now); err != nil {
 				return hunted, took, died, err
 			}
+			// A beast's kill leaves the place less safe and nothing else
+			// (v1.31.0): nobody did it, so no sect and no market answers.
+			_ = game.MarkBeastDeathTx(conn, hunter.location, gm, now)
 			r.recordDeed(conn, "npc_killing", fmt.Sprintf("npc_hunt_death:%s:%s:%d", hunter.name, quarry.Name, gm),
 				"A "+quarry.Name+" kills "+hunter.name,
 				fmt.Sprintf("%s went out after a %s near %s and did not come back.", hunter.name, quarry.Name, hunter.location),

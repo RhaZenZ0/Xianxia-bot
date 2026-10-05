@@ -7032,6 +7032,40 @@ it near-certain. The step now said only "the panel still takes presses" because 
 both tries fell through silently; it says "the clock jump never landed" now, and
 `stop_every_view_but` stops every view but the panel under test before the jump.
 
+### What v1.27–v1.30 left alone (v1.31.0)
+
+The PR for the interlinks releases listed three things deliberately left alone, and the owner asked
+for all three.
+
+**Every room grants a focus.** `abodeFacilityEffects` named four of the nine rooms, and the focus
+picker offered all nine, so focusing the Defensive Formation, the storehouse, the herb garden, the beast
+pen or the merchant hall spent the press and applied nothing - rc.36 wrote that down as the design.
+Each has a Home effect now, built only from stats a rule already fetches (combat and escape, insight and
+sense precision, alchemy and detox, presence and spirit - the taming roll's attributes - and presence),
+so `modifier_vocabulary_test.go` had nothing new to learn. `TestEveryFacilityFocusGrantsAnEffect` walks
+`homesteadFacilities`; its drill drops one entry and names the room.
+
+**A focus is four real hours, then one more** (on the owner's call). It was 240 *game* minutes, one real
+hour at the shipped scale and a different length at every other. `active_effects` keeps only a
+game-minute deadline, so `abodeFocusGameMinutes` converts four real hours at the scale the focus was
+taken at, read through `loadCanonicalWorldClock`; a stopped clock is held at one game minute a real
+minute so the effect is never written already over. The wait is a real-time cooldown,
+`cooldownAbodeFocus` at 300 minutes, one across every room, with a `gateHome` family on the cooldown
+card. A GM changing the rate mid-focus moves its end, which is in `docs/TODO.md` rather than a
+real-time column for one effect. The reply (`focus_reply` in `formatting.py`) restates no number.
+
+**History is filed by world.** Every simulation writer passed a world and the engine's own history door,
+`recordWorldHistoryTx`, wrote an empty string, and nothing read the column. `historyWorldTx` reads the
+world off `content_locations` (empty for a place no world carries, never the Mortal World - rc.52's
+rule), and `record_world_history_event` does the same in SQL when its caller names none. The reader is
+the narrator's recall: `_history_allowed` drops a **public** row from another world unless the player
+took part, and a row with no resolvable world is kept, because "no world" is not "another world". A row
+written before this release is resolved off its location, so nothing needed backfilling.
+
+**A beast's kill makes the place less safe**, and only that (`MarkBeastDeathTx`, beside `MarkKillingTx`):
+security down by the lightest killing's term, read by NPC crime and a caravan's risk. Nobody did the
+killing, so no sect, unrest or market answers it - the rest of `MarkKillingTx` is about a culprit.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

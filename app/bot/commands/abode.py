@@ -12,7 +12,7 @@ import discord
 from discord import app_commands
 
 from ...ops.game_engine import GameEngineError
-from ..formatting import player_property_emoji, player_property_facility_lines, player_property_unbuilt, property_overview_lines
+from ..formatting import focus_reply, player_property_emoji, player_property_facility_lines, player_property_unbuilt, property_overview_lines
 from ..pickers import usable_item_autocomplete
 from ..registry import registered_group_command, registered_root_command
 from ..character_state import record_quest_progress, announce_quest_progress
@@ -229,7 +229,8 @@ async def abode_focus(interaction:discord.Interaction,facility:app_commands.Choi
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
-    await interaction.followup.send(f"🏡 You focus within the **{facility.value}** facility.",ephemeral=False)
+    effect=WORLD.special_effects.get(str(result.get("effect_id") or "")) or {}
+    await interaction.followup.send(focus_reply(result, facility.name, effect),ephemeral=False)
 
 
 # ---------- Teleportation arrays / spatial keys ----------

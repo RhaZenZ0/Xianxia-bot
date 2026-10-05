@@ -6505,6 +6505,9 @@ class Database:
         History is descriptive past-tense canon, not mutable mechanical state.
         ``visibility`` is intentionally narrow: ``public``, ``participant``,
         ``faction`` or ``hidden``. Hidden rows are never returned to narrator RAG.
+        A caller that names no ``world_name`` gets the world its ``location``
+        stands in (v1.31.0), read off ``content_locations`` the way the engine's
+        writer reads it, and ``''`` for a place no world carries.
         """
         now = time.time()
         safe_visibility = str(visibility or "public").strip().lower()
@@ -6523,7 +6526,9 @@ class Database:
                        source_key,event_type,title,summary,significance,visibility,location,world_name,faction,
                        actor_type,actor_key,actor_name,target_type,target_key,target_name,related_user_id,
                        related_npc_name,tags,game_minute,metadata_json,created_at,updated_at
-                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                   ) VALUES(?,?,?,?,?,?,?,
+                       COALESCE(NULLIF(?, ''), (SELECT world FROM content_locations WHERE name=?), ''),
+                       ?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                    ON CONFLICT(source_key) DO UPDATE SET
                        event_type=excluded.event_type,title=excluded.title,summary=excluded.summary,
                        significance=excluded.significance,visibility=excluded.visibility,location=excluded.location,
@@ -6536,7 +6541,7 @@ class Database:
                    RETURNING *""",
                 (
                     key, str(event_type)[:80], str(title)[:220], str(summary)[:1800], safe_significance,
-                    safe_visibility, str(location)[:180], str(world_name)[:120], str(faction)[:180],
+                    safe_visibility, str(location)[:180], str(world_name)[:120], str(location)[:180], str(faction)[:180],
                     str(actor_type)[:60], str(actor_key)[:180], str(actor_name)[:160],
                     str(target_type)[:60], str(target_key)[:180], str(target_name)[:160],
                     int(related_user_id) if related_user_id is not None else None, str(related_npc_name)[:160],

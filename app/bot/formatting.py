@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..rules.item_effects import describe_modifier
 from .runtime import player_property_definition
 from .services import PLAYER_PROPERTY_FACILITY_KEYS, PLAYER_PROPERTY_FACILITY_LABELS
 
@@ -122,3 +123,25 @@ def roll_line(result) -> str:
         f"**{result.total}** vs TN **{result.tn}** — **{result.degree}**{chance}"
     )
 
+
+
+def focus_reply(result: dict[str, Any], label: str, effect: dict[str, Any]) -> str:
+    """What a home focus gave, in the engine's numbers (v1.31.0): the effect,
+    what its modifiers do, how long it lasts and when the next focus opens.
+    Nothing here restates a duration or a wait; a field the engine did not send
+    is not said."""
+    name = str(result.get("effect_name") or "")
+    if not name:
+        return f"🏡 You focus within the **{label}**."
+    does = ", ".join(filter(None, (describe_modifier(m) for m in effect.get("modifiers") or [])))
+    line = f"🏡 You focus within the **{label}** and gain **{name}**"
+    if does:
+        line += f" ({does})"
+    real = int(result.get("duration_real_minutes") or 0)
+    if real:
+        line += f" for **{real // 60}h**" if real % 60 == 0 else f" for **{real} minutes**"
+    line += "."
+    nxt = int(result.get("next_focus_unix") or 0)
+    if nxt:
+        line += f" You can focus a room again <t:{nxt}:R>."
+    return line
