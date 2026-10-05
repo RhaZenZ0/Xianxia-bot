@@ -345,9 +345,13 @@ func professionExamAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 		return authoritativeMutation{}, err
 	}
 	balance := int64(0)
-	if exam.Fee > 0 {
-		if balance, err = walletDeltaTx(conn, catalog, userID, currency, -exam.Fee, nowSeconds()); err != nil {
-			return authoritativeMutation{}, fmt.Errorf("the examination fee is %d %s, which you do not have", exam.Fee, strings.ReplaceAll(currency, "_", " "))
+	// A hall charges somebody it already knows less (v1.28.0): every
+	// examination passed is standing with that trade's halls, and nothing read
+	// it until now.
+	fee := examFeeAfterStanding(exam.Fee, standingTx(conn, userID, "craft_hall:"+trade))
+	if fee > 0 {
+		if balance, err = walletDeltaTx(conn, catalog, userID, currency, -fee, nowSeconds()); err != nil {
+			return authoritativeMutation{}, fmt.Errorf("the examination fee is %d %s, which you do not have", fee, strings.ReplaceAll(currency, "_", " "))
 		}
 	} else if balance, err = walletBalanceTx(conn, userID, currency); err != nil {
 		return authoritativeMutation{}, err
@@ -387,7 +391,7 @@ func professionExamAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 		"profession": trade, "rank": level, "rank_name": exam.RankName, "title": exam.Title,
 		"hall": exam.Hall, "hall_kind": exam.HallKind, "location": c.Location, "shop": shop.Name,
 		"examiner": shop.Keeper, "attribute": attribute, "tn": tn, "roll": roll,
-		"fee": exam.Fee, "currency": currency, "balance": balance, "passed": success,
+		"fee": fee, "listed_fee": exam.Fee, "currency": currency, "balance": balance, "passed": success,
 		"quest_key": exam.QuestKey, "opening": exam.Opening,
 	}
 	if !success {

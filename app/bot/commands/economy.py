@@ -1162,8 +1162,14 @@ async def _black_market_access(user_id:int, character:dict[str,Any]) -> tuple[st
     alignment = ""
     if membership:
         alignment = str((WORLD.sects.get(str(membership.get("sect_name"))) or {}).get("alignment", ""))
+    circles = next((int(r.get("score",0)) for r in reps if str(r.get("faction_key","")).casefold()=="demonic circles"), 0)
+    try:
+        initiate = await DB.is_hidden_sect_initiate(user_id)
+    except Exception:
+        initiate = False
     reason = black_market_access_reason(
-        karma=int(character.get("karma_score",0)), underworld_reputation=underworld, sect_alignment=alignment
+        karma=int(character.get("karma_score",0)), underworld_reputation=underworld, sect_alignment=alignment,
+        hidden_initiate=initiate, demonic_circles=circles,
     )
     return reason, underworld, alignment
 

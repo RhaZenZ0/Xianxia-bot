@@ -9,6 +9,7 @@ import discord
 from discord import app_commands
 
 from ..formatting import roll_line
+from ..character_state import announce_quest_progress, record_quest_progress
 from ..hubs import HubDynamicOption, register_hub_option_hint, register_hub_option_provider
 from ..registry import registered_group_command
 from ..runtime import (
@@ -63,9 +64,9 @@ async def beast_status(interaction: discord.Interaction) -> None:
 def _companion_line(row: Any) -> str:
     """What one beast adds in a fight (v1.7.5): the engine's
     `combatCompanionBonus`, twinned in `companion_bonus`."""
-    bonus = companion_bonus(row.get("rank"), row.get("evolution_stage"), row.get("loyalty"))
+    bonus = companion_bonus(row.get("rank"), row.get("evolution_stage"), row.get("loyalty"), row.get("intelligence"))
     when = "while active" if row.get("active") else "if made active"
-    return f"🐾 **{bonus:+d}** to your attack, flee and defence rolls {when} (1v1 battles)"
+    return f"🐾 **{bonus:+d}** to your attack, flee and defence rolls {when} (1v1 battles and hunts)"
 
 
 @registered_group_command(beast_group, name="encounters", description="View subdued wild beasts currently available for taming")
@@ -124,11 +125,15 @@ async def beast_tame(interaction: discord.Interaction, encounter_id: int) -> Non
         beast = dict(resolved.get("beast") or {})
         beast_progress = dict(resolved.get("profession_progress") or {})
         active_line = " It becomes your active companion." if beast.get("active") else ""
+        # Recorded once the engine has made the contract, told after the
+        # reply (v1.28.0).
+        progressed = await record_quest_progress(interaction.user.id, "beast_tame", game_minute=(await current_world_time()).total_minutes)
         await interaction.followup.send(
             f"🐉 **Spirit-Beast Bond — {species}**\n{roll_line(result)}\n"
             f"The beast accepts an **equality contract** at loyalty **{beast.get('loyalty', 30)}**.{active_line}\n"
             f"🪢 Beast Taming: **{profession_rank(int(beast_progress.get('level', 0)), 'Beast Taming')}** Lv.{int(beast_progress.get('level', 0))}."
         )
+        await announce_quest_progress(interaction, progressed)
     else:
         await interaction.followup.send(
             f"🐾 **Taming Failed — {species}**\n{roll_line(result)}\n"
@@ -219,11 +224,13 @@ async def beast_evolve(interaction: discord.Interaction, beast_id: int) -> None:
     resolved = dict(envelope.get("result") or {})
     row = dict(resolved.get("beast") or {})
     beast_progress = dict(resolved.get("profession_progress") or {})
+    progressed = await record_quest_progress(interaction.user.id, "beast_evolve", game_minute=(await current_world_time()).total_minutes)
     await interaction.followup.send(
         f"🧬 **{row['name']} evolves.** Evolution Stage **{row['evolution_stage']}**, Rank **{row['rank']}**. The strain reduces loyalty to **{row['loyalty']}**.\n"
         f"🪢 Beast Taming: **{profession_rank(int(beast_progress.get('level', 0)), 'Beast Taming')}** Lv.{int(beast_progress.get('level', 0))}.",
         ephemeral=False,
     )
+    await announce_quest_progress(interaction, progressed)
 
 
 @registered_group_command(beast_group, name="active", description="Choose the spirit beast that supports you in battle")
@@ -247,7 +254,7 @@ async def beast_active(interaction: discord.Interaction, beast_id: int) -> None:
     row = dict((envelope or {}).get("result") or {})
     chosen = " Its rank, evolution and loyalty now contribute to one-on-one battles."
     if row.get("rank") is not None:
-        bonus = companion_bonus(row.get("rank"), row.get("evolution_stage"), row.get("loyalty"))
+        bonus = companion_bonus(row.get("rank"), row.get("evolution_stage"), row.get("loyalty"), row.get("intelligence"))
         chosen = f" **{row.get('name') or 'Your beast'}** now adds **{bonus:+d}** to your attack, flee and defence rolls in one-on-one battles."
     await interaction.followup.send(f"🐉 Active companion changed.{chosen}", ephemeral=False)
 
@@ -262,7 +269,7 @@ async def beast_active(interaction: discord.Interaction, beast_id: int) -> None:
 
 
 def _beast_option(row: Any) -> HubDynamicOption:
-    bonus = companion_bonus(row.get("rank"), row.get("evolution_stage"), row.get("loyalty"))
+    bonus = companion_bonus(row.get("rank"), row.get("evolution_stage"), row.get("loyalty"), row.get("intelligence"))
     return HubDynamicOption(
         label=f"{row['name']} ({row['species']})"[:100],
         value=int(row["beast_id"]),

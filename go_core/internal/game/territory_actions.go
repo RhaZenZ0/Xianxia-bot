@@ -109,6 +109,20 @@ func territoryClaimActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 		out["claimed"] = true
 		out["controller_key"] = sect
 		RecordTerritoryClaimedTx(conn, catalog, sect, p.TerritoryKey, p.GameMinute, now)
+		// A banner raised is work done for the sect, paid as one war act is
+		// (v1.28.0): a claim earned nothing, so the member who took the ground
+		// was worse off than one who fought over it.
+		points := warRules(catalog).ActPoints
+		if points > 0 {
+			promoted, e := creditSectContributionTx(conn, catalog, userID, points, 0)
+			if e != nil {
+				return authoritativeMutation{}, e
+			}
+			out["contribution"] = points
+			if promoted != "" {
+				out["eligible_for"] = promoted
+			}
+		}
 	} else if controller == sect {
 		return authoritativeMutation{}, errors.New("your sect already controls that territory")
 	} else {
@@ -191,6 +205,10 @@ func territoryWarActActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 		manorBonus = manorDefensePowerGo(conn, sect, fmt.Sprint(war["territory_key"]))
 		power += manorBonus
 	}
+	// A member the sect listens to carries more of it into a war (v1.28.0):
+	// every point of contribution raised `sect_membership.influence`, and the
+	// sect card printed it under Internal Politics, and no rule read it.
+	power += sectInfluenceWarPower(i64(mem["influence"]))
 	territory := fmt.Sprint(war["territory_key"])
 	power = max64(1, int64(math.Round(float64(power)*math.Max(.25, currentEraModifierGo(conn, catalog, territory, "war_pressure", 1)))))
 	if e = ensureWarOperationGo(conn, p.WarID, p.GameMinute, now); e != nil {
@@ -608,4 +626,10 @@ func RecordTerritoryClaimedTx(conn *storage.Conn, catalog worlddata.Catalog, sec
         ON CONFLICT(source_key) DO NOTHING`,
 		[]any{source, "territory_claimed", title, summary, 60, territory, world, sect,
 			sect, sect, territory, territory, "territory claim " + territory, gm, "{}", now, now})
+}
+
+// sectInfluenceWarPower is what a member's institutional influence adds to a
+// war act's power: a point for every 20, at most three (v1.28.0).
+func sectInfluenceWarPower(influence int64) int64 {
+	return minI64(3, maxI64(0, influence)/20)
 }

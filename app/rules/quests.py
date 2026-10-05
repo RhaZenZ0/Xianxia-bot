@@ -397,6 +397,18 @@ OBJECTIVE_TYPES: dict[str, dict[str, Any]] = {
     "law_comprehend": {"target": "law", "label": "Comprehend the Law of {target}", "untargeted": "Comprehend a Law"},
     "law_technique": {"target": "law_technique", "label": "Manifest {target}", "untargeted": "Manifest a Law technique"},
     "personal_world": {"target": None, "label": "", "untargeted": "Stabilize a personal world"},
+    # Six things a cultivator works long for that no quest could ask about
+    # (v1.28.0): taming a beast, evolving one, refining a flame, settling a
+    # stage of the spirit sense, completing a Perfect Path and raising a
+    # property's facility. Each is untargeted - the beast is whatever the hunt
+    # turned up, and the rest are the player's own - and each is reported
+    # after the engine agreed and before the command answers.
+    "beast_tame": {"target": None, "label": "", "untargeted": "Tame a spirit beast"},
+    "beast_evolve": {"target": None, "label": "", "untargeted": "Evolve a spirit beast"},
+    "flame_refine": {"target": None, "label": "", "untargeted": "Refine a flame you hold"},
+    "spirit_settle": {"target": None, "label": "", "untargeted": "Settle a stage of your spirit sense"},
+    "perfection_complete": {"target": None, "label": "", "untargeted": "Complete a Perfect Path"},
+    "abode_upgrade": {"target": None, "label": "", "untargeted": "Raise a facility of your property"},
 }
 # Where each objective is done (v1.27.0). A label written by hand names its
 # door (`**/world → City → Envoys**`), and a panel draws that as a button; 375
@@ -433,6 +445,12 @@ OBJECTIVE_PATHS: dict[str, str] = {
     "law_comprehend": "**/cultivation → Laws → Comprehend**",
     "law_technique": "**/cultivation → Laws → Technique**",
     "personal_world": "**/innerworld → Personal World → Create**",
+    "beast_tame": "**/beast → Companions → Tame**",
+    "beast_evolve": "**/beast → Companions → Evolve**",
+    "flame_refine": "**/craft → Flames → Refine**",
+    "spirit_settle": "**/craft → Spirit Sense → Settle**",
+    "perfection_complete": "**/ascend → Perfection → Trial**",
+    "abode_upgrade": "**/abode → Property → Upgrade**",
 }
 
 

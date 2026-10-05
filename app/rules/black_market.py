@@ -7,13 +7,21 @@ BLACK_MARKET_MIN_ACCESS_KARMA = -40
 BLACK_MARKET_ACCESS_REPUTATION = 15
 
 
-def access_reason(*, karma: int, underworld_reputation: int, sect_alignment: str) -> str | None:
+def access_reason(*, karma: int, underworld_reputation: int, sect_alignment: str,
+                  hidden_initiate: bool = False, demonic_circles: int = 0) -> str | None:
+    """The engine's `blackMarketAuthorized`, in its order: dark karma,
+    Underworld Contacts, a demonic sect, and since v1.28.0 the hidden sect's
+    initiation and standing with the Demonic Circles."""
     if int(karma) <= BLACK_MARKET_MIN_ACCESS_KARMA:
         return "your karmic reputation is dark enough that underworld brokers recognize you"
     if int(underworld_reputation) >= BLACK_MARKET_ACCESS_REPUTATION:
         return "your Underworld Contacts reputation vouches for you"
     if str(sect_alignment).casefold() == "demonic":
         return "your demonic-sect affiliation grants you an introduction"
+    if hidden_initiate:
+        return "the hidden sect's brand is introduction enough"
+    if int(demonic_circles) >= BLACK_MARKET_ACCESS_REPUTATION:
+        return "the Demonic Circles count you as one of theirs"
     return None
 
 

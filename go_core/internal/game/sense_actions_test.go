@@ -345,3 +345,34 @@ func TestSenseTargetNoticesAProbeItCanFeel(t *testing.T) {
 		}
 	}
 }
+
+// v1.28.0: a built spirit sense sharpens the sweep it is named for. It
+// steadied only Formation and Inscription crafts before, so a ninth-stage
+// sense swept a room as well as an unbuilt one.
+func TestABuiltSpiritSenseSharpensTheSweep(t *testing.T) {
+	conn, catalog := senseGroundConn(t)
+	if _, err := conn.Execute(
+		`INSERT INTO characters(user_id,name,gender,path,spiritual_root,location,attributes_json,
+		 realm_index,phase,cultivation,body_realm_index,body_phase,body_cultivation,life_status,
+		 karma_score,qi,qi_max,vitality,vitality_max)
+		 VALUES(?,?,'male','Qi Refiner','Single',?,?,?,?,0,0,1,0,'alive',0,10,10,10,10)`,
+		[]any{4343, "Seer", "Greenriver Town", `{"spirit":5,"insight":5,"will":5}`, 2, 3}); err != nil {
+		t.Fatal(err)
+	}
+	_, power, precision, _, err := senseStatsGo(conn, catalog, 4343, 600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.ExecScript(`CREATE TABLE IF NOT EXISTS character_spirit_sense(user_id INTEGER PRIMARY KEY, stage INTEGER NOT NULL DEFAULT 0, progress INTEGER NOT NULL DEFAULT 0, updated_at REAL NOT NULL DEFAULT 0);
+INSERT INTO character_spirit_sense(user_id,stage,progress) VALUES(4343,9,0);`); err != nil {
+		t.Fatal(err)
+	}
+	_, builtPower, builtPrecision, _, err := senseStatsGo(conn, catalog, 4343, 600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if builtPower-power != 9*spiritSenseSweepPerStage || builtPrecision-precision != 9*spiritSenseSweepPerStage {
+		t.Fatalf("a ninth-stage spirit sense moved the sweep by power %d and precision %d, want %d each",
+			builtPower-power, builtPrecision-precision, 9*spiritSenseSweepPerStage)
+	}
+}

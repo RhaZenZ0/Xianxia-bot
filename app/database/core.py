@@ -3410,6 +3410,12 @@ class _ObservedConnection:
         self._owner._writer_lock.release()
 
 
+# What each level of a property's Storage facility adds to spatial storage
+# (v1.28.0); the engine's `propertyStorageSlotsPerLevel`, held equal by
+# `test_built_things_do_something.py`.
+PROPERTY_STORAGE_SLOTS_PER_LEVEL = 10
+
+
 class Database:
     def __init__(
         self,
@@ -7044,7 +7050,19 @@ class Database:
                 "SELECT item_id,quantity FROM storage_inventory WHERE user_id=? AND quantity>0 ORDER BY item_id",(user_id,)
             )
             data["items"]={str(k):int(v) for k,v in await cur.fetchall()}
-            data["used_slots"]=len(data["items"]); return data
+            data["used_slots"]=len(data["items"])
+            # A property's Storage facility adds stacks (v1.28.0), as the
+            # engine's `propertyStorageSlotsTx` counts them on a deposit.
+            extra = 0
+            for table in ("cave_abodes", "sect_abodes"):
+                try:
+                    cur = await db.execute(f"SELECT COALESCE(MAX(storage_level),0) FROM {table} WHERE user_id=?", (user_id,))
+                    extra += max(0, int((await cur.fetchone())[0] or 0)) * PROPERTY_STORAGE_SLOTS_PER_LEVEL
+                except (sqlite3.OperationalError, RemoteDatabaseError):
+                    log.debug("no %s storage column yet", table)
+            data["property_slots"] = extra
+            data["slot_capacity"] = int(data.get("slot_capacity") or 0) + extra
+            return data
 
     # ------------------------------------------------------------------
     # Sect hierarchy/resources
@@ -7915,6 +7933,16 @@ class Database:
                 "SELECT * FROM faction_reputation WHERE user_id=? ORDER BY ABS(score) DESC,faction_key", (int(user_id),)
             )
             return [dict(r) for r in await cur.fetchall()]
+
+
+    async def is_hidden_sect_initiate(self, user_id: int) -> bool:
+        """Whether the cultivator is an active initiate of the hidden sect
+        (v1.28.0) - the black market's door reads it as the engine does."""
+        async with self._connect() as db:
+            cur = await db.execute(
+                "SELECT 1 FROM hidden_sect_membership WHERE user_id=? AND status='active' LIMIT 1", (int(user_id),)
+            )
+            return await cur.fetchone() is not None
 
 
     async def get_crimes(self, user_id: int, *, open_only: bool = True, limit: int = 20) -> list[dict[str, Any]]:

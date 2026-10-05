@@ -85,6 +85,49 @@ func sectReputationScore(conn *storage.Conn, userID int64, sect string) (int64, 
 	}
 	return i64(row["score"]), nil
 }
+
+// recommendationTermsTx is everything a sponsor weighs before vouching for a
+// cultivator, each term named (v1.28.0). The bot's notes had printed family
+// influence and karmic reputation as terms of this roll since the
+// recommendation was written, while the engine rolled presence, realm and
+// standing alone - and capped nothing, where the notes capped standing at
+// three. One statement now, in the order the notes always gave it, and the
+// reply prints these terms rather than its own: a household of standing is
+// worth up to +2, and a sect's karmic leaning +1 or -1.
+func recommendationTermsTx(conn *storage.Conn, catalog worlddata.Catalog, userID, presence, realm, repScore int64, sect string) []map[string]any {
+	terms := []map[string]any{{"name": "presence", "value": presence}, {"name": "realm", "value": realm * 2}}
+	if standing := clampI64(repScore/20, -3, 3); standing != 0 {
+		terms = append(terms, map[string]any{"name": "sect standing", "value": standing})
+	}
+	if tableExistsTx(conn, "character_birth_family") && tableExistsTx(conn, "birth_families") {
+		if r, err := conn.Execute(`SELECT bf.influence FROM character_birth_family cbf JOIN birth_families bf ON bf.family_id=cbf.family_id WHERE cbf.user_id=?`, []any{userID}); err == nil && len(r.Rows) > 0 {
+			if family := minI64(2, maxI64(0, storage.ParseInt(r.Rows[0][0]))/40); family > 0 {
+				terms = append(terms, map[string]any{"name": "family influence", "value": family})
+			}
+		}
+	}
+	karma, _ := characterKarmaTx(conn, userID)
+	leaning := int64(0)
+	switch strings.ToLower(catalog.Sects[sect].Alignment) {
+	case "orthodox":
+		if karma >= 50 {
+			leaning = 1
+		} else if karma <= -100 {
+			leaning = -1
+		}
+	case "demonic":
+		if karma <= -50 {
+			leaning = 1
+		} else if karma >= 100 {
+			leaning = -1
+		}
+	}
+	if leaning != 0 {
+		terms = append(terms, map[string]any{"name": "karmic reputation", "value": leaning})
+	}
+	return terms
+}
+
 func sectRecommendationActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p sectRecommendationPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
@@ -141,7 +184,11 @@ func sectRecommendationActionGo(conn *storage.Conn, catalog worlddata.Catalog, u
 	// vouch for this character derives from the character's own presence,
 	// cultivation depth, and standing already earned with this sect - never
 	// from a client-chosen modifier/TN/bonus.
-	modifier := c.Attributes["presence"] + c.RealmIndex*2 + repScore/20
+	terms := recommendationTermsTx(conn, catalog, userID, c.Attributes["presence"], c.RealmIndex, repScore, p.SectName)
+	modifier := int64(0)
+	for _, term := range terms {
+		modifier += i64(term["value"])
+	}
 	tn := int64(14)
 	roll, e := roll2d10Go(modifier, tn)
 	if e != nil {
@@ -177,7 +224,7 @@ func sectRecommendationActionGo(conn *storage.Conn, catalog worlddata.Catalog, u
 	if e = recordSectAttemptGo(conn, userID, p.SectName, "recommendation", p.NPCName, gate, map[bool]string{true: "pass", false: "fail"}[roll.Success], roll.Total, roll.TN, bonus, p.GameMinute, details, now); e != nil {
 		return authoritativeMutation{}, e
 	}
-	out := map[string]any{"success": roll.Success, "roll": rollMapGo(roll), "recommendation_id": recID, "recommendation_bonus": bonus, "route_revealed": route, "new_sect": newSect, "gate": gate, "sect_name": p.SectName, "npc_name": p.NPCName}
+	out := map[string]any{"success": roll.Success, "roll": rollMapGo(roll), "recommendation_id": recID, "recommendation_bonus": bonus, "route_revealed": route, "new_sect": newSect, "gate": gate, "sect_name": p.SectName, "npc_name": p.NPCName, "terms": terms}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "sect", EventType: "sect.recruitment.recommendation", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 
@@ -456,7 +503,10 @@ func sectTrialActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	}
 	primaryMod := c.Attributes["body"] + c.RealmIndex*2 + c.Phase/3 + recBonus + tuning.Bonus
 	secondaryMod := c.Attributes["insight"] + c.Attributes["spirit"]/2 + c.RealmIndex + recBonus + tuning.Bonus
-	baseTN := maxI64(10, tuning.BaseTN-repScore/25)
+	// Standing with the sect's wider circle (v1.28.0): Orthodox Society for
+	// an orthodox sect, Demonic Circles for a demonic one.
+	circle := standingBonus(standingTx(conn, userID, sectCircleKey(catalog, p.SectName)), circleTrialPer, circleTrialCap)
+	baseTN := maxI64(10, tuning.BaseTN-repScore/25-circle)
 	primary, e := roll2d10Go(primaryMod, baseTN)
 	if e != nil {
 		return authoritativeMutation{}, e

@@ -409,7 +409,13 @@ func (r *Runner) advanceHunters(conn *storage.Conn, gm int64) (int64, error) {
 		if pressure >= 65 {
 			status = "engaged"
 			if sanctuary == "" {
-				capture = min64(100, capture+int64(math.Round(float64(elapsed*max64(5, i64(p["hunter_power"])))*m)))
+				// A fugitive inside their own property is behind its
+				// Defensive Formation (v1.28.0), which nothing ever read: each
+				// level takes a tenth off the hunter's capture, and at ten it
+				// holds them off entirely. Pressure still builds - the hunter
+				// waits at the gate.
+				ward := 1.0 - 0.1*float64(game.PropertyDefenseLevelTx(conn, i64(p["user_id"]), fmt.Sprint(p["location"])))
+				capture = min64(100, capture+int64(math.Round(float64(elapsed*max64(5, i64(p["hunter_power"])))*m*math.Max(0, ward))))
 			}
 		}
 		if capture >= 100 {
@@ -425,6 +431,12 @@ func (r *Runner) advanceHunters(conn *storage.Conn, gm int64) (int64, error) {
 			if _, err = conn.Execute(`UPDATE crime_records SET status='captured',updated_at=? WHERE crime_id=(SELECT source_crime_id FROM bounties WHERE bounty_id=?) AND status='open'`, []any{now, i64(p["bounty_id"])}); err != nil {
 				return 0, err
 			}
+			// Being caught is worse than walking in (v1.28.0): the capture
+			// pays half again the restitution a surrender pays, and karma
+			// and Orthodox standing besides. It never refuses - the purse
+			// pays what it holds - and a settlement that cannot be read is
+			// skipped rather than ending the tick.
+			_, _ = game.SettleBountyTx(conn, r.World, i64(p["user_id"]), i64(p["bounty_id"]), true, now)
 		}
 	}
 	return int64(len(rows)), nil

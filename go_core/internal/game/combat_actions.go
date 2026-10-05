@@ -188,12 +188,12 @@ func loadBattle(conn *storage.Conn, userID, battleID int64) (battleRow, error) {
 func bval(r map[string]any, k string) bool { v, _ := r[k].(bool); return v }
 func combatCompanionBonus(conn *storage.Conn, userID int64) (int64, error) {
 	bonus := int64(0)
-	r, e := conn.Execute(`SELECT rank,evolution_stage,loyalty FROM spirit_beasts WHERE user_id=? AND active=1 ORDER BY beast_id LIMIT 1`, []any{userID})
+	r, e := conn.Execute(`SELECT rank,evolution_stage,loyalty,intelligence FROM spirit_beasts WHERE user_id=? AND active=1 ORDER BY beast_id LIMIT 1`, []any{userID})
 	if e != nil {
 		return 0, e
 	}
 	if len(r.Rows) > 0 {
-		bonus += i64(r.Rows[0][0])/2 + i64(r.Rows[0][1]) + i64(r.Rows[0][2])/40 + beastMilestoneBonus(i64(r.Rows[0][0]))
+		bonus += i64(r.Rows[0][0])/2 + i64(r.Rows[0][1]) + i64(r.Rows[0][2])/40 + beastMilestoneBonus(i64(r.Rows[0][0])) + beastIntelligenceBonus(i64(r.Rows[0][3]))
 	}
 	a, e := conn.Execute(`SELECT bond_level,item_id FROM artifact_bonds WHERE user_id=? AND awakened=1`, []any{userID})
 	if e != nil {
@@ -214,6 +214,17 @@ func combatCompanionBonus(conn *storage.Conn, userID int64) (int64, error) {
 	}
 	return bonus + ab, nil
 }
+
+// beastIntelligenceBonus is what a companion's training is worth in a fight
+// (v1.28.0): a point for every 25 intelligence, at most +4. Feed and Train
+// have raised `intelligence` since the beasts were written - Train's own
+// description says so - and no rule read it, so training a beast changed
+// nothing but its loyalty.
+func beastIntelligenceBonus(intelligence int64) int64 {
+	return minI64(beastIntelligenceCap, maxI64(0, intelligence)/25)
+}
+
+const beastIntelligenceCap = int64(4)
 
 // artifactStillHeldTx says whether a bonded artifact is still the cultivator's
 // (v1.27.0): carried at any grade, or bound as equipment, which takes it out
@@ -793,7 +804,7 @@ func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	out["player_hp"] = php
 	if php <= 0 {
 		gap := maxI64(0, (b.NPCRealm-realm)*9+(b.NPCStage-stage))
-		fatalChance := minI64(75, 8+gap*3)
+		fatalChance := defeatFatalChance(gap, standingTx(conn, userID, "Merciful Reputation"))
 		rr, e := gamerng.Intn(100)
 		if e != nil {
 			return authoritativeMutation{}, e
@@ -1062,7 +1073,7 @@ func combatTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	out["player_hp"] = php
 	if php <= 0 {
 		gap := maxI64(0, (b.NPCRealm-realm)*9+(b.NPCStage-stage))
-		fatalChance := minI64(75, 8+gap*3)
+		fatalChance := defeatFatalChance(gap, standingTx(conn, userID, "Merciful Reputation"))
 		rr, e := gamerng.Intn(100)
 		if e != nil {
 			return authoritativeMutation{}, e

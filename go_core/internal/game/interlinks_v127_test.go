@@ -12,7 +12,7 @@ import (
 func TestAPlayersClaimIsHeardLikeASects(t *testing.T) {
 	path := setupBatch4AuthorityDB(t)
 	world := batch4WorldPath(t)
-	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS sect_membership(user_id INTEGER PRIMARY KEY,sect_name TEXT NOT NULL,rank_name TEXT NOT NULL DEFAULT 'Disciple',rank_level INTEGER NOT NULL DEFAULT 0,joined_at REAL NOT NULL)`)
+	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS sect_membership(user_id INTEGER PRIMARY KEY,sect_name TEXT NOT NULL,rank_name TEXT NOT NULL DEFAULT 'Disciple',rank_level INTEGER NOT NULL DEFAULT 0,joined_at REAL NOT NULL,contribution_points INTEGER NOT NULL DEFAULT 0,influence INTEGER NOT NULL DEFAULT 0,contribution_earned INTEGER NOT NULL DEFAULT 0)`)
 	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS territory_state(territory_key TEXT PRIMARY KEY, name TEXT NOT NULL, region TEXT NOT NULL, controller_type TEXT NOT NULL DEFAULT 'neutral', controller_key TEXT NOT NULL DEFAULT '', resource_type TEXT NOT NULL DEFAULT 'mixed', prosperity INTEGER NOT NULL DEFAULT 50, defense INTEGER NOT NULL DEFAULT 50, unrest INTEGER NOT NULL DEFAULT 0, updated_game_minute INTEGER NOT NULL DEFAULT 0, updated_at REAL NOT NULL)`)
 	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS world_history_events(history_id INTEGER PRIMARY KEY AUTOINCREMENT, source_key TEXT UNIQUE, event_type TEXT, title TEXT, summary TEXT, significance INTEGER, visibility TEXT, location TEXT, world_name TEXT, faction TEXT, actor_type TEXT, actor_key TEXT, actor_name TEXT, target_type TEXT, target_key TEXT, target_name TEXT, related_user_id INTEGER, related_npc_name TEXT, tags TEXT, game_minute INTEGER, metadata_json TEXT, created_at REAL, updated_at REAL)`)
 	batch4Exec(t, path, `INSERT INTO sect_membership(user_id,sect_name,rank_name,rank_level,joined_at) VALUES(42,'Azure Cloud Sect','Deacon',40,0)`)
@@ -28,6 +28,10 @@ func TestAPlayersClaimIsHeardLikeASects(t *testing.T) {
 	if n := storage.ParseInt(actionScalar(t, path, `SELECT COUNT(*) FROM world_history_events`)); n != 1 {
 		t.Fatalf("%d history rows, want 1", n)
 	}
+	// v1.28.0: and the member who raised the banner is paid one war act.
+	if got := storage.ParseInt(actionScalar(t, path, `SELECT contribution_earned FROM sect_membership WHERE user_id=42`)); got != WarRules(eventScopeCatalog(t)).ActPoints || got <= 0 {
+		t.Fatalf("a claim on neutral ground paid %d contribution, want one war act (%d)", got, WarRules(eventScopeCatalog(t)).ActPoints)
+	}
 }
 
 // v1.27.0: an awakened artifact bond counted in every fight whether or not
@@ -39,7 +43,7 @@ func TestABondCountsOnlyWhileTheArtifactIsHeld(t *testing.T) {
 	}
 	defer conn.Close()
 	if err := conn.ExecScript(`
-CREATE TABLE spirit_beasts(beast_id INTEGER PRIMARY KEY, user_id INTEGER, rank INTEGER, evolution_stage INTEGER, loyalty INTEGER, active INTEGER);
+CREATE TABLE spirit_beasts(beast_id INTEGER PRIMARY KEY, user_id INTEGER, rank INTEGER, evolution_stage INTEGER, loyalty INTEGER, intelligence INTEGER NOT NULL DEFAULT 0, active INTEGER);
 CREATE TABLE artifact_bonds(user_id INTEGER NOT NULL, item_id TEXT NOT NULL, bond_level INTEGER NOT NULL DEFAULT 0, resonance INTEGER NOT NULL DEFAULT 0, awakened INTEGER NOT NULL DEFAULT 0, spirit_name TEXT NOT NULL DEFAULT '', temperament TEXT NOT NULL DEFAULT 'dormant', created_at REAL NOT NULL DEFAULT 0, updated_at REAL NOT NULL DEFAULT 0, PRIMARY KEY(user_id,item_id));
 CREATE TABLE inventory(user_id INTEGER NOT NULL, item_id TEXT NOT NULL, quantity INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(user_id,item_id));
 CREATE TABLE equipment_instances(equipment_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, item_id TEXT NOT NULL, slot TEXT NOT NULL DEFAULT 'weapon', durability INTEGER NOT NULL DEFAULT 10, max_durability INTEGER NOT NULL DEFAULT 10, quality INTEGER NOT NULL DEFAULT 100, equipped INTEGER NOT NULL DEFAULT 0, bound_at REAL NOT NULL DEFAULT 0, updated_at REAL NOT NULL DEFAULT 0);

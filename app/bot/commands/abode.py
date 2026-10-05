@@ -191,10 +191,12 @@ async def abode_upgrade(interaction:discord.Interaction,facility:app_commands.Ch
     label=PLAYER_PROPERTY_FACILITY_LABELS.get(facility.value,facility.value.replace('_',' ').title())
     level=int(result.get('level',0) or 0)
     cost=f" for **{result.get('cost','?')}** {WORLD.currency_name(str(result.get('currency','')))}" if result.get('cost') is not None else ""
+    progressed=await record_quest_progress(interaction.user.id,"abode_upgrade",game_minute=wt.total_minutes)
     if level<=1:
         await interaction.followup.send(f"🏡 You build a **{label}**{cost}.",ephemeral=False)
     else:
         await interaction.followup.send(f"🏡 **{label}** raised to level **{level}**{cost}.",ephemeral=False)
+    await announce_quest_progress(interaction,progressed)
 
 
 @registered_group_command(abode_group, name="focus",description="Use a developed property facility for a temporary specialization effect or scene benefit")

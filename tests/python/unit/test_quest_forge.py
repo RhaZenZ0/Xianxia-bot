@@ -171,7 +171,12 @@ class ValidatorTests(unittest.TestCase):
              "tribulation_cleared",
              # The upper road's three (v1.18.0): a Law begun, a technique
              # manifested, a world of your own.
-             "law_comprehend", "law_technique", "personal_world"},
+             "law_comprehend", "law_technique", "personal_world",
+             # Six long labours (v1.28.0): a beast tamed and evolved, a flame
+             # refined, a spirit-sense stage settled, a Perfect Path completed,
+             # a property's facility raised.
+             "beast_tame", "beast_evolve", "flame_refine", "spirit_settle",
+             "perfection_complete", "abode_upgrade"},
         )
 
     def test_the_procedural_draft_always_validates(self):

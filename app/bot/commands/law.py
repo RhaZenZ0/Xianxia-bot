@@ -784,7 +784,9 @@ async def flame_refine(interaction: discord.Interaction, flame: str) -> None:
              f"Spent {spent} and {int(result.get('qi_cost') or 0)} qi. It now adds **+{int(result.get('bonus') or 0)}** to a craft roll."]
     if result.get("opens_top_grade"):
         lines.append("✨ Fully refined: while it is bound, a crafter at the sixth rank can make **Transcendent** work.")
+    progressed = await record_quest_progress(interaction.user.id, "flame_refine", game_minute=(await current_world_time()).total_minutes)
     await interaction.followup.send("\n".join(lines), ephemeral=False)
+    await announce_quest_progress(interaction, progressed)
 
 
 @registered_group_command(flame_group, name="bind", description="Bind one of your flames as the one your crafting reads")
@@ -875,4 +877,6 @@ async def spirit_settle(interaction: discord.Interaction) -> None:
              f"for {int(result.get('qi_cost') or 0)} qi. It now adds **+{int(result.get('bonus') or 0)}** to Formation and Inscription rolls."]
     if result.get("opens_top_grade"):
         lines.append("✨ Fully built: a crafter at the sixth rank can make **Transcendent** Formation and Inscription work.")
+    progressed = await record_quest_progress(interaction.user.id, "spirit_settle", game_minute=(await current_world_time()).total_minutes)
     await interaction.followup.send("\n".join(lines), ephemeral=False)
+    await announce_quest_progress(interaction, progressed)

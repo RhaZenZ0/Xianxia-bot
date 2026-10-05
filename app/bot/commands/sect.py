@@ -55,7 +55,6 @@ from ...rules.sect_manor import (
     manor_upgrade_cost,
 )
 from ...rules.sect_recruitment import (
-    recommendation_modifier,
     recruitment_definition,
     trial_modifier,
     trial_profile,
@@ -415,17 +414,20 @@ async def sect_recruitment_recommendation(interaction: discord.Interaction, npc:
     # v1.1.0: a "speak with them first" check stood here and never fired -
     # `get_npc_memory` answers a sentence, never "", for somebody you have not
     # met - and it is gone rather than fixed: asking is the conversation.
-    family=await DB.get_birth_family(interaction.user.id); reps=await DB.get_reputations(interaction.user.id); rep=next((int(x.get('score',0)) for x in reps if str(x.get('faction_key'))==sect_name),0)
-    _,notes=recommendation_modifier(c,faction_reputation=rep,family=family,sect_alignment=str(WORLD.sects[sect_name].get('alignment','Neutral')))
     # Whom the sponsor speaks for and the gate their word reveals are the
     # engine's (v1.1.0): it used to write whatever `location` this sent onto
     # the travel list, where a road-less place is an instant jump.
     try:
-        e=await ENGINE.authoritative_action("sect.recruitment.recommendation",interaction.user.id,{"npc_name":npc,"details":{"modifier_notes":notes}},action_id=f"discord:{interaction.id}:sect.recruitment.recommendation"); r=dict(e.get('result') or {})
+        e=await ENGINE.authoritative_action("sect.recruitment.recommendation",interaction.user.id,{"npc_name":npc},action_id=f"discord:{interaction.id}:sect.recruitment.recommendation"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
         await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
     sect_name=str(r.get('sect_name') or sect_name); gate=str(r.get('gate') or '')
     roll=dict(r.get('roll') or {}); roll_text=f"2d10 {int(roll.get('modifier',0)):+d} = **{int(roll.get('total',0))}** vs TN **{int(roll.get('tn',0))}**"
+    # What the sponsor weighed, as the engine rolled it (v1.28.0): these were
+    # computed here and printed as terms the engine never rolled.
+    terms=[t for t in list(r.get('terms') or []) if isinstance(t,dict) and int(t.get('value') or 0)]
+    if terms:
+        roll_text+="\n-# "+" · ".join(f"{t.get('name')} {int(t.get('value') or 0):+d}" for t in terms)
     if r.get('success'):
         lines=[f"📜 **{npc}** puts their name to you for the **{sect_name}**: **+{int(r.get('recommendation_bonus',0))} on both entrance-trial rolls**."]
         seat=str(r.get('seat') or '')

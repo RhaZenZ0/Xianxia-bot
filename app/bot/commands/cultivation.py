@@ -880,8 +880,13 @@ async def perfect_trial(interaction: discord.Interaction, path: app_commands.Cho
             f"**{int(result['passed'])} of {len(result.get('rolls', []))}** checks held "
             f"— **{int(result['needed'])}** needed."
         )
+    progressed = []
     if bool(result.get("success")):
         lines.append(f"\n★ **PERFECT {spec.realm_name(c).upper()} ACHIEVED**\n{spec.reward_line}")
+        # Recorded once the engine has passed the trial, told after the
+        # reply (v1.28.0).
+        progressed = await record_quest_progress(
+            interaction.user.id, "perfection_complete", game_minute=(await current_world_time()).total_minutes)
     else:
         lines.append(
             f"\n⚠️ The final compression fails. **{int(result.get('training_loss',0))}% recoverable "
@@ -889,6 +894,7 @@ async def perfect_trial(interaction: discord.Interaction, path: app_commands.Cho
             f"Restore it with {spec.restore_hint} before trying again."
         )
     await reply_long(interaction, "\n".join(lines))
+    await announce_quest_progress(interaction, progressed)
 
 
 @registered_group_command(perfect_group, name="abandon", description="Abandon the active Perfect Path and lose its progress")
