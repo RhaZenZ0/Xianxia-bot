@@ -127,6 +127,7 @@ func (r *Runner) npcStallPurchases(conn *storage.Conn, steps, gm int64) (int64, 
 			if affinity {
 				chance += npcStallAffinityBonus
 			}
+			chance = stallChanceAtProsperity(int64(chance), r.territoryProsperity(conn, city))
 			roll, err := gamerng.Intn(100)
 			if err != nil {
 				return bought, err
@@ -230,4 +231,12 @@ func pickStallShopper(shoppers []stallShopper, price int64, trade, city string, 
 	}
 	pick := pool[int(hash64(city, fmt.Sprint(gm), fmt.Sprint(slot), "shopper")%uint64(len(pool)))]
 	return pick, affinity, true
+}
+
+// stallChanceAtProsperity is how a city's fortunes reach its stalls
+// (v1.29.0): a shopper's chance scaled by prosperity/50, so a city at the
+// bootstrap's middle buys as it always did, a thriving one more and a
+// failing one less, and never past certain. A prosperity nobody recorded is 50.
+func stallChanceAtProsperity(chance, prosperity int64) int {
+	return int(min64(95, max64(1, chance*prosperity/50)))
 }

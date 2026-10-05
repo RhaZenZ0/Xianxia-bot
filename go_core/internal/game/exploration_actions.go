@@ -773,6 +773,10 @@ func canonicalRoadNeighbors(catalog worlddata.Catalog, current string, realmInde
 // cityOf resolves a location to the city it belongs to (v0.36.0): a gate,
 // a district, a shop or an auction hall answers its city; anywhere else
 // answers itself.
+// CityOf is cityOf for the simulation package: which city a place is part of
+// (v1.29.0, for the street a crime's chance reads security off).
+func CityOf(catalog worlddata.Catalog, location string) string { return cityOf(catalog, location) }
+
 func cityOf(catalog worlddata.Catalog, location string) string {
 	if loc, ok := catalog.Locations[location]; ok && loc.OutsideLocation != "" && (loc.District != "" || loc.Shop != "" || loc.AuctionHouse != "") {
 		return loc.OutsideLocation

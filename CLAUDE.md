@@ -6959,6 +6959,47 @@ each with its `OBJECTIVE_PATHS` door.
 contribution columns production has added since rc.17 and v1.8.0, so the claim's first contribution
 credit failed on them - the fixture rule this file already states, met at the change that needed it.
 
+### The world and its players answer each other (v1.29.0)
+
+The third release of the interlinks work: places where the world wrote a number and nothing in the
+world read it back. Each is one reader, and the class gates are AST call-site gates, because a
+helper's own test passes against a tree nothing calls it from.
+
+**A sect's ground, its war and its members.** `territoryTribute` stocks a sect's treasury with a lot
+of each held territory's resource a week, scaled by the city's `civilization_regions` prosperity and
+unrest (`territoryLots`); `warPoliticsOutcomeTx` moves both sects' influence and resources when
+`ResolveWarTx` ends a war by anything but peace; `sectResourcesFromContributionTx` turns a member's
+credited points into sect resources (a point for 25, at most three a credit), inside
+`creditSectContributionTx`, the one door points come in by; and `sectRecruitmentEagernessTx` lowers
+the trial's TN by a sect's recruitment pressure above 50. `ManorGroundTakenTx` is asked by every
+manor reader (`manorCultivationMultiplier`, `canonicalCraftManorBonus`, `seclusionEnvironmentGo`), so
+a manor lends nothing while a rival holds its city.
+
+**Trade moves the cities.** `CaravanArrivedTx` is what an arrival does, called by the player's settle
+and by the tick alike: cargo into the destination market's supply, a prosperity nudge, and the toll
+into the destination controller's resources. `CaravanSecurityRisk` adds the origin's insecurity to
+the run. `market.trade` nudges its city as every other sale does, and the town's stall shoppers buy
+at `stallChanceAtProsperity`.
+
+**The era reaches the NPC simulation.** `eraChance` is the one statement: five NPC rolls (sect claims
+and wars on `war_pressure`, crimes on `crime_pressure`, beast hunts on `beast_encounter_rate`,
+breakthroughs on `cultivation_gain`) ask the era of the world they are rolled in, through
+`eraModifiersOrNone`, which answers nothing rather than an error on a database with no era table - a
+tick must never fail over an era read. `TestEveryNPCRollAsksItsEra` reads each key by AST.
+
+**A killing is one statement.** `MarkKillingTx` is the region-and-sect half of a player's kill,
+pulled out of `combat_aftermath.go`, and the world's own killings call it through `markNPCKilling` at
+severity 1 (a robbery that ends in a body and a settled feud), never failing the tick. The region's
+`security` was moved by every killing and read by nothing; `insecurity` adds it to NPC crime and
+`CaravanSecurityRisk` to a caravan. And a player's kill reads the dead's kin (`kinOfTx`: spouse,
+living children, disciples) **before** `ReleaseNPCBondsTx`, which widows the spouse and so takes the
+name off the row the read needs; `TestAKillReadsTheKinBeforeTheWidowing` holds the order.
+
+**The household reads its clan.** `family.simulate` drew a year from ten fixed events while
+`martial_clan_relations` held the household's real treaties and feuds and `martial_clan_branches`
+its branches' shares. `householdWorldTermsTx` adds both to each year, capped so the world shapes a
+year without deciding it.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

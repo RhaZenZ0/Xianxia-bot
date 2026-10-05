@@ -556,7 +556,7 @@ func caravanSettleActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID
 		legacySafe := tax == 0 && escort == 0 && conceal == 0 && !smuggle
 		effective := int64(0)
 		if !legacySafe {
-			effective = clamp(int64(math.Round(float64(i64(data["risk"])+map[bool]int64{true: 20, false: 0}[smuggle]-escort*2-conceal)*eraRisk)), 0, 95)
+			effective = clamp(int64(math.Round(float64(i64(data["risk"])+CaravanSecurityRisk(conn, catalog, fmt.Sprint(data["origin"]))+map[bool]int64{true: 20, false: 0}[smuggle]-escort*2-conceal)*eraRisk)), 0, 95)
 		}
 		roll := stablePercentGo(data["caravan_id"], data["origin"], data["destination"], data["depart_game_minute"])
 		intercepted := roll < effective
@@ -587,6 +587,9 @@ func caravanSettleActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID
 			if _, e = walletDeltaTx(conn, catalog, userID, currency, final, now); e != nil {
 				return authoritativeMutation{}, e
 			}
+		}
+		if e = CaravanArrivedTx(conn, catalog, fmt.Sprint(data["destination"]), cargo, toll, seized, now); e != nil {
+			return authoritativeMutation{}, e
 		}
 		_, _ = conn.Execute(`UPDATE caravans SET status=?,updated_at=? WHERE caravan_id=?`, []any{outcome, now, i64(data["caravan_id"])})
 		lossj, _ := json.Marshal(map[string]any{"percent": loss})
@@ -632,4 +635,29 @@ func RecordTerritoryClaimedTx(conn *storage.Conn, catalog worlddata.Catalog, sec
 // war act's power: a point for every 20, at most three (v1.28.0).
 func sectInfluenceWarPower(influence int64) int64 {
 	return minI64(3, maxI64(0, influence)/20)
+}
+
+// ManorGroundTakenTx says whether a rival sect holds the ground a sect's
+// manor stands on (v1.29.0). The manor's cultivation array, its craft halls
+// and its seclusion chambers asked only whether a member stood at
+// `base_location`, so a sect whose base had been annexed in a war kept every
+// bonus of a manor standing under somebody else's banner. The ground is the
+// manor's city, cityOf's rule, as a territory is; neutral ground, or ground
+// nobody has a row for, is still the sect's to use.
+func ManorGroundTakenTx(conn *storage.Conn, catalog worlddata.Catalog, sect, base string) bool {
+	if sect == "" || !tableExistsTx(conn, "territory_state") {
+		return false
+	}
+	r, err := conn.Execute(`SELECT 1 FROM territory_state WHERE territory_key IN (?,?) AND controller_type='sect' AND controller_key NOT IN ('',?) LIMIT 1`,
+		[]any{base, cityOf(catalog, base), sect})
+	return err == nil && len(r.Rows) > 0
+}
+
+// manorSectTx is the sect a member belongs to, "" for none.
+func manorSectTx(conn *storage.Conn, userID int64) string {
+	r, err := conn.Execute(`SELECT sect_name FROM sect_membership WHERE user_id=?`, []any{userID})
+	if err != nil || len(r.Rows) == 0 {
+		return ""
+	}
+	return fmt.Sprint(r.Rows[0][0])
 }

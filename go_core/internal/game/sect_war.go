@@ -362,6 +362,15 @@ func ResolveWarTx(conn *storage.Conn, catalog worlddata.Catalog, warID int64, wi
 	if winner == defender {
 		loser = attacker
 	}
+	// What a war's end does to the two sects (v1.29.0): a sect that wins a war
+	// is stronger for it and one that loses is weaker, and nothing said so -
+	// `sect_politics_state` only ever fed a war's strength, never heard how it
+	// went. A peace moves neither; a cession is a loss taken at the table.
+	if resolution != "peace" && winner != "" {
+		if err = warPoliticsOutcomeTx(conn, winner, loser, now); err != nil {
+			return nil, false, err
+		}
+	}
 	name := territoryName(conn, territory)
 	title := winner + " takes " + name
 	summary := fmt.Sprintf("%s has taken %s from %s. It is occupied for now; the old banner may yet come back for it.", winner, name, loser)
@@ -581,4 +590,24 @@ func warActPointsLeftTx(conn *storage.Conn, catalog worlddata.Catalog, warID, us
 		return 0, err
 	}
 	return max64(0, rules.WarPointsCap-i64(firstRowMap(r)["n"])*rules.ActPoints), nil
+}
+
+// warPoliticsWinnerGain and warPoliticsLoserLoss are what a war's end moves on
+// each side's `sect_politics_state` influence and resources (v1.29.0).
+const (
+	warPoliticsWinnerGain = int64(5)
+	warPoliticsLoserLoss  = int64(5)
+)
+
+func warPoliticsOutcomeTx(conn *storage.Conn, winner, loser string, now float64) error {
+	if !tableExistsTx(conn, "sect_politics_state") || winner == loser {
+		return nil
+	}
+	if _, err := conn.Execute(`UPDATE sect_politics_state SET influence=MIN(100,influence+?),resources=MIN(100,resources+?),updated_at=? WHERE sect_name=?`,
+		[]any{warPoliticsWinnerGain, warPoliticsWinnerGain, now, winner}); err != nil {
+		return err
+	}
+	_, err := conn.Execute(`UPDATE sect_politics_state SET influence=MAX(0,influence-?),resources=MAX(0,resources-?),updated_at=? WHERE sect_name=?`,
+		[]any{warPoliticsLoserLoss, warPoliticsLoserLoss, now, loser})
+	return err
 }

@@ -104,7 +104,7 @@ func (r *Runner) npcSectClaims(conn *storage.Conn, steps, gm int64) (int64, erro
 			homeOf[home] = name
 		}
 	}
-	chance := min64(60, claimChance*max1(min64(3, steps)))
+	byWorld := r.eraModifiersOrNone(conn)
 	claimed := int64(0)
 	now := nowFloat()
 	for _, row := range res.Rows {
@@ -112,6 +112,8 @@ func (r *Runner) npcSectClaims(conn *storage.Conn, steps, gm int64) (int64, erro
 		if int64(len(held[sect])) >= claimCap(influence) {
 			continue
 		}
+		// An age of open war is an age of claims (v1.29.0).
+		chance := min64(60, r.eraChance(byWorld, game.SectHome(r.World, sect), "war_pressure", claimChance*max1(min64(3, steps))))
 		roll, err := gamerng.Intn(100)
 		if err != nil {
 			return claimed, err

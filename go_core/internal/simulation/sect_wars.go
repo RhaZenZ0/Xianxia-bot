@@ -42,9 +42,8 @@ func (r *Runner) npcSectWars(conn *storage.Conn, steps, gm int64) (int64, error)
 	if err != nil {
 		return 0, err
 	}
-	if int64(roll) >= min64(48, warDeclareChance*max1(min64(3, steps))) {
-		return 0, nil
-	}
+	// The roll is read against the attacker's own age of the world below
+	// (v1.29.0), once it is known who is looking outward.
 
 	// Who is looking outward. Ordered, because map order must not decide who
 	// goes to war.
@@ -64,6 +63,12 @@ func (r *Runner) npcSectWars(conn *storage.Conn, steps, gm int64) (int64, error)
 		return 0, err
 	}
 	attacker := candidates[pick]
+	byWorld := r.eraModifiersOrNone(conn)
+	// "Hundred Sects Strife - open territorial war" made sieges fiercer and
+	// no sect any readier to start one (v1.29.0).
+	if int64(roll) >= min64(48, r.eraChance(byWorld, game.SectHome(r.World, attacker), "war_pressure", warDeclareChance*max1(min64(3, steps)))) {
+		return 0, nil
+	}
 
 	// What it wants: somebody else's ground, weakly held, not already contested.
 	targets, err := conn.Execute(`SELECT t.territory_key,t.controller_key FROM territory_state t

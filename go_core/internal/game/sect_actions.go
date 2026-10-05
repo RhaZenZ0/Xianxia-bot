@@ -506,7 +506,11 @@ func sectTrialActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	// Standing with the sect's wider circle (v1.28.0): Orthodox Society for
 	// an orthodox sect, Demonic Circles for a demonic one.
 	circle := standingBonus(standingTx(conn, userID, sectCircleKey(catalog, p.SectName)), circleTrialPer, circleTrialCap)
-	baseTN := maxI64(10, tuning.BaseTN-repScore/25-circle)
+	// A sect that is recruiting hard is easier to get into (v1.29.0): its
+	// recruitment pressure has walked the world's own people in since the
+	// politics tick was written, and the trial a player sits never asked it.
+	eager := sectRecruitmentEagernessTx(conn, p.SectName)
+	baseTN := maxI64(10, tuning.BaseTN-repScore/25-circle-eager)
 	primary, e := roll2d10Go(primaryMod, baseTN)
 	if e != nil {
 		return authoritativeMutation{}, e
@@ -990,4 +994,17 @@ func sectManorActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		out["cost"] = cost
 	}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "sect", EventType: op, EntityType: "sect", EntityID: sect, GameMinute: p.GameMinute, Payload: out}}, nil
+}
+
+// sectRecruitmentEagernessTx is a point off the entrance trial for every 10
+// of recruitment pressure above 50, at most 5 (v1.29.0).
+func sectRecruitmentEagernessTx(conn *storage.Conn, sect string) int64 {
+	if !tableExistsTx(conn, "sect_politics_state") {
+		return 0
+	}
+	r, err := conn.Execute(`SELECT recruitment_pressure FROM sect_politics_state WHERE sect_name=?`, []any{sect})
+	if err != nil || len(r.Rows) == 0 {
+		return 0
+	}
+	return minI64(5, maxI64(0, storage.ParseInt(r.Rows[0][0])-50)/10)
 }

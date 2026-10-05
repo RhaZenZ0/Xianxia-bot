@@ -634,6 +634,12 @@ func marketTradeAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 			return authoritativeMutation{}, err
 		}
 	}
+	// A market counter is trade like any shelf (v1.29.0): it moved the
+	// market's own supply and demand and was the one sale in the game that
+	// left the city's prosperity where it was.
+	if err := nudgeCityProsperityTx(conn, catalog, p.Location, 1); err != nil {
+		return authoritativeMutation{}, err
+	}
 	out := map[string]any{"item_id": p.ItemID, "quantity": p.Quantity, "unit_price": unit, "total": total, "currency_id": currency, "buy": p.Buy, "balance": bal}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "economy", EventType: "market.trade", EntityType: "market", EntityID: p.Location, GameMinute: p.GameMinute, Payload: out}}, nil
 }

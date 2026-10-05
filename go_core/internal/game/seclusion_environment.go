@@ -64,6 +64,9 @@ func seclusionEnvironmentGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if manor != nil && fmt.Sprint(manor["base_location"]) != residenceBase {
 		manor = nil
 	}
+	if manor != nil && ManorGroundTakenTx(conn, catalog, manorSectTx(conn, userID), fmt.Sprint(manor["base_location"])) {
+		manor = nil
+	}
 	// The birth household (v1.0.0-rc.32): the family's walls are a protected
 	// site, worth what the hearth is worth to active cultivation.
 	hearth, hearthMult, e := birthFamilyCultivationMultiplier(conn, location)

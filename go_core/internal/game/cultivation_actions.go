@@ -137,12 +137,15 @@ func eraCultivationMultiplier(conn *storage.Conn, world string) (string, float64
 	return name, mult, nil
 }
 
-func manorCultivationMultiplier(conn *storage.Conn, userID int64, location string) (string, float64, error) {
-	res, err := conn.Execute(`SELECT m.name,m.base_location,m.qi_array_level FROM sect_membership sm JOIN sect_manors m ON m.sect_name=sm.sect_name WHERE sm.user_id=?`, []any{userID})
+func manorCultivationMultiplier(conn *storage.Conn, catalog worlddata.Catalog, userID int64, location string) (string, float64, error) {
+	res, err := conn.Execute(`SELECT m.name,m.base_location,m.qi_array_level,m.sect_name FROM sect_membership sm JOIN sect_manors m ON m.sect_name=sm.sect_name WHERE sm.user_id=?`, []any{userID})
 	if err != nil {
 		return "", 1, err
 	}
 	if len(res.Rows) == 0 || fmt.Sprint(res.Rows[0][1]) != location {
+		return "", 1, nil
+	}
+	if ManorGroundTakenTx(conn, catalog, fmt.Sprint(res.Rows[0][3]), location) {
 		return "", 1, nil
 	}
 	level := storage.ParseInt(res.Rows[0][2])
@@ -344,7 +347,7 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	manorMult := 1.0
 	storm := int64(0)
 	if !body {
-		manorName, manorMult, err = manorCultivationMultiplier(conn, userID, c.Location)
+		manorName, manorMult, err = manorCultivationMultiplier(conn, catalog, userID, c.Location)
 		if err != nil {
 			return authoritativeMutation{}, err
 		}

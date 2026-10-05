@@ -27,9 +27,11 @@ deferred half and not the half that says what was done about it.
   Storage, beast intelligence, the spirit sense in `/sense`, the hunting musk and the beast in the hunt,
   six reputations no rule read, sect influence and master attention each have a reader; a bounty
   surrender and capture cost restitution; a sponsor rolls the household and karma; six objective types.
-- **deferred (scheduled: v1.29.0)** — *The world's feedback.* Held territory paying, contribution
-  strengthening a sect, era terms in the NPC simulation, NPC deaths marking a region, recruitment
-  pressure in the trial, trade moving markets, a slain NPC's kin, the household's real relations.
+- **fixed (v1.29.0)** — *The world's feedback.* Held territory stocks its sect's treasury, a war's
+  end and a member's contribution move the sect, recruitment pressure eases the trial, a manor under a
+  rival's banner lends nothing, caravans and market trades move their cities, era terms reach five NPC
+  rolls, the world's own killings mark their region and sect, a slain NPC's kin remember the killer,
+  and a household's year reads its real relations and branches.
 - **fixed (v1.24.0)** — *Expand the war system.* Asked for in three words, then a war channel and
   fighting beside an allied sect were asked for mid-build. Reading the system found four faults: the
   world's own sieges were fought for the attacker alone, so a defender with no players could never

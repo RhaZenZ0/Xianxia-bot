@@ -454,7 +454,7 @@ func cultivationStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if err != nil {
 		return nil, err
 	}
-	manorName, manorMult, err := manorCultivationMultiplier(conn, userID, c.Location)
+	manorName, manorMult, err := manorCultivationMultiplier(conn, catalog, userID, c.Location)
 	if err != nil {
 		return nil, err
 	}

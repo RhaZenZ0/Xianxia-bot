@@ -117,7 +117,7 @@ func canonicalCraftAbodeBonus(conn *storage.Conn, userID int64, location, profes
 	return maxI64(0, i64(row["facility_level"])) * 2, nil
 }
 
-func canonicalCraftManorBonus(conn *storage.Conn, userID int64, location, profession string) (int64, error) {
+func canonicalCraftManorBonus(conn *storage.Conn, catalog worlddata.Catalog, userID int64, location, profession string) (int64, error) {
 	column := craftManorFacilityColumn(profession)
 	location = strings.TrimSpace(location)
 	if column == "" || location == "" {
@@ -126,7 +126,7 @@ func canonicalCraftManorBonus(conn *storage.Conn, userID int64, location, profes
 
 	res, err := conn.Execute(
 		fmt.Sprintf(
-			`SELECT m.base_location,m.%s AS facility_level
+			`SELECT m.base_location,m.sect_name,m.%s AS facility_level
 			   FROM sect_membership sm
 			   JOIN sect_manors m ON m.sect_name=sm.sect_name
 			  WHERE sm.user_id=?`,
@@ -139,6 +139,9 @@ func canonicalCraftManorBonus(conn *storage.Conn, userID int64, location, profes
 	}
 	row := firstRowMap(res)
 	if row == nil || strings.TrimSpace(fmt.Sprint(row["base_location"])) != location {
+		return 0, nil
+	}
+	if ManorGroundTakenTx(conn, catalog, fmt.Sprint(row["sect_name"]), location) {
 		return 0, nil
 	}
 	level := clamp(i64(row["facility_level"]), 0, maxSectManorFacilityLevel)
@@ -445,7 +448,7 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	manorFacilityBonus, err := canonicalCraftManorBonus(conn, userID, location, profession)
+	manorFacilityBonus, err := canonicalCraftManorBonus(conn, catalog, userID, location, profession)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

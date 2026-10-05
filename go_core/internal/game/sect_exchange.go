@@ -106,6 +106,12 @@ func creditSectContributionTx(conn *storage.Conn, catalog worlddata.Catalog, use
 	} else if _, err := conn.Execute(`UPDATE sect_membership SET contribution_points=contribution_points+?,influence=influence+? WHERE user_id=?`, []any{points, max64(0, influence), userID}); err != nil {
 		return "", err
 	}
+	// The work a member does for their sect strengthens the sect (v1.29.0):
+	// contribution moved the member's own ledger and never the sect's
+	// resources, which gate its tribute, its claims and its wars.
+	if err := sectResourcesFromContributionTx(conn, userID, points); err != nil {
+		return "", err
+	}
 	if !earned || points <= 0 {
 		return "", nil
 	}
@@ -363,4 +369,21 @@ func sectEventPointsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		out["eligible_for"] = eligible
 	}
 	return out, nil
+}
+
+// contributionPerSectResource is how many contribution points of a member's
+// work make one point of their sect's resources, and contributionResourceCap
+// the most one credit moves them (v1.29.0).
+const (
+	contributionPerSectResource = int64(25)
+	contributionResourceCap     = int64(3)
+)
+
+func sectResourcesFromContributionTx(conn *storage.Conn, userID, points int64) error {
+	gain := minI64(contributionResourceCap, maxI64(0, points)/contributionPerSectResource)
+	if gain <= 0 || !tableExistsTx(conn, "sect_politics_state") {
+		return nil
+	}
+	_, err := conn.Execute(`UPDATE sect_politics_state SET resources=MIN(100,resources+?) WHERE sect_name=(SELECT sect_name FROM sect_membership WHERE user_id=?)`, []any{gain, userID})
+	return err
 }
