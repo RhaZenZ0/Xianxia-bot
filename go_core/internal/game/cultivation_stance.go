@@ -311,7 +311,7 @@ func cultivationInsightAction(conn *storage.Conn, catalog worlddata.Catalog, use
 // so the odds shown before the roll and the roll itself cannot disagree.
 // `place` is the ground's own term (v1.17.0): the heaven-reading altar's
 // bonus on its stone, nothing anywhere else. `master` is an NPC master's help
-// (v1.24.0), on both paths.
+// (v1.25.0), on both paths.
 func breakthroughModifier(c mechanicsCharacter, mods resolvedModifiers, body bool, perfectBonus, resonance, innate, place, master int64) int64 {
 	if body {
 		return mods.value(c.Attributes["body"], "body") + maxI64(1, mods.value(c.Attributes["will"], "will")/2) + 2 + perfectBonus + resonance + innate + place + master

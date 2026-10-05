@@ -156,7 +156,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 77; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 78; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -6685,6 +6685,90 @@ default and nothing more: a finished quest's unheld `follow_on`, else the realm-
 player's realm when they hold no active stage. A stage for a realm already entered still asks for
 its breakthrough, which the GM then Reports - the lever does not pre-credit it, so what a grant does
 is exactly what a crossing does. Not in `reversibleAdminActions`, beside the other two.
+
+### A war worth fighting, from both walls (`sect_war.go`, schema 78, v1.24.0)
+
+Asked for as *"Expand the war system"*, then, mid-build, *"Maybe a channel for war ?"*, *"We can
+help a allied sect in a war"*, *"Make it its own category"* and *"Fix them"* of the three it had deferred. Reading the system first found four faults, and they are the release.
+
+**The world's own sieges could only be lost by the defender.** `advanceWars` struck for one side a
+tick - the attacker, unless players had pushed the defender's force past it - and never moved the
+attacker's morale, so between two sects with nobody at a keyboard every war ended in a fall and
+`defender_holds` was unreachable. Each day both walls fight now: `sectWarStrength` (influence,
+resources and cohesion, to ten), the defender's walls and manor, any force players committed, a
+`stablePercent` hash a side for the day, and `weariness_per_day` off the besieger. The tick catches
+up at most `tick_days_cap` days, the stalls' rule. Its drill (every day the attacker's) prints *"a
+strong sect behind high walls ended the siege "attacker_occupation""*.
+
+**`territory_state.defense` was seeded at 50 and written by nothing**, so the war step's "weakly held"
+filter (`defense<=62`) admitted everything - decoration in a `WHERE`. A defender's fortify raises it,
+a held siege raises it more, a fall leaves it at `fall_defense`, and `WarDefenseBlunt` takes one point
+a `siege_defense_divisor` off every attacking blow, in the act and in the tick alike.
+
+**Fighting paid nothing.** An act is the one thing a sect member could do for their sect that earned
+no contribution. It pays `act_points` through `creditSectContributionTx` (the one door points come in
+by, so they promote), capped at `war_points_cap` a war - counted off `territory_war_actions`, the rows
+the act itself writes, so the cap needs no storage. A win pays `victory_points` once to every fighter
+on the winning side still sworn to it or to an ally of it; `ResolveWarTx` is guarded on
+`status='active'`, so a second resolution pays nobody.
+
+**Nothing came after a war.** `DeclareWarTx` and `ResolveWarTx` are the one door each - two writers and
+two resolvers had each said it their own way, with different unrest - and the simulation calls them
+as it calls `StallSaleTx`. A failed attacker is bound by a truce (`WarTruceUntilTx`, `truce_days`); a
+fall is an occupation (`occupation_days`) in which the **dispossessed** holder is not bound, and
+`npcSectWars` looks there first (`WarOccupiedFromTx`). A retake ends the old occupation
+(`occupation_lost`), and `advanceOccupations` annexes only ground the occupier still holds - without
+both, an occupation that came due after a retake would have handed the ground back. Declaring and
+ending lower the two sects' `sect_relations` score; both are public history rows.
+
+**Allies are the engine's answer, asked twice and stated once.** `warSideTx` puts a sect's member on
+its own side, or - for a sect allied to exactly one side (`marriage_pact`, or standing of
+`ally_min_relation_score`) - on its ally's; allied to both is a refusal. An ally's first act costs its
+sect `ally_relation_drop` with the enemy. `war.fronts` is the read the War → Act picker is built from,
+calling the same `warSideTx`, so the panel never restates who may fight beside whom (rc.46);
+`test_war_fronts.py` forbids `sect_relations` in the command module. `war_id` left `STILL_TYPED`.
+Bootstrap writes `sect_relations` pairs in map order, so every reader and writer here matches a pair
+either way round.
+
+**The war front** is `stall_channels` again (schema 78): one read-only channel per world, gated by the
+access role, every overwrite merged after the bot allows itself. The first push placed the fronts in
+🌠 World Events beside the world's news, to spare the ordering and teardown gates a tenth category; the
+owner asked for one, and **⚔️ Sect Wars** sits after World Events in `CATEGORY_ORDER` and in teardown's
+tuple, which `test_war_fronts.py` holds. `war_feed.py` keeps a card per war, refreshed by an act, by a
+claim that opened one, and by `sync_wars` after every tick;
+a war that ends is drawn once with its verdict and then forgotten, so the message stays as the record
+and no later tick edits it. The card rows are keyed on the war, which no player owns, so neither an
+erasure nor a reset sweeps them.
+
+**One fixture lacked a parent table**: the secret-realm rotation test declared `territory_wars` without
+the `territory_state` it is foreign-keyed to, which production always has, and the tick's new join
+found it - the `npc_consignments` rule. And `war.act`'s 1800 seconds joined `actionCooldowns`
+(`war_action`, no operator key), keeping its raw `INSERT` because the cooldown-roster scanner holds
+that shape.
+
+**Then the three things the first push deferred, on the owner's call** (`sect_war_peace.go`).
+**Allies in the world's own sieges**: `WarAlliesTx` is every sect in `sect_politics_state` allied to
+exactly one side - the cultivator's rule, asked of whole sects - and `WarAllyStrength` lends
+`ally_strength_percent` of their summed strength, capped; `WarAllyJoinsTx` costs the standing once and
+writes a `territory_war_ally` history row. **Disciples**: `WarDisciplesTx` counts the living
+`npc_civilization_state.faction` rows, `WarDiscipleStrength` turns them into strength, and
+`MusterDisciplesTx` names the foremost few in `activity`. **Peace**: `war.peace` by a belligerent's own
+member at `peace_min_rank_level` once the war is `peace_min_days` old, for `peace_cost_points` of the
+balance (never the lifetime count, so it costs no rank); `NPCSuesForPeace` ends a world's war when a
+side's morale reaches `npc_peace_morale`. `PeaceTerms` is the one statement of the terms - below
+`peace_cede_siege` the holder keeps it (`peace`), at or above it the ground is ceded (`ceded`, no
+occupation) - and `ResolveWarTx` pays no victory for either, warms the standing, and the truce binds
+whichever side gave way: an attacker that made peace and a holder that ceded. Migration 78 also adds
+`territory_war_actions.sect_name`, so a blow is written under the sect it was struck for and an ally
+joins once by its own name rather than by whoever happens to be sworn to it now; every writer guards
+on the column. `TestTheSiegeTickAsksTheWarDoor` reads `advanceWars` by AST for each rule it must call,
+and its drill (the peace call replaced) names `game.NPCSuesForPeace`.
+
+**CI caught a printed path that names nothing.** The first push told players to use `**/war act**`, and
+`/war` is no slash command: the war and territory groups are pages of the sect hub, reached only as
+`/sect → War → Act`. `test_hint_paths.py` read the bold path out of the channel blurb and refused it -
+the local run had not included that file, which is why the targeted list is chosen by what the change
+*prints* as well as by what it touches.
 
 ## Testing conventions
 

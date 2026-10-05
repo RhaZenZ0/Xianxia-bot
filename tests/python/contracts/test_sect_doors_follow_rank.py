@@ -1,4 +1,4 @@
-"""A sect's doors follow its ranks (v1.24.0).
+"""A sect's doors follow its ranks (v1.25.0).
 
 v1.19.4 opened every leaf of the `sect` hub to any member, and the owner's call
 is that this was wrong: a member sees what their sect rank lets them do. The
@@ -107,3 +107,19 @@ class TheDoorsFollowTheRank(unittest.TestCase):
         surface = _surface()
         hidden = _hidden(surface, None)
         self.assertIn("in no sect", hidden["/territory claim"])
+
+
+class PeaceIsMadeByRank(unittest.TestCase):
+    """v1.24.0's `war.peace` refuses below `war_system.peace_min_rank_level`;
+    the panel padlocks it from the same key, and names the rank."""
+
+    def test_the_panel_reads_the_engines_key(self):
+        surface = _surface()
+        self.assertEqual(surface.WAR_PEACE_RANK, int(CONTENT["war_system"]["peace_min_rank_level"]))
+
+    def test_a_member_below_it_is_padlocked_and_one_at_it_is_not(self):
+        surface = _surface()
+        floor = surface.WAR_PEACE_RANK
+        below = max(level for level in RANKS if level < floor)
+        self.assertIn(RANKS[floor], _hidden(surface, below).get("/war peace", ""))
+        self.assertNotIn("/war peace", _hidden(surface, floor))

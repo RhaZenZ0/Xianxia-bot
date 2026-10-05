@@ -704,7 +704,7 @@ async def sect_discipleship_leave(interaction: discord.Interaction, confirm: boo
     await interaction.followup.send("🧵 Your discipleship bond has been ended.",ephemeral=False)
 
 
-# The sect's own people as masters, and a rank granted by somebody (v1.24.0).
+# The sect's own people as masters, and a rank granted by somebody (v1.25.0).
 # The engine decides every one of these (`discipleship.npc_request`,
 # `sect.master.teach`, `sect.promote`); the pickers below only offer the people
 # it would hear - rc.46's rule, a surface must not offer what the engine will
@@ -1026,7 +1026,7 @@ async def sect_roster(interaction:discord.Interaction)->None:
             f"{WORLD.realm_name(int(row['realm_index']))} Stage {row['phase']} • "
             f"CP {row.get('contribution_points',0)} • Influence {row.get('influence',0)}"
         )
-    # The sect's own people (v1.24.0): the hall the politics tick keeps full,
+    # The sect's own people (v1.25.0): the hall the politics tick keeps full,
     # grouped by rank. A failed read costs this half of the page, not the page.
     try:
         people=await DB.get_sect_npc_roster(str(membership['sect_name']))

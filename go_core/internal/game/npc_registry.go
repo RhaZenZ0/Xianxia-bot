@@ -59,7 +59,7 @@ const (
 	NPCOriginEvent       = "event"
 	NPCOriginGM          = "gm"
 	// A sect's own people, made by the politics tick to fill its hall
-	// (v1.24.0, simulation/sect_population.go).
+	// (v1.25.0, simulation/sect_population.go).
 	NPCOriginSect = "sect"
 )
 

@@ -375,7 +375,7 @@ class World:
         return f"rank {level}"
 
     def sect_rank_level(self, name: str) -> int:
-        """The level of a rank name on `sect_system.ranks` (v1.24.0), the
+        """The level of a rank name on `sect_system.ranks` (v1.25.0), the
         display twin of the engine's `sectRankLevelByName`; 0 for a name the
         ladder does not carry."""
         wanted = str(name or "").strip().casefold()
@@ -396,7 +396,7 @@ class World:
         return best
 
     def npc_master_rule(self) -> dict[str, Any]:
-        """`sect_system.npc_master` (v1.24.0), what one of a sect's own people
+        """`sect_system.npc_master` (v1.25.0), what one of a sect's own people
         is as a master; an absent key is 0 (or 1 for the multiplier), the
         engine's `npcMasterRuleGo`."""
         raw = self.sect_system.get("npc_master") or {}

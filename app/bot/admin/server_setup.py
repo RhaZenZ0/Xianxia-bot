@@ -40,6 +40,7 @@ from ..channels import (
     ensure_auction_house_channels,
     ensure_cultivator_gate,
     ensure_stall_channels,
+    ensure_war_channels,
     ensure_world_event_channels,
     ensure_realm_hub_channels,
     post_server_log,
@@ -255,6 +256,19 @@ async def clear_managed_channel_messages(guild: discord.Guild) -> dict[str, Any]
             log.exception("Could not delete market-stalls #%s for fresh-start wipe", channel.name)
             skipped.append(f"stalls:{world}")
 
+    # v1.24.0: the four war-front channels, by the same rule.
+    for row in await DB.get_war_channels(guild.id):
+        world = str(row["world_name"])
+        channel = guild.get_channel(int(row["channel_id"]))
+        if not isinstance(channel, discord.TextChannel):
+            continue
+        try:
+            await channel.delete(reason="Xianxia RP fresh-start channel wipe")
+            cleared.append(f"war:{world}")
+        except (discord.Forbidden, discord.HTTPException):
+            log.exception("Could not delete war-front #%s for fresh-start wipe", channel.name)
+            skipped.append(f"war:{world}")
+
     bugs_channel_id = cfg.get("bugs_channel_id")
     bugs_channel = guild.get_channel(int(bugs_channel_id)) if bugs_channel_id else None
     if isinstance(bugs_channel, discord.ForumChannel):
@@ -363,6 +377,8 @@ async def teardown_managed_discord_layout(guild: discord.Guild) -> dict[str, Any
         targets.append((f"world-events:{row['world_name']}", guild.get_channel(int(row["channel_id"]))))
     for row in await DB.get_stall_channels(guild.id):
         targets.append((f"stalls:{row['world_name']}", guild.get_channel(int(row["channel_id"]))))
+    for row in await DB.get_war_channels(guild.id):
+        targets.append((f"war:{row['world_name']}", guild.get_channel(int(row["channel_id"]))))
     bugs_channel_id = cfg.get("bugs_channel_id")
     targets.append(("bugs", guild.get_channel(int(bugs_channel_id)) if bugs_channel_id else None))
 
@@ -390,10 +406,10 @@ async def teardown_managed_discord_layout(guild: discord.Guild) -> dict[str, Any
     # 3. The four Xianxia categories, only if nothing else is left inside.
     categories_deleted: list[str] = []
     categories_kept: list[str] = []
-    # All nine, including the retired SERVER_BASE_CATEGORY: a category Setup no
+    # All of them, including the retired SERVER_BASE_CATEGORY: a category Setup no
     # longer creates is still on every server that ran an older release, and
     # teardown is the only thing that can remove it (v1.0.0-rc.59).
-    for name in (SERVER_BASE_CATEGORY, SERVER_START_CATEGORY, SERVER_ANNOUNCE_CATEGORY, SERVER_WORLD_CATEGORY, SERVER_FEEDBACK_CATEGORY, SERVER_ADMIN_CATEGORY, SERVER_REALM_CATEGORY, SERVER_AUCTION_CATEGORY, SERVER_EVENT_CATEGORY, SERVER_STALL_CATEGORY):
+    for name in (SERVER_BASE_CATEGORY, SERVER_START_CATEGORY, SERVER_ANNOUNCE_CATEGORY, SERVER_WORLD_CATEGORY, SERVER_FEEDBACK_CATEGORY, SERVER_ADMIN_CATEGORY, SERVER_REALM_CATEGORY, SERVER_AUCTION_CATEGORY, SERVER_EVENT_CATEGORY, SERVER_STALL_CATEGORY, SERVER_WAR_CATEGORY):
         category = next((item for item in guild.categories if item.name == name), None)
         if category is None:
             continue
@@ -547,6 +563,13 @@ SERVER_EVENT_CATEGORY = "\U0001f320 World Events"
 SERVER_STALL_CATEGORY = "\U0001f9fa Market Stalls"
 
 
+# v1.24.0: one read-only war-front channel per world, where the bot keeps a live
+# card per sect war. Its own category, on the owner's call, after the world's
+# news, for the reason rc.51 gave the auction floors: it is what lets teardown
+# empty it.
+SERVER_WAR_CATEGORY = "\u2694\ufe0f Sect Wars"
+
+
 # The order a member reads down the channel list, and the only statement of it
 # (v1.0.0-rc.59). Categories were never positioned - no `position=`, no
 # `.edit(position=`, no `.move(` anywhere under `app/` - so their order was the
@@ -561,6 +584,7 @@ CATEGORY_ORDER = (
     SERVER_ANNOUNCE_CATEGORY,
     SERVER_REALM_CATEGORY,
     SERVER_EVENT_CATEGORY,
+    SERVER_WAR_CATEGORY,
     SERVER_AUCTION_CATEGORY,
     SERVER_STALL_CATEGORY,
     SERVER_WORLD_CATEGORY,
@@ -740,6 +764,7 @@ async def _run_complete_server_setup(
     await ensure_auction_house_channels(guild, category_name=SERVER_AUCTION_CATEGORY, create_missing=create_missing)
     await ensure_world_event_channels(guild, category_name=SERVER_EVENT_CATEGORY, create_missing=create_missing)
     await ensure_stall_channels(guild, category_name=SERVER_STALL_CATEGORY, create_missing=create_missing)
+    await ensure_war_channels(guild, category_name=SERVER_WAR_CATEGORY, create_missing=create_missing)
     _bugs_channel, bugs_warning = await ensure_bugs_forum_channel(guild, category_name=SERVER_FEEDBACK_CATEGORY, create_missing=create_missing)
     await ensure_category_order(guild, create_missing=create_missing)
     # 🗺️ Cultivation World behind having played (v1.0.11). Behind
@@ -876,6 +901,31 @@ async def _dashboard_discord_snapshot(client: commands.Bot, guild: discord.Guild
             "ready": is_text and role is not None and bool(visibility.get("hidden")) and bool(read_only),
         })
 
+    # v1.24.0: one read-only war-front channel per world, in its own
+    # category. Reported and, like the stalls, not counted toward `setup_ready`:
+    # a missing one costs the war cards, while the wars are on /war status.
+    war_rows = {str(row["world_name"]): row for row in await DB.get_war_channels(guild.id)}
+    war_fronts: list[dict[str, Any]] = []
+    for world, hub in REALM_HUBS.items():
+        row = war_rows.get(world)
+        channel = guild.get_channel(int(row["channel_id"])) if row else None
+        role = discord.utils.get(guild.roles, name=_realm_access_role_name(world))
+        is_text = isinstance(channel, discord.TextChannel)
+        visibility = realm_hub_visibility(channel, role, guild.default_role) if is_text else {"hidden": False}
+        everyone = (channel.overwrites or {}).get(guild.default_role) if is_text else None
+        member = (channel.overwrites or {}).get(role) if is_text and role is not None else None
+        read_only = is_text and getattr(everyone, "send_messages", None) is False and getattr(member, "send_messages", None) is not True
+        war_fronts.append({
+            "world": world,
+            "channel_name": channel.name if is_text else None,
+            "channel_id": channel.id if is_text else None,
+            "expected_name": str(hub.get("war_channel_name") or ""),
+            "role_name": role.name if role else None,
+            "hidden": bool(visibility.get("hidden")),
+            "read_only": bool(read_only),
+            "ready": is_text and role is not None and bool(visibility.get("hidden")) and bool(read_only),
+        })
+
     auction_rows = {str(row["house_id"]): row for row in await DB.get_auction_house_channels(guild.id)}
     auction_halls: list[dict[str, Any]] = []
     for house_id, house in WORLD.auction_houses.items():
@@ -1003,6 +1053,7 @@ async def _dashboard_discord_snapshot(client: commands.Bot, guild: discord.Guild
         "world_events_total": len(world_event_feeds),
         "auction_halls": auction_halls,
         "stall_markets": stall_markets,
+        "war_fronts": war_fronts,
         "realm_ready": ready_realms,
         "realm_total": len(realm_hubs),
         "text_channels": all_channels,
@@ -1420,6 +1471,7 @@ async def admin_realm_hubs(interaction: discord.Interaction, action: app_command
         await ensure_auction_house_channels(guild, category_name=SERVER_AUCTION_CATEGORY)
         await ensure_world_event_channels(guild, category_name=SERVER_EVENT_CATEGORY)
         await ensure_stall_channels(guild, category_name=SERVER_STALL_CATEGORY)
+        await ensure_war_channels(guild, category_name=SERVER_WAR_CATEGORY)
     existing = {str(row["world_name"]): row for row in await DB.get_realm_hub_channels(guild.id)}
     lines = [
         "🏙️ **Realm-Capital Meeting Channels**",

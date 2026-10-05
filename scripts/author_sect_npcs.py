@@ -1,4 +1,4 @@
-"""Author the sect's people and its doors by rank (v1.24.0).
+"""Author the sect's people and its doors by rank (v1.25.0).
 
 Three blocks under `sect_system`, on the owner's calls:
 

@@ -19,11 +19,11 @@ package game
 //     redeem followed by a donation always loses points.
 //   - creditSectContributionTx is the one door points come in by. It writes
 //     the balance and the lifetime count together, and says when the count
-//     has crossed the next rung (v1.24.0: it no longer promotes). An issued
+//     has crossed the next rung (v1.25.0: it no longer promotes). An issued
 //     redeem writes only the balance, so it can never cost a rank; a treasury
 //     redeem also takes its cost off the lifetime count (v1.12.3), because
 //     what comes back out of the treasury was not a contribution.
-//   - Promotion is granted by asking (`sect.promote`, v1.24.0): one rung at a
+//   - Promotion is granted by asking (`sect.promote`, v1.25.0): one rung at a
 //     time, only to a rank the content's ladder lists, and only when the
 //     lifetime count reaches it. A rank a GM has taken away is not given back
 //     by the next donation, and a rank above the ladder's top is never touched.
@@ -89,7 +89,7 @@ func sectEarnedColumn(conn *storage.Conn) bool {
 // rung's mark - or "" when nothing changed. A caller with no membership row
 // credits nobody.
 //
-// It promoted the member itself until v1.24.0. On the owner's call a rank is
+// It promoted the member itself until v1.25.0. On the owner's call a rank is
 // granted by somebody now (`sect.promote`, npc_master.go): the count only says
 // a member may ask, so a credit that crosses a rung tells them so and moves no
 // rank - which also leaves a GM's demotion standing, the v1.12.3 rule.

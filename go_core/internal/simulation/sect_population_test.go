@@ -9,7 +9,7 @@ import (
 	"xianxia/core/internal/worlddata"
 )
 
-// A sect keeps its people (v1.24.0). No die is rolled anywhere in this step -
+// A sect keeps its people (v1.25.0). No die is rolled anywhere in this step -
 // names, realms and places are hashes of the sect, the rank and the slot - so
 // every assertion is exact, and the step is driven against the shipped
 // catalogue, because "every sect" means the sects the content file has.

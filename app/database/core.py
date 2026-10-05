@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 78
+SCHEMA_VERSION = 79
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -221,6 +221,8 @@ OPERATIONAL_REQUIRED_TABLES = frozenset(
         "trade_offers",
         "tribulation_attempts",
         "tribulation_state",
+        "war_card_messages",
+        "war_channels",
         "wild_beast_encounters",
         "witness_records",
         "world_action_events",
@@ -3246,9 +3248,43 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
     ),
     (
         78,
+        "war_fronts",
+        (
+            # v1.24.0: one read-only war-front channel per world, the
+            # stall_channels shape (schema 66), and one live card per sect war
+            # in it. The card row is a Discord message id and nothing else -
+            # the war is the engine's `territory_wars` row - keyed on the war,
+            # which no player owns, so an erasure or a reset never sweeps it.
+            # The tables live in this migration alone (rc.57).
+            """CREATE TABLE IF NOT EXISTS war_channels (
+                guild_id INTEGER NOT NULL,
+                world_name TEXT NOT NULL,
+                channel_id INTEGER NOT NULL,
+                category_id INTEGER,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL,
+                PRIMARY KEY(guild_id,world_name),
+                UNIQUE(guild_id,channel_id)
+            )""",
+            """CREATE TABLE IF NOT EXISTS war_card_messages (
+                guild_id INTEGER NOT NULL,
+                war_id INTEGER NOT NULL,
+                channel_id INTEGER NOT NULL,
+                message_id INTEGER NOT NULL,
+                updated_at REAL NOT NULL,
+                PRIMARY KEY(guild_id,war_id)
+            )""",
+            # And the sect each blow was struck for, so an ally's blows - a
+            # cultivator's or a whole allied sect's in the world's own sieges -
+            # are told apart from the field's, and a sect joins a war once.
+            "ALTER TABLE territory_war_actions ADD COLUMN sect_name TEXT NOT NULL DEFAULT ''",
+        ),
+    ),
+    (
+        79,
         "npc_masters",
         (
-            # v1.24.0: a player may take one of their own sect's people as a
+            # v1.25.0: a player may take one of their own sect's people as a
             # master. `sect_lineage` cannot hold that - both its ids are
             # foreign-keyed to `characters`, and an NPC is not one - so the bond
             # has a table of its own, keyed on the disciple (one master at a
@@ -5777,6 +5813,9 @@ class Database:
             cur = await db.execute("DELETE FROM stall_channels WHERE guild_id=?", (int(guild_id),))
             stall_channel_rows = int(cur.rowcount or 0)
             await db.execute("DELETE FROM stall_card_messages WHERE guild_id=?", (int(guild_id),))
+            cur = await db.execute("DELETE FROM war_channels WHERE guild_id=?", (int(guild_id),))
+            war_channel_rows = int(cur.rowcount or 0)
+            await db.execute("DELETE FROM war_card_messages WHERE guild_id=?", (int(guild_id),))
             await db.execute("DELETE FROM auction_lot_messages WHERE guild_id=?", (int(guild_id),))
             await db.execute("DELETE FROM playtest_items WHERE guild_id=?", (int(guild_id),))
             cur = await db.execute(
@@ -5787,7 +5826,7 @@ class Database:
             await db.commit()
         return {"server_config": config_rows, "realm_hubs": hub_rows, "auction_houses": auction_rows,
                 "world_events": world_event_rows, "stall_channels": stall_channel_rows,
-                "channel_messages": message_rows}
+                "war_channels": war_channel_rows, "channel_messages": message_rows}
 
     async def get_expedition_thread(self, guild_id: int, user_id: int) -> dict[str, Any] | None:
         async with self._connect() as db:
@@ -6211,8 +6250,8 @@ class Database:
 
     async def get_npc_master(self, user_id: int) -> dict[str, Any] | None:
         """The one of the sect's own people who is this player's master
-        (v1.24.0, `npc_mentorships`), with the rank and realm the world holds
-        for them now; None without one or before schema 78."""
+        (v1.25.0, `npc_mentorships`), with the rank and realm the world holds
+        for them now; None without one or before schema 79."""
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             try:
@@ -6829,7 +6868,7 @@ class Database:
         once a simulation row exists (`MoveRegisteredNPCTx` has no callers), so
         a person the tick has walked away is answered by their simulation row,
         not the registry - the same order `current_npc_location` keeps. Before
-        v1.24.0 that was a household's relatives, who never leave; a sect's
+        v1.25.0 that was a household's relatives, who never leave; a sect's
         twenty-five people travel, and the picker would have offered them in a
         room they left and refused them in the one they stand in.
         """
@@ -7024,7 +7063,7 @@ class Database:
 
 
     async def get_sect_npc_roster(self, sect_name: str) -> list[dict[str, Any]]:
-        """The sect's own people (v1.24.0): every living NPC of the sect, by
+        """The sect's own people (v1.25.0): every living NPC of the sect, by
         rank and then realm. No place is read - where somebody stands is the
         whereabouts rule's to say, not a roster's."""
         async with self._connect() as db:
@@ -7277,6 +7316,48 @@ class Database:
     async def forget_stall_card(self, guild_id: int, user_id: int) -> None:
         async with self._connect() as db:
             await db.execute("DELETE FROM stall_card_messages WHERE guild_id=? AND user_id=?", (int(guild_id), int(user_id)))
+            await db.commit()
+
+    async def set_war_channel(self, *, guild_id: int, world_name: str, channel_id: int, category_id: int | None) -> None:
+        """One war-front channel per world (schema 78), the `stall_channels`
+        shape."""
+        now = time.time()
+        async with self._connect() as db:
+            await db.execute(
+                """INSERT INTO war_channels(guild_id,world_name,channel_id,category_id,created_at,updated_at)
+                   VALUES(?,?,?,?,?,?) ON CONFLICT(guild_id,world_name) DO UPDATE SET
+                   channel_id=excluded.channel_id,category_id=excluded.category_id,updated_at=excluded.updated_at""",
+                (int(guild_id), str(world_name), int(channel_id), int(category_id) if category_id else None, now, now),
+            )
+            await db.commit()
+
+    async def get_war_channels(self, guild_id: int) -> list[dict[str, Any]]:
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute("SELECT * FROM war_channels WHERE guild_id=? ORDER BY world_name", (int(guild_id),))
+            return [dict(row) for row in await cur.fetchall()]
+
+    async def remember_war_card(self, *, guild_id: int, war_id: int, channel_id: int, message_id: int) -> None:
+        """The live card for one war (v1.24.0): a Discord message id, nothing
+        about the war itself - the engine's `territory_wars` row is the war."""
+        async with self._connect() as db:
+            await db.execute(
+                """INSERT INTO war_card_messages(guild_id,war_id,channel_id,message_id,updated_at) VALUES(?,?,?,?,?)
+                   ON CONFLICT(guild_id,war_id) DO UPDATE SET channel_id=excluded.channel_id,
+                   message_id=excluded.message_id,updated_at=excluded.updated_at""",
+                (int(guild_id), int(war_id), int(channel_id), int(message_id), time.time()),
+            )
+            await db.commit()
+
+    async def list_war_cards(self, guild_id: int) -> list[dict[str, Any]]:
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute("SELECT * FROM war_card_messages WHERE guild_id=? ORDER BY war_id", (int(guild_id),))
+            return [dict(row) for row in await cur.fetchall()]
+
+    async def forget_war_card(self, guild_id: int, war_id: int) -> None:
+        async with self._connect() as db:
+            await db.execute("DELETE FROM war_card_messages WHERE guild_id=? AND war_id=?", (int(guild_id), int(war_id)))
             await db.commit()
 
     async def list_player_stalls(self) -> list[dict[str, Any]]:
@@ -7943,7 +8024,11 @@ class Database:
 
 
     async def get_territory_wars(self, *, active_only: bool=True) -> list[dict[str, Any]]:
-        sql="SELECT * FROM territory_wars" + (" WHERE status='active'" if active_only else "") + " ORDER BY war_id DESC"
+        # The ground's own name and walls ride with each war (v1.24.0): the war
+        # card and /war status say what is besieged and how high it stands.
+        sql=("SELECT w.*,t.name AS territory_name,t.defense AS territory_defense,t.controller_key AS territory_holder"
+             " FROM territory_wars w LEFT JOIN territory_state t ON t.territory_key=w.territory_key"
+             + (" WHERE w.status='active'" if active_only else "") + " ORDER BY w.war_id DESC")
         async with self._connect() as db:
             db.row_factory=aiosqlite.Row; cur=await db.execute(sql); rows=[dict(r) for r in await cur.fetchall()]
             for row in rows:
@@ -7956,10 +8041,20 @@ class Database:
                 # reader of its own, because a war and what happened in it are
                 # one answer.
                 cur=await db.execute(
-                    "SELECT side,tactic,power,siege_delta,morale_delta,game_minute,user_id"
-                    " FROM territory_war_actions WHERE war_id=? ORDER BY action_id DESC LIMIT 5",
+                    "SELECT * FROM territory_war_actions WHERE war_id=? ORDER BY action_id DESC LIMIT 5",
                     (int(row['war_id']),))
                 row['recent_actions']=[dict(r) for r in await cur.fetchall()]
+                # Who marched beside each side (v1.24.0): the sects other than
+                # the two belligerents that struck a blow, read off what was
+                # recorded rather than off who is allied now.
+                cur=await db.execute("PRAGMA table_info(territory_war_actions)")
+                if any(str(c[1])=="sect_name" for c in await cur.fetchall()):
+                    cur=await db.execute(
+                        "SELECT DISTINCT side,sect_name FROM territory_war_actions WHERE war_id=? AND sect_name NOT IN ('',?,?) ORDER BY sect_name",
+                        (int(row['war_id']),str(row['attacker_key']),str(row['defender_key'])))
+                    row['allies']=[{"side":str(r[0]),"sect_name":str(r[1])} for r in await cur.fetchall()]
+                else:
+                    row['allies']=[]
             return rows
 
 

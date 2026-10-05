@@ -30,7 +30,7 @@ import "xianxia/core/internal/storage"
 // Best-effort about the tables: a database old enough to lack them must not
 // fail a combat or a tick.
 func ReleaseNPCBondsTx(conn *storage.Conn, deceased string, gameMinute int64, now float64) error {
-	// A dead master teaches nobody (v1.24.0): every player who was their
+	// A dead master teaches nobody (v1.25.0): every player who was their
 	// disciple is free to take another.
 	if tableExistsTx(conn, "npc_mentorships") {
 		if _, err := conn.Execute(`DELETE FROM npc_mentorships WHERE master_npc_name=?`, []any{deceased}); err != nil {

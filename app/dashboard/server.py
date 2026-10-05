@@ -1416,7 +1416,7 @@ class ReadOnlyDashboardStore:
                    LEFT JOIN characters m ON m.user_id=r.master_user_id
                    ORDER BY (r.status='pending') DESC,r.created_at DESC LIMIT 200""",
             )
-            # A player's master may be one of the sect's own people (v1.24.0).
+            # A player's master may be one of the sect's own people (v1.25.0).
             npc_lineage = await self._fetchall_if_table(
                 db,
                 "npc_mentorships",

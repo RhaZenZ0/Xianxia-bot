@@ -698,7 +698,7 @@ func discipleshipActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 			return authoritativeMutation{}, errors.New("master and disciple must belong to the same sect")
 		}
 		// A request to somebody who could never answer it is stranded: the
-		// answer is the master's, and it has a rank floor (v1.24.0).
+		// answer is the master's, and it has a rank floor (v1.25.0).
 		if floor := sectRankFloorGo(catalog, "discipleship.resolve"); floor > 0 {
 			mm, e := sectMembershipRow(conn, p.MasterUserID)
 			if e != nil {
@@ -794,7 +794,7 @@ func discipleshipActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 		}
 		x := firstRowMap(r)
 		if x == nil {
-			// The master may be one of the sect's own people (v1.24.0).
+			// The master may be one of the sect's own people (v1.25.0).
 			name, e := severNPCMasterTx(conn, userID)
 			if e != nil {
 				return authoritativeMutation{}, e

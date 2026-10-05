@@ -15,7 +15,7 @@ import (
 	"xianxia/core/internal/worlddata"
 )
 
-// A sect's doors open by rank (v1.24.0). v1.19.4 opened every sect leaf to any
+// A sect's doors open by rank (v1.25.0). v1.19.4 opened every sect leaf to any
 // member and the engine refused nothing by rank outside the manor, so an Outer
 // Disciple an hour into a sect could start a territorial war. `rank_floors` is
 // the owner's ladder, keyed by operation, and these tests hold the engine to

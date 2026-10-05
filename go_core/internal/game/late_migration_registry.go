@@ -54,6 +54,8 @@ func applyLateMigrationAction(conn *storage.Conn, catalog worlddata.Catalog, use
 		return territoryClaimActionGo(conn, catalog, userID, raw)
 	case "war.act":
 		return territoryWarActActionGo(conn, catalog, userID, raw)
+	case "war.peace":
+		return territoryWarPeaceActionGo(conn, catalog, userID, raw)
 	case "caravan.dispatch":
 		return caravanDispatchActionGo(conn, catalog, userID, raw)
 	case "caravan.settle":

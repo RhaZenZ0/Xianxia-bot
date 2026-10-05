@@ -1,6 +1,6 @@
 package simulation
 
-// A sect keeps its people (v1.24.0).
+// A sect keeps its people (v1.25.0).
 //
 // Every sect had one or two named people in the content file - an examiner, an
 // elder who sponsors - and nobody else, so a player who joined found nobody to

@@ -7,7 +7,7 @@ to the Nascent Soul, so a new member saw the sect they had just joined as one
 collapsed line. Membership is the introduction the curriculum stands in for,
 so a member is free of the realm curriculum on the sect hub whatever their realm.
 
-**v1.24.0 narrowed what that opens, on the owner's call**: *"it should only show
+**v1.25.0 narrowed what that opens, on the owner's call**: *"it should only show
 what you can do at your sect ranks."* The curriculum still steps aside for a
 member - that is what this file holds - and the rank floors
 (`sect_system.rank_floors`) padlock the doors above a member's rank through

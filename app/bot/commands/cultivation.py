@@ -85,7 +85,7 @@ async def cultivate(interaction: discord.Interaction) -> None:
     if float(result.get("root_mult", 1)) != 1.0:
         extra += (f"\n🌿 **{result.get('root_grade') or 'Common'}** spiritual root: "
                   f"**x{float(result['root_mult']):.2f}** cultivation efficiency.")
-    # An NPC master's guidance (v1.24.0), named by the engine with its term.
+    # An NPC master's guidance (v1.25.0), named by the engine with its term.
     if float(result.get("master_mult", 1) or 1) != 1.0:
         extra += f"\n🎓 Your master **{result.get('master_npc_name')}** guides the session: **x{float(result['master_mult']):.2f}**."
     if float(result.get("manual_mult", 1)) != 1.0:
@@ -465,7 +465,7 @@ async def breakthrough(interaction: discord.Interaction, confirm: bool = False, 
     # the engine with its bonus.
     if int(result.get("place_bonus", 0)):
         mechanical += f"\n🌠 {result.get('place')}: **{int(result['place_bonus']):+d}** to this breakthrough."
-    # An NPC master's help (v1.24.0), named by the engine with its bonus.
+    # An NPC master's help (v1.25.0), named by the engine with its bonus.
     if int(result.get("master_bonus", 0)):
         mechanical += f"\n🎓 Your master **{result.get('master_npc_name')}** steadies you: **{int(result['master_bonus']):+d}** to this breakthrough."
     if success:

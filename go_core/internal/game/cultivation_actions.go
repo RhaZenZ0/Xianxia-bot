@@ -323,7 +323,7 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	// the grade's other half on both branches, so excluding it here would split
 	// the root against itself.
 	rootMult := rootWorthMultiplier(catalog, bundle.Root)
-	// An NPC master's guidance (v1.24.0), on both paths: a teacher is not
+	// An NPC master's guidance (v1.25.0), on both paths: a teacher is not
 	// qi-path weather.
 	masterMult, masterNPC := npcMasterCultivationMultTx(conn, catalog, userID)
 	attempted := int64(math.Round(float64(base+resonance) * timeMult * effectMult * soulMult * eraMult * stance.GainMult * worldMult * manualMult * elementMult * rootMult * masterMult))
@@ -849,7 +849,7 @@ func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, user
 		if master != nil {
 			result["master_reward"] = master
 		}
-		// An NPC master's gift on a qi realm crossing (v1.24.0).
+		// An NPC master's gift on a qi realm crossing (v1.25.0).
 		if !body && newRealm != realm {
 			teaching, err := npcMasterRealmInsightTx(conn, catalog, userID, now)
 			if err != nil {

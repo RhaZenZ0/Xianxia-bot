@@ -89,7 +89,7 @@ type seclusionCarried struct {
 	ElementRelation string
 	Root            float64
 	RootGrade       string
-	// An NPC master's guidance (v1.24.0): a bond holds for a retreat's whole
+	// An NPC master's guidance (v1.25.0): a bond holds for a retreat's whole
 	// length, so a retreat carries it.
 	Master     float64
 	MasterName string

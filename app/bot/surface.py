@@ -1209,7 +1209,7 @@ STALL_MIN_REALM_INDEX = int((WORLD.data.get("stall_system") or {}).get("min_real
 HOMESTEAD_FOUNDING_RANK = int((WORLD.data.get("abode_system") or {}).get("founding_rank_level") or 0)
 MANOR_FOUNDING_RANK = int((WORLD.data.get("sect_abode_system") or {}).get("manor_founding_rank_level") or 0)
 MANOR_CONSTRUCTION_RANK = int((WORLD.data.get("sect_abode_system") or {}).get("manor_construction_rank_level") or 0)
-# The sect rank each act asks (v1.24.0), keyed by the engine operation the way
+# The sect rank each act asks (v1.25.0), keyed by the engine operation the way
 # `sect_system.rank_floors` is, with the phrase the engine's refusal opens with
 # (`requireSectRankTx`) and the leaves it hides. v1.19.4 opened every sect leaf
 # to any member, and the owner's call is that a member sees what their rank
@@ -1223,6 +1223,9 @@ RANK_FLOOR_LEAVES: dict[str, tuple[str, tuple[str, ...]]] = {
     "territory.claim": ("claiming territory for your sect", ("territory claim",)),
     "war.act": ("fighting in your sect's war", ("war act",)),
 }
+# Who makes peace (v1.24.0's `war.peace`), read off the key the engine reads,
+# with the engine's own default for a file without one (`sect_war.go`).
+WAR_PEACE_RANK = int((WORLD.data.get("war_system") or {}).get("peace_min_rank_level") or 40)
 PERSONAL_WORLD_FLOOR = int((WORLD.data.get("personal_world_system") or {}).get("min_realm_index") or 0)
 PERSONAL_WORLD_LAW = int((WORLD.data.get("personal_world_system") or {}).get("space_law_comprehension") or 0)
 PROGRESSION_GATES: dict[str, tuple[str, ...]] = {
@@ -1243,7 +1246,7 @@ PROGRESSION_GATES: dict[str, tuple[str, ...]] = {
                     "sect manor establish", "sect manor upgrade", "sect abode", "sect treasury", "sect contribute", "sect redeem",
                     "sect discipleship request", "sect discipleship accept", "sect discipleship reject", "sect discipleship leave",
                     "sect promote", "sect discipleship npcmaster", "sect discipleship teach"),
-    # The sect's own people (v1.24.0): a member with a master asks no other,
+    # The sect's own people (v1.25.0): a member with a master asks no other,
     # Teach is a master's among the sect's people, and Promote is drawn when the
     # contribution reaches the next rung - each anticipating the engine's
     # refusal (`npcMasterRequestAction`, `sectMasterTeachAction`,
@@ -1284,7 +1287,8 @@ PROGRESSION_GATES: dict[str, tuple[str, ...]] = {
     "stall_open": ("stall open",),
     "samsara": ("family ancestry", "family legacy", "family investigate", "family quest", "family claim", "family conflict"),
 }
-# One gate per rank floor (v1.24.0), named for the operation it anticipates.
+PROGRESSION_GATES["war_peace_rank"] = ("war peace",)
+# One gate per rank floor (v1.25.0), named for the operation it anticipates.
 PROGRESSION_GATES.update({f"sect_rank:{op}": leaves for op, (_what, leaves) in RANK_FLOOR_LEAVES.items()})
 
 
@@ -1365,6 +1369,8 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
         floor = SECT_RANK_FLOORS.get(op, 0)
         if floor > 0 and rank_level < floor:
             shut[f"sect_rank:{op}"] = f"{what} asks for {WORLD.sect_rank_name(floor)}; {held}"
+    if membership and WAR_PEACE_RANK > 0 and rank_level < WAR_PEACE_RANK:
+        shut["war_peace_rank"] = f"peace is made by a {WORLD.sect_rank_name(WAR_PEACE_RANK)} or above; {held}"
     if membership:
         npc_master = await DB.get_npc_master(uid)
         if npc_master or await DB.get_master(uid):

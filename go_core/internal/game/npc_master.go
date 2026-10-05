@@ -1,6 +1,6 @@
 package game
 
-// A sect's own people as masters, and a rank granted by somebody (v1.24.0).
+// A sect's own people as masters, and a rank granted by somebody (v1.25.0).
 //
 // Before this a master could only be another player of the sect - and on a
 // small server there was usually nobody stronger to ask - while a rank rose by
@@ -21,7 +21,7 @@ package game
 //     promoter rank, standing with you, whose rank is above the rung asked for.
 //
 // `sect_lineage` cannot hold an NPC - both its ids are foreign-keyed to
-// `characters` - so the bond is `npc_mentorships` (schema 78), one row per
+// `characters` - so the bond is `npc_mentorships` (schema 79), one row per
 // disciple. A player holds a player master or an NPC master, never both.
 
 import (

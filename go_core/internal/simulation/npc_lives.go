@@ -61,7 +61,7 @@ var sectRankLadder = []string{
 
 // nextSectRank is the rung above. Somebody unranked - an independent, or a
 // fresh member with no rank yet - takes the first rung; a rank the ladder does
-// not carry stays where it is. That second half is v1.24.0's: bootstrap and
+// not carry stays where it is. That second half is v1.25.0's: bootstrap and
 // the sect population both make a "Sect Master", which is above this ladder,
 // and the old fallback sent every unknown rank to the first rung - so the work
 // that should have become a Sect Master's influence demoted them to Outer

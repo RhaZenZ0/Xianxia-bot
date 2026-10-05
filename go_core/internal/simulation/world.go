@@ -673,7 +673,7 @@ func (r *Runner) sects(conn *storage.Conn, steps, gm int64) (string, error) {
 			count = i64(row["n"])
 		}
 	}
-	// The hall first (v1.24.0, sect_population.go): a sect short of its people
+	// The hall first (v1.25.0, sect_population.go): a sect short of its people
 	// is topped up before anybody swears in or walks out this tick.
 	populated, err := r.sectPopulation(conn, gm)
 	if err != nil {

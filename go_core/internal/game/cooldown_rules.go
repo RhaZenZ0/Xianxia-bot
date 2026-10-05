@@ -41,6 +41,9 @@ const (
 	cooldownDaoDual      = "dao_dual_cultivation"
 	cooldownGhostHarvest = "ghost_harvest"
 	cooldownGhostAppease = "ghost_appease"
+	// One act per war per member (v1.24.0: the 1800 seconds war.act wrote
+	// as a literal beside this table for releases after it existed).
+	cooldownWarAction = "war_action"
 )
 
 // cultivateWaitMinutes is the pace of the whole game: a session is a share of
@@ -114,6 +117,7 @@ var actionCooldowns = map[string]cooldownRule{
 	cooldownQiRefine:     {30, ""},
 	cooldownGhostHarvest: {15, ""},
 	cooldownGhostAppease: {60, ""},
+	cooldownWarAction:    {30, ""},
 }
 
 // cooldownSecondsFor is how long the wait is, now. An unknown action is an

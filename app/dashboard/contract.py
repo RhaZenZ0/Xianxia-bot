@@ -46,9 +46,13 @@ DASHBOARD_API_VERSION = 2
 # banked intent: a column on a table the Player Editor already reads, no table.
 # Schema 73 (v1.14.0) rewrites characters.attributes_json to the base the
 # engine grows from; no table, and no column the dashboard reads changes shape.
-# Schema 78 (v1.24.0) adds `npc_mentorships`, a player's master among the
+# Schema 78 (v1.24.0) adds `war_channels` and `war_card_messages`: one war-front
+# channel per world and a live card per sect war in it. Discord bindings the
+# Server Setup card provisions, reports and tears down beside the market
+# stalls; neither is a gameplay table.
+# Schema 79 (v1.25.0) adds `npc_mentorships`, a player's master among the
 # sect's own people: read-only on Members & Lineage beside the player lineage.
-DASHBOARD_REVIEWED_SCHEMA_VERSION = 78
+DASHBOARD_REVIEWED_SCHEMA_VERSION = 79
 
 DASHBOARD_GET_API_PATHS = frozenset({
     "/api/overview", "/api/capabilities", "/api/timeline", "/api/npcs", "/api/npc",

@@ -12,7 +12,7 @@ import (
 	"xianxia/core/internal/storage"
 )
 
-// A sect's own people as masters, and a rank granted by somebody (v1.24.0).
+// A sect's own people as masters, and a rank granted by somebody (v1.25.0).
 // Driven through the production dispatch against the shipped catalogue,
 // because the master's gifts, the rank bars and the promotion ladder are all
 // content. No die is rolled anywhere here: a request, a teaching and a

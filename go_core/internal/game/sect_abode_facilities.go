@@ -251,7 +251,7 @@ func manorConstructionRankGo(c worlddata.Catalog) int64 {
 }
 
 // sectRankFloorGo is the sect rank a member must hold before an operation is
-// theirs (sect_system.rank_floors, v1.24.0), keyed by the engine operation so
+// theirs (sect_system.rank_floors, v1.25.0), keyed by the engine operation so
 // the panel and the refusal read one table. Zero means no gate, the
 // homestead's own rule.
 func sectRankFloorGo(c worlddata.Catalog, op string) int64 {

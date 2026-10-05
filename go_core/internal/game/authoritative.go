@@ -142,6 +142,7 @@ var authoritativeMutations = map[string]bool{
 	"boss.claim":                      true,
 	"territory.claim":                 true,
 	"war.act":                         true,
+	"war.peace":                       true,
 	"caravan.dispatch":                true,
 	"caravan.settle":                  true,
 	"sect.recruitment.recommendation": true,
@@ -228,7 +229,10 @@ var authoritativeQueries = map[string]bool{
 	"stall.board":               true,
 	"stall.status":              true,
 	"flame.status":              true,
-	"spirit_sense.status":       true,
+	// v1.24.0: the active wars a cultivator may fight in and on which side,
+	// so a picker offers only what war.act would take.
+	"war.fronts":          true,
+	"spirit_sense.status": true,
 	// v1.8.0: what a sect member may redeem, at the engine's price.
 	"sect.exchange": true,
 	// v0.30.0: the world-status reads that app/simulation/world.py ran as raw
@@ -541,7 +545,7 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			mutation, err = dynastyClaimAction(conn, req.ActorID, req.Payload)
 		case "family.dynasty.conflict":
 			mutation, err = dynastyConflictAction(conn, catalog, req.ActorID, req.Payload)
-		case "auction.enter", "auction.leave", "auction.sell", "auction.bid", "black_market.trade", "market.trade", "stall.open", "stall.list", "stall.withdraw", "stall.buy", "stall.close", "flame.capture", "flame.refine", "flame.bind", "spirit_sense.settle", "bounty_hunter.act", "equipment.bind", "equipment.equip", "equipment.unequip", "equipment.repair", "party.create", "party.join", "party.leave", "formation.create", "formation.assign", "formation.activate", "formation.stance", "boss.start", "boss.act", "boss.claim", "territory.claim", "war.act", "caravan.dispatch", "caravan.settle", "sect.recruitment.recommendation", "sect.recruitment.trial", "sect.recruitment.envoys", "sect.ascend", "sect.contribute", "sect.redeem", "discipleship.request", "discipleship.resolve", "discipleship.leave", "discipleship.npc_request", "sect.master.teach", "sect.promote", "sect.manor.establish", "sect.manor.upgrade", "family.simulate", "family.support", "family.add_child", "family.tutor", "family.errand", "family.lesson", "seclusion.start", "seclusion.settle", "dao.propose", "dao.respond", "dao.sever", "dao.dual_cultivate", "storage.deposit", "storage.withdraw", "storage.upgrade", "abode.establish", "abode.enter", "abode.visit", "abode.leave", "abode.invite", "abode.revoke", "abode.upgrade", "abode.focus", "array.use", "ascension.gate", "profession.exam", "array.deploy", "spatial_key.use", "personal_world.create", "personal_world.set_rule", "personal_world.enter", "personal_world.leave", "item.use", "sect.abode.upgrade", "merchant.buy", "shop.buy", "shop.sell", "trade.offer", "trade.accept", "trade.decline", "appraisal.read":
+		case "auction.enter", "auction.leave", "auction.sell", "auction.bid", "black_market.trade", "market.trade", "stall.open", "stall.list", "stall.withdraw", "stall.buy", "stall.close", "flame.capture", "flame.refine", "flame.bind", "spirit_sense.settle", "bounty_hunter.act", "equipment.bind", "equipment.equip", "equipment.unequip", "equipment.repair", "party.create", "party.join", "party.leave", "formation.create", "formation.assign", "formation.activate", "formation.stance", "boss.start", "boss.act", "boss.claim", "territory.claim", "war.act", "war.peace", "caravan.dispatch", "caravan.settle", "sect.recruitment.recommendation", "sect.recruitment.trial", "sect.recruitment.envoys", "sect.ascend", "sect.contribute", "sect.redeem", "discipleship.request", "discipleship.resolve", "discipleship.leave", "discipleship.npc_request", "sect.master.teach", "sect.promote", "sect.manor.establish", "sect.manor.upgrade", "family.simulate", "family.support", "family.add_child", "family.tutor", "family.errand", "family.lesson", "seclusion.start", "seclusion.settle", "dao.propose", "dao.respond", "dao.sever", "dao.dual_cultivate", "storage.deposit", "storage.withdraw", "storage.upgrade", "abode.establish", "abode.enter", "abode.visit", "abode.leave", "abode.invite", "abode.revoke", "abode.upgrade", "abode.focus", "array.use", "ascension.gate", "profession.exam", "array.deploy", "spatial_key.use", "personal_world.create", "personal_world.set_rule", "personal_world.enter", "personal_world.leave", "item.use", "sect.abode.upgrade", "merchant.buy", "shop.buy", "shop.sell", "trade.offer", "trade.accept", "trade.decline", "appraisal.read":
 			if strings.TrimSpace(worldPath) == "" {
 				return ActionResponse{}, errors.New("world catalog path is required")
 			}
@@ -893,6 +897,20 @@ func applyAuthoritativeQuery(databasePath, worldPath string, req ActionRequest) 
 			return ActionResponse{}, loadErr
 		}
 		result, qerr := flameStatusQuery(conn, catalog, req.ActorID)
+		if qerr != nil {
+			return ActionResponse{}, qerr
+		}
+		v, _ := eventledger.CurrentActorVersion(conn, req.ActorID)
+		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
+	case "war.fronts":
+		if strings.TrimSpace(worldPath) == "" {
+			return ActionResponse{}, errors.New("world catalog path is required")
+		}
+		catalog, loadErr := worlddata.Load(worldPath)
+		if loadErr != nil {
+			return ActionResponse{}, loadErr
+		}
+		result, qerr := warFrontsQuery(conn, catalog, req.ActorID)
 		if qerr != nil {
 			return ActionResponse{}, qerr
 		}

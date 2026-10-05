@@ -149,7 +149,7 @@ func TestTheTreasuryRedeemIsUnchanged(t *testing.T) {
 	}
 }
 
-// A credit makes a member eligible and moves no rank (v1.24.0): the rank is
+// A credit makes a member eligible and moves no rank (v1.25.0): the rank is
 // granted by asking one of the sect's people (`sect.promote`,
 // npc_master_test.go). Spending never costs a rank, and a GM's rank above the
 // ladder is never touched.

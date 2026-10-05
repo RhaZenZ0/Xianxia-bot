@@ -1,4 +1,4 @@
-"""A registered person is offered where the tick put them (v1.24.0).
+"""A registered person is offered where the tick put them (v1.25.0).
 
 `npc_registry.location` is where somebody was put and nothing moves it once a
 simulation row exists. While the registry held a household's relatives, who

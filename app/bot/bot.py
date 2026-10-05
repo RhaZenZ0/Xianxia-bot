@@ -46,6 +46,7 @@ from .services import AI_ROUTER, ALERTS, GUILD, NARRATOR, NARRATOR_CONTEXT, QUES
 from .threads import _private_scene_for_thread
 from .auction_feed import sync_lots
 from .stall_feed import sync_stalls
+from .war_feed import sync_wars
 from .locations import _known_locations, current_npc_location
 from .registry import EVENT_HANDLERS, VIEW_RESTORERS
 from .typed_play import (
@@ -714,6 +715,12 @@ class XianxiaBot(commands.Bot):
                         await sync_stalls(self.get_guild(SETTINGS.guild_id))
                     except Exception:
                         log.exception("Could not refresh the stall cards")
+                    # The world's own sieges are fought, and its wars declared,
+                    # inside the tick too; the war fronts follow it (v1.24.0).
+                    try:
+                        await sync_wars(self.get_guild(SETTINGS.guild_id), game_minute=wt.total_minutes)
+                    except Exception:
+                        log.exception("Could not refresh the war cards")
                     for sim_run in simulation_runs:
                         log.info("World simulation %s: %s", sim_run.system, sim_run.summary)
                         for event in sim_run.events:

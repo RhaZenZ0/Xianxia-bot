@@ -190,7 +190,7 @@ func TestADemotionSurvivesTheNextCredit(t *testing.T) {
 		t.Fatalf("a demoted member was put back to rank %d by the next credit", rank)
 	}
 	// A credit that carries the count over a rung makes the member eligible
-	// for the rung above where they stand (v1.24.0) and still moves no rank.
+	// for the rung above where they stand (v1.25.0) and still moves no rank.
 	setEarned(t, conn, 1, catalog.SectExchange().Promotion[0].Earned-1)
 	if eligible, _ := creditSectContributionTx(conn, catalog, 1, 1, 0); eligible != "Inner Disciple" {
 		t.Fatalf("a credit across the Inner rung made the member eligible for %q", eligible)
