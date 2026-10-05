@@ -1263,7 +1263,7 @@ func activateUnexpectedEventTx(conn *storage.Conn, catalog worlddata.Catalog, us
 			if err != nil {
 				return nil, err
 			}
-			impacts, effectErr := applyWorldEventEffectTx(conn, event.ID, event.Title, c.Location, gameMinute, event.Severity, event.WorldEffect, now)
+			impacts, effectErr := applyWorldEventEffectTx(conn, catalog, event.ID, event.Title, c.Location, gameMinute, event.Severity, event.WorldEffect, now)
 			if effectErr != nil {
 				return nil, effectErr
 			}

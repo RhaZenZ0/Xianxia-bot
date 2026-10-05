@@ -108,6 +108,7 @@ func territoryClaimActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 		}
 		out["claimed"] = true
 		out["controller_key"] = sect
+		RecordTerritoryClaimedTx(conn, catalog, sect, p.TerritoryKey, p.GameMinute, now)
 	} else if controller == sect {
 		return authoritativeMutation{}, errors.New("your sect already controls that territory")
 	} else {
@@ -578,4 +579,33 @@ func caravanSettleActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID
 	}
 	result := map[string]any{"resolved": resolved, "count": len(resolved)}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "caravan", EventType: "caravan.settle", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
+}
+
+// RecordTerritoryClaimedTx puts a claim on neutral ground where the world can
+// hear about it - quieter than a war (60 against 80), because nobody was
+// driven off. It is the one statement of that row: the world's own sects
+// (`npcSectClaims`) had one and a player's `territory.claim` wrote none, so a
+// player could raise a banner the world never heard of (v1.27.0). The source
+// key is per sect, place and minute, so a repeat is ignored; a missing history
+// table or a write error is ignored too, because a claim must never fail over
+// its rumour.
+func RecordTerritoryClaimedTx(conn *storage.Conn, catalog worlddata.Catalog, sect, territory string, gm int64, now float64) {
+	if !tableExistsTx(conn, "world_history_events") {
+		return
+	}
+	world := ""
+	if loc, ok := catalog.Locations[territory]; ok {
+		world = loc.World
+	}
+	title := sect + " claims " + territory
+	summary := fmt.Sprintf("%s has raised its banners over %s, which answered to no sect before.", sect, territory)
+	source := fmt.Sprintf("sect_claim:%s:%s:%d", sect, territory, gm)
+	_, _ = conn.Execute(`INSERT INTO world_history_events(
+        source_key,event_type,title,summary,significance,visibility,location,world_name,faction,
+        actor_type,actor_key,actor_name,target_type,target_key,target_name,related_user_id,
+        related_npc_name,tags,game_minute,metadata_json,created_at,updated_at)
+        VALUES(?,?,?,?,?, 'public', ?,?,?, 'faction',?,?, 'territory',?,?, NULL,'',?,?,?,?,?)
+        ON CONFLICT(source_key) DO NOTHING`,
+		[]any{source, "territory_claimed", title, summary, 60, territory, world, sect,
+			sect, sect, territory, territory, "territory claim " + territory, gm, "{}", now, now})
 }

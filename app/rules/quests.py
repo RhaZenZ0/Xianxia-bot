@@ -682,6 +682,22 @@ def validate_quest_definition(draft: dict[str, Any], world: Any, budget: dict[st
     }, []
 
 
+# The kinds of history row a sect war writes (v1.27.0), and the scene action a
+# drafted quest asks for about each. The engine writes these names in
+# `go_core/internal/game/sect_war.go`, `sect_war_peace.go` and
+# `territory_actions.go`; the Forge's procedural draft and RAG's notable-type
+# bonus read them from here. Both readers had keyed on `war_started` and
+# `war_resolved`, which no writer has ever produced, so no war reached either.
+# `test_the_wars_reach_the_forge.py` holds every war event type the Go source
+# writes to be a key here.
+WAR_HISTORY_EVENT_ACTIONS: dict[str, str] = {
+    "territory_war": "resolve",
+    "territory_war_resolved": "investigate",
+    "territory_war_ally": "influence",
+    "territory_claimed": "observe",
+}
+
+
 def procedural_quest_from_event(event: dict[str, Any], world: Any, budget: dict[str, int]) -> dict[str, Any]:
     """A draft built from a world-history row without a model: explore the
     place it happened, speak to whoever is there, resolve one fitting scene
@@ -694,7 +710,8 @@ def procedural_quest_from_event(event: dict[str, Any], world: Any, budget: dict[
                      if str(npc.get("location") or "") == location and not isinstance(npc.get("hidden_master"), dict)), None)
     kind = str(event.get("event_type") or "event")
     action = {"war_started": "resolve", "leadership_change": "influence", "discovery": "investigate",
-              "inheritance": "investigate", "betrayal": "investigate"}.get(kind, "observe")
+              "inheritance": "investigate", "betrayal": "investigate",
+              **WAR_HISTORY_EVENT_ACTIONS}.get(kind, "observe")
     title = str(event.get("title") or "Echoes of the Recent Past").strip()[:80]
     objectives: list[dict[str, Any]] = [{"id": "visit", "type": "explore", "count": 1, "target": location}]
     if npc_here:

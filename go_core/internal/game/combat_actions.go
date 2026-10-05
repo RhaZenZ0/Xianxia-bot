@@ -195,18 +195,50 @@ func combatCompanionBonus(conn *storage.Conn, userID int64) (int64, error) {
 	if len(r.Rows) > 0 {
 		bonus += i64(r.Rows[0][0])/2 + i64(r.Rows[0][1]) + i64(r.Rows[0][2])/40 + beastMilestoneBonus(i64(r.Rows[0][0]))
 	}
-	a, e := conn.Execute(`SELECT bond_level FROM artifact_bonds WHERE user_id=? AND awakened=1`, []any{userID})
+	a, e := conn.Execute(`SELECT bond_level,item_id FROM artifact_bonds WHERE user_id=? AND awakened=1`, []any{userID})
 	if e != nil {
 		return 0, e
 	}
 	ab := int64(0)
 	for _, x := range a.Rows {
-		ab += 1 + i64(x[0])/4
+		held, e := artifactStillHeldTx(conn, userID, fmt.Sprint(x[1]))
+		if e != nil {
+			return 0, e
+		}
+		if held {
+			ab += 1 + i64(x[0])/4
+		}
 	}
 	if ab > 4 {
 		ab = 4
 	}
 	return bonus + ab, nil
+}
+
+// artifactStillHeldTx says whether a bonded artifact is still the cultivator's
+// (v1.27.0): carried at any grade, or bound as equipment, which takes it out
+// of the bags. A bond is with the thing, so a bond whose thing was sold,
+// traded or dropped adds nothing to a fight - before this an awakened bond
+// counted for ever, and a cheap herb bonded, awakened and sold kept its +1 to
+// +4 on every battle.
+func artifactStillHeldTx(conn *storage.Conn, userID int64, itemID string) (bool, error) {
+	base := itemBaseID(itemID)
+	prefix := base + itemGradeSeparator
+	r, err := conn.Execute(`SELECT 1 FROM inventory WHERE user_id=? AND quantity>0 AND (item_id=? OR substr(item_id,1,?)=?) LIMIT 1`, []any{userID, base, len(prefix), prefix})
+	if err != nil {
+		return false, err
+	}
+	if len(r.Rows) > 0 {
+		return true, nil
+	}
+	if !tableExistsTx(conn, "equipment_instances") {
+		return false, nil
+	}
+	r, err = conn.Execute(`SELECT 1 FROM equipment_instances WHERE user_id=? AND (item_id=? OR substr(item_id,1,?)=?) LIMIT 1`, []any{userID, base, len(prefix), prefix})
+	if err != nil {
+		return false, err
+	}
+	return len(r.Rows) > 0, nil
 }
 
 // equipDefs is a second copy of the same four combat stats as

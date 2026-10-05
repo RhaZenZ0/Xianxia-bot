@@ -274,7 +274,7 @@ func DeclareWarTx(conn *storage.Conn, catalog worlddata.Catalog, attacker, defen
 		summary = fmt.Sprintf("%s has come back for %s, taken from it by %s. The occupation is contested.", attacker, name, defender)
 	}
 	if err = recordWorldHistoryTx(conn, fmt.Sprintf("sect_war:%s:%s:%d", attacker, territory, gm), "territory_war",
-		attacker+" declares on "+defender, summary, 78, "public", territory, attacker,
+		attacker+" declares on "+defender, summary, 80, "public", territory, attacker,
 		"faction", attacker, attacker, "faction", defender, defender, nil, "",
 		[]string{"territory", "war", territory}, gm, map[string]any{"war_id": ins.LastInsertID, "retake": retake}, now); err != nil {
 		return 0, err

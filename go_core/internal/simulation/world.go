@@ -962,24 +962,12 @@ func (r *Runner) applyAutonomousWorldEffect(conn *storage.Conn, event Unexpected
 		}
 	}
 	sect := simMap(effect["sect"])
-	if len(sect) > 0 && simTableExists(conn, "sect_politics_state") {
-		if _, err := conn.Execute(`UPDATE sect_politics_state SET influence=MIN(100,MAX(0,influence+?)),cohesion=MIN(100,MAX(0,cohesion+?)),resources=MIN(100,MAX(0,resources+?)),recruitment_pressure=MIN(100,MAX(0,recruitment_pressure+?)),doctrine_pressure=MIN(100,MAX(0,doctrine_pressure+?)),updated_at=?`, []any{i64(sect["influence"]), i64(sect["cohesion"]), i64(sect["resources"]), i64(sect["recruitment_pressure"]), i64(sect["doctrine_pressure"]), now}); err != nil {
-			return nil, err
-		}
-		rows, err := conn.Execute(`SELECT sect_name FROM sect_politics_state ORDER BY sect_name`, nil)
+	if len(sect) > 0 {
+		touched, err := game.ApplyEventSectEffectTx(conn, r.World, location, sect, history, sev, gm, now)
 		if err != nil {
 			return nil, err
 		}
-		if simTableExists(conn, "sect_politics_events") {
-			for _, row := range rows.Rows {
-				if len(row) > 0 {
-					if _, err = conn.Execute(`INSERT INTO sect_politics_events(sect_name,event_text,severity,game_minute,created_at) VALUES(?,?,?,?,?)`, []any{fmt.Sprint(row[0]), history, sev, gm, now}); err != nil {
-						return nil, err
-					}
-				}
-			}
-		}
-		if len(rows.Rows) > 0 {
+		if touched {
 			impacts = append(impacts, "sect influence, cohesion, resources, or recruitment pressure changed")
 		}
 	}

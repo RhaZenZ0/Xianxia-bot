@@ -487,6 +487,7 @@ async def merchant_buy(interaction:discord.Interaction,merchant:str,item:str,qua
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    await _report_trade(interaction,str(result.get("item_id") or item))
     where="by the roadside" if bool(result.get("on_the_road")) else f"at {result.get('whereabouts')}"
     where+=" from the shop" if str(result.get("source"))=="wares" else " from the floor finds"
     await interaction.followup.send(
@@ -1414,6 +1415,7 @@ async def market_buy_command(interaction:discord.Interaction,item:str,quantity:a
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    await _report_trade(interaction,item)
     await interaction.followup.send(format_trade_receipt(icon="🪙",verb="Bought",item_label=WORLD.item_name(item),quantity=int(quantity),result=result,currency_name=WORLD.currency_name),ephemeral=False)
 
 
@@ -1434,6 +1436,7 @@ async def market_sell_command(interaction:discord.Interaction,item:str,quantity:
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    await _report_trade(interaction,item)
     await interaction.followup.send(format_trade_receipt(icon="🪙",verb="Sold",item_label=WORLD.item_name(item),quantity=int(quantity),result=result,currency_name=WORLD.currency_name),ephemeral=False)
 
 
