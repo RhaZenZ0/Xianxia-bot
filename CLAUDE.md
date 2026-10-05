@@ -6836,6 +6836,42 @@ asks their master or any of the sect's people at `promoter_rank_level` standing 
 is above the rung. A master is not exempt from that last clause - a Core Disciple master cannot raise
 anybody to Core. The pickers offer only people who would be heard (rc.46), off the same content.
 
+### A better travel menu (`travel_preview.go`, v1.26.0)
+
+Asked for as *"a better travel menu"*; on the owner's call, two of four options: pick by kind, and a
+trip preview.
+
+**One list of 25 was the fault, and the sort made it worse.** `destination_groups` gave a road site
+`10 + hops` and a city `20 + hops`, so every road site anywhere outranked every city, and a player
+who had walked the roads met a picker full of waystations: measured from Azure Crown Imperial City
+with the first world known, all four cities one road away fell past row 25. `destination_kind`
+reads the group each row was already drawn in, and `destinations_of_kind` cuts the list four ways
+(Cities, This City, Road Sites, Wilds & Gates), so each kind is its own 25 and a city is never
+crowded out. **The kinds are a cut of the one list, not a second list**: `test_a_better_travel_menu.py`
+holds that the four together are exactly `destination_groups`. The four commands go through
+`ACTIONS.handler_for(travel)`, City → Enter's shape, so the lock, the meter and the preview are
+`/travel go`'s and cannot drift - and they take no lock of their own, because the binding takes it
+and an asyncio lock is not re-entrant.
+
+**The preview is the journey's own planner.** `planTravelTx` is every refusal `exploration.travel`
+makes before it charges anything, plus the road it would walk, pulled out of the action so
+`exploration.travel_preview` (a read on `authoritativeQueries`) and the journey answer through one
+function: a preview cannot show a road, a toll or an arrival gate the journey then disagrees with,
+and a destination the journey refuses is refused by the preview in the same words
+(`TestThePreviewRefusesInTheJourneysWords`). `travelEnds` is the arrival and departure gates, shared
+the same way. A walk with no road is free and immediate, so the bot takes it at once - which is what
+City → Enter and the City → Look buttons rely on. Go under the card is `serialized_user_action(metered=False)`:
+the preview already spent the press.
+
+**The toll was silent.** `travel_cost_spirit_stones` was in the journey's answer and read by nothing
+in the bot; the reply names it now, in the coin the engine returns beside it (`travel_cost_currency`),
+with the roads walked. Two twins the bot lacked came with it: the street does not reveal a private
+district (`knownLocationsTx` has skipped it since v1.19.0, and the picker offered it and the engine
+refused it), and a known part of a city is a known city.
+
+A bare `**/travel**` hint now lands on the Destinations page's first leaf, Cities; the arrival line
+that said *"Step in with /travel"* names City → Enter, the door built for it.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

@@ -64,7 +64,10 @@ def test_python_go_authority_boundary_only_delegates_migrated_mechanics():
         "conceal_command": "sense.conceal",
         "explore": "exploration.explore",
         "hunt": "exploration.hunt",
-        "travel": "exploration.travel",
+        # v1.26.0: `/travel go` asks the preview, and the journey is
+        # `_travel_now`, which Go under the preview and a free walk both reach.
+        "travel": "exploration.travel_preview",
+        "_travel_now": "exploration.travel",
         "realmhub_go": "exploration.travel",
         "secret_status": "secret_realm.status",
         "secret_enter": "secret_realm.enter",

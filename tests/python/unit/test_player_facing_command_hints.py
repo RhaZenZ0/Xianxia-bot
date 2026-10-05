@@ -78,6 +78,12 @@ def _string_constants(tree: ast.AST) -> list[tuple[int, str]]:
             if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant):
                 if isinstance(body[0].value.value, str):
                     docstrings.add(id(body[0].value))
+        # LEAF_LABELS (hubs.py, v1.22.0) is keyed by leaf path, the identifier a
+        # hub builds, never shown to a player; only its labels are.
+        if isinstance(node, (ast.Assign, ast.AnnAssign)) and isinstance(node.value, ast.Dict):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            if any(isinstance(t, ast.Name) and t.id == "LEAF_LABELS" for t in targets):
+                docstrings.update(id(key) for key in node.value.keys if key is not None)
     found = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in docstrings:

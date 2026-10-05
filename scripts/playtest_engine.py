@@ -553,7 +553,18 @@ async def run(url: str, token: str, db_path: str) -> Report:
     # choice beats the .env baseline and this one journey waits half the road.
     await step(report, "a pace above 100 is refused", gm("admin.world.set_travel_pace", {"percent": 101, "reason": "playtest"}), expect_error="between 0 and 100")
     await audited("admin.world.set_travel_pace", {"percent": 50, "reason": "playtest"})
+    # v1.26.0: the trip is shown before it is taken, through the planner the
+    # journey walks - so the preview's road and toll are the journey's.
+    preview = await step(report, "exploration.travel_preview of the road to the capital",
+                         query("exploration.travel_preview", PLAYER, {"destination": capital, "mode": "known"}))
     journey = await step(report, "exploration.travel by road to the capital", act("exploration.travel", PLAYER, {"destination": capital, "mode": "known"}))
+    if preview is not None and journey is not None:
+        same = (present(preview.get("travel_cost_spirit_stones")) == present(journey.get("travel_cost_spirit_stones"))
+                and list(preview.get("road_route") or []) == list(journey.get("road_route") or []))
+        report.add("PASS" if same and present(preview.get("travel_cost_spirit_stones")) > 0 else "FAIL",
+                   "the preview is the journey it shows",
+                   f"preview {preview.get('travel_cost_spirit_stones')} {preview.get('currency_name')} by {preview.get('road_route')}; "
+                   f"journey {journey.get('travel_cost_spirit_stones')} {journey.get('travel_cost_currency')} by {journey.get('road_route')}")
     if journey is not None:
         road, waited = present(journey.get("travel_minutes")), present(journey.get("wait_minutes"))
         report.add("PASS" if road > 0 and waited == road * 50 // 100 else "FAIL",

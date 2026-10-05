@@ -263,6 +263,14 @@ def _world_is_unlocked(character: dict[str, Any], world_name: str) -> bool:
 async def _known_locations(user_id: int, character: dict[str, Any]) -> set[str]:
     rows = await DB.get_discovered_locations(int(user_id))
     known = {str(row.get("location")) for row in rows if row.get("location")}
+    # A known part of a city is a known city - the twin of the rule
+    # `knownLocationsTx` has kept since v1.19.0 and this side never had, so a
+    # gate a sponsor revealed was on the engine's map and the picker's city
+    # list was missing the city it stands in (v1.26.0).
+    for place in list(known):
+        city = _city_of_location(place)
+        if city and city != place:
+            known.add(city)
     current = str(character.get("location") or "")
     if current and not current.startswith(("abode:", "personal_world:")):
         known.add(current)
@@ -275,7 +283,10 @@ async def _known_locations(user_id: int, character: dict[str, Any]) -> set[str]:
             known.add(city)
             current_data = WORLD.locations.get(city) or {}
         for name, data in WORLD.locations.items():
-            if data.get("district") and str(data.get("outside_location")) == city:
+            # A private part - a sect's hidden gate - is a sponsor's to reveal,
+            # not the street's (`knownLocationsTx` skips it too, v1.19.0); the
+            # picker offered it and the engine refused it until v1.26.0.
+            if data.get("district") and str(data.get("outside_location")) == city and not data.get("private"):
                 known.add(name)
         # At a road-side site (v0.39.0) the road runs both ways: both ends
         # of its leg are known, and every other site on that leg.
@@ -592,6 +603,39 @@ def door_allows(current: str, destination: str) -> bool:
     if dest.get("district"):
         return origin == str(dest.get("outside_location") or "")
     return True
+
+
+# The four kinds of place the travel menu picks from (v1.26.0), in the order
+# the Destinations page draws them. One picker held every known place in one
+# list of 25, and every road site anywhere outranked every city, so a player
+# who had walked the roads could not pick most cities at all: from the Azure
+# Crown capital even the four cities one road away fell off the end.
+DESTINATION_KINDS: tuple[tuple[str, str], ...] = (
+    ("city", "Cities"),
+    ("here", "This city"),
+    ("road", "Road sites"),
+    ("wilds", "Wilds and gates"),
+)
+
+
+def destination_kind(emoji: str) -> str:
+    """Which kind a `destination_groups` row is, by the group it was drawn in:
+    the streets, parts and shops of the city you stand in; a road site; a city
+    by road (or a capital, or a road's end); anything else - a wild place, a
+    sect gate, a road-less spot."""
+    if emoji in ("🚪", "🏙️", "🏪"):
+        return "here"
+    if emoji == "🛤️":
+        return "road"
+    if emoji in ("🛣️", "🌀"):
+        return "city"
+    return "wilds"
+
+
+def destinations_of_kind(current: str, known: set[str] | list[str], realm_index: int, kind: str) -> list[tuple[str, str, str, int]]:
+    """The rows of one kind, in `destination_groups`' own order - so a city is
+    nearest first and nothing of another kind can push it off a list of 25."""
+    return [row for row in destination_groups(current, known, realm_index) if destination_kind(row[1]) == kind]
 
 
 def destination_groups(current: str, known: set[str] | list[str], realm_index: int) -> list[tuple[str, str, str, int]]:

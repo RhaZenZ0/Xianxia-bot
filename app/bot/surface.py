@@ -353,7 +353,12 @@ _HUB_DEFINITIONS = (
         title="🗺 Travel Hub",
         description="Choose destinations, teleportation arrays and special movement options.",
         pages=(
-            _hub_page("travel", "Destinations", "Travel to another known normal destination, or check your in-transit status."),
+            # One picker per kind of place (v1.26.0): a city is never crowded off
+            # the list by a road site, and a road trip is previewed before it
+            # is taken. Go keeps its name - the realm road's quests name it - and
+            # is every known place in one list, as before.
+            _hub_page("travel", "Destinations", "Pick where to go by kind - a city, somewhere in this city, a road site, the wilds - and see the road's toll and risk before you leave.",
+                      order=("travel city", "travel nearby", "travel road", "travel wilds", "travel go", "travel status")),
             _hub_page("realmhub", "Realm Capitals", "Travel to and inspect the public meeting city for every realm world."),
             _hub_page("array", "Teleportation Arrays", "List and use public teleportation formations."),
         ),

@@ -213,6 +213,9 @@ var authoritativeQueries = map[string]bool{
 	// v1.0.0: the rotation on its own, for the GM dashboard, which is not an
 	// actor and wants the whole schedule rather than one cultivator's view.
 	"secret_realm.rotation": true,
+	// v1.26.0: the trip before it is taken - the route, the toll and the risk,
+	// through the planner exploration.travel itself walks.
+	"exploration.travel_preview": true,
 	// v1.0.13: what one account has spent of its restart allowance, for the
 	// two GM surfaces that ask. Like the rotation it is not an actor's own
 	// view - the payload names whom it is about.
@@ -818,6 +821,20 @@ func applyAuthoritativeQuery(databasePath, worldPath string, req ActionRequest) 
 			return ActionResponse{}, loadErr
 		}
 		result, qerr := supportVoteStatusQuery(conn, catalog, req.ActorID)
+		if qerr != nil {
+			return ActionResponse{}, qerr
+		}
+		v, _ := eventledger.CurrentActorVersion(conn, req.ActorID)
+		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
+	case "exploration.travel_preview":
+		if strings.TrimSpace(worldPath) == "" {
+			return ActionResponse{}, errors.New("world catalog path is required")
+		}
+		catalog, loadErr := worlddata.Load(worldPath)
+		if loadErr != nil {
+			return ActionResponse{}, loadErr
+		}
+		result, qerr := travelPreviewQuery(conn, catalog, req.ActorID, req.Payload)
 		if qerr != nil {
 			return ActionResponse{}, qerr
 		}
