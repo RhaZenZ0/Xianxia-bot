@@ -6872,6 +6872,52 @@ refused it), and a known part of a city is a known city.
 A bare `**/travel**` hint now lands on the Destinations page's first leaf, Cities; the arrival line
 that said *"Step in with /travel"* names City → Enter, the door built for it.
 
+### Every place a reply names is a button (v1.27.0)
+
+Asked as "missing system links" and then "interlinked systems". Three read-only audits, checked
+again against v1.26.0, found the same shape in three places: a system that names another and gives
+no way to reach it, a system that writes something another should read and nothing connects them,
+and a rule the engine states at one door and not its sibling.
+
+**One rule each for where a door is.** `OBJECTIVE_PATHS` in `app/rules/quests.py` is where every
+objective type is done, and `labelled_objective` appends it to a label that names no door of its
+own - 375 commission labels and every Forge draft named none, and nothing about the 375 was edited.
+`_hint_action` answers a bare tree command (`**/quests**`) from `register_root_hint_actions`, whose
+path is the bare name so the panel gate treats it exactly as the command tree does; it is asked
+*before* the bare-name leaf match, which had answered `/quests` with the GM's `/admin world quests`.
+`HubNextStepView` puts an empty picker's hint path under it; a panel's padlock reasons are
+`suggested_actions` too, drawn as a row when no result is showing, never for a door that is itself
+shut. `path_buttons` (registered by `surface`) is the same for a message outside any panel - the
+quest journal. And `_explain_engine_error` appends a door to a known refusal that names another
+system, inline so the tests that exec it still can. `test_every_refusal_is_explained.py` holds
+every `except GameEngineError` in the commands to pass through it; `test_hint_paths.py` now scans
+production Go too, because an engine string that prints a path reaches a player through the
+explainer like any reply.
+
+**A world event's sect effect has a place.** `ApplyEventSectEffectTx` is the one statement both the
+player-triggered and the autonomous event call; `EventSectTargetsTx` answers the sect whose home is
+the event's city, else the sect holding the ground, else the public sects of its world, and nobody
+for a place the catalogue does not carry. The unscoped `UPDATE` it replaces had drained every sect in
+four worlds for one village's invasion.
+
+**A reader keyed on names no writer produces is decoration.** The Forge and RAG read
+`war_started`/`war_resolved`; the engine writes `territory_war`, `territory_war_resolved`,
+`territory_war_ally` and `territory_claimed`. `WAR_HISTORY_EVENT_ACTIONS` is the one table both
+read, and `test_the_wars_reach_the_forge.py` reads the event types off the Go source, so the next war
+row fails there the day it is written. The declaration rose from 78 to the Forge's floor of 80.
+
+**The rest is a rule found at a second site.** The war step now asks `game.SectsAlliedTx` and the
+attacker's world before it moves (claims always stayed in their world); a player's neutral claim
+writes the `territory_claimed` row the NPC claim always did, through `RecordTerritoryClaimedTx`; an
+artifact bond counts only while `artifactStillHeldTx` finds the artifact carried at any grade or
+bound as equipment; and the merchant and market buys report `trade` like the shops. The dashboard's
+`table()` renders every column keyed on a known name field through `linkedCell`, and one
+document-level click handler opens a player or an NPC from anywhere.
+
+**Decided against, with the reason.** `abode.focus` on Defense or Storage applies no effect, by the
+rc.36 design written above `abodeFacilityEffects`; `world_history_events.world_name` is read by no
+reader, so filling it was left out.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —
