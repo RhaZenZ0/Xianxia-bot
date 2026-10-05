@@ -444,18 +444,11 @@ func abodeUpgradeActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 		return authoritativeMutation{}, errors.New("you do not own a player property")
 	}
 	current := i64(a[col])
-	maxlvl := i64(catalog.AbodeSystem["max_level"])
-	if maxlvl <= 0 {
-		maxlvl = 9
-	}
+	maxlvl := homesteadMaxLevel(catalog)
 	if current >= maxlvl {
 		return authoritativeMutation{}, errors.New("that facility is already at maximum level")
 	}
-	base := i64(catalog.AbodeSystem["upgrade_base_cost"])
-	if base <= 0 {
-		base = 100
-	}
-	cost := base * (current + 1) * (current + 1)
+	cost := homesteadUpgradeCost(catalog, current)
 	// Charged in the money of the world the cultivator stands in (v1.2.1).
 	// `abode_system.currency` names the Mortal stone, and a homestead may be
 	// founded in any world, so the fixed id refused every upgrade above the

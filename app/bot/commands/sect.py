@@ -62,7 +62,8 @@ from ...rules.sect_recruitment import (
 from ..registry import registered_group_command
 from ..locations import DEAD, current_npc_location, npc_whereabouts, npcs_present
 from ..character_state import record_quest_progress, announce_quest_progress
-from ..formatting import player_property_facility_lines, player_property_unbuilt
+from ..formatting import player_property_facility_lines, player_property_unbuilt, property_overview_lines
+from .abode import home_overview
 from ..services import PLAYER_PROPERTY_FACILITY_LABELS, QUESTS, SIM
 from ..threads import ensure_sect_abode_record, ensure_sect_abode_thread_for
 from ..runtime import (
@@ -900,14 +901,21 @@ async def sect_abode(interaction: discord.Interaction, action: app_commands.Choi
     abode = await ensure_sect_abode_record(interaction.user.id, c, membership)
     thread = await ensure_sect_abode_thread_for(interaction.guild, interaction.user, abode) if interaction.guild else None
     if action.value == "status":
-        facilities = " • ".join(player_property_facility_lines(abode, SECT_ABODE_FACILITY_KEYS)) or "No developed facilities"
-        unbuilt = player_property_unbuilt(abode, SECT_ABODE_FACILITY_KEYS)
-        await respond(interaction, 
+        overview = await home_overview(interaction.user.id)
+        residence = (overview or {}).get("residence") or None
+        if residence:
+            # What each room does, what the next level adds and what it still
+            # asks of rank and stage, off the engine's numbers (v1.30.0).
+            facilities_text = "\n".join(f"• {line}" for line in property_overview_lines(residence, currency_name=WORLD.currency_name)) + "\n"
+        else:
+            facilities = " • ".join(player_property_facility_lines(abode, SECT_ABODE_FACILITY_KEYS)) or "No developed facilities"
+            unbuilt = player_property_unbuilt(abode, SECT_ABODE_FACILITY_KEYS)
+            facilities_text = f"Facilities: {facilities}\n" + (f"Not yet built: {', '.join(unbuilt)}\n" if unbuilt else "")
+        await reply_long(interaction, 
             f"🏯 **{abode['name']}**\nSect: **{abode['sect_name']}** • Rank: **{membership.get('rank_name', 'Disciple')}**\n"
             f"Sect gate: **{abode['base_location']}**\n"
             f"Current location: **{await character_location_display(c)}**\n"
-            f"Facilities: {facilities}\n"
-            + (f"Not yet built: {', '.join(unbuilt)}\n" if unbuilt else "")
+            + facilities_text
             + f"Contribution points: **{int(membership.get('contribution_points', 0) or 0)}** - a facility is built or raised with "
             "**/sect → Holdings → Abode** and **Build or raise a facility**; the sect caps each level by your rank and stage.\n"
             + (f"Private scene: {thread.mention}" if thread else "⚠️ Private scene thread is unavailable; repair the base channels."),

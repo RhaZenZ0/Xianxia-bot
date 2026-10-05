@@ -180,8 +180,7 @@ func sectAbodeUpgradeAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 		return authoritativeMutation{}, fmt.Errorf("level %d asks a cultivation stage of %s (realm %d); yours is %s",
 			next, realmNameGo(catalog, floor), floor, realmNameGo(catalog, realm))
 	}
-	base := sectAbodeSystemInt(catalog, "upgrade_base_points", 40)
-	cost := base * next * next
+	cost := residenceUpgradeCost(catalog, next)
 	points := i64(membership["contribution_points"])
 	if points < cost {
 		return authoritativeMutation{}, fmt.Errorf("not enough sect contribution points: %d needed, %d held", cost, points)

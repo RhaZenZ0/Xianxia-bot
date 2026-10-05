@@ -1589,14 +1589,22 @@ async def run(url: str, token: str, db_path: str, shard: tuple[int, int] | None 
             # gave up, wait the workers out and jump once more (a second jump
             # past the same deadline changes nothing the step holds).
             await settle_patiently(env)
+            jumped, jump_error = False, ""
             for _ in range(2):
                 try:
                     await env.advance_time(int(window) + 1)
+                    jumped = True
                     break
-                except TimeoutError:
+                except TimeoutError as exc:
+                    jump_error = str(exc)
                     await settle_patiently(env)
             await settle_patiently(env)
             text = panel.text()
+            # A jump that gave up both times never moved the clock, and the
+            # panel then still taking presses says nothing about its timeout;
+            # say which it was rather than blaming the panel.
+            expect(jumped or "Reopen" in panel.labels(),
+                   "the clock jump never landed - both tries timed out settling: " + jump_error[:600])
             if "Reopen" in panel.labels():
                 reopened = await player.click(panel.message(), label="Reopen")
                 await settle_patiently(env)

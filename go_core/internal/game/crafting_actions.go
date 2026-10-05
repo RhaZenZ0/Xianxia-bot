@@ -95,7 +95,7 @@ func canonicalCraftAbodeBonus(conn *storage.Conn, userID int64, location, profes
 			return 0, residenceErr
 		}
 		if found {
-			return level * 2, nil
+			return abodeFacilityRollBonus(level), nil
 		}
 		return 0, nil
 	}
@@ -114,7 +114,7 @@ func canonicalCraftAbodeBonus(conn *storage.Conn, userID int64, location, profes
 	if !canAccess {
 		return 0, nil
 	}
-	return maxI64(0, i64(row["facility_level"])) * 2, nil
+	return abodeFacilityRollBonus(i64(row["facility_level"])), nil
 }
 
 func canonicalCraftManorBonus(conn *storage.Conn, catalog worlddata.Catalog, userID int64, location, profession string) (int64, error) {
@@ -882,7 +882,7 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	if echoErr != nil {
 		return authoritativeMutation{}, echoErr
 	}
-	gardenBonus := gardenLevel * 2
+	gardenBonus := abodeFacilityRollBonus(gardenLevel)
 	gameMinute, err := canonicalWorldGameMinute(conn)
 	if err != nil {
 		return authoritativeMutation{}, err

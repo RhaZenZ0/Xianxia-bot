@@ -439,7 +439,7 @@ func (r *Runner) advanceHunters(conn *storage.Conn, gm int64) (int64, error) {
 				// level takes a tenth off the hunter's capture, and at ten it
 				// holds them off entirely. Pressure still builds - the hunter
 				// waits at the gate.
-				ward := 1.0 - 0.1*float64(game.PropertyDefenseLevelTx(conn, i64(p["user_id"]), fmt.Sprint(p["location"])))
+				ward := game.PropertyWardShare(game.PropertyDefenseLevelTx(conn, i64(p["user_id"]), fmt.Sprint(p["location"])))
 				capture = min64(100, capture+int64(math.Round(float64(elapsed*max64(5, i64(p["hunter_power"])))*m*math.Max(0, ward))))
 			}
 		}
