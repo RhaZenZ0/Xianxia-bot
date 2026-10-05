@@ -100,7 +100,8 @@ func warDB(t *testing.T) string {
 		}
 	}
 	for _, sql := range []string{
-		`INSERT INTO sect_membership(user_id,sect_name,rank_level,joined_at) VALUES(42,'Attacking Sect',10,0),(43,'Holding Sect',10,0),(44,'Allied Sect',10,0),(45,'Stranger Sect',10,0)`,
+		// Core Disciples (v1.25.0): fighting in a war asks sect_system.rank_floors["war.act"].
+		`INSERT INTO sect_membership(user_id,sect_name,rank_name,rank_level,joined_at) VALUES(42,'Attacking Sect','Core Disciple',30,0),(43,'Holding Sect','Core Disciple',30,0),(44,'Allied Sect','Core Disciple',30,0),(45,'Stranger Sect','Core Disciple',30,0)`,
 		`INSERT INTO sect_relations(sect_a,sect_b,relation_score,relation_type,updated_at) VALUES('Allied Sect','Holding Sect',20,'marriage_pact',0),('Attacking Sect','Allied Sect',0,'neutral',0),('Attacking Sect','Holding Sect',0,'neutral',0)`,
 		`INSERT INTO territory_state(territory_key,name,region,controller_type,controller_key,defense,updated_at) VALUES('the_ford','The Ford','Greenriver Town','sect','Holding Sect',50,0)`,
 	} {

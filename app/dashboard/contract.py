@@ -50,7 +50,9 @@ DASHBOARD_API_VERSION = 2
 # channel per world and a live card per sect war in it. Discord bindings the
 # Server Setup card provisions, reports and tears down beside the market
 # stalls; neither is a gameplay table.
-DASHBOARD_REVIEWED_SCHEMA_VERSION = 78
+# Schema 79 (v1.25.0) adds `npc_mentorships`, a player's master among the
+# sect's own people: read-only on Members & Lineage beside the player lineage.
+DASHBOARD_REVIEWED_SCHEMA_VERSION = 79
 
 DASHBOARD_GET_API_PATHS = frozenset({
     "/api/overview", "/api/capabilities", "/api/timeline", "/api/npcs", "/api/npc",
@@ -139,7 +141,7 @@ DASHBOARD_SYSTEM_TABLES = {
         "sect_politics_state", "sect_factions", "sect_relations", "sect_politics_events",
     ),
     "sect_members": (
-        "sect_membership", "sect_lineage", "disciple_requests",
+        "sect_membership", "sect_lineage", "disciple_requests", "npc_mentorships",
     ),
     "sect_recruitment": (
         "sect_recruitment_attempts", "sect_recommendations", "character_sect_discoveries",

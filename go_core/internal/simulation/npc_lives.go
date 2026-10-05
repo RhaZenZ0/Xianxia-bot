@@ -59,6 +59,13 @@ var sectRankLadder = []string{
 	"Outer Disciple", "Inner Disciple", "Core Disciple", "Elder", "Grand Elder",
 }
 
+// nextSectRank is the rung above. Somebody unranked - an independent, or a
+// fresh member with no rank yet - takes the first rung; a rank the ladder does
+// not carry stays where it is. That second half is v1.25.0's: bootstrap and
+// the sect population both make a "Sect Master", which is above this ladder,
+// and the old fallback sent every unknown rank to the first rung - so the work
+// that should have become a Sect Master's influence demoted them to Outer
+// Disciple.
 func nextSectRank(current string) string {
 	current = strings.TrimSpace(current)
 	for i, rank := range sectRankLadder {
@@ -69,7 +76,10 @@ func nextSectRank(current string) string {
 			return "" // already at the top
 		}
 	}
-	return sectRankLadder[0]
+	if current == "" || strings.HasPrefix(current, "Independent") {
+		return sectRankLadder[0]
+	}
+	return ""
 }
 
 // recordNPCHistory writes a public world-history row. Best-effort: the thing

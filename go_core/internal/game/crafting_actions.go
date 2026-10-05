@@ -469,7 +469,9 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	// And the Immortal World's job (v1.17.0): work made in the grandmasters'
 	// court is made better, whichever trade it is.
 	placeName, placeBonus := craftPlaceBonus(catalog, location)
-	contextBonus := effectBonus + facilityBonus + manorFacilityBonus + familyBonus + craftEcho + flameBonus + senseBonus + placeBonus
+	// And a player master's teaching (v1.25.0), in every trade.
+	masterBonus, masterName := masterTradeBonusTx(conn, catalog, userID)
+	contextBonus := effectBonus + facilityBonus + manorFacilityBonus + familyBonus + craftEcho + flameBonus + senseBonus + placeBonus + masterBonus
 	// Craft all (v1.21.0): as many as the bags pay for, counted here, in the
 	// transaction that spends them, so the number cannot be stale. Bags that
 	// pay for none leave the batch at one, which is refused below with the
@@ -598,6 +600,8 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		"manor_facility_bonus": manorFacilityBonus,
 		"family_bonus":         familyBonus,
 		"family_trade":         familyTrade,
+		"master_trade_bonus":   masterBonus,
+		"master_name":          masterName,
 		"craft_echo":           craftEcho,
 		"craft_echo_life":      craftEchoLife,
 		"craft_echo_level":     craftEchoLevel,
@@ -887,7 +891,8 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	contextBonus := effectBonus + familyBonus + gardenBonus + craftEcho
+	masterBonus, masterName := masterTradeBonusTx(conn, catalog, userID)
+	contextBonus := effectBonus + familyBonus + gardenBonus + craftEcho + masterBonus
 
 	resources := int64(50)
 	worldName := "Mortal World"
@@ -1106,6 +1111,8 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 		"game_minute":         gameMinute,
 		"family_bonus":        familyBonus,
 		"family_trade":        familyTrade,
+		"master_trade_bonus":  masterBonus,
+		"master_name":         masterName,
 		"craft_echo":          craftEcho,
 		"craft_echo_life":     craftEchoLife,
 		"craft_echo_level":    craftEchoLevel,

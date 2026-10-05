@@ -85,6 +85,9 @@ async def cultivate(interaction: discord.Interaction) -> None:
     if float(result.get("root_mult", 1)) != 1.0:
         extra += (f"\n🌿 **{result.get('root_grade') or 'Common'}** spiritual root: "
                   f"**x{float(result['root_mult']):.2f}** cultivation efficiency.")
+    # A master's guidance (v1.25.0), NPC or player, named by the engine with its term.
+    if float(result.get("master_mult", 1) or 1) != 1.0:
+        extra += f"\n🎓 Your master **{result.get('master_name')}** guides the session: **x{float(result['master_mult']):.2f}**."
     if float(result.get("manual_mult", 1)) != 1.0:
         chosen = "you practise" if result.get("manual_chosen") else "the best method you have learned"
         extra += f"\n📖 **{result.get('manual_name')}** ({result.get('manual_grade')} grade, {chosen}): **x{float(result['manual_mult']):.2f}**."
@@ -462,6 +465,9 @@ async def breakthrough(interaction: discord.Interaction, confirm: bool = False, 
     # the engine with its bonus.
     if int(result.get("place_bonus", 0)):
         mechanical += f"\n🌠 {result.get('place')}: **{int(result['place_bonus']):+d}** to this breakthrough."
+    # An NPC master's help (v1.25.0), named by the engine with its bonus.
+    if int(result.get("master_bonus", 0)):
+        mechanical += f"\n🎓 Your master **{result.get('master_npc_name')}** steadies you: **{int(result['master_bonus']):+d}** to this breakthrough."
     if success:
         mechanical += f"\n✨ Advanced to **{next_realm}, Stage {next_phase}**."
         gains = dict(result.get("attribute_gains") or {})
@@ -480,6 +486,9 @@ async def breakthrough(interaction: discord.Interaction, confirm: bool = False, 
                 f"**{result.get('ascended_to_location')}**, the capital of {result.get('to_world')} — it is on your map now, "
                 "and the road out of it begins with **/travel**."
             )
+        teaching = dict(result.get("npc_master_insight") or {})
+        if teaching:
+            mechanical += f"\n📖 **{teaching.get('master_npc_name')}** talks you through the new realm: **+{int(teaching.get('insight_xp',0))} Insight XP**."
         master = dict(result.get("master_reward") or {})
         if master:
             mechanical += f"\n🎓 Your breakthrough feeds the master-disciple bond: **{master.get('master_name','Your master')}** receives **+{int(master.get('insight_xp',0))} Insight XP** and the lineage gains **+{int(master.get('attention',0))} Master Attention**."
@@ -603,6 +612,8 @@ async def body_breakthrough(interaction: discord.Interaction, confirm: bool = Fa
         text += f"\n🌿 Innate aptitude modifier: **{int(result['innate_breakthrough_bonus']):+d}**."
     if int(result.get("place_bonus", 0)):
         text += f"\n🌠 {result.get('place')}: **{int(result['place_bonus']):+d}**."
+    if int(result.get("master_bonus", 0)):
+        text += f"\n🎓 Your master **{result.get('master_npc_name')}**: **{int(result['master_bonus']):+d}**."
     if success:
         text += f"\n✨ Advanced to **{result.get('to_realm','Unknown Realm')}, Stage {int(result.get('to_stage',1))}**."
         if int(result.get("vitality_gain", 0)):

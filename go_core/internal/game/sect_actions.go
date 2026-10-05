@@ -597,12 +597,12 @@ func sectEconomyActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID i
 			out["capped_at_shelf"] = limit
 		}
 		points := p.Quantity * perUnit
-		promoted, e := creditSectContributionTx(conn, catalog, userID, points, max64(1, points/10))
+		eligible, e := creditSectContributionTx(conn, catalog, userID, points, max64(1, points/10))
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
-		if promoted != "" {
-			out["promoted_to"] = promoted
+		if eligible != "" {
+			out["eligible_for"] = eligible
 		}
 		_, _ = conn.Execute(`UPDATE sect_lineage SET attention=attention+? WHERE disciple_user_id=?`, []any{max64(1, points/20), userID})
 		out["points"] = points
@@ -689,13 +689,24 @@ func discipleshipActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 			return authoritativeMutation{}, errors.New("requested master must have a higher cultivation stage")
 		}
 		r, _ = conn.Execute(`SELECT 1 FROM sect_lineage WHERE disciple_user_id=?`, []any{userID})
-		if firstRowMap(r) != nil {
+		if firstRowMap(r) != nil || npcMasterOfTx(conn, userID) != "" {
 			return authoritativeMutation{}, errors.New("you already have a recorded master")
 		}
 		r, _ = conn.Execute(`SELECT user_id,sect_name FROM sect_membership WHERE user_id IN (?,?)`, []any{userID, p.MasterUserID})
 		ms := rowsToMaps(r)
 		if len(ms) == 2 && fmt.Sprint(ms[0]["sect_name"]) != fmt.Sprint(ms[1]["sect_name"]) {
 			return authoritativeMutation{}, errors.New("master and disciple must belong to the same sect")
+		}
+		// A request to somebody who could never answer it is stranded: the
+		// answer is the master's, and it has a rank floor (v1.25.0).
+		if floor := sectRankFloorGo(catalog, "discipleship.resolve"); floor > 0 {
+			mm, e := sectMembershipRow(conn, p.MasterUserID)
+			if e != nil {
+				return authoritativeMutation{}, e
+			}
+			if mm != nil && i64(mm["rank_level"]) < floor {
+				return authoritativeMutation{}, fmt.Errorf("a master takes disciples from %s (rank %d); they hold %s", sectRankName(catalog, floor), floor, fmt.Sprint(mm["rank_name"]))
+			}
 		}
 		_, _ = conn.Execute(`UPDATE disciple_requests SET status='superseded',resolved_at=? WHERE disciple_user_id=? AND status='pending'`, []any{now, userID})
 		c, e := conn.Execute(`INSERT INTO disciple_requests(disciple_user_id,master_user_id,status,created_at) VALUES(?,?,'pending',?)`, []any{userID, p.MasterUserID, now})
@@ -719,6 +730,15 @@ func discipleshipActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 		if i64(req["master_user_id"]) != userID {
 			return authoritativeMutation{}, errors.New("only the requested master can resolve this request")
 		}
+		mem, e := sectMembershipRow(conn, userID)
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		if mem != nil {
+			if e := requireSectRankTx(catalog, mem, "discipleship.resolve", "taking a disciple"); e != nil {
+				return authoritativeMutation{}, e
+			}
+		}
 		disciple := i64(req["disciple_user_id"])
 		if !p.Accept {
 			_, e = conn.Execute(`UPDATE disciple_requests SET status='rejected',resolved_at=? WHERE request_id=?`, []any{now, p.RequestID})
@@ -728,7 +748,7 @@ func discipleshipActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 			out = map[string]any{"request_id": p.RequestID, "disciple_user_id": disciple, "master_user_id": userID, "status": "rejected"}
 		} else {
 			r, _ = conn.Execute(`SELECT 1 FROM sect_lineage WHERE disciple_user_id=?`, []any{disciple})
-			if firstRowMap(r) != nil {
+			if firstRowMap(r) != nil || npcMasterOfTx(conn, disciple) != "" {
 				return authoritativeMutation{}, errors.New("that cultivator already has a recorded master")
 			}
 			r, e = conn.Execute(`SELECT user_id,realm_index,phase,life_status FROM characters WHERE user_id IN (?,?)`, []any{disciple, userID})
@@ -774,7 +794,16 @@ func discipleshipActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 		}
 		x := firstRowMap(r)
 		if x == nil {
-			return authoritativeMutation{}, errors.New("no recorded master")
+			// The master may be one of the sect's own people (v1.25.0).
+			name, e := severNPCMasterTx(conn, userID)
+			if e != nil {
+				return authoritativeMutation{}, e
+			}
+			if name == "" {
+				return authoritativeMutation{}, errors.New("no recorded master")
+			}
+			out = map[string]any{"disciple_user_id": userID, "master_npc_name": name, "severed": true}
+			return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "sect", EventType: op, EntityType: "character", EntityID: fmt.Sprint(userID), Payload: out}}, nil
 		}
 		master := i64(x["master_user_id"])
 		_, e = conn.Execute(`DELETE FROM sect_lineage WHERE disciple_user_id=?`, []any{userID})

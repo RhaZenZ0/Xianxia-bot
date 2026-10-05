@@ -128,8 +128,9 @@ class TheEngineReadsThem(unittest.TestCase):
         self.assertIn("if body {\n\t\telementMult = 1\n\t}", GO_ACTIONS)
         # v1.0.0-rc.55 appended the root's own worth to the product, on both
         # paths - the body carve-out above is about elements, and a grade is
-        # not an element.
-        self.assertIn("* manualMult * elementMult * rootMult))", GO_ACTIONS)
+        # not an element. The factors, not the closing parentheses: v1.25.0
+        # appended a master's term after them, which changed nothing this holds.
+        self.assertIn("* manualMult * elementMult * rootMult", GO_ACTIONS)
         # A clash can turn on its own, whatever the stance.
         self.assertIn('"cultivation", "element_clash", p.GameMinute', GO_ACTIONS)
         self.assertIn("absorption.Surcharge > 0", GO_ACTIONS)

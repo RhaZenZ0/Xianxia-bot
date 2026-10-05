@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 78
+SCHEMA_VERSION = 79
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -152,6 +152,7 @@ OPERATIONAL_REQUIRED_TABLES = frozenset(
         "npc_graves",
         "npc_life_state",
         "npc_memory",
+        "npc_mentorships",
         "npc_mind_state",
         "npc_player_memories",
         "npc_registry",
@@ -3279,6 +3280,29 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             "ALTER TABLE territory_war_actions ADD COLUMN sect_name TEXT NOT NULL DEFAULT ''",
         ),
     ),
+    (
+        79,
+        "npc_masters",
+        (
+            # v1.25.0: a player may take one of their own sect's people as a
+            # master. `sect_lineage` cannot hold that - both its ids are
+            # foreign-keyed to `characters`, and an NPC is not one - so the bond
+            # has a table of its own, keyed on the disciple (one master at a
+            # time) and naming the master by name. An erasure or a reset takes
+            # it with the character; an NPC's death ends it through
+            # `ReleaseNPCBondsTx`, the one door every death path already uses.
+            """CREATE TABLE IF NOT EXISTS npc_mentorships (
+                disciple_user_id INTEGER PRIMARY KEY,
+                master_npc_name TEXT NOT NULL,
+                sect_name TEXT NOT NULL,
+                accepted_game_minute INTEGER NOT NULL DEFAULT 0,
+                attention INTEGER NOT NULL DEFAULT 0,
+                created_at REAL NOT NULL,
+                FOREIGN KEY(disciple_user_id) REFERENCES characters(user_id) ON DELETE CASCADE
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_npc_mentorships_master ON npc_mentorships(master_npc_name)",
+        ),
+    ),
 )
 
 
@@ -6224,6 +6248,27 @@ class Database:
                 return None
             return await self._lineage_person(db, int(row[0]))
 
+    async def get_npc_master(self, user_id: int) -> dict[str, Any] | None:
+        """The one of the sect's own people who is this player's master
+        (v1.25.0, `npc_mentorships`), with the rank and realm the world holds
+        for them now; None without one or before schema 79."""
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            try:
+                cur = await db.execute(
+                    """SELECT m.master_npc_name AS name,m.sect_name,m.attention,m.accepted_game_minute,
+                              c.realm_index,c.phase,c.status,l.sect_rank
+                       FROM npc_mentorships m
+                       LEFT JOIN npc_civilization_state c ON c.npc_name=m.master_npc_name
+                       LEFT JOIN npc_life_state l ON l.npc_name=m.master_npc_name
+                       WHERE m.disciple_user_id=?""",
+                    (user_id,),
+                )
+            except Exception:
+                return None
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
     async def get_lineage_snapshot(self, user_id: int) -> dict[str, Any]:
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row
@@ -6818,15 +6863,26 @@ class Database:
         The same shape and the same reason as `list_active_event_npcs` and
         `list_graves_at`: a name you can address that the catalogue picker
         cannot turn up, because the catalogue does not know they exist.
+
+        `npc_registry.location` is where somebody was put, and nothing moves it
+        once a simulation row exists (`MoveRegisteredNPCTx` has no callers), so
+        a person the tick has walked away is answered by their simulation row,
+        not the registry - the same order `current_npc_location` keeps. Before
+        v1.25.0 that was a household's relatives, who never leave; a sect's
+        twenty-five people travel, and the picker would have offered them in a
+        room they left and refused them in the one they stand in.
         """
         if not str(location or "").strip():
             return []
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             cur = await db.execute(
-                """SELECT name,role,realm,location FROM npc_registry
-                   WHERE location=? ORDER BY name LIMIT ?""",
-                (str(location), max(1, min(int(limit), 50))),
+                """SELECT r.name,r.role,r.realm,COALESCE(c.current_location,r.location) AS location
+                   FROM npc_registry r LEFT JOIN npc_civilization_state c ON c.npc_name=r.name
+                   WHERE (c.npc_name IS NULL AND r.location=?)
+                      OR (c.current_location=? AND c.status IN ('alive','missing'))
+                   ORDER BY r.name LIMIT ?""",
+                (str(location), str(location), max(1, min(int(limit), 50))),
             )
             return [dict(r) for r in await cur.fetchall()]
 
@@ -7005,6 +7061,23 @@ class Database:
                 (sect_name,),
             ); return [dict(r) for r in await cur.fetchall()]
 
+
+    async def get_sect_npc_roster(self, sect_name: str) -> list[dict[str, Any]]:
+        """The sect's own people (v1.25.0): every living NPC of the sect, by
+        rank and then realm. No place is read - where somebody stands is the
+        whereabouts rule's to say, not a roster's."""
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                """SELECT c.npc_name AS name,c.realm_index,c.phase,l.sect_rank
+                   FROM npc_civilization_state c JOIN npc_life_state l ON l.npc_name=c.npc_name
+                   WHERE c.faction=? AND c.status='alive'
+                   ORDER BY CASE l.sect_rank WHEN 'Ancestor' THEN 0 WHEN 'Sect Master' THEN 1 WHEN 'Grand Elder' THEN 2
+                            WHEN 'Elder' THEN 3 WHEN 'Deacon' THEN 4 WHEN 'Core Disciple' THEN 5 WHEN 'Inner Disciple' THEN 6
+                            WHEN 'Outer Disciple' THEN 7 ELSE 8 END, c.realm_index DESC, c.phase DESC, c.npc_name""",
+                (sect_name,),
+            )
+            return [dict(r) for r in await cur.fetchall()]
 
     async def get_sect_treasury(self,sect_name:str)->dict[str,int]:
         async with self._connect() as db:

@@ -114,7 +114,8 @@ class TheRuleIsStatedOnce(unittest.TestCase):
         self.assertIn("func rootGradeBreakthroughBonus(", worth)
         actions = (go / "cultivation_actions.go").read_text(encoding="utf-8")
         self.assertIn("rootMult := rootWorthMultiplier(catalog, bundle.Root)", actions)
-        self.assertIn("* elementMult * rootMult))", actions)
+        # The factors, not the closing parentheses (v1.25.0 appended a master's term).
+        self.assertIn("* elementMult * rootMult", actions)
         aptitudes = (go / "aptitude_actions.go").read_text(encoding="utf-8")
         self.assertIn("rootGradeBreakthroughBonus(catalog, bundle.Root)", aptitudes)
 

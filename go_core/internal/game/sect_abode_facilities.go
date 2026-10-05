@@ -250,6 +250,31 @@ func manorConstructionRankGo(c worlddata.Catalog) int64 {
 	return maxI64(0, i64(c.SectAbodeSystem["manor_construction_rank_level"]))
 }
 
+// sectRankFloorGo is the sect rank a member must hold before an operation is
+// theirs (sect_system.rank_floors, v1.25.0), keyed by the engine operation so
+// the panel and the refusal read one table. Zero means no gate, the
+// homestead's own rule.
+func sectRankFloorGo(c worlddata.Catalog, op string) int64 {
+	floors, _ := c.SectSystem["rank_floors"].(map[string]any)
+	return maxI64(0, i64(floors[op]))
+}
+
+// requireSectRankTx refuses a member below an operation's rank floor, in the
+// sentence the panel's padlock prints: what the act asks, and what they hold.
+func requireSectRankTx(c worlddata.Catalog, mem map[string]any, op, what string) error {
+	floor := sectRankFloorGo(c, op)
+	if floor <= 0 {
+		return nil
+	}
+	if mem == nil {
+		return fmt.Errorf("%s asks for %s (rank %d) or higher; you are in no sect", what, sectRankName(c, floor), floor)
+	}
+	if i64(mem["rank_level"]) >= floor {
+		return nil
+	}
+	return fmt.Errorf("%s asks for %s (rank %d) or higher; you hold %s", what, sectRankName(c, floor), floor, fmt.Sprint(mem["rank_name"]))
+}
+
 // personalWorldFloorGo is what stabilizing a personal world asks
 // (personal_world_system): the realm to stand at and the Space Law
 // comprehension to hold. Zero means no gate on that half.

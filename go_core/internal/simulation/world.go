@@ -673,6 +673,12 @@ func (r *Runner) sects(conn *storage.Conn, steps, gm int64) (string, error) {
 			count = i64(row["n"])
 		}
 	}
+	// The hall first (v1.25.0, sect_population.go): a sect short of its people
+	// is topped up before anybody swears in or walks out this tick.
+	populated, err := r.sectPopulation(conn, gm)
+	if err != nil {
+		return "", err
+	}
 	joined, left, err := r.npcSectChanges(conn, steps, gm)
 	if err != nil {
 		return "", err
@@ -693,7 +699,7 @@ func (r *Runner) sects(conn *storage.Conn, steps, gm int64) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("batch-advanced politics for %d sects; %d swore in, %d walked out, %d places claimed, %d wars declared, %d stocked to the treasuries", count, joined, left, claimed, declared, stocked), nil
+	return fmt.Sprintf("batch-advanced politics for %d sects; %d took their place in a sect's hall, %d swore in, %d walked out, %d places claimed, %d wars declared, %d stocked to the treasuries", count, populated, joined, left, claimed, declared, stocked), nil
 }
 
 func (r *Runner) clans(conn *storage.Conn, steps, gm int64) (string, error) {
