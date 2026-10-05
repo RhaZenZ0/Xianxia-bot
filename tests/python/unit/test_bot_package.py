@@ -822,7 +822,7 @@ SURFACE = {
             "alchemy_group": ('status', 'forage', 'purge'),
             "city_group": ('look', 'enter', 'board', 'accept', 'envoys', 'rumours', 'inn'),
             "realmhub_group": ('status', 'go'),
-            "travel_group": ('go', 'status'),
+            "travel_group": ('go', 'city', 'nearby', 'road', 'wilds', 'status'),
         },
     },
     "commands/family.py": {

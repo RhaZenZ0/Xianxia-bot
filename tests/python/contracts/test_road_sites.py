@@ -30,8 +30,11 @@ class TheEngineOwnsTheRoad(unittest.TestCase):
         sites = (GO / "game" / "road_site_actions.go").read_text(encoding="utf-8")
         for needle in ("func roadSiteEndpoints(", "func roadSitesOnLeg(", "func roadSiteHop(", "func discoverRoadSitesTx(", "func roadSiteCandidates(", "func roadFacingNeighbour(", "profile.TravelMinutes = maxI64(1, profile.TravelMinutes/2)", "if roll >= 50 {"):
             self.assertIn(needle, sites, needle)
-        exploration = (GO / "game" / "exploration_actions.go").read_text(encoding="utf-8")
-        for needle in ('"road_sites_found":', '"site_kind":', '"site_leg":', "roadSiteHop(catalog, originCity, p.Destination, c.accessRealmIndex())", "roadFacingNeighbour(catalog, p.Destination, route[len(route)-2])", "no beast is hunted on a shrine's ground", "siteBonus = huntingGroundRollBonus", "roadSiteCandidates(catalog, known, world, realmIndex)", "discoveryCandidates(catalog, known, currentWorld(c, catalog), c.accessRealmIndex())", '"discovered_site":'):
+        # The planner (v1.26.0, `planTravelTx`) and the arrival gates
+        # (`travelEnds`, travel_preview.go) are shared by the journey and its
+        # preview, so the road is read across both files.
+        exploration = (GO / "game" / "exploration_actions.go").read_text(encoding="utf-8") + (GO / "game" / "travel_preview.go").read_text(encoding="utf-8")
+        for needle in ('"road_sites_found":', '"site_kind":', '"site_leg":', "roadSiteHop(catalog, originCity, destination, c.accessRealmIndex())", "roadFacingNeighbour(catalog, destination, route[len(route)-2])", "no beast is hunted on a shrine's ground", "siteBonus = huntingGroundRollBonus", "roadSiteCandidates(catalog, known, world, realmIndex)", "discoveryCandidates(catalog, known, currentWorld(c, catalog), c.accessRealmIndex())", '"discovered_site":'):
             self.assertIn(needle, exploration, needle)
         self.assertIn('RoadSite string   `json:"road_site"`', (GO / "worlddata" / "catalog.go").read_text(encoding="utf-8"))
         # At a site the player stands on its road, and meets whoever walks it.
@@ -45,7 +48,7 @@ class ThePythonBoundary(unittest.TestCase):
         for hint in ("**/economy → City Shops → Browse**", "**/world → Act → Hunt**",
                      "**/world → Act → Explore**", "The road leads back to"):
             self.assertIn(hint, line)
-        travel = _body(EXPLORATION, "travel")
+        travel = _body(EXPLORATION, "_travel_now")
         self.assertIn('result.get("road_sites_found")', travel)
         self.assertIn("On the way you find", travel)
 

@@ -754,6 +754,10 @@ def _claimed_by(item: Any, only: tuple[str, ...]) -> bool:
 # right for "explore" and wrong for "npcinfo". The hint resolver still answers
 # to the command name, so a printed path written with the old label resolves.
 LEAF_LABELS: dict[str, str] = {
+    "/travel city": "Cities",
+    "/travel nearby": "This City",
+    "/travel road": "Road Sites",
+    "/travel wilds": "Wilds & Gates",
     "/daoheart": "Dao Heart",
     "/specialeffects": "Special Effects",
     "/npcinfo": "Inspect",

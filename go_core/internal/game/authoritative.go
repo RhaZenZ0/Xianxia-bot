@@ -219,16 +219,19 @@ var authoritativeQueries = map[string]bool{
 	"character.reset_status":    true,
 	"exploration.event.status":  true,
 	"exploration.travel_status": true,
-	"merchant.status":           true,
-	"trade.status":              true,
-	"cultivation.status":        true,
-	"qi.status":                 true,
-	"ghost.status":              true,
-	"shop.here":                 true,
-	"shop.browse":               true,
-	"stall.board":               true,
-	"stall.status":              true,
-	"flame.status":              true,
+	// v1.26.0: the trip before it is taken - the route, the toll and the risk,
+	// through the planner exploration.travel itself walks.
+	"exploration.travel_preview": true,
+	"merchant.status":            true,
+	"trade.status":               true,
+	"cultivation.status":         true,
+	"qi.status":                  true,
+	"ghost.status":               true,
+	"shop.here":                  true,
+	"shop.browse":                true,
+	"stall.board":                true,
+	"stall.status":               true,
+	"flame.status":               true,
 	// v1.24.0: the active wars a cultivator may fight in and on which side,
 	// so a picker offers only what war.act would take.
 	"war.fronts":          true,
@@ -818,6 +821,20 @@ func applyAuthoritativeQuery(databasePath, worldPath string, req ActionRequest) 
 			return ActionResponse{}, loadErr
 		}
 		result, qerr := supportVoteStatusQuery(conn, catalog, req.ActorID)
+		if qerr != nil {
+			return ActionResponse{}, qerr
+		}
+		v, _ := eventledger.CurrentActorVersion(conn, req.ActorID)
+		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
+	case "exploration.travel_preview":
+		if strings.TrimSpace(worldPath) == "" {
+			return ActionResponse{}, errors.New("world catalog path is required")
+		}
+		catalog, loadErr := worlddata.Load(worldPath)
+		if loadErr != nil {
+			return ActionResponse{}, loadErr
+		}
+		result, qerr := travelPreviewQuery(conn, catalog, req.ActorID, req.Payload)
 		if qerr != nil {
 			return ActionResponse{}, qerr
 		}
