@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 // Admin writes that used to run from Python (v0.23.0, the v0.21 Authority I
@@ -412,7 +413,7 @@ func adminGrantStorage(conn *storage.Conn, adminUserID int64, raw json.RawMessag
 	return result, nil
 }
 
-func adminSpawnRealm(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
+func adminSpawnRealm(conn *storage.Conn, catalog worlddata.Catalog, adminUserID int64, raw json.RawMessage) (any, error) {
 	p, err := decodeMap(raw)
 	if err != nil {
 		return nil, err
@@ -449,7 +450,7 @@ func adminSpawnRealm(conn *storage.Conn, adminUserID int64, raw json.RawMessage)
 		`UPDATE world_events SET active=0 WHERE active=1 AND ends_at<=?`, []any{now}); err != nil {
 		return nil, err
 	}
-	payload, err := json.Marshal(map[string]any{"definition_id": "admin_spawn", "realm_id": realmID})
+	payload, err := json.Marshal(map[string]any{"definition_id": "admin_spawn", "realm_id": realmID, "severity": SecretRealmSiteSeverity(catalog.SecretRealms[realmID])})
 	if err != nil {
 		return nil, err
 	}
@@ -459,6 +460,9 @@ func adminSpawnRealm(conn *storage.Conn, adminUserID int64, raw json.RawMessage)
 		 ON CONFLICT(event_key) DO UPDATE SET active=1,payload_json=excluded.payload_json,ends_at=excluded.ends_at`,
 		[]any{eventKey, title, location, string(payload), now, endsAt},
 	); err != nil {
+		return nil, err
+	}
+	if _, err = SpawnSecretRealmSite(conn, catalog, eventKey, realmID, location, now); err != nil {
 		return nil, err
 	}
 	after := map[string]any{"realm_id": realmID, "ends_at": endsAt, "location": location}

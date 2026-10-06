@@ -179,6 +179,13 @@ func (r *Runner) advancedMaintenance(conn *storage.Conn, gm int64, automation ma
 	// actually entered: a rotation that only wrote SQLite opened an entrance
 	// with no thread, no announcement and no way in.
 	spawned := []SpawnedWorldEvent{}
+	// A realm opened before every door spawned a site (v1.31.1) gets one
+	// here, whatever the rotation's automation flag says: the flag decides
+	// whether realms open, not whether an open one has anything in it.
+	counts["secret_realm_sites"], err = game.FillSecretRealmSitesTx(conn, r.World, nowFloat())
+	if err != nil {
+		return Run{}, false, err
+	}
 	if !hasBoolKey(automation, "secret_realms") || automation["secret_realms"] {
 		opened, err := game.RotateSecretRealms(conn, r.World, gm)
 		if err != nil {
