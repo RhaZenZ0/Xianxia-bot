@@ -10,7 +10,7 @@ reaches and finds locked for good, with nothing saying why.
 Three rules now, and this file holds the Python side of each:
 
 - **The homestead's rank is a rung the ladder reaches.** Deacon (40) is earned
-  at 9,000 contribution; `test_the_sect_exchange.py` already holds the ladder's
+  at 9,000 contribution; `test_sect.py` already holds the ladder's
   shape and `TestTheHomesteadsRankIsOnThePromotionLadder` holds the reach.
 - **Every floor is content, read by the engine and the panel alike.**
   `sect_abode_system.manor_founding_rank_level` and

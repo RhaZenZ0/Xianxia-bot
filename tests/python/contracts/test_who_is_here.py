@@ -423,7 +423,7 @@ class _NobodyRegistered(_NoRegistry):
 class TheTwinAgreesWithTheEngineAtTheEdges(unittest.TestCase):
     """v1.12.3: two edges where `current_npc_location` and the engine's
     `npcWhereaboutsTx` answered differently. The engine is authoritative
-    (v1.3.1), so the twin follows it; `npc_whereabouts_edges_test.go` holds the
+    (v1.3.1), so the twin follows it; `npc_registry_test.go` holds the
     same two answers on the Go side, with the same synthetic NPC shape.
 
     The NPC is synthetic on purpose: no shipped NPC is both at home and missing

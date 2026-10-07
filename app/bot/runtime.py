@@ -203,7 +203,7 @@ def _explain_engine_error(exc: Exception) -> str:
         text = f"⏳ {what[:1].upper()}{what[1:]} is still on cooldown — ready in **{format_wait(seconds)}**."
     # "family support cooldown has 129600 in-world minutes remaining" is game
     # time, not wall-clock (v1.0.0-rc.32): say it in the world's days.
-    # Inline so the function stays pure (test_cooldown_wording execs it out
+    # Inline so the function stays pure (test_hub_surface.py execs it out
     # of the source); 1440 is MINUTES_PER_DAY.
     support = re.search(r"family support cooldown has (?P<minutes>\d+) in-world minutes remaining", text)
     if support:
@@ -392,7 +392,7 @@ def _realm_access_role_name(world_name: str) -> str:
 # carries no `display_name`, so it and `_realm_access_role_name` can already
 # collide by construction - a fifth hub without one would silently merge two
 # gates. A third name is the moment to gate that, and
-# `test_the_role_names_never_collide.py` is where it is held. "Cultivator" is
+# `test_server_layout.py` is where it is held. "Cultivator" is
 # not a world and no hub may be called one.
 CULTIVATOR_ROLE_NAME = "Xianxia • Cultivator"
 async def _sync_cultivator_role(

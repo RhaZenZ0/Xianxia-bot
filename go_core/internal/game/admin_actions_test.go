@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
 	"xianxia/core/internal/storage"
 )
 
@@ -1512,5 +1511,182 @@ func TestAFindThroughTheSwitchPathPersists(t *testing.T) {
 	}
 	if got := storage.ParseInt(scalar(t, path, "SELECT COUNT(*) FROM world_history_events WHERE event_type='npc_found'")); got != 1 {
 		t.Fatalf("npc_found history rows=%d, want 1", got)
+	}
+}
+
+// --- from admin_narration_test.go ---
+
+// The narration chain is presentation, not canonical mechanics, so the engine
+// stores and audits it without ever reading it back: which slugs are real, and
+// which are free, is Python's question. What Go owns here is that the choice
+// is durable and that nobody can change it without an audit row.
+
+func TestNarrationChainIsStoredAndAudited(t *testing.T) {
+	path := setupAdminDB(t)
+	applyAdmin(t, path, "admin.narration.set_chain", map[string]any{
+		"slots":  map[string]any{"routine_model": "vendor/one:free"},
+		"reason": "GM picked a new routine primary",
+	})
+
+	stored := scalar(t, path, "SELECT value_json FROM world_state WHERE key='narration_chain'")
+	text, _ := stored.(string)
+	slots := map[string]any{}
+	if err := json.Unmarshal([]byte(text), &slots); err != nil {
+		t.Fatalf("stored chain is not JSON: %v (%q)", err, text)
+	}
+	if slots["routine_model"] != "vendor/one:free" {
+		t.Fatalf("routine_model=%v", slots["routine_model"])
+	}
+
+	action := scalar(t, path, "SELECT action FROM admin_audit_log ORDER BY audit_id DESC LIMIT 1")
+	if action != "admin.narration.set_chain" {
+		t.Fatalf("audit action=%v", action)
+	}
+	reason := scalar(t, path, "SELECT reason FROM admin_audit_log ORDER BY audit_id DESC LIMIT 1")
+	if !strings.Contains(strings.ToLower(fmt.Sprint(reason)), "routine primary") {
+		t.Fatalf("audit reason=%v", reason)
+	}
+}
+
+func TestNarrationChainMergesRatherThanReplaces(t *testing.T) {
+	// A GM changing only the epic primary must not silently blank the routine
+	// slots the previous save set.
+	path := setupAdminDB(t)
+	applyAdmin(t, path, "admin.narration.set_chain", map[string]any{
+		"slots": map[string]any{"routine_model": "vendor/routine:free"},
+	})
+	applyAdmin(t, path, "admin.narration.set_chain", map[string]any{
+		"slots": map[string]any{"epic_model": "vendor/epic:free"},
+	})
+
+	slots := map[string]any{}
+	text, _ := scalar(t, path, "SELECT value_json FROM world_state WHERE key='narration_chain'").(string)
+	_ = json.Unmarshal([]byte(text), &slots)
+	if slots["routine_model"] != "vendor/routine:free" {
+		t.Fatalf("routine_model was lost: %v", slots["routine_model"])
+	}
+	if slots["epic_model"] != "vendor/epic:free" {
+		t.Fatalf("epic_model=%v", slots["epic_model"])
+	}
+}
+
+func TestNarrationChainStoresAClearedFallbackAsEmpty(t *testing.T) {
+	// "This tier has no named second hop" is a real answer. Dropping the key
+	// instead of storing "" would read back as "never set" and fall through to
+	// whatever .env says.
+	path := setupAdminDB(t)
+	applyAdmin(t, path, "admin.narration.set_chain", map[string]any{
+		"slots": map[string]any{"routine_fallback_model": "vendor/second:free"},
+	})
+	applyAdmin(t, path, "admin.narration.set_chain", map[string]any{
+		"slots": map[string]any{"routine_fallback_model": ""},
+	})
+
+	slots := map[string]any{}
+	text, _ := scalar(t, path, "SELECT value_json FROM world_state WHERE key='narration_chain'").(string)
+	_ = json.Unmarshal([]byte(text), &slots)
+	value, present := slots["routine_fallback_model"]
+	if !present {
+		t.Fatal("a cleared fallback must be stored, not dropped")
+	}
+	if value != "" {
+		t.Fatalf("routine_fallback_model=%v", value)
+	}
+}
+
+func TestNarrationChainRejectsAnUnknownSlot(t *testing.T) {
+	path := setupAdminDB(t)
+	err := applyAdminErr(t, path, "admin.narration.set_chain", map[string]any{
+		"slots": map[string]any{"reasoning": "off"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "unknown narration slot") {
+		t.Fatalf("err=%v", err)
+	}
+	if got := scalar(t, path, "SELECT COUNT(*) FROM world_state WHERE key='narration_chain'"); fmt.Sprint(got) != "0" {
+		t.Fatalf("a rejected write must store nothing, got %v", got)
+	}
+}
+
+// --- from snowflake_payload_test.go ---
+
+// A Discord id is too big for a float, and the payload was decoded into one
+// (v1.0.12).
+//
+// `decodeMap` is `json.Unmarshal` into `map[string]any`, which turns every JSON
+// number into a **float64**. A Discord snowflake is about 1.4e18 and float64
+// carries 2^53 ≈ 9.0e15 exactly, so every id a payload names came back off by a
+// digit or two: 1456074443989188610 decodes as ...608.
+//
+// Only the untyped path is affected, which is why the game works. `ActionRequest`
+// declares `ActorID int64`, and `encoding/json` parses a number straight into a
+// typed field with no float in between - so every player action, which addresses
+// the actor, is exact. What goes through `decodeMap` is the **payload**, and the
+// operations that carry a `user_id` there are the GM's: `admin.player.set_realm`,
+// `karma`, `teleport`, `grant`, `set_sect`, `erase` and the rest of the console.
+//
+// `storage.ParseInt` has carried a `case json.Number` since it was written, and
+// nothing could ever produce one - the reader was correct and the decoder never
+// handed it the type it was written for. That is the `npc_consignments` shape
+// (rc.28): the fix is the value, not the readers.
+//
+// Found by the Discord playtest, which asked the engine to raise a character's
+// realm and was told "character not found" about a character the panel three
+// lines above had just drawn.
+
+func snowflakeDB(t *testing.T, uid int64) string {
+	t.Helper()
+	path := setupAdminDB(t)
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if _, err := conn.Execute(
+		`INSERT INTO characters(user_id,name,life_status,location,karma_score,vitality,vitality_max,qi,qi_max,spirit_stones,realm_index,phase,updated_at)
+		 VALUES(?,'Snowflake','alive','Greenriver Town',0,20,20,30,30,10,0,1,0)`, []any{uid}); err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// The smallest id that float64 cannot hold exactly, and a real Discord one.
+const (
+	firstLossyID  int64 = 1 << 53
+	realDiscordID int64 = 1456074443989188610
+)
+
+func TestAPayloadCarriesADiscordIdExactly(t *testing.T) {
+	for _, uid := range []int64{firstLossyID + 1, realDiscordID} {
+		t.Run(fmt.Sprint(uid), func(t *testing.T) {
+			path := snowflakeDB(t, uid)
+			// A Go int64 marshals as a JSON number, which is exactly what the
+			// Python client sends for a Discord id.
+			applyAdmin(t, path, "admin.player.set_realm", map[string]any{
+				"user_id": uid, "realm_index": 5, "phase": 1, "reason": "test",
+			})
+			got := storage.ParseInt(scalar(t, path, "SELECT realm_index FROM characters WHERE user_id=?", uid))
+			if got != 5 {
+				t.Fatalf("realm_index is %d for user %d, want 5. The payload decoded the id as a "+
+					"float64, which cannot hold a Discord snowflake: it addressed %d instead.",
+					got, uid, int64(float64(uid)))
+			}
+		})
+	}
+}
+
+func TestTheAuditRowNamesTheIdItActuallyWrote(t *testing.T) {
+	// The audit trail is the half a GM reads back, and a target naming an id
+	// nobody holds is worse than a refusal: it says the action landed on
+	// somebody.
+	path := snowflakeDB(t, realDiscordID)
+	applyAdmin(t, path, "admin.player.set_realm", map[string]any{
+		"user_id": realDiscordID, "realm_index": 4, "phase": 1, "reason": "test",
+	})
+	want := fmt.Sprintf("user:%d", realDiscordID)
+	if got := fmt.Sprint(scalar(t, path, "SELECT target FROM admin_audit_log ORDER BY audit_id DESC LIMIT 1")); got != want {
+		t.Fatalf("the audit row's target is %q, want %q", got, want)
 	}
 }

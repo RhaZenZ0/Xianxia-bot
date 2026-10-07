@@ -3412,7 +3412,7 @@ class _ObservedConnection:
 
 # What each level of a property's Storage facility adds to spatial storage
 # (v1.28.0); the engine's `propertyStorageSlotsPerLevel`, held equal by
-# `test_built_things_do_something.py`.
+# `test_npcs_and_places.py`.
 PROPERTY_STORAGE_SLOTS_PER_LEVEL = 10
 
 
