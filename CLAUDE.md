@@ -745,7 +745,7 @@ memory wakes, the hands remember. It rides `contextBonus` beside the household t
 smith born into a Forging house is deliberately the best smith in town. The result carries
 `craft_echo`, `craft_echo_life` and `craft_echo_level`; `/soul` names the trades a visible life
 carried; nothing is decided in presentation. `craft_echo_test.go` holds the cap, the gate and
-most-recent-wins; `test_craft_echo.py` holds that the record is written before the wipe.
+most-recent-wins; `test_professions.py` holds that the record is written before the wipe.
 
 ### A house worth coming back to (v1.0.0-rc.32)
 
@@ -770,7 +770,7 @@ and none of them needed schema:
   Only what the engine would refuse outright is hidden - never a status read or the door into the
   system, because a road nobody can see is a road nobody learns exists - and a hidden door is not
   silent: every provider answers `path -> reason`, and the page prints each as a locked line
-  ("🔒 Comprehend — a Law needs Foundation Establishment; you stand at Qi Condensation"). `test_hidden_actions.py`
+  ("🔒 Comprehend — a Law needs Foundation Establishment; you stand at Qi Condensation"). `test_hub_surface.py`
   holds every hidden name to a row on the playtest checklist, so a renamed command cannot leave a
   stale hide behind.
 - **The hearth.** `birthFamilyCultivationMultiplier` is `1.04 + 0.02 × tier`, held under the
@@ -1710,7 +1710,7 @@ one rather than drinking it feeds the auction-door system.
 
 **The trap the field invites is worth knowing**: a writer that stored `0` rather than NULL would make
 every treasure expire the instant it was used, and nothing would error.
-`permanent_treasure_test.go` drives a real use, asserts the column is NULL, and reads the modifier
+`salt_king_peach_test.go` drives a real use, asserts the column is NULL, and reads the modifier
 back a world-year later; its drill fails with `ends_game_minute is 1000, not NULL`. And the content
 gate caught its own author - the authoring script wrote `max_realm_index: null` on the two Celestial
 events instead of omitting the key, and rc.53's ceiling test refused it.
@@ -2197,7 +2197,7 @@ for rc.51's bug, where a category Setup made was not one teardown could empty. R
 is a trap: a category Setup *stops* making is one every existing server still has, and set-equality
 pushes you to delete the constant, which would orphan the category on every server in existence.
 `CREATED_CATEGORIES` is what Setup makes; the tuple is what teardown can remove; they are
-deliberately not the same set, and `test_category_order.py` holds both halves.
+deliberately not the same set, and `test_server_layout.py` holds both halves.
 
 **`BASE_CHANNEL_SPECS` learned where each channel belongs.** It was `name -> topic`, with the
 category a single argument every base channel shared. It is a `BaseChannel(topic, category)` now —
@@ -2399,7 +2399,7 @@ quietly depended on the name holding still:
   fixed while building the tick-carrying, *before* the bump — and it worked on the day: the bump
   printed *"carried the live pass from v1.0.0.md and removed it"*, all 38 ticks preserved and stamped
   `[x] v1.0.0`.
-- `test_hidden_actions.py`, which opened `v1.0.0.md` **by literal** and made the whole module error
+- `test_hub_surface.py`, which opened `v1.0.0.md` **by literal** and made the whole module error
   with `FileNotFoundError` the moment the bump landed. Nothing found that one in advance, because
   there was nothing to find until the filename actually moved.
 
@@ -2413,7 +2413,7 @@ docstrings before it looks. The pattern is stated **once** and used by both the 
 self-check, because a second copy in the self-check would be free to stay right while the one that
 matters drifted — which is the exact failure this file catches elsewhere. Three drills: the literal
 restored in code, the pattern broken (the self-check fires first), and the comment-stripping removed
-(it flags `test_hidden_actions.py` again, by its comment).
+(it flags `test_hub_surface.py` again, by its comment).
 
 **The version itself is stamped in seven places**, and `test_release_version.py` has held them equal
 since the day `VERSION` drifted to 0.19 while `app/version.py`, the Dockerfile and compose stayed on
@@ -2533,7 +2533,7 @@ Forging, Formation and Inscription are one fix, not four.
 #0 has length 19"* — 19 being the length of `Swift-Wind Talisman`. `test_authority_boundary` requires
 a state function to have a production caller and it had one; the gate below requires the page to call
 it and it did. **Neither asks whether the call works**, and nothing else executed it, so a leaf that
-had passed for as long as it existed went red in the Discord sweep. `test_known_recipes.py` calls it
+had passed for as long as it existed went red in the Discord sweep. `test_database_readers.py` calls it
 against a real database, and its drill prints the production error.
 
 `test_a_recipe_tells_you_what_it_needs.py` is the gate, behavioural where it can be and reading
@@ -2851,9 +2851,9 @@ or none, and cultivate further if it is not yet in reach.
 
 The Ghost Cultivator's bug was never that gap. It was having **no demonic manual at any realm at
 all**, so the cell could never serve that path however far its initiate climbed - and the content
-fix alone closes it. `TestTheHiddenSectCanServeEveryPath` asks the honest question now (served
-somewhere on the ladder), and `TestTheCellStillRefusesSomeoneElsesArt` guards the decision from the
-other side. The lesson is the one this file keeps recording, met from a new direction: **a gate that
+fix alone closes it. `TestAPathMatchIsStillPreferred` asks the honest question now (every path
+served at the top of the ladder) and guards the decision from the other side (served its own art or
+none). The lesson is the one this file keeps recording, met from a new direction: **a gate that
 encodes a claim rather than a rule will happily make you change the rule.** Two existing tests were
 the only thing standing between that and a merged release.
 
@@ -3659,7 +3659,7 @@ that same string - so a fifth realm hub written without one would generate one n
 start following the character's location, and a cultivator who walked out of a capital would lose
 sight of that world's news feed. `docs/TODO.md` recorded that trap when it planned this role and
 said adding a third name is the moment to gate it.
-`test_the_role_names_never_collide.py` walks whatever `REALM_HUBS` carries, so a fifth hub fails the
+`test_server_layout.py` walks whatever `REALM_HUBS` carries, so a fifth hub fails the
 day it is added - and it drives the fallback itself, because a gate that asserts a collision cannot
 happen without showing what one looks like is asserting a hope.
 
@@ -3728,7 +3728,7 @@ would produce. The engine's own admin tests seed **user 42**, which a float hold
 that cannot fail the way production fails, one more time, and the thing that told the difference was
 a harness asking the engine to act on a real snowflake.
 
-`snowflake_payload_test.go` seeds a character at `1<<53 + 1` and at a real Discord id and drives the
+`admin_actions_test.go` seeds a character at `1<<53 + 1` and at a real Discord id and drives the
 lever through the production dispatch; its drill prints `character not found`. It also holds the
 audit row's `target`, because an audit trail naming an id nobody holds is worse than a refusal - it
 says the action landed on somebody.
@@ -4353,7 +4353,7 @@ because a cultivator carrying two injuries should find the second harder to mend
 `canonicalAttributeExcept` would have made `presence` and `heart` look unread and turned a refactor
 into a red gate. A variadic keeps all twenty-four callers and the gate exactly as they were.
 
-**The Python gate caught itself on its first drill.** `test_a_treatment_always_mends.py` refuses a
+**The Python gate caught itself on its first drill.** `test_raids_and_battle.py` refuses a
 reply that branches on the roll, and its first version looked for the text `"success"` in
 `ast.unparse(node.test)` - which quotes with `'`, so against the broken reply it matched nothing and
 passed. It reads the string constants in the test now. That is rc.52's rule in its most literal
@@ -4640,7 +4640,7 @@ mirror rule; the household's support wait riding the payload is rc.48 and rc.56;
 writing `status='dead'` without `ReleaseNPCBondsTx` is rc.24's widowing; the restore's plain safety
 copy is v0.32.0's sealing; `ENGINE_SHUTDOWN_GRACE_SECONDS` passed by nothing is rc.39's compose
 allowlist. A rule stated in this file and enforced at the sites known when it was written does not
-reach the site written next, which is why `test_every_engine_key_reaches_the_engine.py` reads the
+reach the site written next, which is why `test_engine_boundary.py` reads the
 keys off the Go source rather than off a list: the next one fails the day it is read.
 
 ### Six rules the bot was holding (v1.3.1)
@@ -5294,7 +5294,7 @@ inn's common-room thread was always created in **its world's capital channel**, 
 standing in the capital can see - so at the forty-four inns outside a capital the card linked
 `#unknown` to every patron it was for. A capital's inn keeps the capital channel; every other inn
 hangs in its world's feed through `event_scene_parent`, the door event scenes already use (rc.59),
-gated by the access role everybody in that world holds. `test_every_inn_has_a_common_room_you_can_see.py`
+gated by the access role everybody in that world holds. `test_city.py`
 walks all forty-eight.
 
 **The presence test had pinned the fault's spelling**, `presence_world_for(character.get("location"))`,
@@ -5391,7 +5391,7 @@ be raised to 7, which is the rule arriving in the one test that had never been a
 with the engine's own list - two halves each right about themselves and never asked about each
 other, the v1.0.3 craft-roll seam again. The button sends `guard`; the engine also reads `defend`
 as a guard, because an older bot mid-upgrade still sends it (rc.48's rolling-deploy rule).
-`test_boss_defend_is_a_guard.py` reads the choices by AST and the engine's switch out of the Go, and
+`test_raids_and_battle.py` reads the choices by AST and the engine's switch out of the Go, and
 holds every offered style to being one the switch names.
 
 ### What a weapon gives, said where it is sold (v1.7.5)
@@ -5435,7 +5435,7 @@ through `ACTIONS.root`, which knows no groups. `_tree_command` answers a group f
 `_GROUP_ACTION_ROOTS` - the map the hub pages are built from, so the group Discord registers is the
 very object the page's leaves belong to - and falls back to the root. `/stall` joins the acting
 side of `test_seclusion_lockout`: a secluded player is refused it as the panel refuses its leaves.
-`test_the_stalls_have_a_slash_command.py` holds both halves; putting `ACTIONS.root` back prints
+`test_auctions_and_stalls.py` holds both halves; putting `ACTIONS.root` back prints
 *"the tree tuple is resolved through ACTIONS.root again, which knows no groups"*.
 
 **v1.7.10 found the same fault twice more.** Asked *"where is the boss command located?"*, the answer
@@ -5640,7 +5640,7 @@ that gathered, through `practiceManualTx`, the one door practice comes in by. **
 gathered nothing practises nothing**, for the insight rule's reason: a full stage must not be a
 mastery farm, and `TestCultivatingByAMethodPractisesIt` holds both halves. The leaf is
 `cultivate_by` now (label **Cultivate By**), because a button called Practise that practises
-nothing is the `sync_world_catalog` lie in a panel; `test_cultivating_practises_the_method.py`
+nothing is the `sync_world_catalog` lie in a panel; `test_cultivation.py`
 holds that the old name does not come back.
 
 Reported from play in the same session: *"Tame ask for id when taming and each time you feed
@@ -5665,8 +5665,8 @@ held nothing. A broker buys from a stranger now - a sell is let through unauthor
 `birth_family_sendoff.<archetype>.reputation` grants five underworld households the threshold,
 through `householdReputationTx`, **as a floor, never added**, because the send-off is reached by
 creation, samsara and a household's backfill. `blackMarketTrustReputation` is the one number;
-`test_the_underworld_and_perfection_can_be_reached.py` holds the Python twin to it. Both Go
-drills are recorded in `underworld_contacts_test.go`'s shape: the first version of the floor drill
+`test_cultivation.py` holds the Python twin to it. Both Go
+drills are recorded in `reputation_readers_test.go`'s shape: the first version of the floor drill
 only broke the build, which proves nothing, and was redone as a disabled term.
 
 *"And where is the perfect stage"* - the engine lets a Perfection begin at stage 9 of any realm and
@@ -5805,7 +5805,7 @@ engine compares the higher ladder and the stall's own city; `/talk` offered a co
 giver stood rather than where it can be accepted; and the breakthrough's quest report sat behind the
 narrator context. Each is v1.0.5, rc.46 or rc.48 found at one more site, and each has its gate.
 
-**The gates that went red on correct code, again.** `test_craft_echo.py` pinned the source position
+**The gates that went red on correct code, again.** `test_professions.py` pinned the source position
 of the samsara wipe list; `test_control_techniques_are_the_contents.py` pinned the spelling
 `lawControlCategory {`; `test_npc_consignments.py` pinned which file `lot_identity` lived in; and
 `test_no_two_households_share_a_tradition` forbade two houses one manual, which the thirty-three
@@ -5939,7 +5939,7 @@ and the raid started and then raised `edit_original_response() got an unexpected
 handler's `followup.send(...)` into that edit, and the raid card is sent `wait=True`.
 `_safe_edit_kwargs` had stripped two send-only keywords by name; it keeps only what
 `edit_original_response` takes now (a file becomes an attachment), and
-`test_a_hub_edit_takes_only_what_an_edit_accepts.py` holds that against discord.py's own
+`test_hub_surface.py` holds that against discord.py's own
 signatures. And part 1 failed a settle on `weekend_gift_worker`, a third unconditional worker
 `PERIODIC_WORKERS` (written when there were two) never named: it sleeps forty-five real seconds and
 then asks the engine, harmless mid-section in a lone run and a five-second stall under four. The
@@ -6404,7 +6404,7 @@ Asked for as *"a command for cultivation breakthrough for qi"*. `breakthrough` h
 was `/cultivation → Main Progression` - rc.43's `/learn`, v1.7.4's `/stall` and v1.7.10's `/boss`,
 met a fourth time, while the body's twin has been a tree command (`/body breakthrough`) since
 v1.9.1. `_tree_command` registers the very root the hub leaf presses, and
-`test_the_qi_breakthrough_has_a_slash_command.py` holds that identity and that the root calls
+`test_cultivation.py` holds that identity and that the root calls
 `cultivation.breakthrough` rather than the body's action. It joins the acting side of
 `test_seclusion_lockout`, refused behind a closed door as the leaf is.
 
@@ -6593,7 +6593,7 @@ two doors are one statement each; `npc.found` keeps its own `begin`/commit aroun
 history row places the find where the person was, not where the explorer stood. The result carries
 `found_npcs` and `found_graves` with each `location`, and the bot only prints them (`search_lines`),
 **after** the discovery block, because that block assigns `discovery_text` rather than appending -
-`test_an_explore_finds_the_missing.py` reads the order by AST. `explore_search_test.go` drives a real
+`test_npcs_and_places.py` reads the order by AST. `explore_search_test.go` drives a real
 explore through `ApplyWithWorld` against production's DDL and the shipped map from Greenriver Town;
 its drills put the neighbouring cities back (*"a search from Greenriver Town reached Riverguard City;
 it stops before the next city"*) and disable the wilds (*"a city and the wilds beside it are one
@@ -6662,7 +6662,7 @@ every run: where the dice did not allow every quest it holds the lock, then open
 On the owner's call the final Perfection trial passes on a majority of its checks - two of the
 shipped three - where every one had to hold. `perfectionTrialsNeeded` is the one statement, read by
 both ladders, and the result carries `passed` and `needed` so the reply says how many held without
-restating the rule. `perfection_majority_test.go` lends the dice and lowers the fixture's attributes
+restating the rule. `perfection_lever_test.go` lends the dice and lowers the fixture's attributes
 first: the batch-4 cultivator stands at ~100 in every attribute, so a test that only lent the dice
 held every check whatever was rolled - the first run of it said so.
 
@@ -6671,7 +6671,7 @@ Reported as *"fix stuck quest doesn't give the next one"*: the GM's Complete had
 insert-only, v1.16.0 seeded `realm_road_7` with an empty `follow_on` (the road stopped at the seam),
 and v1.18.0 pointed it at `realm_road_8` in the content with no migration - the class migrations 55
 and 62 each fixed for one chain, missed at a third. Migration 77 re-points it where the seed is still
-exactly the one v1.16.0 wrote, and `test_the_heavens_lead_on.py` holds the migration's seed equal to
+exactly the one v1.16.0 wrote, and `test_realm_road.py` holds the migration's seed equal to
 what the seeder writes today. **A chain changed in content is a migration, every time**; the
 catch-up hands the stage over on the player's next action once the row is right. And the lever now
 says why nothing came (`questNextStageNoteTx`, `next_stage` on the result and in the audit row):
@@ -6685,7 +6685,7 @@ existing levers act only on a held quest. An automatic catch-up onto the road wa
 withdrawn on the owner's call - a GM lever, not a rule. It is `grantOrdinaryQuestTx`, the one door
 every roster uses, so it refuses what that door refuses (already held in any status, not approved, a
 commission), and the picker offers only what it would take (`grantable_quests`, held to the same
-three clauses by `test_a_gm_can_hand_over_the_next_quest.py`). `suggest_next_quest` is the picker's
+three clauses by `test_quest_progress.py`). `suggest_next_quest` is the picker's
 default and nothing more: a finished quest's unheld `follow_on`, else the realm-road stage for the
 player's realm when they hold no active stage. A stage for a realm already entered still asks for
 its breakthrough, which the GM then Reports - the lever does not pre-credit it, so what a grant does
@@ -6889,7 +6889,7 @@ path is the bare name so the panel gate treats it exactly as the command tree do
 `suggested_actions` too, drawn as a row when no result is showing, never for a door that is itself
 shut. `path_buttons` (registered by `surface`) is the same for a message outside any panel - the
 quest journal. And `_explain_engine_error` appends a door to a known refusal that names another
-system, inline so the tests that exec it still can. `test_every_refusal_is_explained.py` holds
+system, inline so the tests that exec it still can. `test_hub_surface.py` holds
 every `except GameEngineError` in the commands to pass through it; `test_hint_paths.py` now scans
 production Go too, because an engine string that prints a path reaches a player through the
 explainer like any reply.
@@ -6903,7 +6903,7 @@ four worlds for one village's invasion.
 **A reader keyed on names no writer produces is decoration.** The Forge and RAG read
 `war_started`/`war_resolved`; the engine writes `territory_war`, `territory_war_resolved`,
 `territory_war_ally` and `territory_claimed`. `WAR_HISTORY_EVENT_ACTIONS` is the one table both
-read, and `test_the_wars_reach_the_forge.py` reads the event types off the Go source, so the next war
+read, and `test_quest_progress.py` reads the event types off the Go source, so the next war
 row fails there the day it is written. The declaration rose from 78 to the Forge's floor of 80.
 
 **The rest is a rule found at a second site.** The war step now asks `game.SectsAlliedTx` and the

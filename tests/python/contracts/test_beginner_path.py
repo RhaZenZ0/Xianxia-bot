@@ -16,13 +16,11 @@ not lead anywhere.
 from __future__ import annotations
 
 import json
-import re
 import unittest
 
 from app.rules.game import World
 from app.rules.quests import (
     MAX_OBJECTIVES,
-    OBJECTIVE_TYPES,
     QUEST_DEFINITIONS,
     beginner_path_seed_rows,
     next_objective_label,
@@ -69,12 +67,6 @@ class TheContentIsAQuestTheForgeWouldAccept(unittest.TestCase):
                 definition, errors = validate_quest_definition(stage, WORLD, BUDGET)
                 self.assertEqual(errors, [])
                 self.assertLessEqual(len(definition["objectives"]), MAX_OBJECTIVES)
-
-    def test_every_objective_type_used_is_one_the_bot_reports(self):
-        for stage in STAGES:
-            for objective in stage["objectives"]:
-                with self.subTest(stage=stage["quest_key"], objective=objective["id"]):
-                    self.assertIn(str(objective["type"]), OBJECTIVE_TYPES)
 
     def test_no_stage_carries_a_giver(self):
         """A giver makes it a commission - one at a time, with a deadline, and

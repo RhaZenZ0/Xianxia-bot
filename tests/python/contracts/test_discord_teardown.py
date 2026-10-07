@@ -118,15 +118,6 @@ class TeardownActionContractTests(unittest.TestCase):
         source = bot_function_source("teardown_managed_discord_layout")
         self.assertLess(source.index("manage_channels"), source.index("all_managed_thread_ids()"))
 
-    def test_the_bookkeeping_write_is_allowlisted_not_a_gameplay_row(self):
-        gate = (PROJECT_ROOT / "tests" / "python" / "contracts" / "test_authority_boundary.py").read_text(encoding="utf-8")
-        self.assertIn('"clear_discord_bindings"', gate[gate.index("BOOKKEEPING_METHODS = {"):])
-        # PLAYER_MUTATIONS has been empty since v0.23.0, so "not a gameplay row"
-        # is now a stronger statement than it was: there are no gameplay rows.
-        self.assertIn("PLAYER_MUTATIONS: dict[tuple[str, str, str], str] = {}", gate)
-        self.assertNotIn("clear_discord_bindings", gate[gate.index("PLAYER_MUTATIONS"):gate.index("BOOKKEEPING_METHODS = {")])
-
-
 class DashboardButtonTests(unittest.TestCase):
     def test_button_exists_in_the_danger_zone_with_a_typed_box(self):
         self.assertIn('id="teardownDiscord"', APP_JS)

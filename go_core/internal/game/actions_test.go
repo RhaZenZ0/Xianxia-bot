@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"path/filepath"
 	"testing"
-
 	"xianxia/core/internal/storage"
 )
 
@@ -142,5 +141,32 @@ func TestCultivationRewardCapsProgressAndCommitsWalletItemsAndEvent(t *testing.T
 	}
 	if got := storage.ParseInt(actionScalar(t, path, "SELECT COUNT(*) FROM event_log WHERE user_id=42 AND event_type='cultivate'")); got != 1 {
 		t.Fatalf("events=%d", got)
+	}
+}
+
+// --- from first4_registry_test.go ---
+
+func TestFirstFourMigrationOperationsRegisteredAuthoritative(t *testing.T) {
+	operations := []string{
+		"craft.resolve",
+		"forage.resolve",
+		"beast.tame",
+		"beast.feed",
+		"beast.train",
+		"beast.evolve",
+		"beast.active",
+		"artifact.bond",
+		"artifact.awaken",
+		"pvp.challenge",
+		"pvp.respond",
+		"pvp.act",
+		"manual.study",
+		"manual.technique",
+		"crime.atone",
+	}
+	for _, op := range operations {
+		if !isAuthoritativeOperation(op) {
+			t.Errorf("%s is not registered as authoritative", op)
+		}
 	}
 }

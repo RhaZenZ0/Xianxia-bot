@@ -194,14 +194,6 @@ class EquipmentOptionTests(unittest.TestCase):
         # in the v0.19.32 command split; every guard below follows them.
         self.bot = (BOT_DIR / "commands" / "equipment.py").read_text(encoding="utf-8")
 
-    def test_every_equipment_id_action_has_a_live_option_provider(self):
-        for action in ("equipment_equip", "equipment_unequip", "equipment_repair"):
-            self.assertIn(
-                f'register_hub_option_provider({action}, "equipment_id"',
-                self.bot,
-                action,
-            )
-
     def test_bind_has_one_too(self):
         # Bind is the FIRST rung: without options it asks for a typed item id, so
         # nothing can ever become bound equipment, so Equip is permanently empty.

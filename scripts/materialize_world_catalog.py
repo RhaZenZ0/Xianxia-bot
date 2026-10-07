@@ -11,7 +11,7 @@ the other 142: it could not stock them, `manual.study` refused them as
 Content is content. This script runs the same deterministic, idempotent
 expansion once and writes the result back, so both sides read one catalog.
 `World` still calls the expansion at load; on a materialised file it is a
-no-op, and `tests/python/unit/test_world_catalog_materialised.py` fails if
+no-op, and `tests/python/unit/test_world_catalog.py` fails if
 the file on disk ever drifts from what the expansion produces.
 
     python3 scripts/materialize_world_catalog.py           # rewrite the file

@@ -416,7 +416,7 @@ OBJECTIVE_TYPES: dict[str, dict[str, Any]] = {
 # label the Forge builds from the templates above named none, so "Speak with
 # Bo Tan" and "Explore Ashenwall City" left the player to find the command.
 # `labelled_objective` appends the path to a label that carries none; a label
-# that already names one is left as written. `test_every_objective_says_where`
+# that already names one is left as written. `test_quest_progress.py`
 # holds each type here and every path to one a panel resolves.
 OBJECTIVE_PATHS: dict[str, str] = {
     "explore": "**/world → Act → Explore**",
@@ -755,7 +755,7 @@ def validate_quest_definition(draft: dict[str, Any], world: Any, budget: dict[st
 # `territory_actions.go`; the Forge's procedural draft and RAG's notable-type
 # bonus read them from here. Both readers had keyed on `war_started` and
 # `war_resolved`, which no writer has ever produced, so no war reached either.
-# `test_the_wars_reach_the_forge.py` holds every war event type the Go source
+# `test_quest_progress.py` holds every war event type the Go source
 # writes to be a key here.
 WAR_HISTORY_EVENT_ACTIONS: dict[str, str] = {
     "territory_war": "resolve",

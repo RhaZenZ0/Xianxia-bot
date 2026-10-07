@@ -286,7 +286,7 @@ deferred half and not the half that says what was done about it.
   `reset_database.sh` drove the bot with `wget` inside an image that has none;
   `ENGINE_SHUTDOWN_GRACE_SECONDS` was documented and passed by nothing; `search_catalog` treated `_`
   and `%` as wildcards; and a grave's claim ignored its own guarded UPDATE's row count. Each has a
-  test; `test_every_engine_key_reaches_the_engine.py` is the gate for the compose class.
+  test; `test_engine_boundary.py` is the gate for the compose class.
 - **fixed (v1.2.3)** — *The review's eight deferred claims, read.* Six held. VACUUM stalled ten
   seconds behind a session's open transaction and failed (`SessionManager.InTransaction`, a
   `sessions_busy` refusal; `server_vacuum_session_test.go` reproduced the stall). The sect manor's
@@ -311,7 +311,7 @@ deferred half and not the half that says what was done about it.
   minute; `ai_router` spent a route slot before the shared budget could end the walk; `health.py`
   dropped a control request whose body timed out; an upper-world rebirth got no send-off
   (`sendoffArchetypeFor`, below) and its sheet mirror was 0 outside the Mortal World; `mining.go`
-  kept a literal world list. `review_second_tier_test.go` and `test_the_second_tier.py` hold them.
+  kept a literal world list. `review_second_tier_test.go` and `test_review_decisions.py` hold them.
 - **fixed (v1.3.0)** — *Which Mortal house an upper-world house sends its child off as.* v1.2.3 read
   a Mortal counterpart off the kind in each of the thirty-three upper-world templates' ids; on the
   owner's call all thirty-three houses have `birth_family_sendoff` entries of their own in
@@ -372,8 +372,8 @@ deferred half and not the half that says what was done about it.
   and `karma_preference` off the sect's recruitment block, the bonus rides both rolls and the base
   TN is the sect's own (14 to 20; the literal was 15 for all); the karma preference refuses a
   notorious applicant at an orthodox gate without a sponsor, as `trial_modifier` in Python has
-  claimed since it was written. `sect_trial_tuning_test.go` lends the dice and holds each term;
-  `test_the_trial_reads_its_tuning.py` holds that the engine reads every key the notes print.
+  claimed since it was written. `sect_doors_test.go` lends the dice and holds each term;
+  `test_sect.py` holds that the engine reads every key the notes print.
 - **fixed (v1.3.1)** — *A catalogue sponsor's position was checked by the bot.* `npcWhereaboutsTx`
   is the engine's own answer to where a catalogue NPC stands - the circuit a wandering master walks,
   the simulation's row, the daily schedule while they are at home, the registry, a running event's
@@ -742,7 +742,7 @@ deferred half and not the half that says what was done about it.
   before it denies `@everyone` (rc.52); and it **merges** rather than replaces, because
   `set_permissions(**perms)` would have taken `send_messages=False` off `@everyone` with it and
   left two read-only anchors writable to everybody holding the role. The name-family trap this
-  entry called out is now `test_the_role_names_never_collide.py`. See CLAUDE.md, "A room for people
+  entry called out is now `test_server_layout.py`. See CLAUDE.md, "A room for people
   who have played".
 - **fixed (v1.0.1)** — *The release after a live pass would have deleted it.* The checklist is named
   after `RELEASE_VERSION`, so the filename held still across all fifty-nine release candidates of

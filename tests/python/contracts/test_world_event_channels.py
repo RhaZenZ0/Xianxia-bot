@@ -204,16 +204,6 @@ class TheChannelsAreDashboardOwnedAndTornDown(unittest.TestCase):
         self.assertIn("DB.get_world_event_channels(guild.id)", teardown)
         self.assertIn("SERVER_EVENT_CATEGORY", teardown)
 
-    def test_the_table_is_in_the_readiness_probe(self):
-        from app.database import OPERATIONAL_REQUIRED_TABLES
-        self.assertTrue("world_event_channels" in OPERATIONAL_REQUIRED_TABLES,
-                        "a table a fresh bootstrap makes must be in the exact readiness set")
-
-    def test_the_setter_is_bookkeeping_not_a_gameplay_write(self):
-        gate = (PROJECT_ROOT / "tests" / "python" / "contracts" / "test_authority_boundary.py").read_text(encoding="utf-8")
-        self.assertIn('"set_world_event_channel"', gate[gate.index("BOOKKEEPING_METHODS = {"):])
-
-
 class TheBotKeepsItsOwnKeyToTheRoom(unittest.TestCase):
     """Found by the harness the first time it was allowed to run Full Setup.
 

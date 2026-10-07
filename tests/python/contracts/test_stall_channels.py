@@ -136,18 +136,6 @@ class TheRowsAreForgottenAndTheChannelsDeleted(unittest.TestCase):
         self.assertIn("DB.get_stall_channels(guild.id)", teardown)
         self.assertIn("SERVER_STALL_CATEGORY", teardown)
 
-    def test_the_tables_are_in_the_readiness_probe(self):
-        from app.database import OPERATIONAL_REQUIRED_TABLES
-        for table in ("stall_channels", "stall_card_messages"):
-            self.assertIn(table, OPERATIONAL_REQUIRED_TABLES)
-
-    def test_the_writers_are_bookkeeping(self):
-        gate = (PROJECT_ROOT / "tests" / "python" / "contracts" / "test_authority_boundary.py").read_text(encoding="utf-8")
-        bookkeeping = gate[gate.index("BOOKKEEPING_METHODS = {"):]
-        for method in ("set_stall_channel", "remember_stall_card", "forget_stall_card"):
-            self.assertIn(f'"{method}"', bookkeeping)
-
-
 class TheCardFollowsTheStall(unittest.TestCase):
     def test_every_stall_command_refreshes_after_the_engine_agreed(self):
         for handler, action in (("stall_open", "stall.open"), ("stall_list", "stall.list"),

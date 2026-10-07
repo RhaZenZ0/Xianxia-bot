@@ -27,7 +27,7 @@ Four traps were known before a line was written, and each is a test here.
 - **The grant precedes thread creation.** Both anchors carry private threads,
   whose members still need to see the parent.
 - **A third generated role name is where the name family has to be gated** -
-  that one lives in `test_the_role_names_never_collide.py`.
+  that one lives in `test_server_layout.py`.
 
 And one that is not a trap but a rule: `set_permissions(target, **perms)`
 *replaces* an overwrite rather than merging into it, and the `@everyone`

@@ -270,7 +270,7 @@ async def seclusion_start(
     # The literal is deliberate and cannot be the constant: `@serialized_user_action`
     # wraps the handler, so discord.py resolves this annotation against
     # `runtime.py`'s globals rather than this module's, and a name here is a
-    # NameError at import. `test_seclusion_cap.py` holds the two equal to the
+    # NameError at import. `test_cooldowns_are_the_engines.py` holds the two equal to the
     # engine's own `seclusionMaxRealMinutes`, which is the real bound - this is
     # only the picker's shape.
     minutes: app_commands.Range[int, 10, 120] = SECLUSION_MAX_REAL_MINUTES,
