@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"xianxia/core/internal/gamerng"
 	"xianxia/core/internal/storage"
 )
 
@@ -62,6 +63,9 @@ func TestTheRotationOpensARealmWithASite(t *testing.T) {
 }
 
 func TestASpatialKeyOpensARealmWithASite(t *testing.T) {
+	// The spawn counts are fixed by severity, but the action path can reach a
+	// roll elsewhere, so the dice are lent rather than argued about.
+	defer gamerng.UseRoller(func(int) int { return 0 })()
 	path := setupShopDB(t)
 	addEventSiteTables(t, path)
 	world := batch4WorldPath(t)
@@ -77,6 +81,9 @@ func TestASpatialKeyOpensARealmWithASite(t *testing.T) {
 }
 
 func TestAGMSpawnedRealmHasASite(t *testing.T) {
+	// The spawn counts are fixed by severity, but the action path can reach a
+	// roll elsewhere, so the dice are lent rather than argued about.
+	defer gamerng.UseRoller(func(int) int { return 0 })()
 	path := setupAdminPlayerDB(t)
 	addEventSiteTables(t, path)
 	raw, _ := json.Marshal(map[string]any{
