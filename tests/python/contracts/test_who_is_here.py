@@ -256,8 +256,10 @@ class _NoRegistry:
 @contextlib.contextmanager
 def _wired(module):
     sim = _CountingSim(module.WORLD.npcs)
+    sim.clock_calls = 0
 
     async def _clock():
+        sim.clock_calls += 1
         return SimpleNamespace(total_minutes=0, period="Morning")
 
     saved = (module.SIM, module.DB, module.current_world_time)
@@ -296,6 +298,23 @@ class WhoIsHereCostsOneQuery(unittest.TestCase):
             sim.status_calls, 12,
             f"drawing one scene cost {sim.status_calls} npc.status round trips against a "
             f"catalogue of {len(module.WORLD.npcs)}; the per-NPC loop is back",
+        )
+
+    def test_one_open_reads_the_clock_once(self):
+        """The circuit walkers are placed by the canonical clock, and until
+        v1.31.2 each of the eleven was resolved through `current_npc_location`,
+        whose circuit branch read the clock again - twelve identical
+        `world.clock` round trips on every panel header. The clock is read once
+        at the top of `npcs_present` and handed down."""
+        module = _locations_module()
+        walkers = [n for n, d in module.WORLD.npcs.items() if d.get("circuit")]
+        self.assertTrue(walkers, "no catalogue NPC walks a circuit, so this proves nothing")
+        with _wired(module) as sim:
+            asyncio.run(module.npcs_present("Greenriver Town", "Afternoon"))
+        self.assertEqual(
+            sim.clock_calls, 1,
+            f"drawing one scene read the clock {sim.clock_calls} times; "
+            f"the {len(walkers)} circuit walkers are each reading it again",
         )
 
     def test_it_agrees_with_the_single_lookup_wherever_a_schedule_moves_somebody(self):

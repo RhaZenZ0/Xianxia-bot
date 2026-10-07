@@ -57,11 +57,18 @@ def scheduled_location(npc_name: str, period: str) -> str:
     return str(schedule.get(period) or "").strip()
 
 
-async def current_npc_location(npc_name: str, period: str | None = None) -> str | None:
+async def current_npc_location(npc_name: str, period: str | None = None, *, world_time: Any = None) -> str | None:
     """Resolve the mechanical NPC location from initialized simulation state.
 
     Daily world.json schedules still shape an NPC's routine while they remain in
     their home region, but there is no legacy no-simulation fallback anymore.
+
+    `world_time` is the clock a caller has already read (v1.31.2). The circuit
+    branch below needs the full game minute, so handing it only `period` did
+    not spare it a clock read - and `npcs_present` resolved every circuit walker
+    in the catalogue through here, eleven identical `world.clock` round trips
+    on every panel header. A caller with the clock in hand passes it; one
+    without still reads it here, once.
     """
     # A hidden master who walks the road is wherever their circuit puts them
     # this month, and that answer outranks both the daily schedule and the
@@ -70,7 +77,7 @@ async def current_npc_location(npc_name: str, period: str | None = None) -> str 
     # canonical clock, so nothing has to tick to move them.
     walking = WORLD.npcs.get(npc_name, {}).get("circuit")
     if walking:
-        wt = await current_world_time()
+        wt = world_time if world_time is not None else await current_world_time()
         stop = circuit_stop(
             walking, int(getattr(wt, "total_minutes", 0)),
             months=int(WORLD.npcs[npc_name].get("circuit_months", 2) or 2),
@@ -81,7 +88,7 @@ async def current_npc_location(npc_name: str, period: str | None = None) -> str 
 
     sim_state = await SIM.npc_status(npc_name)
     if period is None:
-        period = (await current_world_time()).period
+        period = (world_time if world_time is not None else await current_world_time()).period
     status = str((sim_state or {}).get("status") or "")
     if sim_state and status not in ("", "alive", "missing"):
         return DEAD
@@ -169,8 +176,12 @@ async def npcs_present(location: str, period: str | None = None) -> list[str]:
     where = str(location or "")
     if not where:
         return []
+    # The clock is read once here and handed to every resolve below (v1.31.2):
+    # the period for the schedules, the minute for the circuit walkers. Before
+    # this each walker's resolve read it again, and there are eleven of them.
+    wt = await current_world_time()
     if period is None:
-        period = (await current_world_time()).period
+        period = wt.period
     present: list[str] = []
     seen: set[str] = set()
     engine_rows: list[dict[str, Any]] = []
@@ -209,7 +220,7 @@ async def npcs_present(location: str, period: str | None = None) -> list[str]:
         # cost nothing to resolve and are the one group the engine cannot rule
         # on at all.
         if (definition or {}).get("circuit"):
-            if await current_npc_location(name, period) == where:
+            if await current_npc_location(name, period, world_time=wt) == where:
                 present.append(name)
                 seen.add(name)
             continue
@@ -225,7 +236,7 @@ async def npcs_present(location: str, period: str | None = None) -> list[str]:
             continue
         # Content says here, so the engine gets the last word - it may have
         # walked them away, or buried them.
-        if await current_npc_location(name, period) == where:
+        if await current_npc_location(name, period, world_time=wt) == where:
             present.append(name)
             seen.add(name)
     return sorted(present)

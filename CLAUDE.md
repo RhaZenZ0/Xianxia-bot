@@ -7091,6 +7091,45 @@ Go constant.
 than per function on purpose - the explore action writes two rows, and its `random_event` branch's
 spawn would have satisfied a per-function check while the realm branch stayed empty.
 
+### A refresh buys one session (v1.31.2)
+
+Reported as a count: *a hub press makes about 75–90 HTTP calls to the Go engine, one after another.*
+Measured with a counting proxy on the connection and a fake engine, a fresh character in Greenriver
+Town: the refresh that redraws a panel after every press (`LayoutHubView.refresh_status`) cost **32
+connections, 32 statements and 19 engine actions - 115 round trips** on the Go transport for 14 of
+the 17 hubs, and the press gate and usage counter 10 more. Ten of those were the fake's own
+artifact (a missing `npc.status` row fires the registry fallbacks), so production was the 85 to 105
+reported. Four causes, none of them the fifteen gates themselves:
+
+- **A one-row read is three round trips**, because every `DB.get_x()` opens its own engine session
+  (`POST /v1/db/session`, one `execute`, `DELETE`). `Database.reuse_connection` already existed for
+  exactly this and had one production user, the narrator's context builder. `hubs.register_read_scope`
+  hands it down (the `register_panel_gate` shape, since `hubs` sits below `runtime`), and both
+  `refresh_status` methods, the hub's Menu button and `/menu` read inside it. It is safe to hold
+  across the refresh's engine calls because a SELECT-only session holds no transaction
+  (`maybeBeginImplicitLocked` BEGINs on a write alone) and the engine reaps idle sessions at two
+  minutes. The usage counter's fire-and-forget write is created before the handler runs and the
+  refresh after it, so its copied context never carries the shared connection.
+- **The Here line read the clock twelve times.** `npcs_present` read it once for the period and then
+  `current_npc_location` read it again for each of the eleven circuit walkers, because the circuit
+  branch wants the full minute and `period` could not carry it. `world_time=` carries it now, and the
+  clock is read once at the top.
+- **Three lookups to learn a town is a town.** `character_location_display` asked the abode,
+  personal-world and sect-abode tables for every location; it asks only for a private key, and only
+  the table that key's prefix names. `PRIVATE_PREFIXES` is read off `PRIVATE_LOCATION_EXITS` in
+  `runtime` and imported by the surface, one list where there were two.
+- **The character was read three times and the membership twice**, once per provider.
+  `reuse_connection` keeps a memo of the point reads marked `_memoised_read` (those two) for its
+  span; a write through the scope's connection clears it, so a read-write-read still sees its write,
+  and outside a scope a read is exactly what it always was.
+
+After: **1 connection, 26 statements, 8 engine actions - 36 round trips** with the fake (about 25 in
+production). `test_a_panel_refresh_is_bounded.py` is the gate, behavioural in `test_who_is_here.py`'s
+shape: every hub's refresh and the menu's reads against a real bootstrap, held to one connection, no
+commit, at most two clock reads and bounded statements and engine actions; and `test_who_is_here`
+holds `npcs_present` to one clock read. What is deliberately not built - one engine query for the
+gate state, or the SELECTs through `/v1/db/batch` - is in `docs/TODO.md` with its reason.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

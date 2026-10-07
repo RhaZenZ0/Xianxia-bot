@@ -113,13 +113,14 @@ from .hubs import (
     register_not_yet_unlocked,
     register_realm_namer,
     register_panel_gate,
+    register_read_scope,
     register_root_hint_actions,
     register_path_buttons,
     send_hub,
 )
 from .locations import here_summary
 from .registry import ACTIONS, EVENT_HANDLERS, registered_root_command
-from .runtime import DB, SETTINGS, WORLD, character_location_display, current_world_time, log, private_location_exit
+from .runtime import DB, PRIVATE_PREFIXES, SETTINGS, WORLD, character_location_display, current_world_time, log, private_location_exit
 from .services import GUILD, QUESTS, SIM
 from .cards import register_page_timeout
 from .status_cards import _who_is_here, cultivation_status_fields, menu_facts_line
@@ -1156,11 +1157,13 @@ async def menu(interaction: discord.Interaction) -> None:
     facts = ""
     shape: dict[str, Any] = {}
     if LAYOUT_COMPONENTS_AVAILABLE:
-        try:
-            facts = await _menu_facts(interaction)
-        except Exception:
-            log.exception("Menu facts unavailable")
-        shape = await menu_shape(interaction)
+        # One session for the menu's reads, as a panel refresh has (v1.31.2).
+        async with DB.reuse_connection():
+            try:
+                facts = await _menu_facts(interaction)
+            except Exception:
+                log.exception("Menu facts unavailable")
+            shape = await menu_shape(interaction)
     view = MenuView(
         owner_id=member.id, is_admin=bool(is_admin), owner_name=getattr(member, "display_name", str(member)), facts=facts,
         hidden_hubs=shape.get("hidden_hubs"), tutorial=str(shape.get("tutorial") or ""),
@@ -1537,8 +1540,8 @@ LOCATION_GATES: dict[str, tuple[str, ...]] = {
 
 # The prefixes of a place that is somebody's own rather than the world's.
 # `exploration_actions.go` writes these four out at every handler that refuses
-# inside one; `private_location_exit` is their Python twin.
-PRIVATE_PREFIXES = ("birth_family:", "sect_abode:", "abode:", "personal_world:")
+# inside one; `private_location_exit` is their Python twin, and `PRIVATE_PREFIXES`
+# is read off its table in `runtime` (one list, since v1.31.2) and imported above.
 
 
 def envoys_hall(city: str) -> str:
@@ -1821,6 +1824,9 @@ async def _panel_gate(user: "discord.abc.User", path: str) -> str | None:
 
 
 register_panel_gate(_panel_gate)
+# A refresh reads inside one database session (v1.31.2): every `DB.get_x()` the
+# providers and the status card make reuses it instead of opening its own.
+register_read_scope(DB.reuse_connection)
 # How long a panel may sit idle (v1.0.12), injected because the layering puts
 # `hubs` and `runtime` in one tier - the shape `register_hidden_actions` and its
 # three siblings above already use.

@@ -11,6 +11,7 @@ import os
 from collections import deque
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
+from functools import wraps
 from pathlib import Path
 from typing import Any
 
@@ -3389,6 +3390,11 @@ class _ObservedConnection:
     async def _acquire_writer_if_needed(self, sql: str) -> None:
         operation = str(sql).lstrip().split(None, 1)[0].upper() if str(sql).strip() else ""
         if operation in self._WRITE_OPERATIONS:
+            # A write inside a `reuse_connection` scope makes every remembered
+            # read suspect, so the scope forgets them all (v1.31.2).
+            memo = self._owner._read_memo.get()
+            if memo:
+                memo.clear()
             await self._acquire_writer()
 
     async def _acquire_writer(self) -> None:
@@ -3416,6 +3422,30 @@ class _ObservedConnection:
 PROPERTY_STORAGE_SLOTS_PER_LEVEL = 10
 
 
+def _memoised_read(method):
+    """Answer a point read from the open `reuse_connection` scope's memo (v1.31.2).
+
+    Outside a scope the memo is None and the method runs as it always has. Inside
+    one, the first call runs and remembers its answer under `(name, args)`, and a
+    second ask with the same arguments is answered from memory - a deep copy both
+    ways, so a caller editing the dict it got cannot edit what the next caller is
+    handed. Any write through the scope's connection clears the memo
+    (`_ObservedConnection._acquire_writer_if_needed`).
+    """
+    @wraps(method)
+    async def wrapper(self, *args, **kwargs):
+        memo = self._read_memo.get()
+        if memo is None or kwargs:
+            return await method(self, *args, **kwargs)
+        key = (method.__name__, args)
+        if key in memo:
+            return copy.deepcopy(memo[key])
+        value = await method(self, *args)
+        memo[key] = copy.deepcopy(value)
+        return value
+    return wrapper
+
+
 class Database:
     def __init__(
         self,
@@ -3441,6 +3471,12 @@ class Database:
         self._connections_reused = 0
         self._shared_connection: ContextVar[_ObservedConnection | None] = ContextVar(
             f"xianxia_db_shared_connection_{id(self)}", default=None
+        )
+        # The reads a `reuse_connection` scope has already answered (v1.31.2):
+        # `(method, args) -> value`, a dict only while a scope is open and None
+        # outside one, so a read outside a scope is exactly what it always was.
+        self._read_memo: ContextVar[dict[tuple, Any] | None] = ContextVar(
+            f"xianxia_db_read_memo_{id(self)}", default=None
         )
         self._catalog_cache: dict[tuple[str, str], dict[str, Any]] = {}
         self._catalog_cache_hits = 0
@@ -3510,6 +3546,13 @@ class Database:
         This is intentionally opt-in. Callers must await database operations in
         sequence rather than sharing the connection between concurrent tasks.
         Individual methods may still commit small maintenance writes.
+
+        A scope also remembers the point reads marked `_memoised_read` (v1.31.2):
+        a panel refresh read the character three times and the sect membership
+        twice, once per provider, and inside one scope the second ask is
+        answered from the first. Any write through the scope's connection
+        forgets the memo, so a method that reads, writes and reads again still
+        sees its own write.
         """
         shared = self._shared_connection.get()
         if shared is not None:
@@ -3518,9 +3561,11 @@ class Database:
             return
         async with self._open_connection() as db:
             token = self._shared_connection.set(db)
+            memo_token = self._read_memo.set({})
             try:
                 yield db
             finally:
+                self._read_memo.reset(memo_token)
                 self._shared_connection.reset(token)
 
     async def _preflight_schema_version(self) -> None:
@@ -4992,6 +5037,7 @@ class Database:
             )
             return await cur.fetchone() is not None
 
+    @_memoised_read
     async def get_character(self, user_id: int) -> dict[str, Any] | None:
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row
@@ -6216,6 +6262,7 @@ class Database:
             )
             await db.commit()
 
+    @_memoised_read
     async def get_sect_membership(self, user_id: int) -> dict[str, Any] | None:
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row

@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import logging
 import re
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
@@ -694,6 +695,35 @@ async def _confirm_note(interaction: discord.Interaction, action: "HubAction") -
         log.exception("confirm note for %s failed; asking without it", action.path)
         return ""
     return f"\n{note}" if note.strip() else ""
+
+
+# One database session for a whole panel refresh (v1.31.2). A refresh asked the
+# hidden-action providers, the curriculum and the status card in turn, and every
+# `DB.get_x()` each of them made bought its own engine session - open, one
+# statement, close - so a press on most hubs cost thirty-two sessions for
+# thirty-two one-row reads, three HTTP round trips apiece. The surface registers
+# `Database.reuse_connection`, which is the opt-in scope the narrator's context
+# builder already uses for the same reason; a refresh only ever reads, so one
+# session can serve all of it. Registered from above for `register_panel_gate`'s
+# reason: `hubs` sits below `runtime` and cannot reach the handle itself. With
+# nothing registered the scope is a no-op, which is what a panel built in a
+# test with no bot around it wants.
+_READ_SCOPE: Any = None
+
+
+def register_read_scope(factory: Any) -> None:
+    """Register the async context manager a refresh reads inside."""
+    global _READ_SCOPE
+    _READ_SCOPE = factory
+
+
+@asynccontextmanager
+async def _read_scope():
+    if not callable(_READ_SCOPE):
+        yield None
+        return
+    async with _READ_SCOPE():
+        yield None
 
 
 def register_panel_gate(provider: Any) -> None:
@@ -2447,8 +2477,9 @@ class HubLayoutMenuButton(discord.ui.Button):
             return
         member = interaction.user
         is_admin = isinstance(member, discord.Member) and bool(member.guild_permissions.administrator)
-        facts = await menu_facts(interaction)
-        shape = await menu_shape(interaction)
+        async with _read_scope():
+            facts = await menu_facts(interaction)
+            shape = await menu_shape(interaction)
         menu = _MENU_BUILDER(owner_id=self.hub_view.owner_id, is_admin=is_admin, owner_name=self.hub_view.owner_name, facts=facts, shape=shape)
         await interaction.response.edit_message(view=menu)
         menu.message = getattr(interaction, "message", None)
@@ -2658,19 +2689,20 @@ class LayoutHubView(_LayoutHubBase):
         return self.visible_pages()[0] if self.visible_pages() else None
 
     async def refresh_status(self, interaction: discord.Interaction) -> None:
-        self.hidden_paths = await hidden_actions(interaction)
-        self.unlocks_at = await not_yet_unlocked(interaction)
-        if not callable(self.status_provider):
-            return
-        try:
-            result = self.status_provider(interaction)
-            if inspect.isawaitable(result):
-                result = await result
-            self.status_fields = [
-                item for item in list(result or [])[:6] if isinstance(item, HubStatusField)
-            ]
-        except Exception:
-            log.exception("Could not refresh live hub status for %s", self.definition.name)
+        async with _read_scope():
+            self.hidden_paths = await hidden_actions(interaction)
+            self.unlocks_at = await not_yet_unlocked(interaction)
+            if not callable(self.status_provider):
+                return
+            try:
+                result = self.status_provider(interaction)
+                if inspect.isawaitable(result):
+                    result = await result
+                self.status_fields = [
+                    item for item in list(result or [])[:6] if isinstance(item, HubStatusField)
+                ]
+            except Exception:
+                log.exception("Could not refresh live hub status for %s", self.definition.name)
 
     def page_actions(self, page: HubPage | None) -> list[HubAction]:
         """The page's actions this player can use where they stand."""
@@ -2967,21 +2999,22 @@ class CommandHubView(discord.ui.View):
         return self.visible_pages()[0] if self.visible_pages() else None
 
     async def refresh_status(self, interaction: discord.Interaction) -> None:
-        self.hidden_paths = await hidden_actions(interaction)
-        self.unlocks_at = await not_yet_unlocked(interaction)
-        if not callable(self.status_provider):
-            return
-        try:
-            result = self.status_provider(interaction)
-            if inspect.isawaitable(result):
-                result = await result
-            fields = []
-            for item in list(result or [])[:6]:
-                if isinstance(item, HubStatusField):
-                    fields.append(item)
-            self.status_fields = fields
-        except Exception:
-            log.exception("Could not refresh live hub status for %s", self.definition.name)
+        async with _read_scope():
+            self.hidden_paths = await hidden_actions(interaction)
+            self.unlocks_at = await not_yet_unlocked(interaction)
+            if not callable(self.status_provider):
+                return
+            try:
+                result = self.status_provider(interaction)
+                if inspect.isawaitable(result):
+                    result = await result
+                fields = []
+                for item in list(result or [])[:6]:
+                    if isinstance(item, HubStatusField):
+                        fields.append(item)
+                self.status_fields = fields
+            except Exception:
+                log.exception("Could not refresh live hub status for %s", self.definition.name)
 
     def page_actions(self, page: HubPage | None) -> list[HubAction]:
         """The page's actions this player can use where they stand."""
