@@ -71862,6 +71862,105 @@
             "descriptor": "A child keeping pace with you and narrating."
           }
         ]
+      },
+      "Secret Realm": {
+        "objective": "Hold the threshold while the realm is open, and take what it spills.",
+        "nodes": [
+          {
+            "key": "chart_threshold",
+            "type": "task",
+            "name": "Chart the Threshold",
+            "descriptor": "The entrance shifts by the hour; somebody has to mark which stones are still stone.",
+            "count": [
+              2,
+              4
+            ],
+            "rank_bonus": 0,
+            "tn": 13,
+            "attribute": "insight",
+            "item": "",
+            "item_qty": 0,
+            "cultivation": 8,
+            "spirit_stones": 0,
+            "contribution": 3
+          },
+          {
+            "key": "seepage_herb",
+            "type": "herb",
+            "name": "Seepage-Fed Spirit-Herb",
+            "descriptor": "Qi leaking from the opening has pushed a season's growth into a day.",
+            "count": [
+              1,
+              4
+            ],
+            "rank_bonus": 0,
+            "tn": 12,
+            "attribute": "insight",
+            "item": "@herb",
+            "item_qty": 1,
+            "cultivation": 4,
+            "spirit_stones": 0,
+            "contribution": 1
+          },
+          {
+            "key": "threshold_guardian",
+            "type": "beast",
+            "name": "Threshold Guardian",
+            "descriptor": "Something the realm keeps at its door, and it has not been told the door is open.",
+            "count": [
+              1,
+              3
+            ],
+            "rank_bonus": 1,
+            "tn": 15,
+            "attribute": "body",
+            "item": "@core",
+            "item_qty": 1,
+            "cultivation": 8,
+            "spirit_stones": 6,
+            "contribution": 3
+          },
+          {
+            "key": "spilled_relic",
+            "type": "relic",
+            "name": "Spilled Relic",
+            "descriptor": "Carried out on the realm's first breath and dropped at the edge of the light.",
+            "count": [
+              1,
+              2
+            ],
+            "rank_bonus": 0,
+            "tn": 16,
+            "attribute": "spirit",
+            "item": "@ore",
+            "item_qty": 2,
+            "cultivation": 8,
+            "spirit_stones": 12,
+            "contribution": 3
+          }
+        ],
+        "npcs": [
+          {
+            "key": "warden",
+            "title": "Threshold Warden",
+            "role": "Keeps count of who goes in and who comes back out",
+            "personality": "Patient, unsentimental, has seen this realm open before.",
+            "speech": "Short sentences; numbers rather than adjectives.",
+            "want": "Everybody who goes in counted back out before the entrance seals.",
+            "fear": "Closing the tally with names still open.",
+            "descriptor": "A grey-robed cultivator with a tally-board, sitting where the entrance can be seen."
+          },
+          {
+            "key": "rival_seeker",
+            "title": "Rival Treasure-Seeker",
+            "role": "Got here first and would like everybody to know it",
+            "personality": "Boastful, quick, generous with advice that is half wrong.",
+            "speech": "Talks over people, laughs at his own jokes, drops names.",
+            "want": "The inheritance, and an audience when he takes it.",
+            "fear": "That somebody lesser walks out with it.",
+            "descriptor": "A young cultivator in expensive travelling clothes, already scuffed from the threshold."
+          }
+        ]
       }
     },
     "name_pool": [

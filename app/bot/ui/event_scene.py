@@ -355,7 +355,7 @@ class EventSceneView(CardView):
                 for candidate in WORLD.unexpected_events:
                     if str(candidate.get("id") or "")==definition:
                         description=str(candidate.get("description") or "").strip(); break
-            objective=str(WORLD.event_site_objective(self.category) or "").strip()
+            objective=str(WORLD.event_site_objective(self.category, self.event_type) or "").strip()
             site=await DB.list_world_event_nodes(self.event_key)
             progress=await DB.world_event_site_progress(self.event_key)
             participants=await DB.list_world_event_participants(self.event_key, limit=10)

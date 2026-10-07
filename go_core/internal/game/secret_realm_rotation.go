@@ -109,8 +109,11 @@ func RotateSecretRealms(conn *storage.Conn, catalog worlddata.Catalog, gm int64)
 	}
 	ends := now + float64(maxI64(1, realm.OpenHours))*3600
 	eventKey := fmt.Sprintf("secret_realm_rotation:%s:%d", id, gm)
-	payload, _ := json.Marshal(map[string]any{"definition_id": "rotation", "category": "Rotation", "realm_id": id})
+	payload, _ := json.Marshal(map[string]any{"definition_id": "rotation", "category": "Rotation", "realm_id": id, "severity": SecretRealmSiteSeverity(realm)})
 	if _, err := conn.Execute(`INSERT INTO world_events(event_key,dedupe_key,event_type,title,location,payload_json,active,starts_at,ends_at) VALUES(?,?,?,?,?,?,1,?,?) ON CONFLICT(event_key) DO UPDATE SET active=1,dedupe_key=excluded.dedupe_key,payload_json=excluded.payload_json,ends_at=excluded.ends_at`, []any{eventKey, dedupe, "secret_realm", realm.Name, realm.Location, string(payload), now, ends}); err != nil {
+		return nil, err
+	}
+	if _, err := SpawnSecretRealmSite(conn, catalog, eventKey, id, realm.Location, now); err != nil {
 		return nil, err
 	}
 	summary := fmt.Sprintf("%s has opened at %s. The entrance holds for about %d hours.", realm.Name, realm.Location, maxI64(1, realm.OpenHours))

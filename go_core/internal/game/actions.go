@@ -159,7 +159,7 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 	case "admin.player.grant_storage":
 		result, err = adminGrantStorage(conn, req.ActorID, req.Payload)
 	case "admin.world.spawn_realm":
-		result, err = adminSpawnRealm(conn, req.ActorID, req.Payload)
+		result, err = adminSpawnRealm(conn, catalog, req.ActorID, req.Payload)
 	case "admin.player.set_realm_perfection":
 		result, err = adminSetRealmPerfection(conn, catalog, req.ActorID, req.Payload)
 	case "admin.player.set_spiritual_root":

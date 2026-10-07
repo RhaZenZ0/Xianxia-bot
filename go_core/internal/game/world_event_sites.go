@@ -482,3 +482,57 @@ func worldEventEngageAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 		EntityID: eventKey, GameMinute: p.GameMinute, Payload: out,
 	}}, nil
 }
+
+// SecretRealmSiteCategory is the site template every secret-realm event is
+// spawned from (v1.31.1). Four doors open a realm - the rotation, an explore
+// that turns one up, a spatial key and the GM's spawn - and none of them
+// called SpawnWorldEventNodes, so a realm's scene was the empty room schema
+// 42 was written to end: "Event Actions" and a stance menu, nothing to fight,
+// pick or carry out. The scene is the realm's threshold, so every realm uses
+// the one template whatever category its rumour was filed under.
+const SecretRealmSiteCategory = "Secret Realm"
+
+// SecretRealmSiteSeverity is how much a realm's threshold holds: the deeper
+// the realm's floor, the fuller its roster. Node rank already follows the
+// world tier, so this only scales the counts.
+func SecretRealmSiteSeverity(realm worlddata.SecretRealm) int64 {
+	return clampI64(1+realm.MinRealmIndex/4, 1, 10)
+}
+
+// SpawnSecretRealmSite gives a secret-realm event its threshold site. A realm
+// the catalogue does not carry still gets the roster, at the lowest severity.
+func SpawnSecretRealmSite(conn *storage.Conn, catalog worlddata.Catalog, eventKey, realmID, location string, now float64) (int64, error) {
+	return SpawnWorldEventNodes(conn, catalog, eventKey, SecretRealmSiteCategory, location,
+		SecretRealmSiteSeverity(catalog.SecretRealms[realmID]), now)
+}
+
+// FillSecretRealmSitesTx gives every open secret-realm event that has no site
+// its site. It is how a realm opened before v1.31.1 - or by a door written
+// later that forgets the spawn - stops being an empty room on the next tick,
+// and it is idempotent because SpawnWorldEventNodes is.
+func FillSecretRealmSitesTx(conn *storage.Conn, catalog worlddata.Catalog, now float64) (int64, error) {
+	if !tableExistsTx(conn, "world_events") || !tableExistsTx(conn, "world_event_nodes") {
+		return 0, nil
+	}
+	res, err := conn.Execute(`SELECT e.event_key,e.location,e.payload_json FROM world_events e
+        WHERE e.event_type='secret_realm' AND e.active=1 AND e.ends_at>?
+          AND NOT EXISTS(SELECT 1 FROM world_event_nodes n WHERE n.event_key=e.event_key)
+        ORDER BY e.event_key`, []any{now})
+	if err != nil {
+		return 0, err
+	}
+	filled := int64(0)
+	for _, row := range rowsToMaps(res) {
+		var payload map[string]any
+		_ = json.Unmarshal([]byte(fmt.Sprint(row["payload_json"])), &payload)
+		realmID, _ := payload["realm_id"].(string)
+		spawned, err := SpawnSecretRealmSite(conn, catalog, fmt.Sprint(row["event_key"]), realmID, fmt.Sprint(row["location"]), now)
+		if err != nil {
+			return filled, err
+		}
+		if spawned > 0 {
+			filled++
+		}
+	}
+	return filled, nil
+}

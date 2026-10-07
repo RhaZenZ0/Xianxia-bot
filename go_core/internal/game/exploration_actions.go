@@ -1299,7 +1299,7 @@ func activateUnexpectedEventTx(conn *storage.Conn, catalog worlddata.Catalog, us
 			return nil, errors.New("event_key is required when a secret realm is selected")
 		}
 		ends := now + float64(maxI64(1, realm.OpenHours))*3600
-		payload := map[string]any{"definition_id": event.ID, "category": event.Category, "realm_id": event.SecretRealmID}
+		payload := map[string]any{"definition_id": event.ID, "category": event.Category, "realm_id": event.SecretRealmID, "severity": SecretRealmSiteSeverity(realm)}
 		enc, _ := json.Marshal(payload)
 		_, err := conn.Execute(`UPDATE world_events SET active=0 WHERE active=1 AND ends_at<=?`, []any{now})
 		if err != nil {
@@ -1316,6 +1316,11 @@ func activateUnexpectedEventTx(conn *storage.Conn, catalog worlddata.Catalog, us
 			if err != nil {
 				return nil, err
 			}
+			nodes, siteErr := SpawnSecretRealmSite(conn, catalog, eventKey, event.SecretRealmID, realm.Location, now)
+			if siteErr != nil {
+				return nil, siteErr
+			}
+			out["site_nodes"] = nodes
 		}
 		out["activated"] = activated
 		out["event_key"] = eventKey
