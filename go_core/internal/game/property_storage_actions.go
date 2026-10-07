@@ -864,11 +864,14 @@ func spatialKeyActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	}
 	now := nowSeconds()
 	key := fmt.Sprintf("spatial_key:%s:%d", rid, timeNowUnixNano())
-	payload := map[string]any{"definition_id": "spatial_key", "realm_id": rid, "opened_by": userID}
+	payload := map[string]any{"definition_id": "spatial_key", "realm_id": rid, "opened_by": userID, "severity": SecretRealmSiteSeverity(realm)}
 	enc, _ := json.Marshal(payload)
 	loc := fmt.Sprint(ch["location"])
 	ends := now + float64(hours*3600)
 	if _, e = conn.Execute(`INSERT INTO world_events(event_key,dedupe_key,event_type,title,location,payload_json,active,starts_at,ends_at) VALUES(?,'','secret_realm',?,?,?,1,?,?)`, []any{key, realm.Name, loc, string(enc), now, ends}); e != nil {
+		return authoritativeMutation{}, e
+	}
+	if _, e = SpawnSecretRealmSite(conn, catalog, key, rid, loc, now); e != nil {
 		return authoritativeMutation{}, e
 	}
 	out := map[string]any{"event_key": key, "realm_id": rid, "name": realm.Name, "description": realm.Description, "location": loc, "ends_at": ends, "consumed": consumed}

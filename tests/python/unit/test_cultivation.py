@@ -43,7 +43,7 @@ brokers did not already trust, and Underworld Contacts had one source, a trade
 at a post, which needed that trust. So the reputation door was shut for good,
 and the Hidden-Weapon family's "discreet underworld contacts" were prose. The
 engine half (a broker buys from a stranger; five households send a child out
-known) is held in Go by `underworld_contacts_test.go`.
+known) is held in Go by `reputation_readers_test.go`.
 
 *"And where is the perfect stage"* - the engine lets a Perfection begin at
 stage 9 of any realm, and the panel hid the page until Soul Formation.

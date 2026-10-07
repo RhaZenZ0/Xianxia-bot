@@ -253,7 +253,7 @@ class TechniqueCatalogTests(unittest.IsolatedAsyncioTestCase):
         async with self.db._connect() as conn:
             # Against the catalogue rather than against a literal: this test is
             # "the tables hold every manual", and a second copy of the count is
-            # free to drift from the one `test_world_catalog_materialised.py`
+            # free to drift from the one `test_world_catalog.py`
             # pins (v1.0.3).
             cur = await conn.execute("SELECT COUNT(*) FROM content_manuals")
             self.assertEqual((await cur.fetchone())[0], len(self.world.manuals))

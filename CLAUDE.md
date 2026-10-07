@@ -7066,6 +7066,31 @@ written before this release is resolved off its location, so nothing needed back
 security down by the lightest killing's term, read by NPC crime and a caravan's risk. Nobody did the
 killing, so no sect, unrest or market answers it - the rest of `MarkKillingTx` is about a culprit.
 
+### A secret realm's scene has a site (v1.31.1)
+
+Reported from play with the Stygian Lantern Tomb's thread: a stance menu and "Event Actions", nothing
+to fight, pick or carry out. Schema 42 gave every world event a site and said *"every spawn path
+routes through here so no event can reach a player empty"* - and the four doors that open a secret
+realm (the rotation, an explore that turns one up, a spatial key, the GM's spawn) each wrote their
+`world_events` row and never called `SpawnWorldEventNodes`. The doc comment claimed a rule that only
+the two `random_event` doors kept.
+
+`SpawnSecretRealmSite` is the one call, and every realm uses the one template,
+`SecretRealmSiteCategory` ("Secret Realm" in `event_sites`): the scene is the realm's threshold
+whatever its rumour was filed under, and the rotation files its realms under "Rotation", which has
+no template. Severity is `1 + floor/4` off the realm (node rank already follows the world tier), and
+is written into the payload so the panel's severity agrees with the roster.
+`FillSecretRealmSitesTx` runs in every maintenance pass, outside the rotation's automation flag
+(the flag decides whether realms open, not whether an open one has anything in it), so a realm open
+when the update lands is filled on the next tick. The panel asks
+`event_site_objective(category, event_type)`, and `SECRET_REALM_SITE_CATEGORY` is held equal to the
+Go constant.
+
+`TestEveryWorldEventDoorSpawnsASite` is the class gate: every production function writing a
+`world_events` row must call a site spawn once per row it writes, by AST. Counted per row rather
+than per function on purpose - the explore action writes two rows, and its `random_event` branch's
+spawn would have satisfied a per-function check while the realm branch stayed empty.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

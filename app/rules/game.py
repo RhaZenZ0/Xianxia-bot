@@ -17,6 +17,11 @@ from .realm_hubs import city_of_place
 # field, not a second list of which techniques those are (v1.0.0-rc.58).
 CONTROL_EFFECT_CATEGORY = "Law Control"
 
+# The site template every secret-realm event is spawned from, whichever door
+# opened it. The engine states it once as `SecretRealmSiteCategory`; this is
+# the same word, held equal to it by test_a_secret_realm_has_a_site (v1.31.1).
+SECRET_REALM_SITE_CATEGORY = "Secret Realm"
+
 
 class D10Source(Protocol):
     """Injected randomness boundary used by parity and replay tests."""
@@ -117,12 +122,18 @@ class World:
     def unexpected_events(self) -> list[dict[str, Any]]:
         return list(self.data.get("unexpected_events", []))
 
-    def event_site_objective(self, category: str) -> str:
+    def event_site_objective(self, category: str, event_type: str = "") -> str:
         """The shared goal an event category's site is worked towards. Falls
         back to the default template so a category nobody wrote a site for
-        still reads as something to do rather than as nothing."""
+        still reads as something to do rather than as nothing.
+
+        A secret realm's site is its threshold, spawned from one template
+        whatever its rumour was filed under (v1.31.1, the engine's
+        ``SecretRealmSiteCategory``), so its objective is that template's."""
         sites = dict(self.data.get("event_sites") or {})
         categories = dict(sites.get("categories") or {})
+        if str(event_type) == "secret_realm":
+            category = SECRET_REALM_SITE_CATEGORY
         template = categories.get(str(category)) or sites.get("default") or {}
         return str(dict(template).get("objective") or "")
 
