@@ -57,11 +57,13 @@ CANNED = {
                            "insight_xp": 0, "pace": 10, "sessions_per_stage": 12, "multipliers": {}},
 }
 
-# The ceilings. Measured at 26 statements and 8 engine actions on the shipped
-# content with the fake above; the slack is for a fuller character, not for a
-# second loop.
-MAX_STATEMENTS = 34
-MAX_ENGINE_ACTIONS = 12
+# The ceilings. Measured at 16 statements and 8 engine actions per hub on the
+# shipped content with the fake above and the character seeded below. The slack
+# is two: enough for one more row on the sheet, not for the three by-location
+# lookups a plain town used to cost (the first drill of this file put them
+# back under a ceiling of 34 and the gate stayed green).
+MAX_STATEMENTS = 18
+MAX_ENGINE_ACTIONS = 10
 MAX_CLOCK_READS = 2
 
 
@@ -195,6 +197,23 @@ class APanelRefreshCostsOneSession(unittest.TestCase):
             self.assertGreater(counts.statements, 0, "the menu ran no statement; the proxy is broken, not the tree")
             self.assertEqual(counts.connections, 1, f"the menu opened {counts.connections} sessions")
             self.assertLessEqual(counts.engine.get("world.clock", 0), MAX_CLOCK_READS)
+
+    def test_a_plain_town_costs_no_lookup(self):
+        """`character_location_display` asked the abode, personal-world and
+        sect-abode tables for every location, on every refresh, to be told that
+        Greenriver Town is Greenriver Town. Only a private key needs a lookup,
+        and only the table its prefix names."""
+        with _measured() as (surface, hubs, counts):
+            runtime = importlib.import_module("app.bot.runtime")
+            shown = asyncio.run(runtime.character_location_display({"location": "Greenriver Town", "user_id": UID}))
+            self.assertEqual(shown, "Greenriver Town")
+            self.assertEqual(counts.statements, 0,
+                             f"naming a plain town ran {counts.statements} statements; the by-location lookups are back")
+            counts.reset()
+            shown = asyncio.run(runtime.character_location_display({"location": "abode:424242", "user_id": UID}))
+            self.assertEqual(shown, "abode:424242")
+            self.assertEqual(counts.statements, 1,
+                             f"a private key ran {counts.statements} statements; only the table its prefix names is asked")
 
     def test_a_point_read_is_remembered_for_the_scope_and_forgotten_outside_it(self):
         with _measured() as (surface, hubs, counts):

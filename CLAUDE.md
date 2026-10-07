@@ -7123,11 +7123,18 @@ reported. Four causes, none of them the fifteen gates themselves:
   span; a write through the scope's connection clears it, so a read-write-read still sees its write,
   and outside a scope a read is exactly what it always was.
 
-After: **1 connection, 26 statements, 8 engine actions - 36 round trips** with the fake (about 25 in
-production). `test_a_panel_refresh_is_bounded.py` is the gate, behavioural in `test_who_is_here.py`'s
-shape: every hub's refresh and the menu's reads against a real bootstrap, held to one connection, no
-commit, at most two clock reads and bounded statements and engine actions; and `test_who_is_here`
-holds `npcs_present` to one clock read. What is deliberately not built - one engine query for the
+After: **1 connection, 16 statements, 8 engine actions - 26 round trips** (measured under the gate's
+fake, which answers a found `npc.status` row the way production does).
+`test_a_panel_refresh_is_bounded.py` is the gate, behavioural in `test_who_is_here.py`'s shape: every
+hub's refresh and the menu's reads against a real bootstrap, held to one connection, no commit, at
+most two clock reads, and 18 statements and 10 engine actions; a plain town is held to no lookup at
+all; and `test_who_is_here` holds `npcs_present` to one clock read. **Its first drill passed against
+the broken tree**: with the three lookups put back under a ceiling of 34 statements the gate stayed
+green, because a ceiling with sixteen of slack cannot see three (rc.47) - the ceiling is two above
+the measurement now and the lookup has a test of its own, and the three drills print
+*"opened 19 sessions; the one-session scope is gone"*, *"read the clock 12 times; the 11 circuit
+walkers are each reading it again"* and *"naming a plain town ran 3 statements"*. What is
+deliberately not built - one engine query for the
 gate state, or the SELECTs through `/v1/db/batch` - is in `docs/TODO.md` with its reason.
 
 ## Testing conventions
