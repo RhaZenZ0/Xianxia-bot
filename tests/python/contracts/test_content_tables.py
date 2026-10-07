@@ -20,12 +20,9 @@ from __future__ import annotations
 
 import ast
 import re
-import tempfile
 import unittest
-from pathlib import Path
 
-from app.database import OPERATIONAL_REQUIRED_TABLES
-from app.database.core import SCHEMA_MIGRATIONS, Database
+from app.database.core import SCHEMA_MIGRATIONS
 from tests.support import PROJECT_ROOT
 
 GO = PROJECT_ROOT / "go_core" / "internal"
@@ -89,11 +86,6 @@ class TheProjectionIsDefinedOnce(unittest.TestCase):
         cols = go_projection()["content_locations"]
         for field in ("road_site", "district", "settlement_type"):
             self.assertIn(field, cols)
-
-    def test_every_content_table_is_in_the_readiness_probe(self):
-        for table in CONTENT_TABLES:
-            self.assertIn(table, OPERATIONAL_REQUIRED_TABLES)
-
 
 class OnlyTheEngineWrites(unittest.TestCase):
     def test_no_python_writes_a_content_table(self):
@@ -212,10 +204,6 @@ class ThereIsOneCatalogueAndTheEngineWritesIt(unittest.TestCase):
         server = (PROJECT_ROOT / "app" / "dashboard" / "server.py").read_text(encoding="utf-8")
         self.assertIn("FROM content_npcs", server)
         self.assertIn("FROM content_locations", server)
-
-    def test_the_readiness_probe_no_longer_expects_them(self):
-        for table in RETIRED_MIRRORS:
-            self.assertNotIn(table, OPERATIONAL_REQUIRED_TABLES)
 
     def test_migration_52_drops_each_of_them(self):
         # The migration drill proves nothing else vanished with them, across

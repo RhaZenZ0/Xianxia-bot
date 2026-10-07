@@ -4,9 +4,8 @@ Three presentation halves of engine fixes, each held where only Python can see:
 
 - **The recovery picker printed base figures.** ``_battle_available_options`` built
   the line under a pill from the content's own ``instant`` numbers, while the
-  engine heals at the carried grade (``itemEffectMult``), so a High pill read as
-  a Low one. ``app.rules.item_grades.effect_mult`` / ``graded_amount`` are the
-  display twins of the engine's ``itemEffectMult`` / ``gradedAmount``.
+  engine heals at the carried grade. That half is held by
+  ``test_the_recovery_picker_reads_the_grade.py``, which tested the same twin.
 - **The opponent card printed the engine's own bookkeeping.** The battle row's
   ``opponent_modifiers_json`` records which effects have landed as
   ``effect:<id>`` beside the stats (a control effect lands once a battle), and
@@ -18,7 +17,6 @@ Three presentation halves of engine fixes, each held where only Python can see:
 from __future__ import annotations
 
 import ast
-import asyncio
 import importlib
 import os
 import unittest
@@ -28,7 +26,7 @@ import pytest
 
 from app.rules.battle import opponent_debuff_label
 from app.rules.game import World
-from app.rules.item_grades import effect_mult, grade_cap_note, graded_amount
+from app.rules.item_grades import grade_cap_note
 from app.rules.progression_systems import profession_rank
 from tests.support import PROJECT_ROOT
 
@@ -42,53 +40,6 @@ ENV = {"DISCORD_TOKEN": "test-token", "GUILD_ID": "123456789012345678",
 def _battle():
     with patch.dict(os.environ, ENV):
         return importlib.import_module("app.bot.commands.battle")
-
-
-class TheGradeTwinIsTheEngines(unittest.TestCase):
-    def test_a_grade_multiplies_by_the_ladders_own_number(self):
-        ladder = WORLD.item_grades
-        self.assertEqual(effect_mult(ladder, "recovery_pill"), 1.0)
-        self.assertEqual(effect_mult(ladder, "recovery_pill@mid"), 1.25)
-        self.assertEqual(effect_mult(ladder, "recovery_pill@high"), 1.5)
-        self.assertEqual(effect_mult(ladder, "recovery_pill@transcendent"), 3.0)
-
-    def test_an_unknown_grade_is_worth_one_not_the_bottom_rung(self):
-        # The engine's itemEffectMult answers 1 for an id itemDef refuses; a
-        # fallback that looked like a value would hand it some rung's number.
-        self.assertEqual(effect_mult(WORLD.item_grades, "recovery_pill@legendary"), 1.0)
-
-    def test_a_quantity_rounds_half_away_from_zero_and_never_shrinks(self):
-        # Go's math.Round: 2 x 1.25 = 2.5 -> 3. Python's round() gives 2.
-        self.assertEqual(graded_amount(2, 1.25), 3)
-        self.assertEqual(graded_amount(12, 1.5), 18)
-        self.assertEqual(graded_amount(8, 1.0), 8)
-        self.assertEqual(graded_amount(3, 0.5), 3, "a grade only ever adds")
-        self.assertEqual(graded_amount(0, 3.0), 0)
-
-
-class TheRecoveryPickerPrintsWhatTheGradeHeals(unittest.TestCase):
-    def test_a_high_pill_reads_higher_than_a_low_one(self):
-        battle = _battle()
-        base = WORLD.item_definition("recovery_pill")["use"]["instant"]
-        vitality = int(base["vitality_restore"])
-        self.assertGreater(vitality, 0, "the reader found no vitality restore; the gate is broken, not the tree")
-
-        class _DB:
-            async def get_law_progress(self, _user_id):
-                return []
-
-            async def get_manuals(self, _user_id):
-                return []
-
-            async def get_inventory(self, _user_id):
-                return {"recovery_pill": 1, "recovery_pill@high": 1}
-
-        with patch.object(battle, "DB", _DB()):
-            _, usable = asyncio.run(battle._battle_available_options(1, {"realm_index": 0}))
-        lines = {item_id: description for item_id, _label, description in usable}
-        self.assertEqual(lines["recovery_pill"], f"Vitality +{vitality}" + (f" • Qi +{int(base['qi_restore'])}" if int(base.get("qi_restore", 0)) else ""))
-        self.assertIn(f"Vitality +{graded_amount(vitality, 1.5)}", lines["recovery_pill@high"],
-                      "the picker printed the base figure for a High pill, which heals at x1.5")
 
 
 class TheOpponentCardSkipsTheEnginesRecord(unittest.TestCase):

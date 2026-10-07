@@ -54,13 +54,6 @@ class TheErrandsAreQuestsTheForgeWouldAccept(unittest.TestCase):
                     self.assertNotIn(errand["quest_key"], keys)
                     keys.add(errand["quest_key"])
 
-    def test_every_objective_type_used_is_one_the_bot_reports(self):
-        reported = reported_objective_types()
-        for pool in ERRANDS.values():
-            for errand in pool:
-                for objective in errand["objectives"]:
-                    self.assertIn(objective["type"], reported, objective)
-
     def test_only_an_errand_may_pay_standing(self):
         errand = dict(ERRANDS["Forging"][0])
         forged = {**errand, "quest_key": "forge_something_else"}

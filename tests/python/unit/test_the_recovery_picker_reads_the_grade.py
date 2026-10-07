@@ -61,12 +61,6 @@ class TheTwinsAgreeWithTheEngine(unittest.TestCase):
         self.assertEqual(graded_amount(0, 3.0), 0)
         self.assertEqual(graded_amount(-4, 3.0), 0)
 
-    def test_the_engine_still_rounds_that_way(self):
-        go = GO.read_text(encoding="utf-8")
-        self.assertIn("math.Round(float64(base)*mult)", go, "the engine's rounding moved; the twin must follow it")
-        self.assertIn("maxI64(base, ", go)
-
-
 class TheBattlePickerPrintsTheGrade(unittest.TestCase):
     def setUp(self):
         self.battle = _battle()

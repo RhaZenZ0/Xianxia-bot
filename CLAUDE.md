@@ -2851,9 +2851,9 @@ or none, and cultivate further if it is not yet in reach.
 
 The Ghost Cultivator's bug was never that gap. It was having **no demonic manual at any realm at
 all**, so the cell could never serve that path however far its initiate climbed - and the content
-fix alone closes it. `TestTheHiddenSectCanServeEveryPath` asks the honest question now (served
-somewhere on the ladder), and `TestTheCellStillRefusesSomeoneElsesArt` guards the decision from the
-other side. The lesson is the one this file keeps recording, met from a new direction: **a gate that
+fix alone closes it. `TestAPathMatchIsStillPreferred` asks the honest question now (every path
+served at the top of the ladder) and guards the decision from the other side (served its own art or
+none). The lesson is the one this file keeps recording, met from a new direction: **a gate that
 encodes a claim rather than a rule will happily make you change the rule.** Two existing tests were
 the only thing standing between that and a merged release.
 

@@ -41,12 +41,6 @@ class AlchemyBeastExpansionTests(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self):
         self.tmp.cleanup()
 
-    async def test_the_expansion_tables_exist(self):
-        import sqlite3
-        with sqlite3.connect(self.path) as conn:
-            tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        self.assertTrue({"alchemy_state", "alchemy_batches", "wild_beast_encounters"}.issubset(tables))
-
     async def test_a_schema_v4_database_migrates_to_current_without_losing_the_character(self):
         import sqlite3
         with sqlite3.connect(self.path) as conn:

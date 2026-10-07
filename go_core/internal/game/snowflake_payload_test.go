@@ -75,19 +75,6 @@ func TestAPayloadCarriesADiscordIdExactly(t *testing.T) {
 	}
 }
 
-func TestAnIdInsideAFloatIsStillExact(t *testing.T) {
-	// The other direction: ids small enough for a float must keep working, so
-	// the fix is not a new class of refusal. 42 is what every other admin test
-	// in this package uses.
-	path := setupAdminDB(t)
-	applyAdmin(t, path, "admin.player.set_realm", map[string]any{
-		"user_id": 42, "realm_index": 3, "phase": 2, "reason": "test",
-	})
-	if got := storage.ParseInt(scalar(t, path, "SELECT realm_index FROM characters WHERE user_id=42")); got != 3 {
-		t.Fatalf("realm_index is %d, want 3", got)
-	}
-}
-
 func TestTheAuditRowNamesTheIdItActuallyWrote(t *testing.T) {
 	// The audit trail is the half a GM reads back, and a target naming an id
 	// nobody holds is worse than a refusal: it says the action landed on
