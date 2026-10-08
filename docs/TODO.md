@@ -16,6 +16,17 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.31.2)** — *A hub press made about ninety engine round trips.* The panel refresh after
+  every press opened a session per one-row read (thirty-two of them), read the clock once per circuit
+  walker to draw the Here line (twelve), and looked a plain town up in three private-property tables.
+  One `reuse_connection` scope per refresh (`hubs.register_read_scope`), the clock read once in
+  `npcs_present` and handed down, a lookup only for a private key, and a per-scope memo of the character
+  and membership reads; `test_a_panel_refresh_is_bounded.py` holds it.
+- **deferred (design)** — *One engine query for the panel's gate state.* After v1.31.2 a refresh is one
+  session, about sixteen SELECTs and seven engine actions in production. A single `panel.gates` query in
+  Go, or the sixteen SELECTs through `/v1/db/batch`, would make it about ten round trips; not built,
+  because each `get_x` is its own repository method and a batched read changes that shape for a saving
+  that no longer dominates a press.
 - **fixed (v1.27.0)** — *Missing system links.* Three read-only audits, re-checked against v1.26.0.
   Navigation: every objective type has a door (`OBJECTIVE_PATHS`), bare tree commands, empty pickers,
   padlock reasons and engine refusals earn buttons, forty-eight handlers that printed the engine's bare

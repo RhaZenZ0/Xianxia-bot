@@ -108,15 +108,24 @@ async def character_location_display(character: dict[str, Any]) -> str:
     world-catalog location, or a stale/orphaned private-location key).
     """
     location = str(character.get("location") or "Unknown")
-    abode_location = await DB.get_abode_by_location(location)
-    if abode_location:
-        return f"{abode_location['name']} ({player_property_label(abode_location)})"
-    personal_location = await DB.get_personal_world_by_location(location)
-    if personal_location:
-        return f"{personal_location['name']} (Personal World)"
-    sect_abode_location = await DB.get_sect_abode_by_location(location)
-    if sect_abode_location:
-        return f"{sect_abode_location['name']} (Sect Abode)"
+    # Only a private key needs a lookup, and only the one its prefix names
+    # (v1.31.2): this used to ask all three tables for every location, so a
+    # cultivator standing in Greenriver Town cost three engine round trips to
+    # be told they stood in Greenriver Town - on every panel refresh.
+    if not location.startswith(PRIVATE_PREFIXES):
+        return location
+    if location.startswith("abode:"):
+        abode_location = await DB.get_abode_by_location(location)
+        if abode_location:
+            return f"{abode_location['name']} ({player_property_label(abode_location)})"
+    if location.startswith("personal_world:"):
+        personal_location = await DB.get_personal_world_by_location(location)
+        if personal_location:
+            return f"{personal_location['name']} (Personal World)"
+    if location.startswith("sect_abode:"):
+        sect_abode_location = await DB.get_sect_abode_by_location(location)
+        if sect_abode_location:
+            return f"{sect_abode_location['name']} (Sect Abode)"
     if location.startswith("birth_family:"):
         family = await DB.get_birth_family(int(character.get("user_id") or 0))
         if family and location == f"birth_family:{int(family.get('family_id') or 0)}":
@@ -144,6 +153,10 @@ PRIVATE_LOCATION_EXITS: tuple[tuple[str, str, str], ...] = (
     ("abode:", "**/abode → Leave**", "your own property"),
     ("personal_world:", "**/innerworld → Leave**", "your personal world"),
 )
+# The prefixes of a place that is somebody's own rather than the world's - the
+# four `exploration_actions.go` refuses inside. Read off the exits above so
+# there is one list; `surface.PRIVATE_PREFIXES` is this name.
+PRIVATE_PREFIXES: tuple[str, ...] = tuple(prefix for prefix, _command, _description in PRIVATE_LOCATION_EXITS)
 def private_location_exit(location: object) -> tuple[str, str] | None:
     """The command that steps a character back out into the shared world.
 
