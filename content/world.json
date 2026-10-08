@@ -27900,6 +27900,155 @@
         }
       },
       "base_price": 70
+    },
+    "iron_root_grounding_array": {
+      "name": "Iron-Root Grounding Array",
+      "description": "Spirit-iron filings set in a chalked ring; the ground inside it holds the body as a root holds a tree.",
+      "sect_value": 24,
+      "base_price": 60,
+      "array_deploy": "iron_root_grounding_array"
+    },
+    "iron_root_grounding_array_method": {
+      "name": "Iron-Root Grounding Array — Method Slip",
+      "description": "A jade slip carrying the method for Iron-Root Grounding Array. The jade holds one impression of the method and goes blank as it is taken, so the reading is the end of the slip.",
+      "sect_value": 40,
+      "base_price": 120,
+      "teaches_recipe": "Iron-Root Grounding Array"
+    },
+    "crystal_spirit_gathering_array": {
+      "name": "Crystal Spirit-Gathering Array",
+      "description": "Spirit crystal ground into the lines of a gathering circle; the qi of the place runs toward whoever sits in it.",
+      "sect_value": 60,
+      "base_price": 150,
+      "array_deploy": "crystal_spirit_gathering_array"
+    },
+    "crystal_spirit_gathering_array_method": {
+      "name": "Crystal Spirit-Gathering Array — Method Slip",
+      "description": "A jade slip carrying the method for Crystal Spirit-Gathering Array. The jade holds one impression of the method and goes blank as it is taken, so the reading is the end of the slip.",
+      "sect_value": 100,
+      "base_price": 300,
+      "teaches_recipe": "Crystal Spirit-Gathering Array"
+    },
+    "nine_star_heaven_lock_array": {
+      "name": "Nine-Star Heaven-Lock Array",
+      "description": "Nine starsteel points in a heavenpetal ring: the array a Celestial grandmaster closes a battlefield with, and nothing inside it leaves unbidden.",
+      "sect_value": 256,
+      "base_price": 640,
+      "array_deploy": "nine_star_heaven_lock_array"
+    },
+    "nine_star_heaven_lock_array_method": {
+      "name": "Nine-Star Heaven-Lock Array — Method Slip",
+      "description": "A jade slip carrying the method for Nine-Star Heaven-Lock Array. The jade holds one impression of the method and goes blank as it is taken, so the reading is the end of the slip.",
+      "sect_value": 426,
+      "base_price": 1280,
+      "teaches_recipe": "Nine-Star Heaven-Lock Array"
+    },
+    "spirit_iron_greaves": {
+      "name": "Spirit-Iron Greaves",
+      "description": "Shin-plates of spirit iron over boiled leather; light enough to run in, and the first thing a smith makes that is not a blade.",
+      "sect_value": 9,
+      "base_price": 22
+    },
+    "spirit_iron_greaves_method": {
+      "name": "Spirit-Iron Greaves — Method Slip",
+      "description": "A jade slip carrying the method for Spirit-Iron Greaves. The jade holds one impression of the method and goes blank as it is taken, so the reading is the end of the slip.",
+      "sect_value": 14,
+      "base_price": 44,
+      "teaches_recipe": "Spirit-Iron Greaves"
+    },
+    "starsteel_sky_treader_boots": {
+      "name": "Starsteel Sky-Treader Boots",
+      "description": "Boots soled in starsteel and lined with heavenpetal; each step lands a heartbeat before it was taken.",
+      "sect_value": 170,
+      "base_price": 680
+    },
+    "starsteel_sky_treader_boots_method": {
+      "name": "Starsteel Sky-Treader Boots — Method Slip",
+      "description": "A jade slip carrying the method for Starsteel Sky-Treader Boots. The jade holds one impression of the method and goes blank as it is taken, so the reading is the end of the slip.",
+      "sect_value": 453,
+      "base_price": 1360,
+      "teaches_recipe": "Starsteel Sky-Treader Boots"
+    },
+    "gilded_heart_ward_talisman": {
+      "name": "Gilded Heart-Ward Talisman",
+      "description": "A talisman of gold ink over dawnlotus paste; the heart keeps its own counsel while it burns, and no demon gets a word in.",
+      "sect_value": 80,
+      "base_price": 240,
+      "use": {
+        "effect_key": "gilded_heart_ward_talisman",
+        "name": "Gilded Heart-Ward Talisman",
+        "duration_game_minutes": 180,
+        "consume": true,
+        "effect": {
+          "description": "A talisman of gold ink over dawnlotus paste; the heart keeps its own counsel while it burns, and no demon gets a word in.",
+          "modifiers": [
+            {
+              "stat": "will",
+              "operation": "add",
+              "value": 3
+            },
+            {
+              "stat": "heart_demon_resistance",
+              "operation": "add",
+              "value": 25
+            }
+          ],
+          "tags": [
+            "talisman",
+            "formation"
+          ]
+        }
+      }
+    },
+    "gilded_heart_ward_talisman_method": {
+      "name": "Gilded Heart-Ward Talisman — Method Slip",
+      "description": "A jade slip carrying the method for Gilded Heart-Ward Talisman. The jade holds one impression of the method and goes blank as it is taken, so the reading is the end of the slip.",
+      "sect_value": 160,
+      "base_price": 480,
+      "teaches_recipe": "Gilded Heart-Ward Talisman"
+    },
+    "heaven_stepping_talisman": {
+      "name": "Heaven-Stepping Talisman",
+      "description": "Starsteel dust in heavenpetal ink; the feet find a road where there is none, and nothing closes it behind them.",
+      "sect_value": 128,
+      "base_price": 320,
+      "use": {
+        "effect_key": "heaven_stepping_talisman",
+        "name": "Heaven-Stepping Talisman",
+        "duration_game_minutes": 180,
+        "consume": true,
+        "effect": {
+          "description": "Starsteel dust in heavenpetal ink; the feet find a road where there is none, and nothing closes it behind them.",
+          "modifiers": [
+            {
+              "stat": "agility",
+              "operation": "add",
+              "value": 4
+            },
+            {
+              "stat": "escape_bonus",
+              "operation": "add",
+              "value": 4
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 1
+            }
+          ],
+          "tags": [
+            "talisman",
+            "formation"
+          ]
+        }
+      }
+    },
+    "heaven_stepping_talisman_method": {
+      "name": "Heaven-Stepping Talisman — Method Slip",
+      "description": "A jade slip carrying the method for Heaven-Stepping Talisman. The jade holds one impression of the method and goes blank as it is taken, so the reading is the end of the slip.",
+      "sect_value": 213,
+      "base_price": 640,
+      "teaches_recipe": "Heaven-Stepping Talisman"
     }
   },
   "recipes": {
@@ -28325,6 +28474,99 @@
         "marrow_tempering_pill": 1
       },
       "min_level": 2
+    },
+    "Iron-Root Grounding Array": {
+      "profession": "Formation",
+      "tn": 18,
+      "cost": {
+        "array_disk_blank": 1,
+        "spirit_iron": 2,
+        "beast_core": 1
+      },
+      "output": {
+        "iron_root_grounding_array": 1
+      },
+      "min_level": 2
+    },
+    "Crystal Spirit-Gathering Array": {
+      "profession": "Formation",
+      "tn": 21,
+      "cost": {
+        "array_disk_blank": 2,
+        "spirit_crystal_ore": 2,
+        "moonveil_herb": 1
+      },
+      "output": {
+        "crystal_spirit_gathering_array": 1
+      },
+      "min_level": 3
+    },
+    "Nine-Star Heaven-Lock Array": {
+      "profession": "Formation",
+      "tn": 29,
+      "cost": {
+        "array_disk_blank": 3,
+        "starsteel_ore": 2,
+        "heavenpetal_herb": 1,
+        "spirit_ink": 2
+      },
+      "output": {
+        "nine_star_heaven_lock_array": 1
+      },
+      "min_level": 5
+    },
+    "Spirit-Iron Greaves": {
+      "profession": "Forging",
+      "tn": 15,
+      "cost": {
+        "spirit_iron": 3,
+        "beast_core": 1
+      },
+      "output": {
+        "spirit_iron_greaves": 1
+      },
+      "min_level": 1
+    },
+    "Starsteel Sky-Treader Boots": {
+      "profession": "Forging",
+      "tn": 29,
+      "cost": {
+        "starsteel_ore": 3,
+        "heavenpetal_herb": 1,
+        "beast_core": 2
+      },
+      "output": {
+        "starsteel_sky_treader_boots": 1
+      },
+      "min_level": 5
+    },
+    "Gilded Heart-Ward Talisman": {
+      "profession": "Inscription",
+      "tn": 26,
+      "cost": {
+        "talisman_paper": 2,
+        "spirit_ink": 2,
+        "immortal_gold_ore": 1,
+        "dawnlotus_herb": 1
+      },
+      "output": {
+        "gilded_heart_ward_talisman": 1
+      },
+      "min_level": 4
+    },
+    "Heaven-Stepping Talisman": {
+      "profession": "Inscription",
+      "tn": 28,
+      "cost": {
+        "talisman_paper": 3,
+        "spirit_ink": 3,
+        "starsteel_ore": 1,
+        "heavenpetal_herb": 1
+      },
+      "output": {
+        "heaven_stepping_talisman": 1
+      },
+      "min_level": 5
     }
   },
   "perfection": {
@@ -60088,6 +60330,12 @@
           "made_here": true
         },
         {
+          "item_id": "spirit_iron_greaves",
+          "quantity": 1,
+          "price": 17,
+          "made_here": true
+        },
+        {
           "item_id": "beast_core",
           "quantity": 5,
           "price": 12,
@@ -60159,7 +60407,8 @@
         "immortal_gold_sabre": 45,
         "azure_flying_sword": 122,
         "spirit_crystal_mail": 22,
-        "immortal_gold_plate": 56
+        "immortal_gold_plate": 56,
+        "spirit_iron_greaves": 6
       }
     },
     "adamant_body_array_workshop": {
@@ -60295,6 +60544,12 @@
           "made_here": false
         },
         {
+          "item_id": "iron_root_grounding_array_method",
+          "quantity": 1,
+          "price": 120,
+          "made_here": false
+        },
+        {
           "item_id": "guiding_chalk_array_method",
           "quantity": 1,
           "price": 44,
@@ -60308,7 +60563,8 @@
         "verdant_grotto_key": 98,
         "nine_echo_spatial_token": 118,
         "stygian_tomb_token": 147,
-        "guiding_chalk_array": 5
+        "guiding_chalk_array": 5,
+        "iron_root_grounding_array": 15
       }
     },
     "ashenwall_provisions": {
@@ -60386,6 +60642,18 @@
           "made_here": true
         },
         {
+          "item_id": "spirit_iron_greaves",
+          "quantity": 1,
+          "price": 14,
+          "made_here": true
+        },
+        {
+          "item_id": "spirit_iron_greaves@mid",
+          "quantity": 1,
+          "price": 28,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_iron_armor@mid",
           "quantity": 1,
           "price": 34,
@@ -60434,6 +60702,12 @@
           "made_here": false
         },
         {
+          "item_id": "spirit_iron_greaves_method",
+          "quantity": 1,
+          "price": 55,
+          "made_here": false
+        },
+        {
           "item_id": "spirit_iron_sword_method",
           "quantity": 1,
           "price": 45,
@@ -60452,7 +60726,9 @@
         "spirit_iron_sword@mid": 10,
         "spirit_iron_armor@mid": 12,
         "spirit_crystal_sword@mid": 36,
-        "spirit_crystal_mail@mid": 44
+        "spirit_crystal_mail@mid": 44,
+        "spirit_iron_greaves": 5,
+        "spirit_iron_greaves@mid": 10
       }
     },
     "azure_crown_apothecary": {
@@ -60901,6 +61177,12 @@
           "made_here": false
         },
         {
+          "item_id": "crystal_spirit_gathering_array_method",
+          "quantity": 1,
+          "price": 300,
+          "made_here": false
+        },
+        {
           "item_id": "steppe_bone_token",
           "quantity": 1,
           "price": 340,
@@ -60914,7 +61196,8 @@
         "minor_warding_array_disk": 12,
         "spirit_crystal_ore": 3,
         "guiding_chalk_array": 5,
-        "moonveil_concealment_array": 27
+        "moonveil_concealment_array": 27,
+        "crystal_spirit_gathering_array": 37
       }
     },
     "broken_halo_provisions": {
@@ -61019,6 +61302,18 @@
           "made_here": true
         },
         {
+          "item_id": "spirit_iron_greaves",
+          "quantity": 1,
+          "price": 28,
+          "made_here": true
+        },
+        {
+          "item_id": "spirit_iron_greaves@mid",
+          "quantity": 1,
+          "price": 56,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_iron_armor@mid",
           "quantity": 1,
           "price": 66,
@@ -61115,6 +61410,18 @@
           "made_here": true
         },
         {
+          "item_id": "starsteel_sky_treader_boots",
+          "quantity": 1,
+          "price": 566,
+          "made_here": true
+        },
+        {
+          "item_id": "starsteel_sky_treader_boots@mid",
+          "quantity": 1,
+          "price": 1132,
+          "made_here": true
+        },
+        {
           "item_id": "starsteel_aegis@mid",
           "quantity": 1,
           "price": 936,
@@ -61136,6 +61443,12 @@
           "item_id": "starsteel_aegis_method",
           "quantity": 1,
           "price": 1405,
+          "made_here": false
+        },
+        {
+          "item_id": "starsteel_sky_treader_boots_method",
+          "quantity": 1,
+          "price": 1700,
           "made_here": false
         }
       ],
@@ -61161,7 +61474,11 @@
         "starsteel_glaive@mid": 300,
         "spirit_crystal_mail@mid": 44,
         "immortal_gold_plate@mid": 112,
-        "starsteel_aegis@mid": 280
+        "starsteel_aegis@mid": 280,
+        "spirit_iron_greaves": 10,
+        "starsteel_sky_treader_boots": 169,
+        "spirit_iron_greaves@mid": 20,
+        "starsteel_sky_treader_boots@mid": 338
       }
     },
     "celestial_mandate_apothecary": {
@@ -61477,6 +61794,18 @@
           "made_here": true
         },
         {
+          "item_id": "gilded_heart_ward_talisman",
+          "quantity": 2,
+          "price": 390,
+          "made_here": true
+        },
+        {
+          "item_id": "gilded_heart_ward_talisman@mid",
+          "quantity": 1,
+          "price": 780,
+          "made_here": true
+        },
+        {
           "item_id": "golden_edge_talisman@mid",
           "quantity": 1,
           "price": 312,
@@ -61486,6 +61815,18 @@
           "item_id": "starfall_talisman",
           "quantity": 2,
           "price": 312,
+          "made_here": true
+        },
+        {
+          "item_id": "heaven_stepping_talisman",
+          "quantity": 2,
+          "price": 520,
+          "made_here": true
+        },
+        {
+          "item_id": "heaven_stepping_talisman@mid",
+          "quantity": 1,
+          "price": 1040,
           "made_here": true
         },
         {
@@ -61511,6 +61852,12 @@
           "quantity": 1,
           "price": 480,
           "made_here": false
+        },
+        {
+          "item_id": "heaven_stepping_talisman_method",
+          "quantity": 1,
+          "price": 800,
+          "made_here": false
         }
       ],
       "buys": {
@@ -61529,7 +61876,11 @@
         "crystal_ward_talisman@mid": 60,
         "golden_edge_talisman@mid": 120,
         "starfall_talisman@mid": 192,
-        "spirit_focus_talisman@mid": 12
+        "spirit_focus_talisman@mid": 12,
+        "gilded_heart_ward_talisman": 150,
+        "heaven_stepping_talisman": 160,
+        "gilded_heart_ward_talisman@mid": 300,
+        "heaven_stepping_talisman@mid": 320
       }
     },
     "celestial_mandate_provisions": {
@@ -61916,6 +62267,12 @@
           "made_here": false
         },
         {
+          "item_id": "spirit_iron_greaves_method",
+          "quantity": 1,
+          "price": 44,
+          "made_here": false
+        },
+        {
           "item_id": "spirit_iron_sword_method",
           "quantity": 1,
           "price": 36,
@@ -62028,6 +62385,12 @@
           "made_here": true
         },
         {
+          "item_id": "spirit_iron_greaves",
+          "quantity": 1,
+          "price": 14,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_crystal_ore",
           "quantity": 7,
           "price": 11,
@@ -62072,7 +62435,8 @@
         "spirit_crystal_ore": 3,
         "spirit_crystal_sword": 18,
         "azure_flying_sword": 91,
-        "spirit_crystal_mail": 22
+        "spirit_crystal_mail": 22,
+        "spirit_iron_greaves": 5
       }
     },
     "cloudedge_talisman_hall": {
@@ -62357,9 +62721,21 @@
           "made_here": true
         },
         {
+          "item_id": "gilded_heart_ward_talisman",
+          "quantity": 2,
+          "price": 312,
+          "made_here": true
+        },
+        {
           "item_id": "starfall_talisman",
           "quantity": 2,
           "price": 250,
+          "made_here": true
+        },
+        {
+          "item_id": "heaven_stepping_talisman",
+          "quantity": 2,
+          "price": 417,
           "made_here": true
         },
         {
@@ -62379,6 +62755,12 @@
           "quantity": 1,
           "price": 384,
           "made_here": false
+        },
+        {
+          "item_id": "heaven_stepping_talisman_method",
+          "quantity": 1,
+          "price": 640,
+          "made_here": false
         }
       ],
       "buys": {
@@ -62391,7 +62773,9 @@
         "starfall_talisman": 96,
         "paper_crane_charm": 42,
         "void_stride_talisman": 630,
-        "spirit_focus_talisman": 6
+        "spirit_focus_talisman": 6,
+        "gilded_heart_ward_talisman": 120,
+        "heaven_stepping_talisman": 160
       }
     },
     "emberforge_smithy": {
@@ -62422,6 +62806,12 @@
           "item_id": "spirit_iron_armor_method",
           "quantity": 1,
           "price": 52,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_iron_greaves_method",
+          "quantity": 1,
+          "price": 44,
           "made_here": false
         },
         {
@@ -62663,6 +63053,12 @@
           "made_here": true
         },
         {
+          "item_id": "spirit_iron_greaves",
+          "quantity": 1,
+          "price": 22,
+          "made_here": true
+        },
+        {
           "item_id": "beast_core",
           "quantity": 6,
           "price": 15,
@@ -62723,6 +63119,12 @@
           "made_here": true
         },
         {
+          "item_id": "starsteel_sky_treader_boots",
+          "quantity": 1,
+          "price": 454,
+          "made_here": true
+        },
+        {
           "item_id": "azure_flying_sword",
           "quantity": 1,
           "price": 440,
@@ -62738,6 +63140,12 @@
           "item_id": "starsteel_aegis_method",
           "quantity": 1,
           "price": 1124,
+          "made_here": false
+        },
+        {
+          "item_id": "starsteel_sky_treader_boots_method",
+          "quantity": 1,
+          "price": 1360,
           "made_here": false
         }
       ],
@@ -62755,7 +63163,9 @@
         "azure_flying_sword": 154,
         "spirit_crystal_mail": 22,
         "immortal_gold_plate": 56,
-        "starsteel_aegis": 140
+        "starsteel_aegis": 140,
+        "spirit_iron_greaves": 8,
+        "starsteel_sky_treader_boots": 169
       }
     },
     "firmament_blade_talisman_hall": {
@@ -62813,9 +63223,21 @@
           "made_here": true
         },
         {
+          "item_id": "gilded_heart_ward_talisman",
+          "quantity": 2,
+          "price": 312,
+          "made_here": true
+        },
+        {
           "item_id": "starfall_talisman",
           "quantity": 2,
           "price": 250,
+          "made_here": true
+        },
+        {
+          "item_id": "heaven_stepping_talisman",
+          "quantity": 2,
+          "price": 417,
           "made_here": true
         },
         {
@@ -62835,6 +63257,12 @@
           "quantity": 1,
           "price": 384,
           "made_here": false
+        },
+        {
+          "item_id": "heaven_stepping_talisman_method",
+          "quantity": 1,
+          "price": 640,
+          "made_here": false
         }
       ],
       "buys": {
@@ -62847,7 +63275,9 @@
         "starfall_talisman": 96,
         "paper_crane_charm": 42,
         "void_stride_talisman": 630,
-        "spirit_focus_talisman": 6
+        "spirit_focus_talisman": 6,
+        "gilded_heart_ward_talisman": 120,
+        "heaven_stepping_talisman": 160
       }
     },
     "four_roads_provisions": {
@@ -63072,9 +63502,21 @@
           "made_here": true
         },
         {
+          "item_id": "gilded_heart_ward_talisman",
+          "quantity": 2,
+          "price": 312,
+          "made_here": true
+        },
+        {
           "item_id": "starfall_talisman",
           "quantity": 2,
           "price": 250,
+          "made_here": true
+        },
+        {
+          "item_id": "heaven_stepping_talisman",
+          "quantity": 2,
+          "price": 417,
           "made_here": true
         },
         {
@@ -63094,6 +63536,12 @@
           "quantity": 1,
           "price": 384,
           "made_here": false
+        },
+        {
+          "item_id": "heaven_stepping_talisman_method",
+          "quantity": 1,
+          "price": 640,
+          "made_here": false
         }
       ],
       "buys": {
@@ -63106,7 +63554,9 @@
         "starfall_talisman": 96,
         "paper_crane_charm": 42,
         "void_stride_talisman": 630,
-        "spirit_focus_talisman": 6
+        "spirit_focus_talisman": 6,
+        "gilded_heart_ward_talisman": 120,
+        "heaven_stepping_talisman": 160
       }
     },
     "frostwatch_provisions": {
@@ -63362,6 +63812,12 @@
           "made_here": true
         },
         {
+          "item_id": "spirit_iron_greaves",
+          "quantity": 1,
+          "price": 17,
+          "made_here": true
+        },
+        {
           "item_id": "beast_core",
           "quantity": 5,
           "price": 12,
@@ -63433,7 +63889,8 @@
         "immortal_gold_sabre": 45,
         "azure_flying_sword": 122,
         "spirit_crystal_mail": 22,
-        "immortal_gold_plate": 56
+        "immortal_gold_plate": 56,
+        "spirit_iron_greaves": 6
       }
     },
     "golden_spear_provisions": {
@@ -63679,6 +64136,12 @@
           "made_here": true
         },
         {
+          "item_id": "spirit_iron_greaves",
+          "quantity": 1,
+          "price": 17,
+          "made_here": true
+        },
+        {
           "item_id": "beast_core",
           "quantity": 5,
           "price": 12,
@@ -63750,7 +64213,8 @@
         "immortal_gold_sabre": 45,
         "azure_flying_sword": 122,
         "spirit_crystal_mail": 22,
-        "immortal_gold_plate": 56
+        "immortal_gold_plate": 56,
+        "spirit_iron_greaves": 6
       }
     },
     "heavenblade_talisman_hall": {
@@ -63808,6 +64272,12 @@
           "made_here": true
         },
         {
+          "item_id": "gilded_heart_ward_talisman",
+          "quantity": 2,
+          "price": 235,
+          "made_here": true
+        },
+        {
           "item_id": "paper_crane_charm",
           "quantity": 2,
           "price": 96,
@@ -63817,6 +64287,12 @@
           "item_id": "golden_edge_talisman_method",
           "quantity": 1,
           "price": 192,
+          "made_here": false
+        },
+        {
+          "item_id": "gilded_heart_ward_talisman_method",
+          "quantity": 1,
+          "price": 480,
           "made_here": false
         }
       ],
@@ -63828,7 +64304,8 @@
         "crystal_ward_talisman": 18,
         "golden_edge_talisman": 36,
         "paper_crane_charm": 33,
-        "spirit_focus_talisman": 6
+        "spirit_focus_talisman": 6,
+        "gilded_heart_ward_talisman": 90
       }
     },
     "hundred_herb_apothecary": {
@@ -64226,6 +64703,12 @@
           "made_here": false
         },
         {
+          "item_id": "spirit_iron_greaves_method",
+          "quantity": 1,
+          "price": 44,
+          "made_here": false
+        },
+        {
           "item_id": "spirit_iron_sword_method",
           "quantity": 1,
           "price": 36,
@@ -64459,6 +64942,12 @@
           "made_here": true
         },
         {
+          "item_id": "gilded_heart_ward_talisman",
+          "quantity": 2,
+          "price": 235,
+          "made_here": true
+        },
+        {
           "item_id": "paper_crane_charm",
           "quantity": 2,
           "price": 96,
@@ -64468,6 +64957,12 @@
           "item_id": "golden_edge_talisman_method",
           "quantity": 1,
           "price": 192,
+          "made_here": false
+        },
+        {
+          "item_id": "gilded_heart_ward_talisman_method",
+          "quantity": 1,
+          "price": 480,
           "made_here": false
         }
       ],
@@ -64479,7 +64974,8 @@
         "crystal_ward_talisman": 18,
         "golden_edge_talisman": 36,
         "paper_crane_charm": 33,
-        "spirit_focus_talisman": 6
+        "spirit_focus_talisman": 6,
+        "gilded_heart_ward_talisman": 90
       }
     },
     "jade_crown_provisions": {
@@ -64982,9 +65478,21 @@
           "made_here": true
         },
         {
+          "item_id": "gilded_heart_ward_talisman",
+          "quantity": 2,
+          "price": 312,
+          "made_here": true
+        },
+        {
           "item_id": "starfall_talisman",
           "quantity": 2,
           "price": 250,
+          "made_here": true
+        },
+        {
+          "item_id": "heaven_stepping_talisman",
+          "quantity": 2,
+          "price": 417,
           "made_here": true
         },
         {
@@ -65004,6 +65512,12 @@
           "quantity": 1,
           "price": 384,
           "made_here": false
+        },
+        {
+          "item_id": "heaven_stepping_talisman_method",
+          "quantity": 1,
+          "price": 640,
+          "made_here": false
         }
       ],
       "buys": {
@@ -65016,7 +65530,9 @@
         "starfall_talisman": 96,
         "paper_crane_charm": 42,
         "void_stride_talisman": 630,
-        "spirit_focus_talisman": 6
+        "spirit_focus_talisman": 6,
+        "gilded_heart_ward_talisman": 120,
+        "heaven_stepping_talisman": 160
       }
     },
     "lunar_shadow_apothecary": {
@@ -65230,6 +65746,12 @@
           "made_here": true
         },
         {
+          "item_id": "gilded_heart_ward_talisman",
+          "quantity": 2,
+          "price": 235,
+          "made_here": true
+        },
+        {
           "item_id": "paper_crane_charm",
           "quantity": 2,
           "price": 96,
@@ -65239,6 +65761,12 @@
           "item_id": "golden_edge_talisman_method",
           "quantity": 1,
           "price": 192,
+          "made_here": false
+        },
+        {
+          "item_id": "gilded_heart_ward_talisman_method",
+          "quantity": 1,
+          "price": 480,
           "made_here": false
         }
       ],
@@ -65250,7 +65778,8 @@
         "crystal_ward_talisman": 18,
         "golden_edge_talisman": 36,
         "paper_crane_charm": 33,
-        "spirit_focus_talisman": 6
+        "spirit_focus_talisman": 6,
+        "gilded_heart_ward_talisman": 90
       }
     },
     "lunar_veil_apothecary": {
@@ -65535,9 +66064,21 @@
           "made_here": true
         },
         {
+          "item_id": "gilded_heart_ward_talisman",
+          "quantity": 2,
+          "price": 312,
+          "made_here": true
+        },
+        {
           "item_id": "starfall_talisman",
           "quantity": 2,
           "price": 250,
+          "made_here": true
+        },
+        {
+          "item_id": "heaven_stepping_talisman",
+          "quantity": 2,
+          "price": 417,
           "made_here": true
         },
         {
@@ -65557,6 +66098,12 @@
           "quantity": 1,
           "price": 384,
           "made_here": false
+        },
+        {
+          "item_id": "heaven_stepping_talisman_method",
+          "quantity": 1,
+          "price": 640,
+          "made_here": false
         }
       ],
       "buys": {
@@ -65569,7 +66116,9 @@
         "starfall_talisman": 96,
         "paper_crane_charm": 42,
         "void_stride_talisman": 630,
-        "spirit_focus_talisman": 6
+        "spirit_focus_talisman": 6,
+        "gilded_heart_ward_talisman": 120,
+        "heaven_stepping_talisman": 160
       }
     },
     "mandate_spear_forge": {
@@ -65600,6 +66149,12 @@
           "item_id": "spirit_iron_armor",
           "quantity": 1,
           "price": 26,
+          "made_here": true
+        },
+        {
+          "item_id": "spirit_iron_greaves",
+          "quantity": 1,
+          "price": 22,
           "made_here": true
         },
         {
@@ -65663,6 +66218,12 @@
           "made_here": true
         },
         {
+          "item_id": "starsteel_sky_treader_boots",
+          "quantity": 1,
+          "price": 454,
+          "made_here": true
+        },
+        {
           "item_id": "azure_flying_sword",
           "quantity": 1,
           "price": 440,
@@ -65678,6 +66239,12 @@
           "item_id": "starsteel_aegis_method",
           "quantity": 1,
           "price": 1124,
+          "made_here": false
+        },
+        {
+          "item_id": "starsteel_sky_treader_boots_method",
+          "quantity": 1,
+          "price": 1360,
           "made_here": false
         }
       ],
@@ -65695,7 +66262,9 @@
         "azure_flying_sword": 154,
         "spirit_crystal_mail": 22,
         "immortal_gold_plate": 56,
-        "starsteel_aegis": 140
+        "starsteel_aegis": 140,
+        "spirit_iron_greaves": 8,
+        "starsteel_sky_treader_boots": 169
       }
     },
     "mandate_spear_provisions": {
@@ -66164,6 +66733,18 @@
           "made_here": true
         },
         {
+          "item_id": "spirit_iron_greaves",
+          "quantity": 1,
+          "price": 21,
+          "made_here": true
+        },
+        {
+          "item_id": "spirit_iron_greaves@mid",
+          "quantity": 1,
+          "price": 42,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_iron_armor@mid",
           "quantity": 1,
           "price": 50,
@@ -66260,6 +66841,18 @@
           "made_here": true
         },
         {
+          "item_id": "starsteel_sky_treader_boots",
+          "quantity": 1,
+          "price": 425,
+          "made_here": true
+        },
+        {
+          "item_id": "starsteel_sky_treader_boots@mid",
+          "quantity": 1,
+          "price": 850,
+          "made_here": true
+        },
+        {
           "item_id": "starsteel_aegis@mid",
           "quantity": 1,
           "price": 702,
@@ -66306,7 +66899,11 @@
         "starsteel_glaive@mid": 224,
         "spirit_crystal_mail@mid": 44,
         "immortal_gold_plate@mid": 112,
-        "starsteel_aegis@mid": 280
+        "starsteel_aegis@mid": 280,
+        "spirit_iron_greaves": 8,
+        "starsteel_sky_treader_boots": 169,
+        "spirit_iron_greaves@mid": 16,
+        "starsteel_sky_treader_boots@mid": 338
       }
     },
     "nine_heavens_apothecary": {
@@ -66622,6 +67219,18 @@
           "made_here": true
         },
         {
+          "item_id": "gilded_heart_ward_talisman",
+          "quantity": 2,
+          "price": 292,
+          "made_here": true
+        },
+        {
+          "item_id": "gilded_heart_ward_talisman@mid",
+          "quantity": 1,
+          "price": 584,
+          "made_here": true
+        },
+        {
           "item_id": "golden_edge_talisman@mid",
           "quantity": 1,
           "price": 234,
@@ -66631,6 +67240,18 @@
           "item_id": "starfall_talisman",
           "quantity": 2,
           "price": 234,
+          "made_here": true
+        },
+        {
+          "item_id": "heaven_stepping_talisman",
+          "quantity": 2,
+          "price": 390,
+          "made_here": true
+        },
+        {
+          "item_id": "heaven_stepping_talisman@mid",
+          "quantity": 1,
+          "price": 780,
           "made_here": true
         },
         {
@@ -66656,6 +67277,12 @@
           "quantity": 1,
           "price": 240,
           "made_here": false
+        },
+        {
+          "item_id": "gilded_heart_ward_talisman_method",
+          "quantity": 1,
+          "price": 600,
+          "made_here": false
         }
       ],
       "buys": {
@@ -66674,7 +67301,11 @@
         "crystal_ward_talisman@mid": 44,
         "golden_edge_talisman@mid": 90,
         "starfall_talisman@mid": 180,
-        "spirit_focus_talisman@mid": 12
+        "spirit_focus_talisman@mid": 12,
+        "gilded_heart_ward_talisman": 112,
+        "heaven_stepping_talisman": 150,
+        "gilded_heart_ward_talisman@mid": 224,
+        "heaven_stepping_talisman@mid": 300
       }
     },
     "nine_heavens_provisions": {
@@ -66943,6 +67574,12 @@
           "made_here": true
         },
         {
+          "item_id": "gilded_heart_ward_talisman",
+          "quantity": 2,
+          "price": 235,
+          "made_here": true
+        },
+        {
           "item_id": "paper_crane_charm",
           "quantity": 2,
           "price": 96,
@@ -66952,6 +67589,12 @@
           "item_id": "golden_edge_talisman_method",
           "quantity": 1,
           "price": 192,
+          "made_here": false
+        },
+        {
+          "item_id": "gilded_heart_ward_talisman_method",
+          "quantity": 1,
+          "price": 480,
           "made_here": false
         }
       ],
@@ -66963,7 +67606,8 @@
         "crystal_ward_talisman": 18,
         "golden_edge_talisman": 36,
         "paper_crane_charm": 33,
-        "spirit_focus_talisman": 6
+        "spirit_focus_talisman": 6,
+        "gilded_heart_ward_talisman": 90
       }
     },
     "northwind_provisions": {
@@ -67242,6 +67886,12 @@
           "made_here": true
         },
         {
+          "item_id": "gilded_heart_ward_talisman",
+          "quantity": 2,
+          "price": 235,
+          "made_here": true
+        },
+        {
           "item_id": "paper_crane_charm",
           "quantity": 2,
           "price": 96,
@@ -67251,6 +67901,12 @@
           "item_id": "golden_edge_talisman_method",
           "quantity": 1,
           "price": 192,
+          "made_here": false
+        },
+        {
+          "item_id": "gilded_heart_ward_talisman_method",
+          "quantity": 1,
+          "price": 480,
           "made_here": false
         }
       ],
@@ -67262,7 +67918,8 @@
         "crystal_ward_talisman": 18,
         "golden_edge_talisman": 36,
         "paper_crane_charm": 33,
-        "spirit_focus_talisman": 6
+        "spirit_focus_talisman": 6,
+        "gilded_heart_ward_talisman": 90
       }
     },
     "riverguard_beast_hall": {
@@ -67445,6 +68102,12 @@
           "made_here": false
         },
         {
+          "item_id": "nine_star_heaven_lock_array_method",
+          "quantity": 1,
+          "price": 1280,
+          "made_here": false
+        },
+        {
           "item_id": "firmament_shard_key",
           "quantity": 1,
           "price": 480,
@@ -67460,7 +68123,8 @@
         "immortal_gold_ore": 12,
         "starsteel_ore": 24,
         "guiding_chalk_array": 5,
-        "starfall_bulwark_array": 110
+        "starfall_bulwark_array": 110,
+        "nine_star_heaven_lock_array": 160
       }
     },
     "ruined_constellation_provisions": {
@@ -67742,6 +68406,12 @@
           "made_here": true
         },
         {
+          "item_id": "spirit_iron_greaves",
+          "quantity": 1,
+          "price": 22,
+          "made_here": true
+        },
+        {
           "item_id": "beast_core",
           "quantity": 6,
           "price": 15,
@@ -67802,6 +68472,12 @@
           "made_here": true
         },
         {
+          "item_id": "starsteel_sky_treader_boots",
+          "quantity": 1,
+          "price": 454,
+          "made_here": true
+        },
+        {
           "item_id": "azure_flying_sword",
           "quantity": 1,
           "price": 440,
@@ -67817,6 +68493,12 @@
           "item_id": "starsteel_aegis_method",
           "quantity": 1,
           "price": 1124,
+          "made_here": false
+        },
+        {
+          "item_id": "starsteel_sky_treader_boots_method",
+          "quantity": 1,
+          "price": 1360,
           "made_here": false
         }
       ],
@@ -67834,7 +68516,9 @@
         "azure_flying_sword": 154,
         "spirit_crystal_mail": 22,
         "immortal_gold_plate": 56,
-        "starsteel_aegis": 140
+        "starsteel_aegis": 140,
+        "spirit_iron_greaves": 8,
+        "starsteel_sky_treader_boots": 169
       }
     },
     "solar_crucible_provisions": {
@@ -67967,6 +68651,12 @@
           "made_here": true
         },
         {
+          "item_id": "spirit_iron_greaves",
+          "quantity": 1,
+          "price": 17,
+          "made_here": true
+        },
+        {
           "item_id": "beast_core",
           "quantity": 5,
           "price": 12,
@@ -68038,7 +68728,8 @@
         "immortal_gold_sabre": 45,
         "azure_flying_sword": 122,
         "spirit_crystal_mail": 22,
-        "immortal_gold_plate": 56
+        "immortal_gold_plate": 56,
+        "spirit_iron_greaves": 6
       }
     },
     "solar_furnace_provisions": {
@@ -68157,6 +68848,12 @@
           "made_here": true
         },
         {
+          "item_id": "spirit_iron_greaves",
+          "quantity": 1,
+          "price": 14,
+          "made_here": true
+        },
+        {
           "item_id": "spirit_crystal_ore",
           "quantity": 7,
           "price": 11,
@@ -68201,7 +68898,8 @@
         "spirit_crystal_ore": 3,
         "spirit_crystal_sword": 18,
         "azure_flying_sword": 91,
-        "spirit_crystal_mail": 22
+        "spirit_crystal_mail": 22,
+        "spirit_iron_greaves": 5
       }
     },
     "spearwall_provisions": {
@@ -68303,6 +69001,18 @@
           "item_id": "spirit_iron_armor",
           "quantity": 1,
           "price": 20,
+          "made_here": true
+        },
+        {
+          "item_id": "spirit_iron_greaves",
+          "quantity": 1,
+          "price": 17,
+          "made_here": true
+        },
+        {
+          "item_id": "spirit_iron_greaves@mid",
+          "quantity": 1,
+          "price": 34,
           "made_here": true
         },
         {
@@ -68413,7 +69123,9 @@
         "spirit_crystal_sword@mid": 44,
         "immortal_gold_sabre@mid": 90,
         "spirit_crystal_mail@mid": 44,
-        "immortal_gold_plate@mid": 112
+        "immortal_gold_plate@mid": 112,
+        "spirit_iron_greaves": 6,
+        "spirit_iron_greaves@mid": 12
       }
     },
     "spirit_jade_apothecary": {
@@ -68680,6 +69392,18 @@
           "made_here": true
         },
         {
+          "item_id": "gilded_heart_ward_talisman",
+          "quantity": 2,
+          "price": 235,
+          "made_here": true
+        },
+        {
+          "item_id": "gilded_heart_ward_talisman@mid",
+          "quantity": 1,
+          "price": 470,
+          "made_here": true
+        },
+        {
           "item_id": "golden_edge_talisman@mid",
           "quantity": 1,
           "price": 188,
@@ -68711,7 +69435,9 @@
         "stone_skin_talisman@mid": 12,
         "crystal_ward_talisman@mid": 36,
         "golden_edge_talisman@mid": 72,
-        "spirit_focus_talisman@mid": 12
+        "spirit_focus_talisman@mid": 12,
+        "gilded_heart_ward_talisman": 90,
+        "gilded_heart_ward_talisman@mid": 180
       }
     },
     "spirit_jade_provisions": {
@@ -69020,6 +69746,12 @@
           "made_here": false
         },
         {
+          "item_id": "spirit_iron_greaves_method",
+          "quantity": 1,
+          "price": 44,
+          "made_here": false
+        },
+        {
           "item_id": "spirit_iron_sword_method",
           "quantity": 1,
           "price": 36,
@@ -69093,6 +69825,12 @@
           "made_here": false
         },
         {
+          "item_id": "iron_root_grounding_array_method",
+          "quantity": 1,
+          "price": 120,
+          "made_here": false
+        },
+        {
           "item_id": "guiding_chalk_array_method",
           "quantity": 1,
           "price": 44,
@@ -69106,7 +69844,8 @@
         "verdant_grotto_key": 98,
         "nine_echo_spatial_token": 118,
         "stygian_tomb_token": 147,
-        "guiding_chalk_array": 5
+        "guiding_chalk_array": 5,
+        "iron_root_grounding_array": 15
       }
     },
     "stoneheart_forge": {
@@ -69137,6 +69876,12 @@
           "item_id": "spirit_iron_armor",
           "quantity": 1,
           "price": 16,
+          "made_here": true
+        },
+        {
+          "item_id": "spirit_iron_greaves",
+          "quantity": 1,
+          "price": 14,
           "made_here": true
         },
         {
@@ -69184,7 +69929,8 @@
         "spirit_crystal_ore": 3,
         "spirit_crystal_sword": 18,
         "azure_flying_sword": 91,
-        "spirit_crystal_mail": 22
+        "spirit_crystal_mail": 22,
+        "spirit_iron_greaves": 5
       }
     },
     "stoneheart_array_workshop": {
@@ -69236,6 +69982,12 @@
           "made_here": false
         },
         {
+          "item_id": "crystal_spirit_gathering_array_method",
+          "quantity": 1,
+          "price": 300,
+          "made_here": false
+        },
+        {
           "item_id": "steppe_bone_token",
           "quantity": 1,
           "price": 340,
@@ -69249,7 +70001,8 @@
         "minor_warding_array_disk": 12,
         "spirit_crystal_ore": 3,
         "guiding_chalk_array": 5,
-        "moonveil_concealment_array": 27
+        "moonveil_concealment_array": 27,
+        "crystal_spirit_gathering_array": 37
       }
     },
     "vermilion_furnace_smithy": {
@@ -69280,6 +70033,12 @@
           "item_id": "spirit_iron_armor",
           "quantity": 1,
           "price": 16,
+          "made_here": true
+        },
+        {
+          "item_id": "spirit_iron_greaves",
+          "quantity": 1,
+          "price": 14,
           "made_here": true
         },
         {
@@ -69327,7 +70086,8 @@
         "spirit_crystal_ore": 3,
         "spirit_crystal_sword": 18,
         "azure_flying_sword": 91,
-        "spirit_crystal_mail": 22
+        "spirit_crystal_mail": 22,
+        "spirit_iron_greaves": 5
       }
     },
     "vermilion_furnace_provisions": {
@@ -69426,6 +70186,12 @@
           "made_here": true
         },
         {
+          "item_id": "spirit_iron_greaves",
+          "quantity": 1,
+          "price": 22,
+          "made_here": true
+        },
+        {
           "item_id": "beast_core",
           "quantity": 6,
           "price": 15,
@@ -69486,6 +70252,12 @@
           "made_here": true
         },
         {
+          "item_id": "starsteel_sky_treader_boots",
+          "quantity": 1,
+          "price": 454,
+          "made_here": true
+        },
+        {
           "item_id": "azure_flying_sword",
           "quantity": 1,
           "price": 440,
@@ -69501,6 +70273,12 @@
           "item_id": "starsteel_aegis_method",
           "quantity": 1,
           "price": 1124,
+          "made_here": false
+        },
+        {
+          "item_id": "starsteel_sky_treader_boots_method",
+          "quantity": 1,
+          "price": 1360,
           "made_here": false
         }
       ],
@@ -69518,7 +70296,9 @@
         "azure_flying_sword": 154,
         "spirit_crystal_mail": 22,
         "immortal_gold_plate": 56,
-        "starsteel_aegis": 140
+        "starsteel_aegis": 140,
+        "spirit_iron_greaves": 8,
+        "starsteel_sky_treader_boots": 169
       }
     },
     "worldstone_array_workshop": {
@@ -69582,6 +70362,12 @@
           "made_here": false
         },
         {
+          "item_id": "nine_star_heaven_lock_array_method",
+          "quantity": 1,
+          "price": 1280,
+          "made_here": false
+        },
+        {
           "item_id": "firmament_shard_key",
           "quantity": 1,
           "price": 480,
@@ -69597,7 +70383,8 @@
         "immortal_gold_ore": 12,
         "starsteel_ore": 24,
         "guiding_chalk_array": 5,
-        "starfall_bulwark_array": 110
+        "starfall_bulwark_array": 110,
+        "nine_star_heaven_lock_array": 160
       }
     },
     "halfmoon_waystation": {
