@@ -6686,6 +6686,32 @@ player's realm when they hold no active stage. A stage for a realm already enter
 its breakthrough, which the GM then Reports - the lever does not pre-credit it, so what a grant does
 is exactly what a crossing does. Not in `reversibleAdminActions`, beside the other two.
 
+### Seven more slips, where the ladder stopped short (v1.24.0)
+
+Asked for as *"Add more learning slips"*. Every recipe already had exactly one slip
+(`teaches_recipe` on the item, 34 of each), so more slips meant more methods, and the shape of the
+ladder said where: Inscription had nothing at the fourth tier, no trade had anything at the fifth,
+and Formation held six to Alchemy's twelve. On the owner's call the thin trades were caught up and
+Alchemy left alone - `test_no_crafting_profession_is_left_far_behind` holds the biggest trade to
+twice the smallest, so Alchemy was at its cap *because* Formation was thin, and the way to open it
+is the one taken here. Formation 9, Forging 10, Inscription 10 now, at levels 1 to 5; nothing at
+level 0, because migration 46's drill reads today's content and a new entry method looks "taken
+away" there (the rc.45/v1.8.0 shape).
+
+**Everything a method needs is content, except three tables.** A recipe, its output, its slip at
+twice the output's price, the slip on the shelves of its trade's halls in the world whose material
+it needs, a buy line for the output wherever it is sold, and the capitals' Mid line through
+`scripts/author_mid_shelves.py`. What is code is a disk's effect (`deployedArrayDefs`) and a piece
+of gear's stats, in the three copies `test_equipment_stat_parity.py` holds equal. The greaves and
+the sky-treader boots are the first boots a smith forges - the slot held only a flight relic.
+
+**A disk does not temper a body, and that was checked before it was written.** The first draft gave
+the Mortal disk `body_cultivation_gain`. `loadEffectModifiers` reads `active_effects` alone, a
+deployed array's multiplier is read by `deployedArrayMultiplier` for `cultivation_gain` only, and
+`placeMultiplierForPath` withholds that from the body path on purpose (v1.2.3). A stat authored on
+a disk that no reader fetches is rc.58's dead modifier; the disk carries body +2 and will +1, which
+reach everybody standing in it through `canonicalAdditiveEffectBonus`.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

@@ -59,6 +59,16 @@ EQUIPMENT_DEFINITIONS: dict[str, dict[str, Any]] = {
         "name": "Starsteel Aegis", "slot": "armor", "max_durability": 560,
         "attack": 1, "defense": 17, "spirit": 4, "agility": 0,
     },
+    # The boots a smith makes (v1.24.0): the first Forging method that is not
+    # a blade or a cuirass, and the top of the boots ladder above it.
+    "spirit_iron_greaves": {
+        "name": "Spirit-Iron Greaves", "slot": "boots", "max_durability": 130,
+        "attack": 0, "defense": 1, "spirit": 0, "agility": 2,
+    },
+    "starsteel_sky_treader_boots": {
+        "name": "Starsteel Sky-Treader Boots", "slot": "boots", "max_durability": 520,
+        "attack": 0, "defense": 3, "spirit": 3, "agility": 7,
+    },
     # The flying sword (v1.0.0-rc.15) is the one artifact that both carries a
     # rider and takes the weapon slot - which is why the genre makes it the
     # default way to travel: it is still a sword when you arrive.
