@@ -38,7 +38,7 @@ from ..discovery import (
 )
 from ..formatting import human_duration, roll_line
 from ..hubs import register_hub_option_hint, HubDynamicOption, panel_timeout, register_hub_option_provider
-from ..locations import _known_locations, access_realm_index, destination_groups, door_allows, npcs_present
+from ..locations import _known_locations, access_realm_index, destination_groups, destinations_of_kind, door_allows, npcs_present
 from ..registry import ACTIONS, VIEW_RESTORERS, registered_group_command, registered_root_command
 from ..runtime import (
     DB,
@@ -195,7 +195,7 @@ class ExplorationEventView(CardView):
                 action_id=f"discord:{interaction.id}:{operation}:{action}",
             )
         except GameEngineError as exc:
-            await interaction.followup.send(f"That event action could not proceed: {exc}", ephemeral=False)
+            await interaction.followup.send(f"That event action could not proceed: {_explain_engine_error(exc)}", ephemeral=False)
             return
         result = dict(envelope.get("result") or {})
         self.event = dict(result.get("event") or self.event)
@@ -247,7 +247,7 @@ class ExplorationEventView(CardView):
                 {"event_id": str(self.event.get("event_id") or "")},
             )
         except GameEngineError as exc:
-            await interaction.response.send_message(f"Could not refresh the event: {exc}", ephemeral=False)
+            await interaction.response.send_message(f"Could not refresh the event: {_explain_engine_error(exc)}", ephemeral=False)
             return
         self.event = dict(status or self.event)
         self._sync_buttons()
@@ -741,6 +741,9 @@ async def mine(interaction: discord.Interaction) -> None:
     family_bonus = int(resolved.get("family_bonus", 0))
     family_trade = str(resolved.get("family_trade") or "Forging")
     bonus_bits = f" • Household {family_trade.lower()} lore **+{family_bonus}**" if family_bonus else ""
+    # A player master's teaching (v1.25.0), named by the engine with its bonus.
+    if int(resolved.get("master_trade_bonus", 0)):
+        bonus_bits += f" • Taught by {resolved.get('master_name')} **+{int(resolved['master_trade_bonus'])}**"
     rank_line = (
         f"\n⛏️ Mining: **{profession_rank(level, 'Mining')}** Lv.{level} "
         f"• XP {int(mine_progress.get('xp', 0))}/{profession_xp_needed(level)}"
@@ -1115,6 +1118,8 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str, craft_all
             # The Immortal World's job (v1.17.0): the grandmasters' court, named
             # by the engine with its bonus.
             (f"🏛️ {resolved.get('place') or 'The ground'}", int(resolved.get("place_bonus", 0))),
+            # A player master's teaching (v1.25.0), in every trade.
+            (f"🎓 Taught by {resolved.get('master_name') or 'your master'}", int(resolved.get("master_trade_bonus", 0))),
         )
         if value
     ]
@@ -1361,7 +1366,7 @@ async def alchemy_forage(interaction: discord.Interaction) -> None:
             action_id=f"discord:{interaction.id}:forage.resolve",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"Foraging could not resolve: {exc}", ephemeral=False)
+        await interaction.response.send_message(f"Foraging could not resolve: {_explain_engine_error(exc)}", ephemeral=False)
         return
     resolved = dict(envelope.get("result") or {})
     result = SimpleNamespace(**resolved)
@@ -1380,6 +1385,7 @@ async def alchemy_forage(interaction: discord.Interaction) -> None:
         f"{(' • Household herb lore **+'+str(inherited_forage_bonus)+'**') if inherited_forage_bonus else ''}"
         f"{(' • Property herb garden **+'+str(garden_bonus)+'**') if garden_bonus else ''}"
         f"{(' • A past life’s hands **+'+str(craft_echo)+'**') if craft_echo else ''}"
+        f"{(' • Taught by '+str(resolved.get('master_name'))+' **+'+str(int(resolved.get('master_trade_bonus') or 0))+'**') if int(resolved.get('master_trade_bonus') or 0) else ''}"
     )
     if not success:
         await interaction.response.send_message(
@@ -1537,7 +1543,7 @@ async def realmhub_go(interaction:discord.Interaction,world:str)->None:
             action_id=f"discord:{interaction.id}:exploration.travel.hub",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"Realm-capital travel failed: {exc}",ephemeral=False);return
+        await interaction.response.send_message(f"Realm-capital travel failed: {_explain_engine_error(exc)}",ephemeral=False);return
     result=dict(envelope.get("result") or {})
     # Hub travel is instant: put the capital's presence role on now so the
     # channel appears before the reply does (v0.21.6).
@@ -2200,10 +2206,108 @@ async def travel_destination_autocomplete(interaction: discord.Interaction, curr
 @app_commands.autocomplete(destination=travel_destination_autocomplete)
 @serialized_user_action
 async def travel(interaction: discord.Interaction, destination: str) -> None:
+    """Go somewhere you know - shown first, when the road costs anything.
+
+    A road journey is previewed before it is taken (v1.26.0): the engine's
+    `exploration.travel_preview` plans it through the same `planTravelTx` the
+    journey walks, and the card names the route, the toll, the danger and
+    where it arrives, with Go and Cancel. A walk with no road - a part of the
+    city you stand in, a wild place, a capital by its gate - is free and
+    immediate, so it is taken at once, which is what City → Enter relies on.
+    """
     await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
+    try:
+        preview = dict(await ENGINE.action(
+            "exploration.travel_preview", interaction.user.id, {"destination": destination, "mode": "known"}) or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"Travel failed: {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    if not preview.get("road_connection"):
+        await _travel_now(interaction, c, destination)
+        return
+    view = TravelPreviewView(interaction.user.id, destination, travel_preview_card(c, destination, preview))
+    await interaction.followup.send(view=view, ephemeral=False)
+
+
+def travel_preview_card(c: dict[str, Any], destination: str, preview: dict[str, Any]) -> Card:
+    """The trip before it is taken, every number the engine's own."""
+    route = [str(x) for x in list(preview.get("road_route") or [])]
+    hops = int(preview.get("road_hops") or 0)
+    cost = int(preview.get("travel_cost_spirit_stones") or 0)
+    balance = int(preview.get("balance") or 0)
+    coin = str(preview.get("currency_name") or preview.get("currency") or "spirit stones")
+    card = Card(title=f"🗺️ The road to {destination}",
+                description=" → ".join(route) if route else destination)
+    card.add_field(name="Road", value=f"**{hops}** road hop{'s' if hops != 1 else ''} • {_travel_mode_line(preview).strip() or 'on foot'}", inline=False)
+    toll = f"**{cost}** {coin} — you carry {balance}."
+    if not preview.get("affordable", True):
+        toll = f"**{cost}** {coin} — you carry only **{balance}**, so the road will refuse you."
+    card.add_field(name="Toll", value=toll, inline=False)
+    card.add_field(name="Risk", value=f"Danger **{int(preview.get('road_danger') or 0)}/45** • Encounter risk **{int(preview.get('road_encounter_chance_percent') or 0)}%** on the worst leg", inline=False)
+    arrives = str(preview.get("arrives_at") or destination)
+    where = f"You arrive at the **{arrives}**." if arrives != destination else f"You arrive in **{destination}**."
+    if preview.get("left_by_gate"):
+        where = f"You leave by the **{preview.get('left_by_gate')} Gate**. " + where
+    if int(preview.get("wait_minutes") or 0):
+        where += f" The road takes **{int(preview['wait_minutes'])}** world minutes, and you are on it until then."
+    card.add_field(name="Arrival", value=where, inline=False)
+    card.set_footer(text=f"{c.get('name', 'You')} stands at {preview.get('from') or c.get('location')}")
+    return card
+
+
+class TravelPreviewView(CardView):
+    """Go or Cancel under a trip's preview. Only the traveller may press."""
+
+    def __init__(self, user_id: int, destination: str, card: Card) -> None:
+        super().__init__(card=card, timeout=panel_timeout())
+        self.user_id = int(user_id)
+        self.destination = destination
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if int(interaction.user.id) != self.user_id:
+            await interaction.response.send_message("This is somebody else's road.", ephemeral=False)
+            return False
+        return True
+
+    def _settle(self, label: str) -> None:
+        for item in list(self.controls):
+            item.disabled = True
+            if isinstance(item, discord.ui.Button) and item.label == label:
+                item.style = discord.ButtonStyle.primary
+
+    @discord.ui.button(label="Go", style=discord.ButtonStyle.success, emoji="🚶")
+    async def go(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
+        self._settle("Go")
+        self.stop()
+        await _travel_confirmed(interaction, self.destination, self)
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
+        self._settle("Cancel")
+        self.stop()
+        await interaction.response.edit_message(view=self)
+
+
+@serialized_user_action(metered=False)
+async def _travel_confirmed(interaction: discord.Interaction, destination: str, view: discord.ui.View) -> None:
+    """Go pressed under a preview. Unmetered: the preview already spent the
+    press, and the journey is the same request carried out."""
+    await interaction.response.edit_message(view=view)
+    c = await require_character(interaction)
+    if not c:
+        return
+    await _travel_now(interaction, c, destination)
+
+
+async def _travel_now(interaction: discord.Interaction, c: dict[str, Any], destination: str) -> None:
+    """The journey itself, after the response has been answered."""
+    # Both callers have answered by now (Go defers, the preview's Go edits
+    # the card); the guard makes the ack unconditional for anyone else.
+    if not interaction.response.is_done():
+        await interaction.response.defer(thinking=True)
     undiscovered_image_locations = {
         location
         for location in LOCATION_DISCOVERY_IMAGES
@@ -2216,7 +2320,7 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
             action_id=f"discord:{interaction.id}:exploration.travel",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"Travel failed: {exc}",ephemeral=False)
+        await interaction.followup.send(f"Travel failed: {_explain_engine_error(exc)}",ephemeral=False)
         return
     result=dict(envelope.get("result") or {})
     desc=str(result.get("description") or "")
@@ -2228,6 +2332,14 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
         road=_travel_mode_line(result)+(
             f"\n⏱️ Danger **{danger}/45** • Encounter risk **{chance}%**."
         )
+        # The roads walked and the toll paid (v1.26.0): both were in the
+        # engine's answer and neither was ever printed.
+        walked=[str(x) for x in list(result.get("road_route") or [])]
+        if len(walked)>=2:
+            road+=f"\n🛣️ By road: {' → '.join(walked)}."
+        toll=int(result.get("travel_cost_spirit_stones") or 0)
+        if toll:
+            road+=f"\n💰 Toll paid: **{toll}** {result.get('travel_cost_currency') or 'spirit stones'}."
         # The wait is the engine's (`TRAVEL_TIME_PERCENT`, v1.2.0), and by
         # default there is none: a road is walked in the telling. Only a
         # journey that actually put the traveller in transit says so.
@@ -2253,7 +2365,7 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
         parts=[p for p in list(result.get("city_parts") or []) if p!=arrived_at]
         inside=", ".join(f"**{p}**" for p in parts) if parts else "the streets"
         gate_line=(f"\n🏯 You arrive at the **{arrived_at}** — the road behind you, the city ahead. Inside the walls: {inside}. "
-                   "Step in with **/travel**; **/world → City → Look** shows who is about.")
+                   "Step in with **/world → City → Enter**; **/world → City → Look** shows who is about.")
     if result.get("left_by_gate"):
         gate_line=f"\n🚪 You leave by the **{result.get('left_by_gate')} Gate**."+gate_line
     shop_line=""
@@ -2325,6 +2437,61 @@ async def travel_destination_hub_options(interaction: discord.Interaction, curre
 register_hub_option_provider(travel, "destination", travel_destination_hub_options)
 
 
+# One picker per kind of place (v1.26.0). Every known place in one list of 25,
+# with every road site above every city, left most cities unpickable for
+# anybody who had walked the roads. Each kind is its own list now, so a city
+# is never crowded out by a waystation and every known city fits. Each command
+# goes through the registry's binding of `/travel go`, as City → Enter does, so
+# the lock, the meter and the preview are that command's and cannot drift.
+def _kind_options(kind: str):
+    async def options(interaction: discord.Interaction, current: str) -> list[HubDynamicOption]:
+        c = await DB.get_character(interaction.user.id)
+        if not c:
+            return []
+        known = await _known_locations(interaction.user.id, c)
+        needle = str(current or "").casefold().strip()
+        rows = destinations_of_kind(str(c.get("location") or ""), known, access_realm_index(c), kind)
+        return [HubDynamicOption(label=name[:100], value=name[:100], description=description[:100], emoji=emoji)
+                for name, emoji, description, _order in rows if not needle or needle in name.casefold()][:25]
+    return options
+
+
+def _kind_autocomplete(kind: str):
+    options = _kind_options(kind)
+
+    async def autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+        return [app_commands.Choice(name=f"{o.label} — {o.description}"[:100], value=o.value) for o in await options(interaction, current)]
+    return autocomplete
+
+
+@registered_group_command(travel_group, name="city", description="Travel to a city you know, nearest first")
+@app_commands.autocomplete(destination=_kind_autocomplete("city"))
+async def travel_city(interaction: discord.Interaction, destination: str) -> None:
+    await ACTIONS.handler_for(travel)(interaction, destination)
+
+
+@registered_group_command(travel_group, name="nearby", description="Walk to a street, district, gate or shop of the city you stand in")
+@app_commands.autocomplete(destination=_kind_autocomplete("here"))
+async def travel_nearby(interaction: discord.Interaction, destination: str) -> None:
+    await ACTIONS.handler_for(travel)(interaction, destination)
+
+
+@registered_group_command(travel_group, name="road", description="Travel to a road-side site you have found")
+@app_commands.autocomplete(destination=_kind_autocomplete("road"))
+async def travel_road(interaction: discord.Interaction, destination: str) -> None:
+    await ACTIONS.handler_for(travel)(interaction, destination)
+
+
+@registered_group_command(travel_group, name="wilds", description="Travel to a wild place or a sect gate you know")
+@app_commands.autocomplete(destination=_kind_autocomplete("wilds"))
+async def travel_wilds(interaction: discord.Interaction, destination: str) -> None:
+    await ACTIONS.handler_for(travel)(interaction, destination)
+
+
+for _command, _kind in ((travel_city, "city"), (travel_nearby, "here"), (travel_road, "road"), (travel_wilds, "wilds")):
+    register_hub_option_provider(_command, "destination", _kind_options(_kind))
+
+
 @registered_group_command(travel_group, name="status", description="Show your destination and a live countdown while you are traveling")
 async def travel_status(interaction: discord.Interaction) -> None:
     c = await require_character(interaction)
@@ -2336,7 +2503,7 @@ async def travel_status(interaction: discord.Interaction) -> None:
         # the full envelope) - the query's own fields are the top level here.
         result = dict(await ENGINE.action("exploration.travel_status", interaction.user.id, {}) or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"Travel status could not be read: {exc}", ephemeral=False)
+        await interaction.response.send_message(f"Travel status could not be read: {_explain_engine_error(exc)}", ephemeral=False)
         return
     if not bool(result.get("traveling")):
         await interaction.response.send_message(

@@ -32073,7 +32073,7 @@
         "@ore",
         "@core"
       ],
-      "disciples_per_lot": 2,
+      "disciples_per_lot": 6,
       "cap": 60
     },
     "exchange": {
@@ -32230,6 +32230,219 @@
           "earned": 25000
         }
       ]
+    },
+    "rank_floors": {
+      "discipleship.resolve": 20,
+      "territory.claim": 30,
+      "war.act": 30
+    },
+    "npc_master": {
+      "min_rank_level": 30,
+      "max_disciples": 3,
+      "breakthrough_bonus": 1,
+      "insight_on_realm": 5,
+      "cultivation_mult": 1.05,
+      "teach_rank_level": 20,
+      "promoter_rank_level": 50
+    },
+    "population": {
+      "ranks": {
+        "Sect Master": 1,
+        "Elder": 3,
+        "Core Disciple": 5,
+        "Inner Disciple": 7,
+        "Outer Disciple": 9
+      },
+      "realm_offset": {
+        "Outer Disciple": [
+          0,
+          1
+        ],
+        "Inner Disciple": [
+          1,
+          2
+        ],
+        "Core Disciple": [
+          2,
+          4
+        ],
+        "Elder": [
+          4,
+          6
+        ],
+        "Sect Master": [
+          6,
+          7
+        ]
+      },
+      "at_gate": [
+        "Sect Master",
+        "Elder"
+      ],
+      "max_new_per_tick": 400,
+      "surnames": [
+        "Bai",
+        "Cao",
+        "Chen",
+        "Cui",
+        "Deng",
+        "Ding",
+        "Du",
+        "Fan",
+        "Fang",
+        "Feng",
+        "Gao",
+        "Gu",
+        "Guo",
+        "Han",
+        "He",
+        "Hou",
+        "Hua",
+        "Huang",
+        "Jiang",
+        "Jin",
+        "Kong",
+        "Lan",
+        "Li",
+        "Liang",
+        "Lin",
+        "Liu",
+        "Lu",
+        "Luo",
+        "Ma",
+        "Meng",
+        "Mo",
+        "Ning",
+        "Ou",
+        "Pan",
+        "Pei",
+        "Qian",
+        "Qiao",
+        "Qin",
+        "Ren",
+        "Rong",
+        "Shao",
+        "Shen",
+        "Shi",
+        "Song",
+        "Su",
+        "Sun",
+        "Tan",
+        "Tang",
+        "Tao",
+        "Wan",
+        "Wang",
+        "Wei",
+        "Wen",
+        "Wu",
+        "Xia",
+        "Xiao",
+        "Xie",
+        "Xu",
+        "Xue",
+        "Yan",
+        "Yang",
+        "Yao",
+        "Ye",
+        "Yin",
+        "Yu",
+        "Yuan",
+        "Yue",
+        "Zeng",
+        "Zhang",
+        "Zhao",
+        "Zheng",
+        "Zhou",
+        "Zhu",
+        "Zhuo",
+        "Zuo"
+      ],
+      "given_names": [
+        "An",
+        "Bing",
+        "Chang",
+        "Chen",
+        "Chun",
+        "Dai",
+        "Feng",
+        "Fu",
+        "Gang",
+        "Guang",
+        "Hai",
+        "Han",
+        "Hao",
+        "He",
+        "Heng",
+        "Hong",
+        "Hua",
+        "Hui",
+        "Jian",
+        "Jie",
+        "Jing",
+        "Jun",
+        "Kai",
+        "Kang",
+        "Lan",
+        "Lei",
+        "Li",
+        "Lian",
+        "Ling",
+        "Long",
+        "Mei",
+        "Min",
+        "Ming",
+        "Mu",
+        "Nan",
+        "Ning",
+        "Peng",
+        "Ping",
+        "Qi",
+        "Qian",
+        "Qing",
+        "Qiu",
+        "Rong",
+        "Rui",
+        "Shan",
+        "Sheng",
+        "Shu",
+        "Song",
+        "Tao",
+        "Tian",
+        "Ting",
+        "Wei",
+        "Wen",
+        "Xian",
+        "Xiang",
+        "Xin",
+        "Xiu",
+        "Xuan",
+        "Xue",
+        "Ya",
+        "Yan",
+        "Yang",
+        "Yao",
+        "Yi",
+        "Yin",
+        "Ying",
+        "Yong",
+        "You",
+        "Yu",
+        "Yuan",
+        "Yue",
+        "Yun",
+        "Ze",
+        "Zhen",
+        "Zhi",
+        "Zhong",
+        "Zhu",
+        "Zi",
+        "Ziyan",
+        "Zhuo"
+      ]
+    },
+    "player_master": {
+      "trade_roll_bonus": 1,
+      "cultivation_mult": 1.05
     }
   },
   "sects": {
@@ -34248,6 +34461,113 @@
       "modifiers": [
         {
           "stat": "formation_bonus",
+          "operation": "add",
+          "value": 2
+        }
+      ]
+    },
+    "abode_ward_focus": {
+      "name": "Warded Repose",
+      "category": "Home",
+      "description": "Resting inside your own defensive formation steadies the hand and keeps a way out in mind.",
+      "tags": [
+        "home",
+        "defense"
+      ],
+      "severity": 1,
+      "modifiers": [
+        {
+          "stat": "combat_bonus",
+          "operation": "add",
+          "value": 1
+        },
+        {
+          "stat": "escape_bonus",
+          "operation": "add",
+          "value": 2
+        }
+      ]
+    },
+    "abode_storehouse_focus": {
+      "name": "Ordered Stores",
+      "category": "Home",
+      "description": "An afternoon setting the storehouse in order leaves the mind sorted and quick to notice what is out of place.",
+      "tags": [
+        "home",
+        "storage"
+      ],
+      "severity": 1,
+      "modifiers": [
+        {
+          "stat": "insight",
+          "operation": "add",
+          "value": 1
+        },
+        {
+          "stat": "sense_precision",
+          "operation": "add",
+          "value": 2
+        }
+      ]
+    },
+    "abode_garden_focus": {
+      "name": "Verdant Attunement",
+      "category": "Home",
+      "description": "Tending your own herb beds tunes the senses to living medicine and the body to cleansing it.",
+      "tags": [
+        "home",
+        "herb_garden",
+        "alchemy"
+      ],
+      "severity": 1,
+      "modifiers": [
+        {
+          "stat": "alchemy_bonus",
+          "operation": "add",
+          "value": 1
+        },
+        {
+          "stat": "detox_power",
+          "operation": "add",
+          "value": 10
+        }
+      ]
+    },
+    "abode_pen_focus": {
+      "name": "Beast-Bond Calm",
+      "category": "Home",
+      "description": "Time among your own beasts settles your bearing; wild things read you as one who keeps them.",
+      "tags": [
+        "home",
+        "beast_pen",
+        "beast"
+      ],
+      "severity": 1,
+      "modifiers": [
+        {
+          "stat": "presence",
+          "operation": "add",
+          "value": 1
+        },
+        {
+          "stat": "spirit",
+          "operation": "add",
+          "value": 1
+        }
+      ]
+    },
+    "abode_merchant_focus": {
+      "name": "Host's Bearing",
+      "category": "Home",
+      "description": "Receiving guests in your own merchant hall lends you the ease of someone who is used to being listened to.",
+      "tags": [
+        "home",
+        "merchant"
+      ],
+      "severity": 1,
+      "modifiers": [
+        {
+          "stat": "presence",
           "operation": "add",
           "value": 2
         }
@@ -72329,6 +72649,105 @@
             "descriptor": "A child keeping pace with you and narrating."
           }
         ]
+      },
+      "Secret Realm": {
+        "objective": "Hold the threshold while the realm is open, and take what it spills.",
+        "nodes": [
+          {
+            "key": "chart_threshold",
+            "type": "task",
+            "name": "Chart the Threshold",
+            "descriptor": "The entrance shifts by the hour; somebody has to mark which stones are still stone.",
+            "count": [
+              2,
+              4
+            ],
+            "rank_bonus": 0,
+            "tn": 13,
+            "attribute": "insight",
+            "item": "",
+            "item_qty": 0,
+            "cultivation": 8,
+            "spirit_stones": 0,
+            "contribution": 3
+          },
+          {
+            "key": "seepage_herb",
+            "type": "herb",
+            "name": "Seepage-Fed Spirit-Herb",
+            "descriptor": "Qi leaking from the opening has pushed a season's growth into a day.",
+            "count": [
+              1,
+              4
+            ],
+            "rank_bonus": 0,
+            "tn": 12,
+            "attribute": "insight",
+            "item": "@herb",
+            "item_qty": 1,
+            "cultivation": 4,
+            "spirit_stones": 0,
+            "contribution": 1
+          },
+          {
+            "key": "threshold_guardian",
+            "type": "beast",
+            "name": "Threshold Guardian",
+            "descriptor": "Something the realm keeps at its door, and it has not been told the door is open.",
+            "count": [
+              1,
+              3
+            ],
+            "rank_bonus": 1,
+            "tn": 15,
+            "attribute": "body",
+            "item": "@core",
+            "item_qty": 1,
+            "cultivation": 8,
+            "spirit_stones": 6,
+            "contribution": 3
+          },
+          {
+            "key": "spilled_relic",
+            "type": "relic",
+            "name": "Spilled Relic",
+            "descriptor": "Carried out on the realm's first breath and dropped at the edge of the light.",
+            "count": [
+              1,
+              2
+            ],
+            "rank_bonus": 0,
+            "tn": 16,
+            "attribute": "spirit",
+            "item": "@ore",
+            "item_qty": 2,
+            "cultivation": 8,
+            "spirit_stones": 12,
+            "contribution": 3
+          }
+        ],
+        "npcs": [
+          {
+            "key": "warden",
+            "title": "Threshold Warden",
+            "role": "Keeps count of who goes in and who comes back out",
+            "personality": "Patient, unsentimental, has seen this realm open before.",
+            "speech": "Short sentences; numbers rather than adjectives.",
+            "want": "Everybody who goes in counted back out before the entrance seals.",
+            "fear": "Closing the tally with names still open.",
+            "descriptor": "A grey-robed cultivator with a tally-board, sitting where the entrance can be seen."
+          },
+          {
+            "key": "rival_seeker",
+            "title": "Rival Treasure-Seeker",
+            "role": "Got here first and would like everybody to know it",
+            "personality": "Boastful, quick, generous with advice that is half wrong.",
+            "speech": "Talks over people, laughs at his own jokes, drops names.",
+            "want": "The inheritance, and an audience when he takes it.",
+            "fear": "That somebody lesser walks out with it.",
+            "descriptor": "A young cultivator in expensive travelling clothes, already scuffed from the threshold."
+          }
+        ]
       }
     },
     "name_pool": [
@@ -75563,5 +75982,35 @@
     "spirit_divisor": 4,
     "min_bonus": 1,
     "max_bonus": 5
+  },
+  "war_system": {
+    "description": "How a war between two sects is fought (v1.24.0). act_points is the sect contribution a member earns for each act in a war their sect fights, up to war_points_cap a war; victory_points is paid once to every member who fought on the winning side. A territory's defense is real: fortify_defense_gain a defender's fortify, defense_cap at most, fall_defense where a fallen territory's walls are left, hold_defense_gain what a held siege adds, and every siege_defense_divisor points of it take one off each attacking blow. A sect that loses an attack may not move on that ground again for truce_days; a territory that falls is occupied for occupation_days, and in that time its former holder may strike back. A declaration costs the two sects declare_relation_drop of their standing and an ending end_relation_drop more. The world's own sieges are fought from both walls, at most tick_days_cap days a tick, and a besieger far from home loses weariness_per_day morale a day. A sect allied to one side - a marriage pact between them, or standing of ally_min_relation_score or more - may send its members to fight on that side; they earn the same act points and share the victory pay, and their sect's standing with the side they fight falls by ally_relation_drop the first time one of them does. The world's own sects fight too: in a siege the world fights, every sect allied to exactly one side lends ally_strength_percent of its strength to it, at most ally_strength_cap, and a sect's living NPC disciples add one point for every disciples_per_point of them, at most disciple_strength_cap, with disciples_at_the_walls of them named at the siege. A war ends in peace as well as on the walls: once it is peace_min_days old a member of either warring sect at rank peace_min_rank_level or above may sue for it at a cost of peace_cost_points of their own contribution, and a sect whose morale falls to npc_peace_morale sues on its own. The terms follow the siege - below peace_cede_siege percent the holder keeps the ground, at or above it the ground is ceded - nobody is paid a victory, the side that gave way is bound by the truce, and the two sects' standing rises by peace_relation_gain.",
+    "act_points": 8,
+    "war_points_cap": 80,
+    "victory_points": 120,
+    "truce_days": 30,
+    "occupation_days": 30,
+    "fortify_defense_gain": 2,
+    "defense_cap": 90,
+    "fall_defense": 30,
+    "hold_defense_gain": 10,
+    "siege_defense_divisor": 20,
+    "declare_relation_drop": 15,
+    "end_relation_drop": 10,
+    "tick_days_cap": 7,
+    "weariness_per_day": 1,
+    "ally_min_relation_score": 30,
+    "ally_relation_drop": 5,
+    "ally_strength_percent": 50,
+    "ally_strength_cap": 4,
+    "disciples_per_point": 5,
+    "disciple_strength_cap": 4,
+    "disciples_at_the_walls": 3,
+    "peace_min_days": 3,
+    "peace_min_rank_level": 40,
+    "peace_cost_points": 100,
+    "peace_cede_siege": 60,
+    "peace_relation_gain": 10,
+    "npc_peace_morale": 25
   }
 }

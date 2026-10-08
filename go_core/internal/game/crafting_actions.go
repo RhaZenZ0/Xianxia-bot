@@ -95,7 +95,7 @@ func canonicalCraftAbodeBonus(conn *storage.Conn, userID int64, location, profes
 			return 0, residenceErr
 		}
 		if found {
-			return level * 2, nil
+			return abodeFacilityRollBonus(level), nil
 		}
 		return 0, nil
 	}
@@ -114,10 +114,10 @@ func canonicalCraftAbodeBonus(conn *storage.Conn, userID int64, location, profes
 	if !canAccess {
 		return 0, nil
 	}
-	return maxI64(0, i64(row["facility_level"])) * 2, nil
+	return abodeFacilityRollBonus(i64(row["facility_level"])), nil
 }
 
-func canonicalCraftManorBonus(conn *storage.Conn, userID int64, location, profession string) (int64, error) {
+func canonicalCraftManorBonus(conn *storage.Conn, catalog worlddata.Catalog, userID int64, location, profession string) (int64, error) {
 	column := craftManorFacilityColumn(profession)
 	location = strings.TrimSpace(location)
 	if column == "" || location == "" {
@@ -126,7 +126,7 @@ func canonicalCraftManorBonus(conn *storage.Conn, userID int64, location, profes
 
 	res, err := conn.Execute(
 		fmt.Sprintf(
-			`SELECT m.base_location,m.%s AS facility_level
+			`SELECT m.base_location,m.sect_name,m.%s AS facility_level
 			   FROM sect_membership sm
 			   JOIN sect_manors m ON m.sect_name=sm.sect_name
 			  WHERE sm.user_id=?`,
@@ -139,6 +139,9 @@ func canonicalCraftManorBonus(conn *storage.Conn, userID int64, location, profes
 	}
 	row := firstRowMap(res)
 	if row == nil || strings.TrimSpace(fmt.Sprint(row["base_location"])) != location {
+		return 0, nil
+	}
+	if ManorGroundTakenTx(conn, catalog, fmt.Sprint(row["sect_name"]), location) {
 		return 0, nil
 	}
 	level := clamp(i64(row["facility_level"]), 0, maxSectManorFacilityLevel)
@@ -445,7 +448,7 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	manorFacilityBonus, err := canonicalCraftManorBonus(conn, userID, location, profession)
+	manorFacilityBonus, err := canonicalCraftManorBonus(conn, catalog, userID, location, profession)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -469,7 +472,9 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	// And the Immortal World's job (v1.17.0): work made in the grandmasters'
 	// court is made better, whichever trade it is.
 	placeName, placeBonus := craftPlaceBonus(catalog, location)
-	contextBonus := effectBonus + facilityBonus + manorFacilityBonus + familyBonus + craftEcho + flameBonus + senseBonus + placeBonus
+	// And a player master's teaching (v1.25.0), in every trade.
+	masterBonus, masterName := masterTradeBonusTx(conn, catalog, userID)
+	contextBonus := effectBonus + facilityBonus + manorFacilityBonus + familyBonus + craftEcho + flameBonus + senseBonus + placeBonus + masterBonus
 	// Craft all (v1.21.0): as many as the bags pay for, counted here, in the
 	// transaction that spends them, so the number cannot be stale. Bags that
 	// pay for none leave the batch at one, which is refused below with the
@@ -598,6 +603,8 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		"manor_facility_bonus": manorFacilityBonus,
 		"family_bonus":         familyBonus,
 		"family_trade":         familyTrade,
+		"master_trade_bonus":   masterBonus,
+		"master_name":          masterName,
 		"craft_echo":           craftEcho,
 		"craft_echo_life":      craftEchoLife,
 		"craft_echo_level":     craftEchoLevel,
@@ -875,7 +882,7 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	if echoErr != nil {
 		return authoritativeMutation{}, echoErr
 	}
-	gardenBonus := gardenLevel * 2
+	gardenBonus := abodeFacilityRollBonus(gardenLevel)
 	gameMinute, err := canonicalWorldGameMinute(conn)
 	if err != nil {
 		return authoritativeMutation{}, err
@@ -887,7 +894,8 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	contextBonus := effectBonus + familyBonus + gardenBonus + craftEcho
+	masterBonus, masterName := masterTradeBonusTx(conn, catalog, userID)
+	contextBonus := effectBonus + familyBonus + gardenBonus + craftEcho + masterBonus
 
 	resources := int64(50)
 	worldName := "Mortal World"
@@ -1106,6 +1114,8 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 		"game_minute":         gameMinute,
 		"family_bonus":        familyBonus,
 		"family_trade":        familyTrade,
+		"master_trade_bonus":  masterBonus,
+		"master_name":         masterName,
 		"craft_echo":          craftEcho,
 		"craft_echo_life":     craftEchoLife,
 		"craft_echo_level":    craftEchoLevel,

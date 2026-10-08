@@ -108,15 +108,24 @@ async def character_location_display(character: dict[str, Any]) -> str:
     world-catalog location, or a stale/orphaned private-location key).
     """
     location = str(character.get("location") or "Unknown")
-    abode_location = await DB.get_abode_by_location(location)
-    if abode_location:
-        return f"{abode_location['name']} ({player_property_label(abode_location)})"
-    personal_location = await DB.get_personal_world_by_location(location)
-    if personal_location:
-        return f"{personal_location['name']} (Personal World)"
-    sect_abode_location = await DB.get_sect_abode_by_location(location)
-    if sect_abode_location:
-        return f"{sect_abode_location['name']} (Sect Abode)"
+    # Only a private key needs a lookup, and only the one its prefix names
+    # (v1.31.2): this used to ask all three tables for every location, so a
+    # cultivator standing in Greenriver Town cost three engine round trips to
+    # be told they stood in Greenriver Town - on every panel refresh.
+    if not location.startswith(PRIVATE_PREFIXES):
+        return location
+    if location.startswith("abode:"):
+        abode_location = await DB.get_abode_by_location(location)
+        if abode_location:
+            return f"{abode_location['name']} ({player_property_label(abode_location)})"
+    if location.startswith("personal_world:"):
+        personal_location = await DB.get_personal_world_by_location(location)
+        if personal_location:
+            return f"{personal_location['name']} (Personal World)"
+    if location.startswith("sect_abode:"):
+        sect_abode_location = await DB.get_sect_abode_by_location(location)
+        if sect_abode_location:
+            return f"{sect_abode_location['name']} (Sect Abode)"
     if location.startswith("birth_family:"):
         family = await DB.get_birth_family(int(character.get("user_id") or 0))
         if family and location == f"birth_family:{int(family.get('family_id') or 0)}":
@@ -144,6 +153,10 @@ PRIVATE_LOCATION_EXITS: tuple[tuple[str, str, str], ...] = (
     ("abode:", "**/abode → Leave**", "your own property"),
     ("personal_world:", "**/innerworld → Leave**", "your personal world"),
 )
+# The prefixes of a place that is somebody's own rather than the world's - the
+# four `exploration_actions.go` refuses inside. Read off the exits above so
+# there is one list; `surface.PRIVATE_PREFIXES` is this name.
+PRIVATE_PREFIXES: tuple[str, ...] = tuple(prefix for prefix, _command, _description in PRIVATE_LOCATION_EXITS)
 def private_location_exit(location: object) -> tuple[str, str] | None:
     """The command that steps a character back out into the shared world.
 
@@ -203,7 +216,7 @@ def _explain_engine_error(exc: Exception) -> str:
         text = f"⏳ {what[:1].upper()}{what[1:]} is still on cooldown — ready in **{format_wait(seconds)}**."
     # "family support cooldown has 129600 in-world minutes remaining" is game
     # time, not wall-clock (v1.0.0-rc.32): say it in the world's days.
-    # Inline so the function stays pure (test_cooldown_wording execs it out
+    # Inline so the function stays pure (test_hub_surface.py execs it out
     # of the source); 1440 is MINUTES_PER_DAY.
     support = re.search(r"family support cooldown has (?P<minutes>\d+) in-world minutes remaining", text)
     if support:
@@ -217,6 +230,27 @@ def _explain_engine_error(exc: Exception) -> str:
         minutes = int(lesson.group("minutes"))
         hours = max(1, -(-minutes // 60))
         text = f"⏳ The head of the house has said what there was to say today — ask again in **{hours} in-world hour{'s' if hours != 1 else ''}**."
+    # Refusals that name another system say where it is (v1.27.0): each was
+    # true and left the player to find the place on their own. The path is
+    # bold so a panel turns it into a button. Inline, like the waits above,
+    # so the function stays pure for the tests that exec it.
+    for needle, hint in (
+        ("travel there first", "**/travel → Destinations → Go**"),
+        ("travel to either first", "**/travel → Destinations → Go**"),
+        ("not inside a shop", "**/economy → City Shops → Here** names this city's shops; walk in with **/world → City → Enter**"),
+        ("must be inside an auction house", "**/economy → Auction House → Enter**"),
+        ("not inside a registered auction house", "**/economy → Auction House → Enter**"),
+        ("required beast food is not carried", "gather herbs with **/forage** or hunt for cores with **/hunt**"),
+        ("below evolution requirement", "raise its loyalty with **/beast → Companions → Feed** or **/beast → Companions → Train**"),
+        ("beast cores: missing", "beast cores come from **/hunt**"),
+        ("not enough sect contribution points", "earn more with **/sect → Holdings → Contribute** or your sect's work on **/world → City → Board**"),
+        ("not in an active party", "**/combat → Party → Create**"),
+        ("repair requires", "dig Spirit Iron with **/mine** or buy it with **/economy → City Shops → Buy**"),
+        ("no flame burns here", "**/craft → Flames → Status** names where each world's flame burns"),
+    ):
+        if needle in text and "**/" not in text:
+            text += f"\n→ {hint}"
+            break
     if "private residence or personal world" in text:
         # Spell these the way a player can actually reach them. The individual
         # gameplay commands are not registered with Discord - only the 16 hub
@@ -371,7 +405,7 @@ def _realm_access_role_name(world_name: str) -> str:
 # carries no `display_name`, so it and `_realm_access_role_name` can already
 # collide by construction - a fifth hub without one would silently merge two
 # gates. A third name is the moment to gate that, and
-# `test_the_role_names_never_collide.py` is where it is held. "Cultivator" is
+# `test_server_layout.py` is where it is held. "Cultivator" is
 # not a world and no hub may be called one.
 CULTIVATOR_ROLE_NAME = "Xianxia • Cultivator"
 async def _sync_cultivator_role(

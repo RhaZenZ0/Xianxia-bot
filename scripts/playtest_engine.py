@@ -553,7 +553,18 @@ async def run(url: str, token: str, db_path: str) -> Report:
     # choice beats the .env baseline and this one journey waits half the road.
     await step(report, "a pace above 100 is refused", gm("admin.world.set_travel_pace", {"percent": 101, "reason": "playtest"}), expect_error="between 0 and 100")
     await audited("admin.world.set_travel_pace", {"percent": 50, "reason": "playtest"})
+    # v1.26.0: the trip is shown before it is taken, through the planner the
+    # journey walks - so the preview's road and toll are the journey's.
+    preview = await step(report, "exploration.travel_preview of the road to the capital",
+                         query("exploration.travel_preview", PLAYER, {"destination": capital, "mode": "known"}))
     journey = await step(report, "exploration.travel by road to the capital", act("exploration.travel", PLAYER, {"destination": capital, "mode": "known"}))
+    if preview is not None and journey is not None:
+        same = (present(preview.get("travel_cost_spirit_stones")) == present(journey.get("travel_cost_spirit_stones"))
+                and list(preview.get("road_route") or []) == list(journey.get("road_route") or []))
+        report.add("PASS" if same and present(preview.get("travel_cost_spirit_stones")) > 0 else "FAIL",
+                   "the preview is the journey it shows",
+                   f"preview {preview.get('travel_cost_spirit_stones')} {preview.get('currency_name')} by {preview.get('road_route')}; "
+                   f"journey {journey.get('travel_cost_spirit_stones')} {journey.get('travel_cost_currency')} by {journey.get('road_route')}")
     if journey is not None:
         road, waited = present(journey.get("travel_minutes")), present(journey.get("wait_minutes"))
         report.add("PASS" if road > 0 and waited == road * 50 // 100 else "FAIL",
@@ -1823,6 +1834,43 @@ async def run(url: str, token: str, db_path: str) -> Report:
         severed = await step(report, "discipleship.leave", act("discipleship.leave", BUYER, {}))
         if severed is not None:
             report.add("PASS" if severed.get("severed") else "FAIL", "the disciple leaves", str(severed.get("severed")))
+    # The sect's own people (v1.25.0). `sect_politics` was forced above, so the
+    # hall is full; one of its Elders is walked to the buyer - somebody away
+    # from home keeps no schedule, so the leg is the same at every hour - and
+    # the buyer is set at realm 0 so the elder stands above them.
+    hall = [dict(r) for r in (await db.get_sect_npc_roster(sect) or [])]
+    report.add("PASS" if len(hall) >= 25 else "FAIL", "the sect keeps its hall", f"{len(hall)} people")
+    elder = next((r for r in hall if str(r.get("sect_rank")) == "Elder"), None)
+    if elder is None:
+        report.add("FAIL", "an Elder to ask", "the hall has none")
+    else:
+        elder_name = str(elder["name"])
+        buyer_before = dict(await db.get_character(BUYER) or {})
+        elder_home = str((dict(await query("npc.status", PLAYER, {"npc_name": elder_name}) or {})).get("current_location") or "")
+        here = str(buyer_before.get("location") or town)
+        await step(report, "the buyer at realm 0", gm("admin.player.set_realm", {"user_id": BUYER, "realm_index": 0, "phase": 1, "reason": "playtest: a junior disciple"}))
+        await audited("admin.npc.relocate", {"npc_name": elder_name, "location": here, "reason": "playtest: an elder asked in person"}, name="admin.npc.relocate an Elder to the buyer")
+        bonded = await step(report, "discipleship.npc_request", act("discipleship.npc_request", BUYER, {"npc_name": elder_name}))
+        if bonded is not None:
+            report.add("PASS" if str(bonded.get("master_npc_name")) == elder_name else "FAIL", "the Elder takes the disciple", str(bonded.get("master_npc_name")))
+        await step(report, "sect.master.teach below the rank is refused", act("sect.master.teach", BUYER, {}), expect_error="teaches the sect's arts to")
+        await step(report, "sect.promote short of the points is refused", act("sect.promote", BUYER, {"npc_name": elder_name}), expect_error="contribution earned")
+        inner = content.next_promotion_rung(10)
+        await audited("admin.player.set_sect_contribution", {"user_id": BUYER, "contribution_points": 0, "contribution_earned": int(inner[1]) if inner else 600, "reason": "playtest: earned the rung"})
+        promoted = await step(report, "sect.promote by the Elder", act("sect.promote", BUYER, {"npc_name": elder_name}))
+        if promoted is not None:
+            report.add("PASS" if str(promoted.get("promoted_to")) == "Inner Disciple" and str(promoted.get("granted_by")) == elder_name else "FAIL",
+                       "an Elder grants the rank", f"{promoted.get('promoted_to')} by {promoted.get('granted_by')}")
+        taught = await step(report, "sect.master.teach", act("sect.master.teach", BUYER, {}))
+        if taught is not None:
+            report.add("PASS" if taught.get("manual_id") else "FAIL", "the master teaches the sect's art", str(taught.get("name")))
+        await step(report, "sect.master.teach twice is refused", act("sect.master.teach", BUYER, {}), expect_error="already taught you")
+        left = await step(report, "discipleship.leave an NPC master", act("discipleship.leave", BUYER, {}))
+        if left is not None:
+            report.add("PASS" if str(left.get("master_npc_name")) == elder_name else "FAIL", "the NPC bond is severed", str(left.get("master_npc_name")))
+        if elder_home:
+            await audited("admin.npc.relocate", {"npc_name": elder_name, "location": elder_home, "reason": "playtest: home again"}, name="admin.npc.relocate the Elder home")
+        await step(report, "the buyer's realm is put back", gm("admin.player.set_realm", {"user_id": BUYER, "realm_index": int(buyer_before.get("realm_index") or 0), "phase": int(buyer_before.get("phase") or 1), "reason": "playtest"}))
     # A territory is claimed standing in its region (v1.3.1); both claims were
     # made from the town and refused (v1.7.1).
     await step(report, "to the hills to claim them", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Cloudspine Foothills", "reason": "playtest"}))
@@ -1831,18 +1879,48 @@ async def run(url: str, token: str, db_path: str) -> Report:
         report.add("PASS" if claimed.get("claimed") else "FAIL", "a neutral territory is claimed", str(claimed.get("controller_key")))
     await audited("admin.player.set_sect", {"user_id": BUYER, "sect_name": "Crimson Furnace Sect", "rank_name": "Outer Disciple", "rank_level": 10, "reason": "playtest"}, name="admin.player.set_sect the buyer into the Crimson Furnace")
     await step(report, "the buyer to the hills to contest them", gm("admin.player.teleport", {"user_id": BUYER, "location": "Cloudspine Foothills", "reason": "playtest"}))
+    # A sect's doors follow its ranks (v1.25.0): an Outer Disciple claims no
+    # territory, a Core Disciple does.
+    await step(report, "territory.claim by an Outer Disciple is refused", act("territory.claim", BUYER, {"territory_key": "Cloudspine Foothills"}), expect_error="asks for Core Disciple")
+    await audited("admin.player.set_sect_rank", {"user_id": BUYER, "rank_name": "Core Disciple", "rank_level": 30, "reason": "playtest"}, name="admin.player.set_sect_rank the buyer to Core Disciple")
     contested = await step(report, "territory.claim the hills for a second sect", act("territory.claim", BUYER, {"territory_key": "Cloudspine Foothills"}))
     war_id = int((contested or {}).get("war_id") or 0)
     if contested is not None:
         report.add("PASS" if war_id and str(contested.get("attacker_key")) == "Crimson Furnace Sect" and str(contested.get("defender_key")) == sect else "FAIL",
                    "a second claim starts a war", f"war={war_id} {contested.get('attacker_key')} vs {contested.get('defender_key')}")
     if war_id:
+        # Which wars a cultivator may fight in, and on which side, is the
+        # engine's answer (v1.24.0): the /war act picker is built from it.
+        fronts = await step(report, "war.fronts for the holder", query("war.fronts", PLAYER, {}))
+        if fronts is not None:
+            mine = [f for f in list(fronts.get("wars") or []) if int(f.get("war_id") or 0) == war_id]
+            report.add("PASS" if mine and str(mine[0].get("side")) == "defender" else "FAIL",
+                       "the holder is offered the war on the defending side", str(mine[0].get("side") if mine else "not offered"))
         for uid, tactic in ((BUYER, "assault"), (PLAYER, "fortify")):
             acted = await step(report, f"war.act {tactic}", act("war.act", uid, {"war_id": war_id, "tactic": tactic}))
             if acted is not None:
                 ops = dict(acted.get("operations") or {})
                 report.add("PASS", "the tactic's roll, reported", f"status={acted.get('status')} siege={ops.get('siege_progress')} morale={ops.get('attacker_morale')}/{ops.get('defender_morale')}")
+                # Fighting pays sect contribution (v1.24.0).
+                report.add("PASS" if int(acted.get("points") or 0) > 0 else "FAIL", "the act earned sect contribution", str(acted.get("points")))
         await either("war.act again waits, or the war is over", act("war.act", PLAYER, {"war_id": war_id, "tactic": "repel"}), "still on cooldown", "active war not found")
+        # Peace (v1.24.0): a Deacon of a warring sect sues once the war is
+        # three days old, at a price; the terms follow the siege. Staged with
+        # levers - the rank, the purse and the days - and refused first while
+        # the war is young.
+        await audited("admin.player.set_sect_rank", {"user_id": PLAYER, "rank_name": "Deacon", "rank_level": 40, "reason": "playtest"}, name="admin.player.set_sect_rank a Deacon to make peace")
+        await step(report, "a purse to pay for peace", gm("admin.player.set_sect_contribution", {"user_id": PLAYER, "contribution_points": 300, "contribution_earned": 300, "reason": "playtest"}))
+        await step(report, "war.peace while the war is young is refused", act("war.peace", PLAYER, {"war_id": war_id}), expect_error="not ready for terms")
+        await step(report, "three days of war pass", gm("admin.world.advance_time", {"minutes": 3 * 24 * 60 + 60, "reason": "playtest"}))
+        open_wars = await step(report, "war.fronts before the peace", query("war.fronts", PLAYER, {}))
+        if any(int(f.get("war_id") or 0) == war_id for f in list((open_wars or {}).get("wars") or [])):
+            peace = await step(report, "war.peace", act("war.peace", PLAYER, {"war_id": war_id}))
+            if peace is not None:
+                report.add("PASS" if str(peace.get("status")) == "resolved" and str(peace.get("resolution")) in ("peace", "ceded") else "FAIL",
+                           "the war ends at the table on the siege's terms",
+                           f"{peace.get('resolution')} at siege {peace.get('siege_progress')}%, held by {peace.get('winner_key')}")
+        else:
+            report.add("PASS", "the war was already over before peace could be sued for", f"war={war_id}")
     # Both walked to the hills to claim them; the homestead below is founded
     # where its founder stands, and the buyer visits it in the town.
     for uid, who in ((PLAYER, "the founder"), (BUYER, "the buyer")):
@@ -1863,13 +1941,34 @@ async def run(url: str, token: str, db_path: str) -> Report:
     furnished = await step(report, "abode.upgrade the alchemy room", act("abode.upgrade", PLAYER, {"facility": "alchemy"}))
     if furnished is not None:
         report.add("PASS" if int(furnished.get("level") or 0) == 1 and int(furnished.get("cost") or 0) == 100 else "FAIL", "level 1 costs a hundred stones", f"level={furnished.get('level')} cost={furnished.get('cost')}")
+    # What a home holds (v1.30.0): one read answers both homes from the helpers
+    # the rules call, so the alchemy room just built is worth what a craft
+    # under it is given, and the next level costs what the upgrade charges.
+    overview = await step(report, "property.overview reads both homes", query("property.overview", PLAYER, {}))
+    if overview is not None:
+        rooms = {f.get("key"): f for f in ((overview.get("homestead") or {}).get("facilities") or [])}
+        furnace = rooms.get("alchemy") or {}
+        report.add("PASS" if int(furnace.get("level") or 0) == 1 and int((furnace.get("does") or {}).get("craft_bonus") or 0) == 2
+                   and int(furnace.get("next_cost") or 0) == 400 else "FAIL",
+                   "the furnace says what it gives and what the next level costs",
+                   f"level={furnace.get('level')} does={furnace.get('does')} next_cost={furnace.get('next_cost')}")
+        residence = overview.get("residence") or {}
+        report.add("PASS" if residence.get("facilities") else "FAIL", "the sect residence is read beside it",
+                   f"{residence.get('name')}: {len(residence.get('facilities') or [])} facilities")
     await step(report, "abode.enter", act("abode.enter", PLAYER, {}))
     focused = await step(report, "abode.focus the cultivation chamber", act("abode.focus", PLAYER, {"facility": "cultivation"}))
     if focused is not None:
         report.add("PASS" if focused.get("effect_id") else "FAIL", "the chamber grants an effect", str(focused.get("effect_name")))
-    stored = await step(report, "abode.focus the storage", act("abode.focus", PLAYER, {"facility": "storage"}))
+        # v1.31.0: four real hours, then one more before the next focus.
+        report.add("PASS" if int(focused.get("duration_real_minutes") or 0) == 240 else "FAIL",
+                   "a focus lasts four real hours", str(focused.get("duration_real_minutes")))
+    await step(report, "a second focus inside the wait is refused",
+               act("abode.focus", PLAYER, {"facility": "storage"}), expect_error="home focus cooldown")
+    # Every room grants a focus since v1.31.0; the storehouse granted nothing before.
+    stored = await step(report, "abode.focus the storage once the wait is cleared", act_free("abode.focus", PLAYER, {"facility": "storage"}))
     if stored is not None:
-        report.add("PASS" if not stored.get("effect_id") else "FAIL", "storage is a room, not an effect", str(stored.get("effect_id")))
+        report.add("PASS" if stored.get("effect_id") == "abode_storehouse_focus" else "FAIL",
+                   "the storehouse grants its focus", str(stored.get("effect_name")))
     await step(report, "abode.leave", act("abode.leave", PLAYER, {}))
     await audited("admin.player.set_sect_rank", {"user_id": PLAYER, "rank_name": "Outer Disciple", "rank_level": 10, "reason": "playtest"}, name="admin.player.set_sect_rank back to Outer Disciple")
 

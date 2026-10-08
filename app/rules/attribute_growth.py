@@ -4,7 +4,7 @@ The engine computes growth from the stage (``go_core/internal/game/
 attribute_growth.go``); ``attributes_json`` holds only the base. This is the
 display twin of ``characterSheetAttributes`` - +``per_stage`` a qi stage on all
 six, +``path_per_stage`` on the path's pair - and it decides nothing: no rule
-reads it. ``tests/python/unit/test_attribute_growth.py`` holds it equal to the
+reads it. ``tests/python/unit/test_cultivation.py`` holds it equal to the
 Go.
 
 The content is passed in: ``WORLD`` is built in the bot, and ``rules`` sits

@@ -773,6 +773,10 @@ func canonicalRoadNeighbors(catalog worlddata.Catalog, current string, realmInde
 // cityOf resolves a location to the city it belongs to (v0.36.0): a gate,
 // a district, a shop or an auction hall answers its city; anywhere else
 // answers itself.
+// CityOf is cityOf for the simulation package: which city a place is part of
+// (v1.29.0, for the street a crime's chance reads security off).
+func CityOf(catalog worlddata.Catalog, location string) string { return cityOf(catalog, location) }
+
 func cityOf(catalog worlddata.Catalog, location string) string {
 	if loc, ok := catalog.Locations[location]; ok && loc.OutsideLocation != "" && (loc.District != "" || loc.Shop != "" || loc.AuctionHouse != "") {
 		return loc.OutsideLocation
@@ -1263,7 +1267,7 @@ func activateUnexpectedEventTx(conn *storage.Conn, catalog worlddata.Catalog, us
 			if err != nil {
 				return nil, err
 			}
-			impacts, effectErr := applyWorldEventEffectTx(conn, event.ID, event.Title, c.Location, gameMinute, event.Severity, event.WorldEffect, now)
+			impacts, effectErr := applyWorldEventEffectTx(conn, catalog, event.ID, event.Title, c.Location, gameMinute, event.Severity, event.WorldEffect, now)
 			if effectErr != nil {
 				return nil, effectErr
 			}
@@ -1295,7 +1299,7 @@ func activateUnexpectedEventTx(conn *storage.Conn, catalog worlddata.Catalog, us
 			return nil, errors.New("event_key is required when a secret realm is selected")
 		}
 		ends := now + float64(maxI64(1, realm.OpenHours))*3600
-		payload := map[string]any{"definition_id": event.ID, "category": event.Category, "realm_id": event.SecretRealmID}
+		payload := map[string]any{"definition_id": event.ID, "category": event.Category, "realm_id": event.SecretRealmID, "severity": SecretRealmSiteSeverity(realm)}
 		enc, _ := json.Marshal(payload)
 		_, err := conn.Execute(`UPDATE world_events SET active=0 WHERE active=1 AND ends_at<=?`, []any{now})
 		if err != nil {
@@ -1312,6 +1316,11 @@ func activateUnexpectedEventTx(conn *storage.Conn, catalog worlddata.Catalog, us
 			if err != nil {
 				return nil, err
 			}
+			nodes, siteErr := SpawnSecretRealmSite(conn, catalog, eventKey, event.SecretRealmID, realm.Location, now)
+			if siteErr != nil {
+				return nil, siteErr
+			}
+			out["site_nodes"] = nodes
 		}
 		out["activated"] = activated
 		out["event_key"] = eventKey
@@ -1445,57 +1454,70 @@ func explorationExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "exploration", EventType: "exploration_resolved", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 }
 
-func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
-	var p travelPayload
-	if err := json.Unmarshal(raw, &p); err != nil {
-		return authoritativeMutation{}, err
-	}
-	p.Destination = strings.TrimSpace(p.Destination)
-	if p.Destination == "" {
-		return authoritativeMutation{}, errors.New("destination is required")
+// travelPlanned is a journey decided and not taken: every refusal
+// exploration.travel makes before it charges anything, and the road it would
+// walk. planTravelTx is the one statement of both (v1.26.0), so the preview a
+// player is shown before they leave (exploration.travel_preview) and the
+// journey itself cannot disagree about whether they may go, by which road, or
+// what it costs.
+type travelPlanned struct {
+	c          mechanicsCharacter
+	dest, cur  worlddata.LocationDefinition
+	originCity string
+	mode       string
+	plan       roadRoutePlan
+	found      bool
+	siteHop    bool
+	modeName   string
+}
+
+func planTravelTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, destination, modeIn string) (travelPlanned, error) {
+	destination = strings.TrimSpace(destination)
+	if destination == "" {
+		return travelPlanned{}, errors.New("destination is required")
 	}
 	c, err := loadMechanicsCharacter(conn, catalog, userID)
 	if err != nil {
-		return authoritativeMutation{}, err
+		return travelPlanned{}, err
 	}
 	if c.LifeStatus != "alive" {
-		return authoritativeMutation{}, errors.New("only a living incarnation can travel")
+		return travelPlanned{}, errors.New("only a living incarnation can travel")
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
 	if active, err := activeExplorationEventForUserTx(conn, userID, now); err != nil {
-		return authoritativeMutation{}, err
+		return travelPlanned{}, err
 	} else if active != nil {
-		return authoritativeMutation{}, fmt.Errorf("resolve or leave active exploration event %s before travelling", active.EventID)
+		return travelPlanned{}, fmt.Errorf("resolve or leave active exploration event %s before travelling", active.EventID)
 	}
 	if strings.HasPrefix(c.Location, "abode:") {
-		return authoritativeMutation{}, errors.New("leave the player-owned property before normal travel")
+		return travelPlanned{}, errors.New("leave the player-owned property before normal travel")
 	}
 	if strings.HasPrefix(c.Location, "personal_world:") {
-		return authoritativeMutation{}, errors.New("leave the personal world before normal travel")
+		return travelPlanned{}, errors.New("leave the personal world before normal travel")
 	}
 	if strings.HasPrefix(c.Location, "sect_abode:") {
-		return authoritativeMutation{}, errors.New("leave the sect abode before normal travel")
+		return travelPlanned{}, errors.New("leave the sect abode before normal travel")
 	}
 	if strings.HasPrefix(c.Location, "birth_family:") {
-		return authoritativeMutation{}, errors.New("leave the birth family household before normal travel")
+		return travelPlanned{}, errors.New("leave the birth family household before normal travel")
 	}
-	dest, ok := catalog.Locations[p.Destination]
+	dest, ok := catalog.Locations[destination]
 	if !ok {
-		return authoritativeMutation{}, errors.New("unknown destination")
+		return travelPlanned{}, errors.New("unknown destination")
 	}
-	if c.Location == p.Destination {
-		return authoritativeMutation{}, errors.New("already at destination")
+	if c.Location == destination {
+		return travelPlanned{}, errors.New("already at destination")
 	}
 	if dest.AuctionHouse != "" {
-		return authoritativeMutation{}, errors.New("auction houses must be entered through their warded doors")
+		return travelPlanned{}, errors.New("auction houses must be entered through their warded doors")
 	}
 	if cur, ok := catalog.Locations[c.Location]; ok && cur.AuctionHouse != "" {
 		outside := cur.OutsideLocation
 		if outside == "" {
 			outside = "Greenriver Town"
 		}
-		if p.Destination != outside {
-			return authoritativeMutation{}, fmt.Errorf("warded auction exit leads first to %s", outside)
+		if destination != outside {
+			return travelPlanned{}, fmt.Errorf("warded auction exit leads first to %s", outside)
 		}
 	}
 	// A shop (v0.35.0) is entered from anywhere in its city - the street, a
@@ -1509,37 +1531,89 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 	// so the shop rules below do not apply to a road-side site.
 	if dest.Shop != "" && dest.RoadSite == "" {
 		if originCity != dest.OutsideLocation {
-			return authoritativeMutation{}, fmt.Errorf("%s is in %s; travel there first", p.Destination, dest.OutsideLocation)
+			return travelPlanned{}, fmt.Errorf("%s is in %s; travel there first", destination, dest.OutsideLocation)
 		}
-	} else if cur.Shop != "" && cur.RoadSite == "" && p.Destination != cur.OutsideLocation {
-		return authoritativeMutation{}, fmt.Errorf("the shop door opens onto %s", cur.OutsideLocation)
+	} else if cur.Shop != "" && cur.RoadSite == "" && destination != cur.OutsideLocation {
+		return travelPlanned{}, fmt.Errorf("the shop door opens onto %s", cur.OutsideLocation)
 	} else if dest.District != "" && originCity != dest.OutsideLocation {
-		return authoritativeMutation{}, fmt.Errorf("%s is in %s; travel there first", p.Destination, dest.OutsideLocation)
+		return travelPlanned{}, fmt.Errorf("%s is in %s; travel there first", destination, dest.OutsideLocation)
 	}
 	if c.accessRealmIndex() < dest.MinRealmIndex {
-		return authoritativeMutation{}, errors.New("destination lies beyond the character's current cultivation")
+		return travelPlanned{}, errors.New("destination lies beyond the character's current cultivation")
 	}
 
-	mode := strings.TrimSpace(strings.ToLower(p.Mode))
+	mode := strings.TrimSpace(strings.ToLower(modeIn))
 	if mode == "" {
 		mode = "known"
 	}
 	if mode == "hub" {
 		if !dest.RealmHub {
-			return authoritativeMutation{}, errors.New("destination is not a realm capital")
+			return travelPlanned{}, errors.New("destination is not a realm capital")
 		}
 		if c.accessRealmIndex() < worldMinRealm(catalog, dest.World) {
-			return authoritativeMutation{}, errors.New("realm capital is not yet unlocked")
+			return travelPlanned{}, errors.New("realm capital is not yet unlocked")
 		}
 	} else {
 		known, err := knownLocationsTx(conn, catalog, userID, c)
 		if err != nil {
-			return authoritativeMutation{}, err
+			return travelPlanned{}, err
 		}
-		if !known[p.Destination] {
-			return authoritativeMutation{}, errors.New("destination route has not been discovered")
+		if !known[destination] {
+			return travelPlanned{}, errors.New("destination route has not been discovered")
 		}
 	}
+	out := travelPlanned{c: c, dest: dest, cur: cur, originCity: originCity, mode: mode, modeName: travelModeFor(c.accessRealmIndex()).Name}
+
+	// A road-side site (v0.39.0) is half a leg from either end of its road
+	// and from the other sites on it; from a site the road leads nowhere
+	// else. A site is never a hub.
+	out.siteHop = dest.RoadSite != "" || cur.RoadSite != ""
+	if out.siteHop && mode == "hub" {
+		return travelPlanned{}, errors.New("a road-side site is reached by its road, not by the realm gate")
+	}
+	if mode != "hub" {
+		if out.siteHop {
+			out.plan, out.found = roadSiteHop(catalog, originCity, destination, c.accessRealmIndex())
+			if !out.found {
+				if cur.RoadSite != "" {
+					a, b, _ := roadSiteEndpoints(catalog, c.Location)
+					return travelPlanned{}, fmt.Errorf("the road from %s leads back to %s or on to %s", c.Location, a, b)
+				}
+				return travelPlanned{}, fmt.Errorf("%s lies on the road between %s and %s; travel to either first", destination, dest.RoadLeg[0], dest.RoadLeg[1])
+			}
+		} else {
+			// What is in their bags decides how they cross the ground.
+			flight, mount, ferr := bestFlightArtifact(conn, catalog, userID)
+			if ferr != nil {
+				return travelPlanned{}, ferr
+			}
+			riding := c.accessRealmIndex()
+			if flight > riding {
+				riding = flight
+			} else {
+				mount = ""
+			}
+			out.plan, out.found = canonicalRoadRouteRiding(catalog, originCity, destination, c.accessRealmIndex(), riding, mount)
+		}
+	}
+	return out, nil
+}
+
+func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+	var p travelPayload
+	if err := json.Unmarshal(raw, &p); err != nil {
+		return authoritativeMutation{}, err
+	}
+	p.Destination = strings.TrimSpace(p.Destination)
+	if p.Destination == "" {
+		return authoritativeMutation{}, errors.New("destination is required")
+	}
+	t, err := planTravelTx(conn, catalog, userID, p.Destination, p.Mode)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	c, dest, originCity, mode := t.c, t.dest, t.originCity, t.mode
+	now := float64(time.Now().UnixNano()) / 1e9
 
 	route := []string{}
 	roadLegs := []map[string]any{}
@@ -1552,40 +1626,11 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 	// How they crossed it, and what carried them if anything did. Read off
 	// the plan rather than recomputed, so the words can never disagree with
 	// the minutes they were charged.
-	travelModeName, travelMount := travelModeFor(c.accessRealmIndex()).Name, ""
-
-	// A road-side site (v0.39.0) is half a leg from either end of its road
-	// and from the other sites on it; from a site the road leads nowhere
-	// else. A site is never a hub.
-	siteHop := dest.RoadSite != "" || cur.RoadSite != ""
-	if siteHop && mode == "hub" {
-		return authoritativeMutation{}, errors.New("a road-side site is reached by its road, not by the realm gate")
-	}
+	travelModeName, travelMount := t.modeName, ""
+	travelCurrency := ""
+	siteHop := t.siteHop
 	if mode != "hub" {
-		plan, found := roadRoutePlan{}, false
-		if siteHop {
-			plan, found = roadSiteHop(catalog, originCity, p.Destination, c.accessRealmIndex())
-			if !found {
-				if cur.RoadSite != "" {
-					a, b, _ := roadSiteEndpoints(catalog, c.Location)
-					return authoritativeMutation{}, fmt.Errorf("the road from %s leads back to %s or on to %s", c.Location, a, b)
-				}
-				return authoritativeMutation{}, fmt.Errorf("%s lies on the road between %s and %s; travel to either first", p.Destination, dest.RoadLeg[0], dest.RoadLeg[1])
-			}
-		} else {
-			// What is in their bags decides how they cross the ground.
-			flight, mount, ferr := bestFlightArtifact(conn, catalog, userID)
-			if ferr != nil {
-				return authoritativeMutation{}, ferr
-			}
-			riding := c.accessRealmIndex()
-			if flight > riding {
-				riding = flight
-			} else {
-				mount = ""
-			}
-			plan, found = canonicalRoadRouteRiding(catalog, originCity, p.Destination, c.accessRealmIndex(), riding, mount)
-		}
+		plan, found := t.plan, t.found
 		if found {
 			roadConnection = true
 			route = plan.Nodes
@@ -1594,6 +1639,11 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 			if len(plan.Legs) > 0 {
 				travelModeName = plan.Legs[0].Profile.Mode
 				travelMount = plan.Legs[0].Profile.Mount
+			}
+			// The coin it is paid in, named for the reply (v1.26.0): the toll
+			// used to leave the purse without a word.
+			if code, cerr := characterBaseCurrencyTx(conn, catalog, userID); cerr == nil {
+				travelCurrency = firstNonempty(catalog.Currencies[code].Name, code)
 			}
 			if err := chargeRoadTravelTx(conn, catalog, userID, travelCost, now); err != nil {
 				return authoritativeMutation{}, err
@@ -1628,15 +1678,9 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 	// Arrival by road is at the gate facing the road you came by (v0.36.0);
 	// departure by road is by the gate facing the first leg. A city with no
 	// gates, or a direct journey, lands on the destination itself.
-	arrivedAt := p.Destination
-	arrivalGate, leftBy := "", ""
-	if roadConnection && len(route) >= 2 {
-		if gate, direction, ok := gateFacing(catalog, p.Destination, roadFacingNeighbour(catalog, p.Destination, route[len(route)-2])); ok {
-			arrivedAt, arrivalGate = gate, direction
-		}
-		if _, direction, ok := gateFacing(catalog, originCity, roadFacingNeighbour(catalog, originCity, route[1])); ok {
-			leftBy = direction
-		}
+	arrivedAt, arrivalGate, leftBy := p.Destination, "", ""
+	if roadConnection {
+		arrivedAt, arrivalGate, leftBy = travelEnds(catalog, p.Destination, originCity, route)
 	}
 	if _, err = moveCharacterTx(conn, catalog, userID, arrivedAt, now); err != nil {
 		return authoritativeMutation{}, err
@@ -1715,6 +1759,7 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 		"travel_mode":                   travelModeName,
 		"travel_mount":                  travelMount,
 		"travel_cost_spirit_stones":     travelCost,
+		"travel_cost_currency":          travelCurrency,
 		"road_danger":                   dangerScore,
 		"road_encounter_chance_percent": encounterChance,
 		"road_encounter":                roadEncounterOut,
@@ -1855,6 +1900,20 @@ func RollHuntQuarry(realmIndex int64) (HuntQuarry, error) {
 	return HuntQuarry{Name: b.Name, TN: b.TN, Rank: b.Rank, Loot: loot, Stones: b.Stones, Cultivation: b.Cultivation}, nil
 }
 
+// huntCompanionBonusTx is combatCompanionBonus for a hunt, and 0 when the
+// tables a fixture or a fresh world lacks are not there - a hunt must not
+// refuse over a companion it does not have.
+func huntCompanionBonusTx(conn *storage.Conn, userID int64) int64 {
+	if !tableExistsTx(conn, "spirit_beasts") || !tableExistsTx(conn, "artifact_bonds") {
+		return 0
+	}
+	bonus, err := combatCompanionBonus(conn, userID)
+	if err != nil {
+		return 0
+	}
+	return bonus
+}
+
 func explorationHuntAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p huntPayload
 	if err := json.Unmarshal(raw, &p); err != nil {
@@ -1914,7 +1973,17 @@ func explorationHuntAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	if c.RealmIndex == c.BodyRealmIndex && c.Phase == c.BodyPhase {
 		dual = 1
 	}
-	roll, err := rollCheck(agility+body+1+dual+siteBonus, beast.TN)
+	// What a fight is fought with, a hunt is too (v1.28.0): an effect that
+	// steadies a cultivator in battle - the Thousand Beast Valley's hunting
+	// musk carries `combat_bonus` and says beasts misjudge its wearer - and a
+	// companion beast at their side. Both were read by a battle and by no
+	// hunt, though the hunt is the fight most cultivators have every day.
+	huntEdge, err := canonicalAdditiveEffectBonus(conn, catalog, userID, c.Location, p.GameMinute, "combat_bonus")
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	companion := huntCompanionBonusTx(conn, userID)
+	roll, err := rollCheck(agility+body+1+dual+siteBonus+huntEdge+companion, beast.TN)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -1992,6 +2061,6 @@ func explorationHuntAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 		}
 	}
 	beastOut := map[string]any{"name": beast.Name, "tn": beast.TN, "taming_tn": beast.TamingTN, "rank": beast.Rank, "element": beast.Element, "temperament": beast.Temperament, "bloodline": beast.Bloodline, "intelligence": beast.Intelligence, "loot": beast.Loot, "stones": beast.Stones, "cultivation": beast.Cultivation}
-	result := map[string]any{"beast": beastOut, "roll": roll, "success": roll["success"], "cultivation_awarded": awarded, "bonded_beast": bonded, "wild_encounter": wild, "site_kind": siteKind, "site_bonus": siteBonus, "body_tempered": bodyTempered}
+	result := map[string]any{"beast": beastOut, "roll": roll, "success": roll["success"], "cultivation_awarded": awarded, "bonded_beast": bonded, "wild_encounter": wild, "site_kind": siteKind, "site_bonus": siteBonus, "hunt_edge": huntEdge, "companion_bonus": companion, "body_tempered": bodyTempered}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "exploration", EventType: "hunt_resolved", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 }

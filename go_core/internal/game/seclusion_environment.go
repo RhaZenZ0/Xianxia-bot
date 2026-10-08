@@ -64,6 +64,9 @@ func seclusionEnvironmentGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if manor != nil && fmt.Sprint(manor["base_location"]) != residenceBase {
 		manor = nil
 	}
+	if manor != nil && ManorGroundTakenTx(conn, catalog, manorSectTx(conn, userID), fmt.Sprint(manor["base_location"])) {
+		manor = nil
+	}
 	// The birth household (v1.0.0-rc.32): the family's walls are a protected
 	// site, worth what the hearth is worth to active cultivation.
 	hearth, hearthMult, e := birthFamilyCultivationMultiplier(conn, location)
@@ -81,14 +84,14 @@ func seclusionEnvironmentGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 		env["abode_name"] = hearth
 	case abode != nil:
 		level := max64(0, i64(abode["cultivation_level"]))
-		base = math.Min(1.45, 1.05+0.05*float64(level))
+		base = homeCultivationMult(level)
 		env["site"] = "abode"
 		env["abode_name"] = fmt.Sprint(abode["name"])
 		env["abode_property_type"] = fmt.Sprint(abode["property_type"])
 		env["abode_level"] = level
 	case sectAbode != nil:
 		level := max64(0, i64(sectAbode["cultivation_level"]))
-		base = math.Min(1.45, 1.05+0.05*float64(level))
+		base = homeCultivationMult(level)
 		env["site"] = "sect_abode"
 		env["abode_name"] = fmt.Sprint(sectAbode["name"])
 		env["abode_level"] = level

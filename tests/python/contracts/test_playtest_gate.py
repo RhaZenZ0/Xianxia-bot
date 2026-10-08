@@ -375,7 +375,7 @@ class NothingOutsideTheGeneratorNamesTheChecklistFile(unittest.TestCase):
     v1.0.1 is this project's first bump that moves it, and two things had
     quietly depended on the name holding still: `merge_ticks`, handed the file
     it was about to overwrite, which would have blanked the live pass; and
-    `test_hidden_actions.py`, which opened `v1.0.0.md` by literal and made the
+    `test_hub_surface.py`, which opened `v1.0.0.md` by literal and made the
     whole module error with `FileNotFoundError` the moment the bump landed.
     Two instances is a class, so this is the gate.
     """
@@ -395,7 +395,7 @@ class NothingOutsideTheGeneratorNamesTheChecklistFile(unittest.TestCase):
     def _code_only(text: str) -> str:
         """The source with its comments and docstrings blanked.
 
-        Its own first run flagged `test_hidden_actions.py` - the file it had
+        Its own first run flagged `test_hub_surface.py` - the file it had
         just been written for - because the *comment* explaining the fix names
         the old filename. A gate that cannot tell prose from code is
         decoration (v1.0.0-rc.52), so the prose goes before the scan.

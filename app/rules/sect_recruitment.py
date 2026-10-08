@@ -121,39 +121,3 @@ def trial_modifier(
     return modifier, notes, None
 
 
-def recommendation_modifier(
-    character: dict[str, Any],
-    *,
-    faction_reputation: int = 0,
-    family: dict[str, Any] | None = None,
-    sect_alignment: str = "Neutral",
-) -> tuple[int, list[str]]:
-    attrs = dict(character.get("attributes") or {})
-    base = int(attrs.get("presence", 0))
-    notes = [f"Presence {base:+d}"]
-
-    rep_bonus = max(-3, min(3, int(faction_reputation) // 20))
-    if rep_bonus:
-        base += rep_bonus
-        notes.append(f"sect reputation {rep_bonus:+d}")
-
-    influence = int((family or {}).get("influence", 0))
-    family_bonus = min(2, max(0, influence // 40))
-    if family_bonus:
-        base += family_bonus
-        notes.append(f"family influence +{family_bonus}")
-
-    karma = int(character.get("karma_score", 0))
-    alignment = str(sect_alignment or "Neutral").lower()
-    karma_bonus = 0
-    if alignment == "orthodox":
-        karma_bonus = 1 if karma >= 50 else -1 if karma <= -100 else 0
-    elif alignment == "demonic":
-        karma_bonus = 1 if karma <= -50 else -1 if karma >= 100 else 0
-    if karma_bonus:
-        base += karma_bonus
-        notes.append(f"karmic reputation {karma_bonus:+d}")
-
-    return base, notes
-
-

@@ -11,6 +11,7 @@ import os
 from collections import deque
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
+from functools import wraps
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +27,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 77
+SCHEMA_VERSION = 79
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -152,6 +153,7 @@ OPERATIONAL_REQUIRED_TABLES = frozenset(
         "npc_graves",
         "npc_life_state",
         "npc_memory",
+        "npc_mentorships",
         "npc_mind_state",
         "npc_player_memories",
         "npc_registry",
@@ -220,6 +222,8 @@ OPERATIONAL_REQUIRED_TABLES = frozenset(
         "trade_offers",
         "tribulation_attempts",
         "tribulation_state",
+        "war_card_messages",
+        "war_channels",
         "wild_beast_encounters",
         "witness_records",
         "world_action_events",
@@ -3243,6 +3247,63 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                 WHERE quest_key='realm_road_7' AND seed_json='{"follow_on": "", "realm_index": 7}'""",
         ),
     ),
+    (
+        78,
+        "war_fronts",
+        (
+            # v1.24.0: one read-only war-front channel per world, the
+            # stall_channels shape (schema 66), and one live card per sect war
+            # in it. The card row is a Discord message id and nothing else -
+            # the war is the engine's `territory_wars` row - keyed on the war,
+            # which no player owns, so an erasure or a reset never sweeps it.
+            # The tables live in this migration alone (rc.57).
+            """CREATE TABLE IF NOT EXISTS war_channels (
+                guild_id INTEGER NOT NULL,
+                world_name TEXT NOT NULL,
+                channel_id INTEGER NOT NULL,
+                category_id INTEGER,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL,
+                PRIMARY KEY(guild_id,world_name),
+                UNIQUE(guild_id,channel_id)
+            )""",
+            """CREATE TABLE IF NOT EXISTS war_card_messages (
+                guild_id INTEGER NOT NULL,
+                war_id INTEGER NOT NULL,
+                channel_id INTEGER NOT NULL,
+                message_id INTEGER NOT NULL,
+                updated_at REAL NOT NULL,
+                PRIMARY KEY(guild_id,war_id)
+            )""",
+            # And the sect each blow was struck for, so an ally's blows - a
+            # cultivator's or a whole allied sect's in the world's own sieges -
+            # are told apart from the field's, and a sect joins a war once.
+            "ALTER TABLE territory_war_actions ADD COLUMN sect_name TEXT NOT NULL DEFAULT ''",
+        ),
+    ),
+    (
+        79,
+        "npc_masters",
+        (
+            # v1.25.0: a player may take one of their own sect's people as a
+            # master. `sect_lineage` cannot hold that - both its ids are
+            # foreign-keyed to `characters`, and an NPC is not one - so the bond
+            # has a table of its own, keyed on the disciple (one master at a
+            # time) and naming the master by name. An erasure or a reset takes
+            # it with the character; an NPC's death ends it through
+            # `ReleaseNPCBondsTx`, the one door every death path already uses.
+            """CREATE TABLE IF NOT EXISTS npc_mentorships (
+                disciple_user_id INTEGER PRIMARY KEY,
+                master_npc_name TEXT NOT NULL,
+                sect_name TEXT NOT NULL,
+                accepted_game_minute INTEGER NOT NULL DEFAULT 0,
+                attention INTEGER NOT NULL DEFAULT 0,
+                created_at REAL NOT NULL,
+                FOREIGN KEY(disciple_user_id) REFERENCES characters(user_id) ON DELETE CASCADE
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_npc_mentorships_master ON npc_mentorships(master_npc_name)",
+        ),
+    ),
 )
 
 
@@ -3329,6 +3390,11 @@ class _ObservedConnection:
     async def _acquire_writer_if_needed(self, sql: str) -> None:
         operation = str(sql).lstrip().split(None, 1)[0].upper() if str(sql).strip() else ""
         if operation in self._WRITE_OPERATIONS:
+            # A write inside a `reuse_connection` scope makes every remembered
+            # read suspect, so the scope forgets them all (v1.31.2).
+            memo = self._owner._read_memo.get()
+            if memo:
+                memo.clear()
             await self._acquire_writer()
 
     async def _acquire_writer(self) -> None:
@@ -3348,6 +3414,36 @@ class _ObservedConnection:
             return
         self._writer_lock_held = False
         self._owner._writer_lock.release()
+
+
+# What each level of a property's Storage facility adds to spatial storage
+# (v1.28.0); the engine's `propertyStorageSlotsPerLevel`, held equal by
+# `test_npcs_and_places.py`.
+PROPERTY_STORAGE_SLOTS_PER_LEVEL = 10
+
+
+def _memoised_read(method):
+    """Answer a point read from the open `reuse_connection` scope's memo (v1.31.2).
+
+    Outside a scope the memo is None and the method runs as it always has. Inside
+    one, the first call runs and remembers its answer under `(name, args)`, and a
+    second ask with the same arguments is answered from memory - a deep copy both
+    ways, so a caller editing the dict it got cannot edit what the next caller is
+    handed. Any write through the scope's connection clears the memo
+    (`_ObservedConnection._acquire_writer_if_needed`).
+    """
+    @wraps(method)
+    async def wrapper(self, *args, **kwargs):
+        memo = self._read_memo.get()
+        if memo is None or kwargs:
+            return await method(self, *args, **kwargs)
+        key = (method.__name__, args)
+        if key in memo:
+            return copy.deepcopy(memo[key])
+        value = await method(self, *args)
+        memo[key] = copy.deepcopy(value)
+        return value
+    return wrapper
 
 
 class Database:
@@ -3375,6 +3471,12 @@ class Database:
         self._connections_reused = 0
         self._shared_connection: ContextVar[_ObservedConnection | None] = ContextVar(
             f"xianxia_db_shared_connection_{id(self)}", default=None
+        )
+        # The reads a `reuse_connection` scope has already answered (v1.31.2):
+        # `(method, args) -> value`, a dict only while a scope is open and None
+        # outside one, so a read outside a scope is exactly what it always was.
+        self._read_memo: ContextVar[dict[tuple, Any] | None] = ContextVar(
+            f"xianxia_db_read_memo_{id(self)}", default=None
         )
         self._catalog_cache: dict[tuple[str, str], dict[str, Any]] = {}
         self._catalog_cache_hits = 0
@@ -3444,6 +3546,13 @@ class Database:
         This is intentionally opt-in. Callers must await database operations in
         sequence rather than sharing the connection between concurrent tasks.
         Individual methods may still commit small maintenance writes.
+
+        A scope also remembers the point reads marked `_memoised_read` (v1.31.2):
+        a panel refresh read the character three times and the sect membership
+        twice, once per provider, and inside one scope the second ask is
+        answered from the first. Any write through the scope's connection
+        forgets the memo, so a method that reads, writes and reads again still
+        sees its own write.
         """
         shared = self._shared_connection.get()
         if shared is not None:
@@ -3452,9 +3561,11 @@ class Database:
             return
         async with self._open_connection() as db:
             token = self._shared_connection.set(db)
+            memo_token = self._read_memo.set({})
             try:
                 yield db
             finally:
+                self._read_memo.reset(memo_token)
                 self._shared_connection.reset(token)
 
     async def _preflight_schema_version(self) -> None:
@@ -4926,6 +5037,7 @@ class Database:
             )
             return await cur.fetchone() is not None
 
+    @_memoised_read
     async def get_character(self, user_id: int) -> dict[str, Any] | None:
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row
@@ -5753,6 +5865,9 @@ class Database:
             cur = await db.execute("DELETE FROM stall_channels WHERE guild_id=?", (int(guild_id),))
             stall_channel_rows = int(cur.rowcount or 0)
             await db.execute("DELETE FROM stall_card_messages WHERE guild_id=?", (int(guild_id),))
+            cur = await db.execute("DELETE FROM war_channels WHERE guild_id=?", (int(guild_id),))
+            war_channel_rows = int(cur.rowcount or 0)
+            await db.execute("DELETE FROM war_card_messages WHERE guild_id=?", (int(guild_id),))
             await db.execute("DELETE FROM auction_lot_messages WHERE guild_id=?", (int(guild_id),))
             await db.execute("DELETE FROM playtest_items WHERE guild_id=?", (int(guild_id),))
             cur = await db.execute(
@@ -5763,7 +5878,7 @@ class Database:
             await db.commit()
         return {"server_config": config_rows, "realm_hubs": hub_rows, "auction_houses": auction_rows,
                 "world_events": world_event_rows, "stall_channels": stall_channel_rows,
-                "channel_messages": message_rows}
+                "war_channels": war_channel_rows, "channel_messages": message_rows}
 
     async def get_expedition_thread(self, guild_id: int, user_id: int) -> dict[str, Any] | None:
         async with self._connect() as db:
@@ -6147,6 +6262,7 @@ class Database:
             )
             await db.commit()
 
+    @_memoised_read
     async def get_sect_membership(self, user_id: int) -> dict[str, Any] | None:
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row
@@ -6184,6 +6300,27 @@ class Database:
             if not row:
                 return None
             return await self._lineage_person(db, int(row[0]))
+
+    async def get_npc_master(self, user_id: int) -> dict[str, Any] | None:
+        """The one of the sect's own people who is this player's master
+        (v1.25.0, `npc_mentorships`), with the rank and realm the world holds
+        for them now; None without one or before schema 79."""
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            try:
+                cur = await db.execute(
+                    """SELECT m.master_npc_name AS name,m.sect_name,m.attention,m.accepted_game_minute,
+                              c.realm_index,c.phase,c.status,l.sect_rank
+                       FROM npc_mentorships m
+                       LEFT JOIN npc_civilization_state c ON c.npc_name=m.master_npc_name
+                       LEFT JOIN npc_life_state l ON l.npc_name=m.master_npc_name
+                       WHERE m.disciple_user_id=?""",
+                    (user_id,),
+                )
+            except Exception:
+                return None
+            row = await cur.fetchone()
+            return dict(row) if row else None
 
     async def get_lineage_snapshot(self, user_id: int) -> dict[str, Any]:
         async with self._connect() as db:
@@ -6415,6 +6552,9 @@ class Database:
         History is descriptive past-tense canon, not mutable mechanical state.
         ``visibility`` is intentionally narrow: ``public``, ``participant``,
         ``faction`` or ``hidden``. Hidden rows are never returned to narrator RAG.
+        A caller that names no ``world_name`` gets the world its ``location``
+        stands in (v1.31.0), read off ``content_locations`` the way the engine's
+        writer reads it, and ``''`` for a place no world carries.
         """
         now = time.time()
         safe_visibility = str(visibility or "public").strip().lower()
@@ -6433,7 +6573,9 @@ class Database:
                        source_key,event_type,title,summary,significance,visibility,location,world_name,faction,
                        actor_type,actor_key,actor_name,target_type,target_key,target_name,related_user_id,
                        related_npc_name,tags,game_minute,metadata_json,created_at,updated_at
-                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                   ) VALUES(?,?,?,?,?,?,?,
+                       COALESCE(NULLIF(?, ''), (SELECT world FROM content_locations WHERE name=?), ''),
+                       ?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                    ON CONFLICT(source_key) DO UPDATE SET
                        event_type=excluded.event_type,title=excluded.title,summary=excluded.summary,
                        significance=excluded.significance,visibility=excluded.visibility,location=excluded.location,
@@ -6446,7 +6588,7 @@ class Database:
                    RETURNING *""",
                 (
                     key, str(event_type)[:80], str(title)[:220], str(summary)[:1800], safe_significance,
-                    safe_visibility, str(location)[:180], str(world_name)[:120], str(faction)[:180],
+                    safe_visibility, str(location)[:180], str(world_name)[:120], str(location)[:180], str(faction)[:180],
                     str(actor_type)[:60], str(actor_key)[:180], str(actor_name)[:160],
                     str(target_type)[:60], str(target_key)[:180], str(target_name)[:160],
                     int(related_user_id) if related_user_id is not None else None, str(related_npc_name)[:160],
@@ -6779,15 +6921,26 @@ class Database:
         The same shape and the same reason as `list_active_event_npcs` and
         `list_graves_at`: a name you can address that the catalogue picker
         cannot turn up, because the catalogue does not know they exist.
+
+        `npc_registry.location` is where somebody was put, and nothing moves it
+        once a simulation row exists (`MoveRegisteredNPCTx` has no callers), so
+        a person the tick has walked away is answered by their simulation row,
+        not the registry - the same order `current_npc_location` keeps. Before
+        v1.25.0 that was a household's relatives, who never leave; a sect's
+        twenty-five people travel, and the picker would have offered them in a
+        room they left and refused them in the one they stand in.
         """
         if not str(location or "").strip():
             return []
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             cur = await db.execute(
-                """SELECT name,role,realm,location FROM npc_registry
-                   WHERE location=? ORDER BY name LIMIT ?""",
-                (str(location), max(1, min(int(limit), 50))),
+                """SELECT r.name,r.role,r.realm,COALESCE(c.current_location,r.location) AS location
+                   FROM npc_registry r LEFT JOIN npc_civilization_state c ON c.npc_name=r.name
+                   WHERE (c.npc_name IS NULL AND r.location=?)
+                      OR (c.current_location=? AND c.status IN ('alive','missing'))
+                   ORDER BY r.name LIMIT ?""",
+                (str(location), str(location), max(1, min(int(limit), 50))),
             )
             return [dict(r) for r in await cur.fetchall()]
 
@@ -6949,7 +7102,19 @@ class Database:
                 "SELECT item_id,quantity FROM storage_inventory WHERE user_id=? AND quantity>0 ORDER BY item_id",(user_id,)
             )
             data["items"]={str(k):int(v) for k,v in await cur.fetchall()}
-            data["used_slots"]=len(data["items"]); return data
+            data["used_slots"]=len(data["items"])
+            # A property's Storage facility adds stacks (v1.28.0), as the
+            # engine's `propertyStorageSlotsTx` counts them on a deposit.
+            extra = 0
+            for table in ("cave_abodes", "sect_abodes"):
+                try:
+                    cur = await db.execute(f"SELECT COALESCE(MAX(storage_level),0) FROM {table} WHERE user_id=?", (user_id,))
+                    extra += max(0, int((await cur.fetchone())[0] or 0)) * PROPERTY_STORAGE_SLOTS_PER_LEVEL
+                except (sqlite3.OperationalError, RemoteDatabaseError):
+                    log.debug("no %s storage column yet", table)
+            data["property_slots"] = extra
+            data["slot_capacity"] = int(data.get("slot_capacity") or 0) + extra
+            return data
 
     # ------------------------------------------------------------------
     # Sect hierarchy/resources
@@ -6966,6 +7131,23 @@ class Database:
                 (sect_name,),
             ); return [dict(r) for r in await cur.fetchall()]
 
+
+    async def get_sect_npc_roster(self, sect_name: str) -> list[dict[str, Any]]:
+        """The sect's own people (v1.25.0): every living NPC of the sect, by
+        rank and then realm. No place is read - where somebody stands is the
+        whereabouts rule's to say, not a roster's."""
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                """SELECT c.npc_name AS name,c.realm_index,c.phase,l.sect_rank
+                   FROM npc_civilization_state c JOIN npc_life_state l ON l.npc_name=c.npc_name
+                   WHERE c.faction=? AND c.status='alive'
+                   ORDER BY CASE l.sect_rank WHEN 'Ancestor' THEN 0 WHEN 'Sect Master' THEN 1 WHEN 'Grand Elder' THEN 2
+                            WHEN 'Elder' THEN 3 WHEN 'Deacon' THEN 4 WHEN 'Core Disciple' THEN 5 WHEN 'Inner Disciple' THEN 6
+                            WHEN 'Outer Disciple' THEN 7 ELSE 8 END, c.realm_index DESC, c.phase DESC, c.npc_name""",
+                (sect_name,),
+            )
+            return [dict(r) for r in await cur.fetchall()]
 
     async def get_sect_treasury(self,sect_name:str)->dict[str,int]:
         async with self._connect() as db:
@@ -7204,6 +7386,48 @@ class Database:
     async def forget_stall_card(self, guild_id: int, user_id: int) -> None:
         async with self._connect() as db:
             await db.execute("DELETE FROM stall_card_messages WHERE guild_id=? AND user_id=?", (int(guild_id), int(user_id)))
+            await db.commit()
+
+    async def set_war_channel(self, *, guild_id: int, world_name: str, channel_id: int, category_id: int | None) -> None:
+        """One war-front channel per world (schema 78), the `stall_channels`
+        shape."""
+        now = time.time()
+        async with self._connect() as db:
+            await db.execute(
+                """INSERT INTO war_channels(guild_id,world_name,channel_id,category_id,created_at,updated_at)
+                   VALUES(?,?,?,?,?,?) ON CONFLICT(guild_id,world_name) DO UPDATE SET
+                   channel_id=excluded.channel_id,category_id=excluded.category_id,updated_at=excluded.updated_at""",
+                (int(guild_id), str(world_name), int(channel_id), int(category_id) if category_id else None, now, now),
+            )
+            await db.commit()
+
+    async def get_war_channels(self, guild_id: int) -> list[dict[str, Any]]:
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute("SELECT * FROM war_channels WHERE guild_id=? ORDER BY world_name", (int(guild_id),))
+            return [dict(row) for row in await cur.fetchall()]
+
+    async def remember_war_card(self, *, guild_id: int, war_id: int, channel_id: int, message_id: int) -> None:
+        """The live card for one war (v1.24.0): a Discord message id, nothing
+        about the war itself - the engine's `territory_wars` row is the war."""
+        async with self._connect() as db:
+            await db.execute(
+                """INSERT INTO war_card_messages(guild_id,war_id,channel_id,message_id,updated_at) VALUES(?,?,?,?,?)
+                   ON CONFLICT(guild_id,war_id) DO UPDATE SET channel_id=excluded.channel_id,
+                   message_id=excluded.message_id,updated_at=excluded.updated_at""",
+                (int(guild_id), int(war_id), int(channel_id), int(message_id), time.time()),
+            )
+            await db.commit()
+
+    async def list_war_cards(self, guild_id: int) -> list[dict[str, Any]]:
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute("SELECT * FROM war_card_messages WHERE guild_id=? ORDER BY war_id", (int(guild_id),))
+            return [dict(row) for row in await cur.fetchall()]
+
+    async def forget_war_card(self, guild_id: int, war_id: int) -> None:
+        async with self._connect() as db:
+            await db.execute("DELETE FROM war_card_messages WHERE guild_id=? AND war_id=?", (int(guild_id), int(war_id)))
             await db.commit()
 
     async def list_player_stalls(self) -> list[dict[str, Any]]:
@@ -7763,6 +7987,16 @@ class Database:
             return [dict(r) for r in await cur.fetchall()]
 
 
+    async def is_hidden_sect_initiate(self, user_id: int) -> bool:
+        """Whether the cultivator is an active initiate of the hidden sect
+        (v1.28.0) - the black market's door reads it as the engine does."""
+        async with self._connect() as db:
+            cur = await db.execute(
+                "SELECT 1 FROM hidden_sect_membership WHERE user_id=? AND status='active' LIMIT 1", (int(user_id),)
+            )
+            return await cur.fetchone() is not None
+
+
     async def get_crimes(self, user_id: int, *, open_only: bool = True, limit: int = 20) -> list[dict[str, Any]]:
         sql = "SELECT * FROM crime_records WHERE user_id=?"
         params: list[Any] = [int(user_id)]
@@ -7870,7 +8104,11 @@ class Database:
 
 
     async def get_territory_wars(self, *, active_only: bool=True) -> list[dict[str, Any]]:
-        sql="SELECT * FROM territory_wars" + (" WHERE status='active'" if active_only else "") + " ORDER BY war_id DESC"
+        # The ground's own name and walls ride with each war (v1.24.0): the war
+        # card and /war status say what is besieged and how high it stands.
+        sql=("SELECT w.*,t.name AS territory_name,t.defense AS territory_defense,t.controller_key AS territory_holder"
+             " FROM territory_wars w LEFT JOIN territory_state t ON t.territory_key=w.territory_key"
+             + (" WHERE w.status='active'" if active_only else "") + " ORDER BY w.war_id DESC")
         async with self._connect() as db:
             db.row_factory=aiosqlite.Row; cur=await db.execute(sql); rows=[dict(r) for r in await cur.fetchall()]
             for row in rows:
@@ -7883,10 +8121,20 @@ class Database:
                 # reader of its own, because a war and what happened in it are
                 # one answer.
                 cur=await db.execute(
-                    "SELECT side,tactic,power,siege_delta,morale_delta,game_minute,user_id"
-                    " FROM territory_war_actions WHERE war_id=? ORDER BY action_id DESC LIMIT 5",
+                    "SELECT * FROM territory_war_actions WHERE war_id=? ORDER BY action_id DESC LIMIT 5",
                     (int(row['war_id']),))
                 row['recent_actions']=[dict(r) for r in await cur.fetchall()]
+                # Who marched beside each side (v1.24.0): the sects other than
+                # the two belligerents that struck a blow, read off what was
+                # recorded rather than off who is allied now.
+                cur=await db.execute("PRAGMA table_info(territory_war_actions)")
+                if any(str(c[1])=="sect_name" for c in await cur.fetchall()):
+                    cur=await db.execute(
+                        "SELECT DISTINCT side,sect_name FROM territory_war_actions WHERE war_id=? AND sect_name NOT IN ('',?,?) ORDER BY sect_name",
+                        (int(row['war_id']),str(row['attacker_key']),str(row['defender_key'])))
+                    row['allies']=[{"side":str(r[0]),"sect_name":str(r[1])} for r in await cur.fetchall()]
+                else:
+                    row['allies']=[]
             return rows
 
 

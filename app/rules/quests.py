@@ -60,9 +60,9 @@ def next_objective_label(objectives: Any, progress: Any) -> str:
         except (TypeError, ValueError):
             current = 0
         if current < required:
-            label = str(objective.get("label") or "").strip()
-            if not label:
+            if not str(objective.get("label") or "").strip():
                 return ""
+            label = labelled_objective(objective)
             if required > 1:
                 return f"{label} ({current}/{required})"
             return label
@@ -397,7 +397,74 @@ OBJECTIVE_TYPES: dict[str, dict[str, Any]] = {
     "law_comprehend": {"target": "law", "label": "Comprehend the Law of {target}", "untargeted": "Comprehend a Law"},
     "law_technique": {"target": "law_technique", "label": "Manifest {target}", "untargeted": "Manifest a Law technique"},
     "personal_world": {"target": None, "label": "", "untargeted": "Stabilize a personal world"},
+    # Six things a cultivator works long for that no quest could ask about
+    # (v1.28.0): taming a beast, evolving one, refining a flame, settling a
+    # stage of the spirit sense, completing a Perfect Path and raising a
+    # property's facility. Each is untargeted - the beast is whatever the hunt
+    # turned up, and the rest are the player's own - and each is reported
+    # after the engine agreed and before the command answers.
+    "beast_tame": {"target": None, "label": "", "untargeted": "Tame a spirit beast"},
+    "beast_evolve": {"target": None, "label": "", "untargeted": "Evolve a spirit beast"},
+    "flame_refine": {"target": None, "label": "", "untargeted": "Refine a flame you hold"},
+    "spirit_settle": {"target": None, "label": "", "untargeted": "Settle a stage of your spirit sense"},
+    "perfection_complete": {"target": None, "label": "", "untargeted": "Complete a Perfect Path"},
+    "abode_upgrade": {"target": None, "label": "", "untargeted": "Raise a facility of your property"},
 }
+# Where each objective is done (v1.27.0). A label written by hand names its
+# door (`**/world → City → Envoys**`), and a panel draws that as a button; 375
+# of the 524 objective labels in the content file - every commission - and every
+# label the Forge builds from the templates above named none, so "Speak with
+# Bo Tan" and "Explore Ashenwall City" left the player to find the command.
+# `labelled_objective` appends the path to a label that carries none; a label
+# that already names one is left as written. `test_quest_progress.py`
+# holds each type here and every path to one a panel resolves.
+OBJECTIVE_PATHS: dict[str, str] = {
+    "explore": "**/world → Act → Explore**",
+    "talk": "**/npc → People → Talk**",
+    "scene_action": "**/action**",
+    "sect_discovery": "**/world → City → Envoys**",
+    "sect_trial": "**/sect → Recruitment → Trial**",
+    "cultivate": "**/cultivate**",
+    "travel": "**/travel → Destinations → Go**",
+    "combat_win": "**/hunt**",
+    "craft": "**/craft → General Crafting → Craft**",
+    "trade": "**/economy → City Shops → Buy**",
+    "gather": "**/forage**",
+    "breakthrough": "**/breakthrough**",
+    "flame_capture": "**/craft → Flames → Capture**",
+    "raid_win": "**/combat → Boss Raids → Start**",
+    "black_market": "**/economy → Black Market → Buy**",
+    "perfection_start": "**/ascend → Perfection → Start**",
+    "realm_enter": "**/realm → Secret Realms → Enter**",
+    "tribulation_cleared": "**/ascend → Tribulation / Ascension → Attempt**",
+    "return_home": "**/family → Enter**",
+    "family_lesson": "**/family → Hearth → Lesson**",
+    "ascension_gate": "**/ascend → Tribulation / Ascension → Gate**",
+    "world_cross": "**/travel → Teleportation Arrays → Use**",
+    "profession_exam": "**/craft → Profession → Profession Exam**",
+    "law_comprehend": "**/cultivation → Laws → Comprehend**",
+    "law_technique": "**/cultivation → Laws → Technique**",
+    "personal_world": "**/innerworld → Personal World → Create**",
+    "beast_tame": "**/beast → Companions → Tame**",
+    "beast_evolve": "**/beast → Companions → Evolve**",
+    "flame_refine": "**/craft → Flames → Refine**",
+    "spirit_settle": "**/craft → Spirit Sense → Settle**",
+    "perfection_complete": "**/ascend → Perfection → Trial**",
+    "abode_upgrade": "**/abode → Property → Upgrade**",
+}
+
+
+def labelled_objective(objective: Any) -> str:
+    """An objective's label with the place it is done, unless it names one."""
+    if not isinstance(objective, dict):
+        return ""
+    label = str(objective.get("label") or objective.get("id") or "").strip()
+    path = OBJECTIVE_PATHS.get(str(objective.get("type") or ""), "")
+    if not label or not path or "**/" in label:
+        return label
+    return f"{label} - {path}"
+
+
 SCENE_ACTION_KEYS = ("observe", "investigate", "influence", "stealth", "physical", "qi", "resolve", "aid")
 REWARD_KEYS = ("insight_xp", "spirit_stones", "items")
 # What a household errand may pay besides those (v1.0.0-rc.32): standing with
@@ -682,6 +749,22 @@ def validate_quest_definition(draft: dict[str, Any], world: Any, budget: dict[st
     }, []
 
 
+# The kinds of history row a sect war writes (v1.27.0), and the scene action a
+# drafted quest asks for about each. The engine writes these names in
+# `go_core/internal/game/sect_war.go`, `sect_war_peace.go` and
+# `territory_actions.go`; the Forge's procedural draft and RAG's notable-type
+# bonus read them from here. Both readers had keyed on `war_started` and
+# `war_resolved`, which no writer has ever produced, so no war reached either.
+# `test_quest_progress.py` holds every war event type the Go source
+# writes to be a key here.
+WAR_HISTORY_EVENT_ACTIONS: dict[str, str] = {
+    "territory_war": "resolve",
+    "territory_war_resolved": "investigate",
+    "territory_war_ally": "influence",
+    "territory_claimed": "observe",
+}
+
+
 def procedural_quest_from_event(event: dict[str, Any], world: Any, budget: dict[str, int]) -> dict[str, Any]:
     """A draft built from a world-history row without a model: explore the
     place it happened, speak to whoever is there, resolve one fitting scene
@@ -694,7 +777,8 @@ def procedural_quest_from_event(event: dict[str, Any], world: Any, budget: dict[
                      if str(npc.get("location") or "") == location and not isinstance(npc.get("hidden_master"), dict)), None)
     kind = str(event.get("event_type") or "event")
     action = {"war_started": "resolve", "leadership_change": "influence", "discovery": "investigate",
-              "inheritance": "investigate", "betrayal": "investigate"}.get(kind, "observe")
+              "inheritance": "investigate", "betrayal": "investigate",
+              **WAR_HISTORY_EVENT_ACTIONS}.get(kind, "observe")
     title = str(event.get("title") or "Echoes of the Recent Past").strip()[:80]
     objectives: list[dict[str, Any]] = [{"id": "visit", "type": "explore", "count": 1, "target": location}]
     if npc_here:

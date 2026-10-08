@@ -113,7 +113,7 @@ func storageMoveActionGo(conn *storage.Conn, userID int64, raw json.RawMessage, 
 			if e != nil {
 				return authoritativeMutation{}, e
 			}
-			if i64(firstRowMap(r)["n"]) >= i64(container["slot_capacity"]) {
+			if i64(firstRowMap(r)["n"]) >= i64(container["slot_capacity"])+propertyStorageSlotsTx(conn, userID) {
 				return authoritativeMutation{}, errors.New("spatial storage has no free item slots")
 			}
 		}
@@ -444,18 +444,11 @@ func abodeUpgradeActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 		return authoritativeMutation{}, errors.New("you do not own a player property")
 	}
 	current := i64(a[col])
-	maxlvl := i64(catalog.AbodeSystem["max_level"])
-	if maxlvl <= 0 {
-		maxlvl = 9
-	}
+	maxlvl := homesteadMaxLevel(catalog)
 	if current >= maxlvl {
 		return authoritativeMutation{}, errors.New("that facility is already at maximum level")
 	}
-	base := i64(catalog.AbodeSystem["upgrade_base_cost"])
-	if base <= 0 {
-		base = 100
-	}
-	cost := base * (current + 1) * (current + 1)
+	cost := homesteadUpgradeCost(catalog, current)
 	// Charged in the money of the world the cultivator stands in (v1.2.1).
 	// `abode_system.currency` names the Mortal stone, and a homestead may be
 	// founded in any world, so the fixed id refused every upgrade above the
@@ -487,13 +480,64 @@ func abodeUpgradeActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 // then fell through to "" - the action succeeded and applied nothing. That is
 // also why `craftEffectStat`'s "formation_bonus" was a stat no rule could
 // ever grant, leaving Formation and Inscription crafts structurally at
-// effect_bonus 0 while Alchemy and Forging got +2. The other five facilities
-// grant no effect by design (v1.0.0-rc.36).
+// effect_bonus 0 while Alchemy and Forging got +2.
+//
+// The other five granted nothing by design from rc.36 to v1.30.0, and the
+// focus picker offered all nine, so focusing the Defensive Formation, the
+// storehouse, the herb garden, the beast pen or the merchant hall spent the
+// press and did nothing. Every room grants an effect now (v1.31.0), each made
+// of stats a rule already reads, and TestEveryFacilityFocusGrantsAnEffect
+// holds every facility on both homes' rosters to an entry here.
 var abodeFacilityEffects = map[string]string{
 	"cultivation": "abode_cultivation_focus",
 	"alchemy":     "alchemy_inspiration",
 	"forge":       "forge_inspiration",
 	"formation":   "formation_inspiration",
+	"defense":     "abode_ward_focus",
+	"storage":     "abode_storehouse_focus",
+	"herb_garden": "abode_garden_focus",
+	"beast_pen":   "abode_pen_focus",
+	"merchant":    "abode_merchant_focus",
+}
+
+// abodeFocusRealMinutes is how long a focus lasts, in real minutes (v1.31.0,
+// on the owner's call: four real hours, then one before the next). It was 240
+// *game* minutes, which is one real hour at the shipped scale and a different
+// length at every other. `active_effects` keeps only a game-minute deadline,
+// so the span is converted at the scale the focus was taken at
+// (abodeFocusGameMinutes); a GM changing the rate mid-focus moves its end.
+const abodeFocusRealMinutes = int64(240)
+
+// abodeFocusGameMinutes is a focus's span on the world clock at `scale`: four
+// real hours' worth. A stopped clock (scale 0) is held at one game minute a
+// real minute, so the effect is never written already over; it lasts until
+// the clock moves, which is what a stopped clock means.
+func abodeFocusGameMinutes(scale int64) int64 {
+	return abodeFocusRealMinutes * max64(1, scale)
+}
+
+// propertyStorageSlotsPerLevel is what each level of a property's Storage
+// facility adds to the cultivator's spatial storage (v1.28.0). The homestead's
+// `storage_level` and the sect residence's were built and raised - for stones
+// and for contribution - and read by no rule: a storehouse that stored
+// nothing. Both count, because a cultivator may hold one of each.
+const propertyStorageSlotsPerLevel = int64(10)
+
+// propertyStorageSlotsTx is the extra stacks a cultivator's properties hold.
+// A missing table or column is a property that adds nothing, never an error:
+// a deposit must not refuse over a storehouse.
+func propertyStorageSlotsTx(conn *storage.Conn, userID int64) int64 {
+	total := int64(0)
+	for _, table := range []string{"cave_abodes", "sect_abodes"} {
+		if ok, err := tableHasColumns(conn, table, "storage_level", "user_id"); err != nil || !ok {
+			continue
+		}
+		r, err := conn.Execute(fmt.Sprintf(`SELECT COALESCE(MAX(storage_level),0) FROM %s WHERE user_id=?`, table), []any{userID})
+		if err == nil && len(r.Rows) > 0 {
+			total += maxI64(0, storage.ParseInt(r.Rows[0][0])) * propertyStorageSlotsPerLevel
+		}
+	}
+	return total
 }
 
 func abodeFocusActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
@@ -533,6 +577,14 @@ func abodeFocusActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	}
 	effectID := abodeFacilityEffects[p.Facility]
 	out := map[string]any{"facility": p.Facility, "level": lvl, "effect_id": effectID}
+	now := nowSeconds()
+	// One wait across every room of both homes: the four hours of the focus
+	// and one more (cooldownAbodeFocus). A refused focus spends nothing.
+	if remaining, cdErr := cooldownRemaining(conn, userID, cooldownAbodeFocus, now); cdErr != nil {
+		return authoritativeMutation{}, cdErr
+	} else if remaining > 0 {
+		return authoritativeMutation{}, fmt.Errorf("home focus cooldown remaining: %d", remaining)
+	}
 	if effectID != "" {
 		// Through the one door, and refusing (v1.0.0-rc.58). This was a bare
 		// map index: an id the catalogue does not carry yielded a nil map,
@@ -546,16 +598,26 @@ func abodeFocusActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID in
 			return authoritativeMutation{}, fmt.Errorf(
 				"the %s facility names effect %q, which the catalogue does not carry", p.Facility, effectID)
 		}
+		clock, _, clockErr := loadCanonicalWorldClock(conn, now)
+		if clockErr != nil {
+			return authoritativeMutation{}, clockErr
+		}
+		span := abodeFocusGameMinutes(clock.Scale)
 		enc, _ := json.Marshal(effect)
 		name := effectName
 		if name == "" {
 			name = p.Facility
 		}
-		if _, e = conn.Execute(`INSERT INTO active_effects(user_id,effect_key,name,source_type,source_id,effect_json,stacks,starts_game_minute,ends_game_minute,created_at) VALUES(?,?,?,?,?,?,1,?,?,?) ON CONFLICT(user_id,effect_key,source_type,source_id) DO UPDATE SET name=excluded.name,effect_json=excluded.effect_json,stacks=1,starts_game_minute=excluded.starts_game_minute,ends_game_minute=excluded.ends_game_minute,created_at=excluded.created_at`, []any{userID, effectID, name, "abode", fmt.Sprint(a["user_id"]), string(enc), p.GameMinute, p.GameMinute + 240, nowSeconds()}); e != nil {
+		if _, e = conn.Execute(`INSERT INTO active_effects(user_id,effect_key,name,source_type,source_id,effect_json,stacks,starts_game_minute,ends_game_minute,created_at) VALUES(?,?,?,?,?,?,1,?,?,?) ON CONFLICT(user_id,effect_key,source_type,source_id) DO UPDATE SET name=excluded.name,effect_json=excluded.effect_json,stacks=1,starts_game_minute=excluded.starts_game_minute,ends_game_minute=excluded.ends_game_minute,created_at=excluded.created_at`, []any{userID, effectID, name, "abode", fmt.Sprint(a["user_id"]), string(enc), p.GameMinute, p.GameMinute + span, now}); e != nil {
+			return authoritativeMutation{}, e
+		}
+		if e = setCooldown(conn, userID, cooldownAbodeFocus, cooldownSecondsFor(cooldownAbodeFocus), now); e != nil {
 			return authoritativeMutation{}, e
 		}
 		out["effect_name"] = name
-		out["duration_game_minutes"] = int64(240)
+		out["duration_game_minutes"] = span
+		out["duration_real_minutes"] = abodeFocusRealMinutes
+		out["next_focus_unix"] = int64(now) + cooldownSecondsFor(cooldownAbodeFocus)
 	}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "property", EventType: "abode.focus", EntityType: "abode", EntityID: fmt.Sprint(a["location_key"]), GameMinute: p.GameMinute, Payload: out}}, nil
 }
@@ -647,7 +709,7 @@ var deployedArrayDefs = map[string]deployedArrayDef{
 	"moonveil_concealment_array": {"Moonveil Concealment Array", 360, map[string]any{"description": "Veil-work in crystal dust: footsteps and qi signatures blur at the boundary, and leaving is easier than arriving.", "modifiers": []any{map[string]any{"stat": "agility", "operation": "add", "value": 2}, map[string]any{"stat": "will", "operation": "add", "value": 1}}, "tags": []any{"formation", "location", "concealment"}}},
 	"golden_bastion_array":       {"Golden Bastion Array", 360, map[string]any{"description": "An immortal-gold lattice that hardens the air into a standing rampart around everyone inside it.", "modifiers": []any{map[string]any{"stat": "combat_bonus", "operation": "add", "value": 2}, map[string]any{"stat": "body", "operation": "add", "value": 2}}, "tags": []any{"formation", "location", "defense"}}},
 	"starfall_bulwark_array":     {"Starfall Bulwark Array", 480, map[string]any{"description": "Starsteel graven with falling-star sigils - the bulwark a Celestial formation master signs their name to.", "modifiers": []any{map[string]any{"stat": "combat_bonus", "operation": "add", "value": 3}, map[string]any{"stat": "will", "operation": "add", "value": 2}, map[string]any{"stat": "cultivation_gain", "operation": "mul", "value": 1.15}}, "tags": []any{"formation", "location", "defense", "qi"}}},
-	// Three more rungs (v1.24.0), so Formation has a method at every level a
+	// Three more rungs (v1.32.0), so Formation has a method at every level a
 	// slip can teach. A disk's additive stats reach everybody standing in it
 	// through canonicalAdditiveEffectBonus; its cultivation_gain is qi-path
 	// weather (v1.2.3), so none of these claims to temper a body.
@@ -809,11 +871,14 @@ func spatialKeyActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	}
 	now := nowSeconds()
 	key := fmt.Sprintf("spatial_key:%s:%d", rid, timeNowUnixNano())
-	payload := map[string]any{"definition_id": "spatial_key", "realm_id": rid, "opened_by": userID}
+	payload := map[string]any{"definition_id": "spatial_key", "realm_id": rid, "opened_by": userID, "severity": SecretRealmSiteSeverity(realm)}
 	enc, _ := json.Marshal(payload)
 	loc := fmt.Sprint(ch["location"])
 	ends := now + float64(hours*3600)
 	if _, e = conn.Execute(`INSERT INTO world_events(event_key,dedupe_key,event_type,title,location,payload_json,active,starts_at,ends_at) VALUES(?,'','secret_realm',?,?,?,1,?,?)`, []any{key, realm.Name, loc, string(enc), now, ends}); e != nil {
+		return authoritativeMutation{}, e
+	}
+	if _, e = SpawnSecretRealmSite(conn, catalog, key, rid, loc, now); e != nil {
 		return authoritativeMutation{}, e
 	}
 	out := map[string]any{"event_key": key, "realm_id": rid, "name": realm.Name, "description": realm.Description, "location": loc, "ends_at": ends, "consumed": consumed}

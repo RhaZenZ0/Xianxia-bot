@@ -673,6 +673,12 @@ func (r *Runner) sects(conn *storage.Conn, steps, gm int64) (string, error) {
 			count = i64(row["n"])
 		}
 	}
+	// The hall first (v1.25.0, sect_population.go): a sect short of its people
+	// is topped up before anybody swears in or walks out this tick.
+	populated, err := r.sectPopulation(conn, gm)
+	if err != nil {
+		return "", err
+	}
 	joined, left, err := r.npcSectChanges(conn, steps, gm)
 	if err != nil {
 		return "", err
@@ -693,7 +699,7 @@ func (r *Runner) sects(conn *storage.Conn, steps, gm int64) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("batch-advanced politics for %d sects; %d swore in, %d walked out, %d places claimed, %d wars declared, %d stocked to the treasuries", count, joined, left, claimed, declared, stocked), nil
+	return fmt.Sprintf("batch-advanced politics for %d sects; %d took their place in a sect's hall, %d swore in, %d walked out, %d places claimed, %d wars declared, %d stocked to the treasuries", count, populated, joined, left, claimed, declared, stocked), nil
 }
 
 func (r *Runner) clans(conn *storage.Conn, steps, gm int64) (string, error) {
@@ -956,24 +962,12 @@ func (r *Runner) applyAutonomousWorldEffect(conn *storage.Conn, event Unexpected
 		}
 	}
 	sect := simMap(effect["sect"])
-	if len(sect) > 0 && simTableExists(conn, "sect_politics_state") {
-		if _, err := conn.Execute(`UPDATE sect_politics_state SET influence=MIN(100,MAX(0,influence+?)),cohesion=MIN(100,MAX(0,cohesion+?)),resources=MIN(100,MAX(0,resources+?)),recruitment_pressure=MIN(100,MAX(0,recruitment_pressure+?)),doctrine_pressure=MIN(100,MAX(0,doctrine_pressure+?)),updated_at=?`, []any{i64(sect["influence"]), i64(sect["cohesion"]), i64(sect["resources"]), i64(sect["recruitment_pressure"]), i64(sect["doctrine_pressure"]), now}); err != nil {
-			return nil, err
-		}
-		rows, err := conn.Execute(`SELECT sect_name FROM sect_politics_state ORDER BY sect_name`, nil)
+	if len(sect) > 0 {
+		touched, err := game.ApplyEventSectEffectTx(conn, r.World, location, sect, history, sev, gm, now)
 		if err != nil {
 			return nil, err
 		}
-		if simTableExists(conn, "sect_politics_events") {
-			for _, row := range rows.Rows {
-				if len(row) > 0 {
-					if _, err = conn.Execute(`INSERT INTO sect_politics_events(sect_name,event_text,severity,game_minute,created_at) VALUES(?,?,?,?,?)`, []any{fmt.Sprint(row[0]), history, sev, gm, now}); err != nil {
-						return nil, err
-					}
-				}
-			}
-		}
-		if len(rows.Rows) > 0 {
+		if touched {
 			impacts = append(impacts, "sect influence, cohesion, resources, or recruitment pressure changed")
 		}
 	}

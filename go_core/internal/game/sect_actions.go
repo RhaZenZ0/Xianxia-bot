@@ -85,6 +85,49 @@ func sectReputationScore(conn *storage.Conn, userID int64, sect string) (int64, 
 	}
 	return i64(row["score"]), nil
 }
+
+// recommendationTermsTx is everything a sponsor weighs before vouching for a
+// cultivator, each term named (v1.28.0). The bot's notes had printed family
+// influence and karmic reputation as terms of this roll since the
+// recommendation was written, while the engine rolled presence, realm and
+// standing alone - and capped nothing, where the notes capped standing at
+// three. One statement now, in the order the notes always gave it, and the
+// reply prints these terms rather than its own: a household of standing is
+// worth up to +2, and a sect's karmic leaning +1 or -1.
+func recommendationTermsTx(conn *storage.Conn, catalog worlddata.Catalog, userID, presence, realm, repScore int64, sect string) []map[string]any {
+	terms := []map[string]any{{"name": "presence", "value": presence}, {"name": "realm", "value": realm * 2}}
+	if standing := clampI64(repScore/20, -3, 3); standing != 0 {
+		terms = append(terms, map[string]any{"name": "sect standing", "value": standing})
+	}
+	if tableExistsTx(conn, "character_birth_family") && tableExistsTx(conn, "birth_families") {
+		if r, err := conn.Execute(`SELECT bf.influence FROM character_birth_family cbf JOIN birth_families bf ON bf.family_id=cbf.family_id WHERE cbf.user_id=?`, []any{userID}); err == nil && len(r.Rows) > 0 {
+			if family := minI64(2, maxI64(0, storage.ParseInt(r.Rows[0][0]))/40); family > 0 {
+				terms = append(terms, map[string]any{"name": "family influence", "value": family})
+			}
+		}
+	}
+	karma, _ := characterKarmaTx(conn, userID)
+	leaning := int64(0)
+	switch strings.ToLower(catalog.Sects[sect].Alignment) {
+	case "orthodox":
+		if karma >= 50 {
+			leaning = 1
+		} else if karma <= -100 {
+			leaning = -1
+		}
+	case "demonic":
+		if karma <= -50 {
+			leaning = 1
+		} else if karma >= 100 {
+			leaning = -1
+		}
+	}
+	if leaning != 0 {
+		terms = append(terms, map[string]any{"name": "karmic reputation", "value": leaning})
+	}
+	return terms
+}
+
 func sectRecommendationActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p sectRecommendationPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
@@ -141,7 +184,11 @@ func sectRecommendationActionGo(conn *storage.Conn, catalog worlddata.Catalog, u
 	// vouch for this character derives from the character's own presence,
 	// cultivation depth, and standing already earned with this sect - never
 	// from a client-chosen modifier/TN/bonus.
-	modifier := c.Attributes["presence"] + c.RealmIndex*2 + repScore/20
+	terms := recommendationTermsTx(conn, catalog, userID, c.Attributes["presence"], c.RealmIndex, repScore, p.SectName)
+	modifier := int64(0)
+	for _, term := range terms {
+		modifier += i64(term["value"])
+	}
 	tn := int64(14)
 	roll, e := roll2d10Go(modifier, tn)
 	if e != nil {
@@ -177,7 +224,7 @@ func sectRecommendationActionGo(conn *storage.Conn, catalog worlddata.Catalog, u
 	if e = recordSectAttemptGo(conn, userID, p.SectName, "recommendation", p.NPCName, gate, map[bool]string{true: "pass", false: "fail"}[roll.Success], roll.Total, roll.TN, bonus, p.GameMinute, details, now); e != nil {
 		return authoritativeMutation{}, e
 	}
-	out := map[string]any{"success": roll.Success, "roll": rollMapGo(roll), "recommendation_id": recID, "recommendation_bonus": bonus, "route_revealed": route, "new_sect": newSect, "gate": gate, "sect_name": p.SectName, "npc_name": p.NPCName}
+	out := map[string]any{"success": roll.Success, "roll": rollMapGo(roll), "recommendation_id": recID, "recommendation_bonus": bonus, "route_revealed": route, "new_sect": newSect, "gate": gate, "sect_name": p.SectName, "npc_name": p.NPCName, "terms": terms}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "sect", EventType: "sect.recruitment.recommendation", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 
@@ -456,7 +503,14 @@ func sectTrialActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	}
 	primaryMod := c.Attributes["body"] + c.RealmIndex*2 + c.Phase/3 + recBonus + tuning.Bonus
 	secondaryMod := c.Attributes["insight"] + c.Attributes["spirit"]/2 + c.RealmIndex + recBonus + tuning.Bonus
-	baseTN := maxI64(10, tuning.BaseTN-repScore/25)
+	// Standing with the sect's wider circle (v1.28.0): Orthodox Society for
+	// an orthodox sect, Demonic Circles for a demonic one.
+	circle := standingBonus(standingTx(conn, userID, sectCircleKey(catalog, p.SectName)), circleTrialPer, circleTrialCap)
+	// A sect that is recruiting hard is easier to get into (v1.29.0): its
+	// recruitment pressure has walked the world's own people in since the
+	// politics tick was written, and the trial a player sits never asked it.
+	eager := sectRecruitmentEagernessTx(conn, p.SectName)
+	baseTN := maxI64(10, tuning.BaseTN-repScore/25-circle-eager)
 	primary, e := roll2d10Go(primaryMod, baseTN)
 	if e != nil {
 		return authoritativeMutation{}, e
@@ -597,12 +651,12 @@ func sectEconomyActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID i
 			out["capped_at_shelf"] = limit
 		}
 		points := p.Quantity * perUnit
-		promoted, e := creditSectContributionTx(conn, catalog, userID, points, max64(1, points/10))
+		eligible, e := creditSectContributionTx(conn, catalog, userID, points, max64(1, points/10))
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
-		if promoted != "" {
-			out["promoted_to"] = promoted
+		if eligible != "" {
+			out["eligible_for"] = eligible
 		}
 		_, _ = conn.Execute(`UPDATE sect_lineage SET attention=attention+? WHERE disciple_user_id=?`, []any{max64(1, points/20), userID})
 		out["points"] = points
@@ -689,13 +743,24 @@ func discipleshipActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 			return authoritativeMutation{}, errors.New("requested master must have a higher cultivation stage")
 		}
 		r, _ = conn.Execute(`SELECT 1 FROM sect_lineage WHERE disciple_user_id=?`, []any{userID})
-		if firstRowMap(r) != nil {
+		if firstRowMap(r) != nil || npcMasterOfTx(conn, userID) != "" {
 			return authoritativeMutation{}, errors.New("you already have a recorded master")
 		}
 		r, _ = conn.Execute(`SELECT user_id,sect_name FROM sect_membership WHERE user_id IN (?,?)`, []any{userID, p.MasterUserID})
 		ms := rowsToMaps(r)
 		if len(ms) == 2 && fmt.Sprint(ms[0]["sect_name"]) != fmt.Sprint(ms[1]["sect_name"]) {
 			return authoritativeMutation{}, errors.New("master and disciple must belong to the same sect")
+		}
+		// A request to somebody who could never answer it is stranded: the
+		// answer is the master's, and it has a rank floor (v1.25.0).
+		if floor := sectRankFloorGo(catalog, "discipleship.resolve"); floor > 0 {
+			mm, e := sectMembershipRow(conn, p.MasterUserID)
+			if e != nil {
+				return authoritativeMutation{}, e
+			}
+			if mm != nil && i64(mm["rank_level"]) < floor {
+				return authoritativeMutation{}, fmt.Errorf("a master takes disciples from %s (rank %d); they hold %s", sectRankName(catalog, floor), floor, fmt.Sprint(mm["rank_name"]))
+			}
 		}
 		_, _ = conn.Execute(`UPDATE disciple_requests SET status='superseded',resolved_at=? WHERE disciple_user_id=? AND status='pending'`, []any{now, userID})
 		c, e := conn.Execute(`INSERT INTO disciple_requests(disciple_user_id,master_user_id,status,created_at) VALUES(?,?,'pending',?)`, []any{userID, p.MasterUserID, now})
@@ -719,6 +784,15 @@ func discipleshipActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 		if i64(req["master_user_id"]) != userID {
 			return authoritativeMutation{}, errors.New("only the requested master can resolve this request")
 		}
+		mem, e := sectMembershipRow(conn, userID)
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		if mem != nil {
+			if e := requireSectRankTx(catalog, mem, "discipleship.resolve", "taking a disciple"); e != nil {
+				return authoritativeMutation{}, e
+			}
+		}
 		disciple := i64(req["disciple_user_id"])
 		if !p.Accept {
 			_, e = conn.Execute(`UPDATE disciple_requests SET status='rejected',resolved_at=? WHERE request_id=?`, []any{now, p.RequestID})
@@ -728,7 +802,7 @@ func discipleshipActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 			out = map[string]any{"request_id": p.RequestID, "disciple_user_id": disciple, "master_user_id": userID, "status": "rejected"}
 		} else {
 			r, _ = conn.Execute(`SELECT 1 FROM sect_lineage WHERE disciple_user_id=?`, []any{disciple})
-			if firstRowMap(r) != nil {
+			if firstRowMap(r) != nil || npcMasterOfTx(conn, disciple) != "" {
 				return authoritativeMutation{}, errors.New("that cultivator already has a recorded master")
 			}
 			r, e = conn.Execute(`SELECT user_id,realm_index,phase,life_status FROM characters WHERE user_id IN (?,?)`, []any{disciple, userID})
@@ -774,7 +848,16 @@ func discipleshipActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 		}
 		x := firstRowMap(r)
 		if x == nil {
-			return authoritativeMutation{}, errors.New("no recorded master")
+			// The master may be one of the sect's own people (v1.25.0).
+			name, e := severNPCMasterTx(conn, userID)
+			if e != nil {
+				return authoritativeMutation{}, e
+			}
+			if name == "" {
+				return authoritativeMutation{}, errors.New("no recorded master")
+			}
+			out = map[string]any{"disciple_user_id": userID, "master_npc_name": name, "severed": true}
+			return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "sect", EventType: op, EntityType: "character", EntityID: fmt.Sprint(userID), Payload: out}}, nil
 		}
 		master := i64(x["master_user_id"])
 		_, e = conn.Execute(`DELETE FROM sect_lineage WHERE disciple_user_id=?`, []any{userID})
@@ -911,4 +994,17 @@ func sectManorActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		out["cost"] = cost
 	}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "sect", EventType: op, EntityType: "sect", EntityID: sect, GameMinute: p.GameMinute, Payload: out}}, nil
+}
+
+// sectRecruitmentEagernessTx is a point off the entrance trial for every 10
+// of recruitment pressure above 50, at most 5 (v1.29.0).
+func sectRecruitmentEagernessTx(conn *storage.Conn, sect string) int64 {
+	if !tableExistsTx(conn, "sect_politics_state") {
+		return 0
+	}
+	r, err := conn.Execute(`SELECT recruitment_pressure FROM sect_politics_state WHERE sect_name=?`, []any{sect})
+	if err != nil || len(r.Rows) == 0 {
+		return 0
+	}
+	return minI64(5, maxI64(0, storage.ParseInt(r.Rows[0][0])-50)/10)
 }

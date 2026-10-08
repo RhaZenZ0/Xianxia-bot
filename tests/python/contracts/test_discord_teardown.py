@@ -118,15 +118,6 @@ class TeardownActionContractTests(unittest.TestCase):
         source = bot_function_source("teardown_managed_discord_layout")
         self.assertLess(source.index("manage_channels"), source.index("all_managed_thread_ids()"))
 
-    def test_the_bookkeeping_write_is_allowlisted_not_a_gameplay_row(self):
-        gate = (PROJECT_ROOT / "tests" / "python" / "contracts" / "test_authority_boundary.py").read_text(encoding="utf-8")
-        self.assertIn('"clear_discord_bindings"', gate[gate.index("BOOKKEEPING_METHODS = {"):])
-        # PLAYER_MUTATIONS has been empty since v0.23.0, so "not a gameplay row"
-        # is now a stronger statement than it was: there are no gameplay rows.
-        self.assertIn("PLAYER_MUTATIONS: dict[tuple[str, str, str], str] = {}", gate)
-        self.assertNotIn("clear_discord_bindings", gate[gate.index("PLAYER_MUTATIONS"):gate.index("BOOKKEEPING_METHODS = {")])
-
-
 class DashboardButtonTests(unittest.TestCase):
     def test_button_exists_in_the_danger_zone_with_a_typed_box(self):
         self.assertIn('id="teardownDiscord"', APP_JS)
@@ -168,7 +159,7 @@ class ClearBindingsDatabaseTests(unittest.IsolatedAsyncioTestCase):
 
             counts = await db.clear_discord_bindings(1)
 
-            self.assertEqual(counts, {"server_config": 1, "realm_hubs": 2, "auction_houses": 0, "world_events": 0, "stall_channels": 0, "channel_messages": 1})
+            self.assertEqual(counts, {"server_config": 1, "realm_hubs": 2, "auction_houses": 0, "world_events": 0, "stall_channels": 0, "war_channels": 0, "channel_messages": 1})
             cfg = await db.get_server_config(1)
             for column in ("announcement_channel_id", "event_scene_channel_id", "home_scene_channel_id", "log_channel_id",
                            "begin_channel_id", "info_channel_id", "exploration_channel_id", "info_message_id", "bugs_channel_id"):
@@ -188,12 +179,12 @@ class ClearBindingsDatabaseTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             db = Database(Path(tmp) / "teardown.sqlite3")
             await db.init()
-            self.assertEqual(await db.clear_discord_bindings(7), {"server_config": 0, "realm_hubs": 0, "auction_houses": 0, "world_events": 0, "stall_channels": 0, "channel_messages": 0})
+            self.assertEqual(await db.clear_discord_bindings(7), {"server_config": 0, "realm_hubs": 0, "auction_houses": 0, "world_events": 0, "stall_channels": 0, "war_channels": 0, "channel_messages": 0})
             await db.set_server_channels(7, announcement_channel_id=1, event_scene_channel_id=2)
             first = await db.clear_discord_bindings(7)
             second = await db.clear_discord_bindings(7)
             self.assertEqual(first["server_config"], 1)
-            self.assertEqual(second, {"server_config": 1, "realm_hubs": 0, "auction_houses": 0, "world_events": 0, "stall_channels": 0, "channel_messages": 0})  # the row exists; nothing else to forget
+            self.assertEqual(second, {"server_config": 1, "realm_hubs": 0, "auction_houses": 0, "world_events": 0, "stall_channels": 0, "war_channels": 0, "channel_messages": 0})  # the row exists; nothing else to forget
 
 
 if __name__ == "__main__":

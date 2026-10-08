@@ -75,7 +75,7 @@ func requireAtHomeTx(conn *storage.Conn, userID int64, what string) (int64, erro
 		return 0, errors.New("no birth family is recorded")
 	}
 	if !home {
-		return 0, fmt.Errorf("%s is asked for at home — step into your birth household first (/family → Enter)", what)
+		return 0, fmt.Errorf("%s is asked for at home — step into your birth household first with **/family → Enter**", what)
 	}
 	return familyID, nil
 }

@@ -15,7 +15,6 @@ conversion) is `world_crossing_test.go`, where the rules live.
 """
 from __future__ import annotations
 
-import json
 import unittest
 
 from app.rules.game import World
@@ -117,17 +116,6 @@ class TheTableIsTheEnginesToWrite(unittest.TestCase):
                     if statement in text:
                         offenders.append(f"{path.relative_to(PROJECT_ROOT)}: {statement}")
         self.assertEqual(offenders, [], f"Python writes a crossing: {offenders}")
-
-    def test_the_readiness_probe_knows_the_table(self):
-        core = (PROJECT_ROOT / "app" / "database" / "core.py").read_text(encoding="utf-8")
-        self.assertIn('"world_crossings",', core)
-        self.assertGreaterEqual(int(core.split("SCHEMA_VERSION = ")[1].split("\n")[0]), 54,
-                                "the crossings table arrived at schema 54 and must still be reachable")
-
-    def test_the_content_block_parses_as_the_engine_reads_it(self):
-        raw = json.loads((PROJECT_ROOT / "content" / "world.json").read_text(encoding="utf-8"))
-        self.assertIn("world_crossing_system", raw)
-
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

@@ -5,7 +5,13 @@ all the commands for it."* A sect is joined at its gate from realm 0, and the
 curriculum held the sect's own pages to Qi Refining and its territory and war
 to the Nascent Soul, so a new member saw the sect they had just joined as one
 collapsed line. Membership is the introduction the curriculum stands in for,
-so a member is shown every leaf of the sect hub whatever their realm.
+so a member is free of the realm curriculum on the sect hub whatever their realm.
+
+**v1.25.0 narrowed what that opens, on the owner's call**: *"it should only show
+what you can do at your sect ranks."* The curriculum still steps aside for a
+member - that is what this file holds - and the rank floors
+(`sect_system.rank_floors`) padlock the doors above a member's rank through
+`PROGRESSION_GATES`, held in `tests/python/contracts/test_sect_doors_follow_rank.py`.
 
 Held here, behaviourally: a member at realm 0 has nothing of the sect hub held
 back and somebody in no sect does (the self-check that keeps the first half
@@ -68,7 +74,7 @@ class ASectMemberSeesTheirSect(unittest.TestCase):
         self.assertTrue(held, "the curriculum holds nothing of the sect hub back at realm 0; the test is vacuous")
         self.assertIn("territory claim", held)
 
-    def test_a_member_at_realm_0_has_every_sect_door_open(self):
+    def test_a_member_at_realm_0_is_not_held_back_by_the_realm_curriculum(self):
         locked = {path.lstrip("/") for path in self._unlocks(FakeDB({"sect_name": "Azure Cloud Sect"}))}
         self.assertEqual(sorted(locked & self.sect_leaves), [],
                          "a sect member is still held back from their own sect")

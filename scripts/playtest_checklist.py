@@ -427,7 +427,7 @@ def build() -> str:
               "and the read-only lock each had to move or lock a channel that already existed, and "
               "until rc.59 none of them did. Walk them on a guild with history, not on a new one.", "",
               "| Loop | Live |", "|---|---|",
-              "| Full Setup (or Repair) leaves nine categories, in order: Start Here, Announcements, Realm Capitals, World Events, Auction Houses, Market Stalls, Cultivation World, Feedback, Admin | [ ] |",
+              "| Full Setup (or Repair) leaves ten categories, in order: Start Here, Announcements, Realm Capitals, World Events, Sect Wars, Auction Houses, Market Stalls, Cultivation World, Feedback, Admin | [ ] |",
               "| channels that already existed have moved into their new categories, not only the ones the run created | [ ] |",
               "| an ordinary member cannot post in #xianxia-info, #expeditions, #player-homes or #updates, including ones that predate the release | [ ] |",
               "| no new #event-scenes is created; an event's scene anchors in its world's own feed, and an existing one keeps the blurb saying it is retired | [ ] |",

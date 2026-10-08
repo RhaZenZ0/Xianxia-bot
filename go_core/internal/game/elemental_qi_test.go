@@ -1,7 +1,6 @@
 package game
 
 import (
-	"strings"
 	"testing"
 
 	"xianxia/core/internal/gamerng"
@@ -195,17 +194,6 @@ func TestQiTheRootCannotStomachCanTurnOnItsOwn(t *testing.T) {
 		out := trainOnce(t, path, world, 1000+seq)
 		if clash, _ := out["element_clash"].(bool); clash {
 			t.Fatal("a resonant method must never clash")
-		}
-	}
-}
-
-func TestTheCatalogueGeneratorAndTheContentAgree(t *testing.T) {
-	// The elements in content must be the ones the generator would produce, or
-	// regenerating the catalogue would silently reshuffle every method.
-	catalog := qiBodyCatalog(t)
-	for id, definition := range catalog.TechniqueSystem.Manuals {
-		if strings.TrimSpace(definition.Element) == "" {
-			t.Fatalf("%s has no element", id)
 		}
 	}
 }

@@ -365,7 +365,7 @@ TIERS = (
     ("services.py", "typed_play.py"),
     ("formatting.py", "locations.py", "pickers.py"),
     ("discovery.py", "character_state.py", "channels.py", "status_cards.py"),
-    ("threads.py", "auction_feed.py", "stall_feed.py"),
+    ("threads.py", "auction_feed.py", "stall_feed.py", "war_feed.py"),
     ("admin/core.py", "admin/release_notes.py"),
     ("admin/channel_messages.py", "admin/bugs_forum.py", "ui/event_scene.py", "ui/creation.py", "ui/commissions.py"),
     ("admin/quest_control.py", "admin/narration_control.py", "admin/server_setup.py", "admin/playtest_board.py"),
@@ -822,7 +822,7 @@ SURFACE = {
             "alchemy_group": ('status', 'forage', 'purge'),
             "city_group": ('look', 'enter', 'board', 'accept', 'envoys', 'rumours', 'inn'),
             "realmhub_group": ('status', 'go'),
-            "travel_group": ('go', 'status'),
+            "travel_group": ('go', 'city', 'nearby', 'road', 'wilds', 'status'),
         },
     },
     "commands/family.py": {
@@ -886,8 +886,8 @@ SURFACE = {
         "roots": (),
         "leaves": {
             "sect_recruitment_group": ('status', 'info', 'recommendation', 'recommendations', 'trial', 'ascend', 'history'),
-            "sect_group": ('form', 'status', 'abode', 'shadow', 'roster', 'politics', 'treasury', 'contribute', 'redeem', 'address', 'family'),
-            "sect_disciple_group": ('status', 'request', 'accept', 'reject', 'leave'),
+            "sect_group": ('form', 'status', 'promote', 'abode', 'shadow', 'roster', 'politics', 'treasury', 'contribute', 'redeem', 'address', 'family'),
+            "sect_disciple_group": ('status', 'request', 'accept', 'reject', 'leave', 'npcmaster', 'teach'),
             "sect_manor_group": ('status', 'establish', 'upgrade'),
         },
     },
@@ -914,7 +914,7 @@ SURFACE = {
         "roots": (),
         "leaves": {
             "territory_group": ('status', 'claim'),
-            "war_group": ('status', 'act'),
+            "war_group": ('status', 'act', 'peace'),
             "caravan_group": ('dispatch', 'status', 'events'),
             "party_group": ('create', 'join', 'status', 'leave'),
         },

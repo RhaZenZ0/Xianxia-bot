@@ -10,7 +10,7 @@ from discord import app_commands
 from ...ops.game_engine import GameEngineError
 from ..formatting import roll_line
 from ..registry import registered_group_command
-from ..runtime import DB, ENGINE, WORLD, require_character, reply_long, serialized_user_action
+from ..runtime import _explain_engine_error, DB, ENGINE, WORLD, require_character, reply_long, serialized_user_action
 
 
 duel_group = app_commands.Group(
@@ -44,7 +44,7 @@ async def duel_challenge(interaction: discord.Interaction, member: discord.Membe
             action_id=f"discord:{interaction.id}:pvp.challenge",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(str(exc), ephemeral=False)
+        await interaction.response.send_message(_explain_engine_error(exc), ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     challenge_id = int(result.get("challenge_id", 0))
@@ -69,7 +69,7 @@ async def duel_respond(interaction: discord.Interaction, challenge_id: int, deci
             action_id=f"discord:{interaction.id}:pvp.respond",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(str(exc), ephemeral=False)
+        await interaction.followup.send(_explain_engine_error(exc), ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     if str(result.get("status")) == "void":
@@ -141,7 +141,7 @@ async def duel_act(interaction: discord.Interaction, style: app_commands.Choice[
             action_id=f"discord:{interaction.id}:pvp.act",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(str(exc), ephemeral=False)
+        await interaction.response.send_message(_explain_engine_error(exc), ephemeral=False)
         return
     resolved = dict(envelope.get("result") or {})
     if resolved.get("breach"):

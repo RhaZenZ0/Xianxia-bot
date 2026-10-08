@@ -1127,6 +1127,10 @@ type Catalog struct {
 	// homestead's merchant hall grows that, the city's cut, and how many
 	// purchases the town makes at one city's stalls on a tick.
 	StallSystem StallSystem `json:"stall_system"`
+	// WarSystem (v1.24.0): how a war between two sects is fought - what
+	// fighting in one earns, what a territory's defense does, the truce after
+	// a failed attack and the occupation after a fall. Read by `warRules`.
+	WarSystem WarSystem `json:"war_system"`
 	// ItemGrades (v1.7.0): the five grades a crafted item can carry, what each
 	// multiplies and the trade rank that can make it. Which items are graded is
 	// not listed here: it is every recipe's output, read off Recipes.
@@ -1223,6 +1227,45 @@ type StallSystem struct {
 	// CrossWorldHops roads.
 	DistancePercentPerHop int64 `json:"distance_percent_per_hop"`
 	CrossWorldHops        int64 `json:"cross_world_hops"`
+}
+
+// WarSystem is that roster. Every field is read by one rule in the game
+// package (`warRules`), which also holds the defaults for a content file that
+// carries none.
+type WarSystem struct {
+	Description         string `json:"description"`
+	ActPoints           int64  `json:"act_points"`
+	WarPointsCap        int64  `json:"war_points_cap"`
+	VictoryPoints       int64  `json:"victory_points"`
+	TruceDays           int64  `json:"truce_days"`
+	OccupationDays      int64  `json:"occupation_days"`
+	FortifyDefenseGain  int64  `json:"fortify_defense_gain"`
+	DefenseCap          int64  `json:"defense_cap"`
+	FallDefense         int64  `json:"fall_defense"`
+	HoldDefenseGain     int64  `json:"hold_defense_gain"`
+	SiegeDefenseDivisor int64  `json:"siege_defense_divisor"`
+	DeclareRelationDrop int64  `json:"declare_relation_drop"`
+	EndRelationDrop     int64  `json:"end_relation_drop"`
+	TickDaysCap         int64  `json:"tick_days_cap"`
+	WearinessPerDay     int64  `json:"weariness_per_day"`
+	// AllyMinRelationScore and AllyRelationDrop: who may fight beside a
+	// belligerent, and what joining costs their standing with the enemy.
+	AllyMinRelationScore int64 `json:"ally_min_relation_score"`
+	AllyRelationDrop     int64 `json:"ally_relation_drop"`
+	// The world's own sects in a siege the tick fights: what an allied sect
+	// lends, and what a sect's NPC disciples add and how many are named.
+	AllyStrengthPercent int64 `json:"ally_strength_percent"`
+	AllyStrengthCap     int64 `json:"ally_strength_cap"`
+	DisciplesPerPoint   int64 `json:"disciples_per_point"`
+	DiscipleStrengthCap int64 `json:"disciple_strength_cap"`
+	DisciplesAtTheWalls int64 `json:"disciples_at_the_walls"`
+	// Suing for peace: when, who, at what cost, and on what terms.
+	PeaceMinDays      int64 `json:"peace_min_days"`
+	PeaceMinRankLevel int64 `json:"peace_min_rank_level"`
+	PeaceCostPoints   int64 `json:"peace_cost_points"`
+	PeaceCedeSiege    int64 `json:"peace_cede_siege"`
+	PeaceRelationGain int64 `json:"peace_relation_gain"`
+	NPCPeaceMorale    int64 `json:"npc_peace_morale"`
 }
 
 // ForageMaterial is one entry of that roster. Chance is the base percentage

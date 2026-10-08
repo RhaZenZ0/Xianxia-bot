@@ -55,15 +55,15 @@ from ...rules.sect_manor import (
     manor_upgrade_cost,
 )
 from ...rules.sect_recruitment import (
-    recommendation_modifier,
     recruitment_definition,
     trial_modifier,
     trial_profile,
 )
 from ..registry import registered_group_command
-from ..locations import DEAD, current_npc_location, npc_whereabouts
+from ..locations import DEAD, current_npc_location, npc_whereabouts, npcs_present
 from ..character_state import record_quest_progress, announce_quest_progress
-from ..formatting import player_property_facility_lines, player_property_unbuilt
+from ..formatting import player_property_facility_lines, player_property_unbuilt, property_overview_lines
+from .abode import home_overview
 from ..services import PLAYER_PROPERTY_FACILITY_LABELS, QUESTS, SIM
 from ..threads import ensure_sect_abode_record, ensure_sect_abode_thread_for
 from ..runtime import (
@@ -415,17 +415,20 @@ async def sect_recruitment_recommendation(interaction: discord.Interaction, npc:
     # v1.1.0: a "speak with them first" check stood here and never fired -
     # `get_npc_memory` answers a sentence, never "", for somebody you have not
     # met - and it is gone rather than fixed: asking is the conversation.
-    family=await DB.get_birth_family(interaction.user.id); reps=await DB.get_reputations(interaction.user.id); rep=next((int(x.get('score',0)) for x in reps if str(x.get('faction_key'))==sect_name),0)
-    _,notes=recommendation_modifier(c,faction_reputation=rep,family=family,sect_alignment=str(WORLD.sects[sect_name].get('alignment','Neutral')))
     # Whom the sponsor speaks for and the gate their word reveals are the
     # engine's (v1.1.0): it used to write whatever `location` this sent onto
     # the travel list, where a road-less place is an instant jump.
     try:
-        e=await ENGINE.authoritative_action("sect.recruitment.recommendation",interaction.user.id,{"npc_name":npc,"details":{"modifier_notes":notes}},action_id=f"discord:{interaction.id}:sect.recruitment.recommendation"); r=dict(e.get('result') or {})
+        e=await ENGINE.authoritative_action("sect.recruitment.recommendation",interaction.user.id,{"npc_name":npc},action_id=f"discord:{interaction.id}:sect.recruitment.recommendation"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
         await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
     sect_name=str(r.get('sect_name') or sect_name); gate=str(r.get('gate') or '')
     roll=dict(r.get('roll') or {}); roll_text=f"2d10 {int(roll.get('modifier',0)):+d} = **{int(roll.get('total',0))}** vs TN **{int(roll.get('tn',0))}**"
+    # What the sponsor weighed, as the engine rolled it (v1.28.0): these were
+    # computed here and printed as terms the engine never rolled.
+    terms=[t for t in list(r.get('terms') or []) if isinstance(t,dict) and int(t.get('value') or 0)]
+    if terms:
+        roll_text+="\n-# "+" · ".join(f"{t.get('name')} {int(t.get('value') or 0):+d}" for t in terms)
     if r.get('success'):
         lines=[f"📜 **{npc}** puts their name to you for the **{sect_name}**: **+{int(r.get('recommendation_bonus',0))} on both entrance-trial rolls**."]
         seat=str(r.get('seat') or '')
@@ -591,8 +594,20 @@ async def sect_status(interaction: discord.Interaction, member: discord.Member |
         snap = await DB.get_lineage_snapshot(target.id)
         if snap.get("person", {}).get("master_attention") is not None and master:
             lines.append(f"Master attention: **{snap['person'].get('master_attention', 0)}**")
+        rung = WORLD.next_promotion_rung(int(membership.get("rank_level") or 0))
+        if rung and int(membership.get("contribution_earned") or 0) >= rung[1]:
+            lines.append(f"🎖️ Eligible for **{WORLD.sect_rank_name(rung[0])}** - ask your master or an Elder (**/sect → Sect → Promote**).")
+        elif rung:
+            lines.append(f"Next rank: **{WORLD.sect_rank_name(rung[0])}** at **{rung[1]}** contribution earned (you have earned {int(membership.get('contribution_earned') or 0)}).")
     else:
         lines.append("Sect: **Unaffiliated / not recorded**")
+    if not master:
+        try:
+            npc_master = await DB.get_npc_master(target.id)
+        except Exception:
+            npc_master = None
+        if npc_master:
+            master = {"name": f"{npc_master['name']} ({npc_master.get('sect_rank') or 'of the sect'})"}
     lines.append(f"Master: **{master['name']}**" if master else "Master: *none recorded*")
     style_names = {
         "masculine": "Senior Brother / Junior Brother",
@@ -615,7 +630,14 @@ async def sect_discipleship_status(interaction: discord.Interaction) -> None:
     outgoing = await DB.get_disciple_requests(interaction.user.id, incoming=False)
     lines = [f"🎓 **Master-Disciple Record — {c['name']}**"]
     master = snap.get("master")
-    lines.append(f"Master: **{master['name']}**" if master else "Master: *none*")
+    if not master:
+        try:
+            npc_master = await DB.get_npc_master(interaction.user.id)
+        except Exception:
+            npc_master = None
+        if npc_master:
+            master = {"name": f"{npc_master['name']}, {npc_master.get('sect_rank') or 'of the sect'} (one of the sect's own)"}
+    lines.append(f"Master: **{master['name']}**" if master else "Master: *none* - **Npcmaster** asks one of the sect's people here")
     disciples = list(snap.get("disciples") or [])
     lines.append("Direct disciples: " + (", ".join(f"**{x['name']}**" for x in disciples[:15]) if disciples else "*none*"))
     if incoming:
@@ -685,6 +707,141 @@ async def sect_discipleship_leave(interaction: discord.Interaction, confirm: boo
     await interaction.followup.send("🧵 Your discipleship bond has been ended.",ephemeral=False)
 
 
+# The sect's own people as masters, and a rank granted by somebody (v1.25.0).
+# The engine decides every one of these (`discipleship.npc_request`,
+# `sect.master.teach`, `sect.promote`); the pickers below only offer the people
+# it would hear - rc.46's rule, a surface must not offer what the engine will
+# refuse - and read the bars off the same content the engine reads.
+
+async def _sect_people_here(user_id: int, c: dict[str, Any]) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    """The member's sect row and the sect's people standing where they stand,
+    through the one resolver of who is here (`npcs_present`). A failed read is
+    nobody here, never an exception in a picker."""
+    try:
+        membership = await DB.get_sect_membership(user_id)
+        if not membership:
+            return None, []
+        here = str(c.get("location") or "")
+        present = set(await npcs_present(here, (await current_world_time()).period))
+        roster = await DB.get_sect_npc_roster(str(membership["sect_name"]))
+    except Exception:
+        log.exception("Could not read the sect's people here")
+        return None, []
+    return membership, [row for row in roster if str(row.get("name")) in present]
+
+
+def _npc_choice(row: dict[str, Any], note: str = "") -> app_commands.Choice[str]:
+    label = f"{row['name']} — {row.get('sect_rank') or 'member'}, {WORLD.realm_name(int(row.get('realm_index') or 0))}"
+    return app_commands.Choice(name=(label + (f" · {note}" if note else ""))[:100], value=str(row["name"])[:100])
+
+
+async def sect_npc_master_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    c = await DB.get_character(interaction.user.id)
+    if not c:
+        return []
+    _membership, people = await _sect_people_here(interaction.user.id, c)
+    rule = WORLD.npc_master_rule()
+    power = int(c.get("realm_index") or 0) * 10 + int(c.get("phase") or 0)
+    needle = current.casefold().strip()
+    out = []
+    for row in people:
+        if WORLD.sect_rank_level(str(row.get("sect_rank") or "")) < rule["min_rank_level"]:
+            continue
+        if int(row.get("realm_index") or 0) * 10 + int(row.get("phase") or 0) <= power:
+            continue
+        if needle and needle not in str(row["name"]).casefold():
+            continue
+        out.append(_npc_choice(row))
+    return out[:25]
+
+
+async def sect_promoter_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    c = await DB.get_character(interaction.user.id)
+    if not c:
+        return []
+    membership, people = await _sect_people_here(interaction.user.id, c)
+    if not membership:
+        return []
+    rung = WORLD.next_promotion_rung(int(membership.get("rank_level") or 0))
+    if not rung:
+        return []
+    try:
+        master = await DB.get_npc_master(interaction.user.id)
+    except Exception:
+        master = None
+    master_name = str((master or {}).get("name") or "")
+    rule = WORLD.npc_master_rule()
+    needle = current.casefold().strip()
+    out = []
+    for row in people:
+        level = WORLD.sect_rank_level(str(row.get("sect_rank") or ""))
+        is_master = str(row["name"]) == master_name
+        if level <= rung[0] or (not is_master and level < rule["promoter_rank_level"]):
+            continue
+        if needle and needle not in str(row["name"]).casefold():
+            continue
+        out.append(_npc_choice(row, "your master" if is_master else ""))
+    return out[:25]
+
+
+@registered_group_command(sect_disciple_group, name="npcmaster", description="Ask one of your sect's own people, standing here, to take you as their disciple")
+@app_commands.autocomplete(npc=sect_npc_master_autocomplete)
+@serialized_user_action
+async def sect_discipleship_npcmaster(interaction: discord.Interaction, npc: str) -> None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction): return
+    try:
+        envelope=await ENGINE.authoritative_action("discipleship.npc_request",interaction.user.id,{"npc_name":npc},action_id=f"discord:{interaction.id}:discipleship.npc_request")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    lines=[f"🙇 **{result.get('master_npc_name')}** ({result.get('master_rank') or 'of the sect'}) takes you as their disciple."]
+    gifts=[]
+    if int(result.get("breakthrough_bonus") or 0):
+        gifts.append(f"**{int(result['breakthrough_bonus']):+d}** on every breakthrough")
+    if int(result.get("insight_on_realm") or 0):
+        gifts.append(f"**{int(result['insight_on_realm'])}** insight each time you cross a realm")
+    if float(result.get("cultivation_mult") or 1)!=1:
+        gifts.append(f"cultivation **×{float(result['cultivation_mult']):g}**, behind a closed door too")
+    if gifts:
+        lines.append("While they live: " + ", ".join(gifts) + ".")
+    if result.get("teach_rank"):
+        lines.append(f"From **{result['teach_rank']}** they will teach you the sect's art (**/sect → Discipleship → Teach**), and they can raise your rank when you have earned it (**/sect → Sect → Promote**).")
+    await interaction.followup.send("\n".join(lines),ephemeral=False)
+
+
+@registered_group_command(sect_disciple_group, name="teach", description="Ask your master among the sect's people to teach you the sect's art")
+@serialized_user_action
+async def sect_discipleship_teach(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction): return
+    try:
+        envelope=await ENGINE.authoritative_action("sect.master.teach",interaction.user.id,{},action_id=f"discord:{interaction.id}:sect.master.teach")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    await interaction.followup.send(
+        f"📕 **{result.get('master_npc_name')}** hands you **{result.get('name')}** and goes through its first forms with you. "
+        f"It is in your bags; study it with **/cultivation → Arts → Study**.",ephemeral=False)
+
+
+@registered_group_command(sect_group, name="promote", description="Ask your master, or an Elder of your sect standing here, to raise you a rank")
+@app_commands.autocomplete(npc=sect_promoter_autocomplete)
+@serialized_user_action
+async def sect_promote(interaction: discord.Interaction, npc: str) -> None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction): return
+    try:
+        envelope=await ENGINE.authoritative_action("sect.promote",interaction.user.id,{"npc_name":npc},action_id=f"discord:{interaction.id}:sect.promote")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    lines=[f"🎖️ **{result.get('granted_by')}** raises you to **{result.get('promoted_to')}** of the **{result.get('sect_name')}**."]
+    if result.get("eligible_for"):
+        lines.append(f"Your contribution already reaches **{result['eligible_for']}** - ask again.")
+    await interaction.followup.send("\n".join(lines),ephemeral=False)
+
+
 SECT_ABODE_ACTIONS = [
     app_commands.Choice(name="Status / Open Thread", value="status"),
     app_commands.Choice(name="Enter Sect Abode", value="enter"),
@@ -744,14 +901,21 @@ async def sect_abode(interaction: discord.Interaction, action: app_commands.Choi
     abode = await ensure_sect_abode_record(interaction.user.id, c, membership)
     thread = await ensure_sect_abode_thread_for(interaction.guild, interaction.user, abode) if interaction.guild else None
     if action.value == "status":
-        facilities = " • ".join(player_property_facility_lines(abode, SECT_ABODE_FACILITY_KEYS)) or "No developed facilities"
-        unbuilt = player_property_unbuilt(abode, SECT_ABODE_FACILITY_KEYS)
-        await respond(interaction, 
+        overview = await home_overview(interaction.user.id)
+        residence = (overview or {}).get("residence") or None
+        if residence:
+            # What each room does, what the next level adds and what it still
+            # asks of rank and stage, off the engine's numbers (v1.30.0).
+            facilities_text = "\n".join(f"• {line}" for line in property_overview_lines(residence, currency_name=WORLD.currency_name)) + "\n"
+        else:
+            facilities = " • ".join(player_property_facility_lines(abode, SECT_ABODE_FACILITY_KEYS)) or "No developed facilities"
+            unbuilt = player_property_unbuilt(abode, SECT_ABODE_FACILITY_KEYS)
+            facilities_text = f"Facilities: {facilities}\n" + (f"Not yet built: {', '.join(unbuilt)}\n" if unbuilt else "")
+        await reply_long(interaction, 
             f"🏯 **{abode['name']}**\nSect: **{abode['sect_name']}** • Rank: **{membership.get('rank_name', 'Disciple')}**\n"
             f"Sect gate: **{abode['base_location']}**\n"
             f"Current location: **{await character_location_display(c)}**\n"
-            f"Facilities: {facilities}\n"
-            + (f"Not yet built: {', '.join(unbuilt)}\n" if unbuilt else "")
+            + facilities_text
             + f"Contribution points: **{int(membership.get('contribution_points', 0) or 0)}** - a facility is built or raised with "
             "**/sect → Holdings → Abode** and **Build or raise a facility**; the sect caps each level by your rank and stage.\n"
             + (f"Private scene: {thread.mention}" if thread else "⚠️ Private scene thread is unavailable; repair the base channels."),
@@ -872,6 +1036,21 @@ async def sect_roster(interaction:discord.Interaction)->None:
             f"{WORLD.realm_name(int(row['realm_index']))} Stage {row['phase']} • "
             f"CP {row.get('contribution_points',0)} • Influence {row.get('influence',0)}"
         )
+    # The sect's own people (v1.25.0): the hall the politics tick keeps full,
+    # grouped by rank. A failed read costs this half of the page, not the page.
+    try:
+        people=await DB.get_sect_npc_roster(str(membership['sect_name']))
+    except Exception:
+        log.exception("Could not read the sect's NPC roster")
+        people=[]
+    if people:
+        lines.append(f"\n\n👥 **The sect's people** ({len(people)})")
+        by_rank:dict[str,list[str]]={}
+        for person in people:
+            by_rank.setdefault(str(person.get('sect_rank') or 'Member'),[]).append(
+                f"{person['name']} ({WORLD.realm_name(int(person.get('realm_index') or 0))})")
+        for rank,names in by_rank.items():
+            lines.append(f"\n**{rank}** — " + ", ".join(names[:12]) + (f" and {len(names)-12} more" if len(names)>12 else ""))
     await reply_long(interaction,"\n".join(lines),ephemeral=False)
 
 
@@ -983,8 +1162,8 @@ async def sect_contribute(interaction:discord.Interaction,item:str,quantity:app_
         lines.append(f"-# Your own trade's work: ×{float(result['crafted_bonus']):g}.")
     if result.get("capped_at_shelf"):
         lines.append(f"-# The sect credits no more than a shop asks: {int(result['capped_at_shelf'])} a unit.")
-    if result.get("promoted_to"):
-        lines.append(f"🎖️ You are now a **{result['promoted_to']}**.")
+    if result.get("eligible_for"):
+        lines.append(f"🎖️ You have earned enough to be raised to **{result['eligible_for']}** - ask your master or an Elder (**/sect → Sect → Promote**).")
     await interaction.followup.send("\n".join(lines),ephemeral=False)
 
 

@@ -480,8 +480,7 @@ func crimeAtoneAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		return authoritativeMutation{}, fmt.Errorf("you must return to %s to negotiate restitution for this jurisdictional record", jurisdiction)
 	}
 	severity := max64(1, i64(crime["severity"]))
-	evidence := max64(0, i64(crime["evidence"]))
-	fine := max64(10, severity*25+(evidence/10)*5)
+	fine := crimeRestitutionFine(severity, i64(crime["evidence"]))
 	realmIndex := i64(ch["realm_index"])
 	world := "Mortal World"
 	if len(catalog.Realms) > 0 {

@@ -18,18 +18,18 @@ package game
 //     (one times the sect value, more for a craftsman's own trade) - so a
 //     redeem followed by a donation always loses points.
 //   - creditSectContributionTx is the one door points come in by. It writes
-//     the balance and the lifetime count together, and promotes. An issued
+//     the balance and the lifetime count together, and says when the count
+//     has crossed the next rung (v1.25.0: it no longer promotes). An issued
 //     redeem writes only the balance, so it can never cost a rank; a treasury
 //     redeem also takes its cost off the lifetime count (v1.12.3), because
 //     what comes back out of the treasury was not a contribution.
-//   - Promotion only raises, only to a rank the content's ladder lists, and
-//     only when the credit that has just been paid carried the count over a
-//     rung (v1.12.3): a rank a GM has taken away is not given back by the
-//     next donation. A rank above the ladder's top (a GM's Elder) is never
-//     touched.
+//   - Promotion is granted by asking (`sect.promote`, v1.25.0): one rung at a
+//     time, only to a rank the content's ladder lists, and only when the
+//     lifetime count reaches it. A rank a GM has taken away is not given back
+//     by the next donation, and a rank above the ladder's top is never touched.
 //   - A missing ratio pays nothing, never a zero read as a value, and a
-//     world where migration 69 has not run yet credits points and promotes
-//     nobody rather than failing the action.
+//     world where migration 69 has not run yet credits points and makes
+//     nobody eligible rather than failing the action.
 
 import (
 	"encoding/json"
@@ -84,9 +84,15 @@ func sectEarnedColumn(conn *storage.Conn) bool {
 }
 
 // creditSectContributionTx is the one door contribution points come in by:
-// the balance and the lifetime count move together, then the member is
-// promoted if the count has passed a rung. It returns the rank reached, or ""
-// when nothing changed. A caller with no membership row credits nobody.
+// the balance and the lifetime count move together. It returns the rank the
+// credit has just made the member eligible for - the count crossed the next
+// rung's mark - or "" when nothing changed. A caller with no membership row
+// credits nobody.
+//
+// It promoted the member itself until v1.25.0. On the owner's call a rank is
+// granted by somebody now (`sect.promote`, npc_master.go): the count only says
+// a member may ask, so a credit that crosses a rung tells them so and moves no
+// rank - which also leaves a GM's demotion standing, the v1.12.3 rule.
 func creditSectContributionTx(conn *storage.Conn, catalog worlddata.Catalog, userID, points, influence int64) (string, error) {
 	if points <= 0 && influence <= 0 {
 		return "", nil
@@ -100,22 +106,13 @@ func creditSectContributionTx(conn *storage.Conn, catalog worlddata.Catalog, use
 	} else if _, err := conn.Execute(`UPDATE sect_membership SET contribution_points=contribution_points+?,influence=influence+? WHERE user_id=?`, []any{points, max64(0, influence), userID}); err != nil {
 		return "", err
 	}
-	if !earned {
-		return "", nil
+	// The work a member does for their sect strengthens the sect (v1.29.0):
+	// contribution moved the member's own ledger and never the sect's
+	// resources, which gate its tribute, its claims and its wars.
+	if err := sectResourcesFromContributionTx(conn, userID, points); err != nil {
+		return "", err
 	}
-	return promoteSectMemberTx(conn, catalog, userID, points)
-}
-
-// promoteSectMemberTx raises a member to the highest rung of the content's
-// ladder that the credit just paid carried their lifetime count over - the
-// count before it was under the rung and the count now is at or past it - if
-// that is above where they stand and the rank they hold is one the ladder
-// reaches. Crossing, not standing past, is the rule (v1.12.3): asked "is the
-// count past a rung" it promoted whenever anything was credited, so a GM who
-// demoted a Core Disciple to Outer had it undone by the next donation.
-func promoteSectMemberTx(conn *storage.Conn, catalog worlddata.Catalog, userID, credited int64) (string, error) {
-	ladder := catalog.SectExchange().Promotion
-	if len(ladder) == 0 {
+	if !earned || points <= 0 {
 		return "", nil
 	}
 	r, err := conn.Execute(`SELECT rank_level,contribution_earned FROM sect_membership WHERE user_id=?`, []any{userID})
@@ -126,23 +123,12 @@ func promoteSectMemberTx(conn *storage.Conn, catalog worlddata.Catalog, userID, 
 	if row == nil {
 		return "", nil
 	}
-	rank, total := i64(row["rank_level"]), i64(row["contribution_earned"])
-	before := total - credited
-	top, target := int64(0), rank
-	for _, rung := range ladder {
-		top = max64(top, rung.RankLevel)
-		if before < rung.Earned && total >= rung.Earned && rung.RankLevel > target {
-			target = rung.RankLevel
-		}
-	}
-	if rank >= top || target <= rank {
+	level, need, ok := nextPromotionRung(catalog, i64(row["rank_level"]))
+	total := i64(row["contribution_earned"])
+	if !ok || total < need || total-points >= need {
 		return "", nil
 	}
-	name := sectRankName(catalog, target)
-	if _, err := conn.Execute(`UPDATE sect_membership SET rank_level=?,rank_name=? WHERE user_id=? AND rank_level<?`, []any{target, name, userID, target}); err != nil {
-		return "", err
-	}
-	return name, nil
+	return sectRankName(catalog, level), nil
 }
 
 // sectIssuedPrice is what one of an issued item costs, in points.
@@ -311,13 +297,13 @@ func sectCommissionPointsTx(conn *storage.Conn, catalog worlddata.Catalog, userI
 		return nil, err
 	}
 	points := max64(1, int64(math.Round(float64(stones)*ratio)))
-	promoted, err := creditSectContributionTx(conn, catalog, userID, points, max64(1, points/10))
+	eligible, err := creditSectContributionTx(conn, catalog, userID, points, max64(1, points/10))
 	if err != nil {
 		return nil, err
 	}
 	out := map[string]any{"sect": requiresSect, "points": points}
-	if promoted != "" {
-		out["promoted_to"] = promoted
+	if eligible != "" {
+		out["eligible_for"] = eligible
 	}
 	return out, nil
 }
@@ -369,7 +355,7 @@ func sectEventPointsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if points <= 0 {
 		return nil, nil
 	}
-	promoted, err := creditSectContributionTx(conn, catalog, userID, points, max64(1, points/10))
+	eligible, err := creditSectContributionTx(conn, catalog, userID, points, max64(1, points/10))
 	if err != nil {
 		return nil, err
 	}
@@ -379,8 +365,25 @@ func sectEventPointsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		return nil, err
 	}
 	out := map[string]any{"sect": sect, "points": points}
-	if promoted != "" {
-		out["promoted_to"] = promoted
+	if eligible != "" {
+		out["eligible_for"] = eligible
 	}
 	return out, nil
+}
+
+// contributionPerSectResource is how many contribution points of a member's
+// work make one point of their sect's resources, and contributionResourceCap
+// the most one credit moves them (v1.29.0).
+const (
+	contributionPerSectResource = int64(25)
+	contributionResourceCap     = int64(3)
+)
+
+func sectResourcesFromContributionTx(conn *storage.Conn, userID, points int64) error {
+	gain := minI64(contributionResourceCap, maxI64(0, points)/contributionPerSectResource)
+	if gain <= 0 || !tableExistsTx(conn, "sect_politics_state") {
+		return nil
+	}
+	_, err := conn.Execute(`UPDATE sect_politics_state SET resources=MIN(100,resources+?) WHERE sect_name=(SELECT sect_name FROM sect_membership WHERE user_id=?)`, []any{gain, userID})
+	return err
 }

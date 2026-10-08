@@ -189,7 +189,7 @@ class ARealmsTreasureIsKept(unittest.TestCase):
     NULL and every reader is `ends_game_minute IS NULL OR ends_game_minute > ?` -
     and until now **no item in the catalogue set it**: every effect the game
     shipped ran 120 to 360 minutes. The behavioural half is
-    `permanent_treasure_test.go`, which drives a use and reads the row back a
+    `salt_king_peach_test.go`, which drives a use and reads the row back a
     world-year later; this holds the shape of the content it reads.
     """
 

@@ -118,15 +118,16 @@ func simulateBirthFamilyGo(conn *storage.Conn, userID int64, raw json.RawMessage
 		Text    string
 		W, I, S int64
 	}{{"A successful trade season enriched the household.", 9, 2, 1}, {"A marriage alliance improved the family's standing.", 2, 8, 6}, {"A talented junior brought prestige to the family.", 1, 9, 2}, {"A crop failure and bad contracts drained family stores.", -9, -1, -5}, {"A feud with a neighboring clan damaged the family's position.", -3, -8, -7}, {"A beast raid damaged property and frightened retainers.", -8, -2, -9}, {"A sect elder took interest in one of the family's juniors.", 0, 11, 3}, {"An internal inheritance dispute split several relatives into factions.", -2, -3, -12}, {"A quiet year allowed the household to recover and consolidate.", 3, 2, 7}, {"A scandal surrounding a senior relative harmed the family name.", -1, -10, -4}}
+	world := householdWorldTermsTx(conn, familyID)
 	for y := int64(0); y < years; y++ {
 		idx, e := gamerng.Intn(len(events))
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
 		ev := events[idx]
-		wealth = clamp(wealth+ev.W, 0, 100)
-		influence = clamp(influence+ev.I, 0, 100)
-		stability = clamp(stability+ev.S, 0, 100)
+		wealth = clamp(wealth+ev.W+world.Wealth, 0, 100)
+		influence = clamp(influence+ev.I+world.Influence, 0, 100)
+		stability = clamp(stability+ev.S+world.Stability, 0, 100)
 		if purity > 0 {
 			roll, e := gamerng.Intn(100)
 			if e != nil {
@@ -176,6 +177,9 @@ func simulateBirthFamilyGo(conn *storage.Conn, userID int64, raw json.RawMessage
 		}
 		history = append(history, ev.Text)
 	}
+	if years > 0 {
+		history = append(history, world.Lines...)
+	}
 	score := wealth + influence + stability
 	tier := int64(1)
 	if score >= 245 {
@@ -205,7 +209,7 @@ func simulateBirthFamilyGo(conn *storage.Conn, userID int64, raw json.RawMessage
 			return authoritativeMutation{}, e
 		}
 	}
-	out := map[string]any{"family_id": familyID, "years_advanced": years, "wealth": wealth, "influence": influence, "stability": stability, "tier": tier, "bloodline_purity": purity, "branch_count": branches, "retainer_count": retainers, "last_simulated_game_minute": anchor, "history": history}
+	out := map[string]any{"family_id": familyID, "years_advanced": years, "wealth": wealth, "influence": influence, "stability": stability, "tier": tier, "bloodline_purity": purity, "branch_count": branches, "retainer_count": retainers, "last_simulated_game_minute": anchor, "history": history, "world_terms": map[string]any{"influence": world.Influence, "stability": world.Stability, "wealth": world.Wealth}}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "family", EventType: "family.simulate", EntityType: "birth_family", EntityID: fmt.Sprint(familyID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 

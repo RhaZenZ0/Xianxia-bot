@@ -59,7 +59,7 @@ EQUIPMENT_DEFINITIONS: dict[str, dict[str, Any]] = {
         "name": "Starsteel Aegis", "slot": "armor", "max_durability": 560,
         "attack": 1, "defense": 17, "spirit": 4, "agility": 0,
     },
-    # The boots a smith makes (v1.24.0): the first Forging method that is not
+    # The boots a smith makes (v1.32.0): the first Forging method that is not
     # a blade or a cuirass, and the top of the boots ladder above it.
     "spirit_iron_greaves": {
         "name": "Spirit-Iron Greaves", "slot": "boots", "max_durability": 130,
@@ -267,11 +267,16 @@ def beast_milestone_bonus(rank: Any) -> int:
     return 0 if rank < 10 else 2 * (rank // 10)
 
 
-def companion_bonus(rank: Any, evolution_stage: Any, loyalty: Any) -> int:
+BEAST_INTELLIGENCE_CAP = 4
+
+
+def companion_bonus(rank: Any, evolution_stage: Any, loyalty: Any, intelligence: Any = 0) -> int:
     """`combatCompanionBonus` for one beast: rank/2 + stage + loyalty/40, in
-    integer division, plus its milestones. Only the active beast counts, and
-    only in 1v1 combat."""
-    return int(rank or 0) // 2 + int(evolution_stage or 0) + int(loyalty or 0) // 40 + beast_milestone_bonus(rank)
+    integer division, plus its milestones and, since v1.28.0, a point for
+    every 25 intelligence up to four. Only the active beast counts; it rides
+    a one-on-one fight and, since v1.28.0, a hunt."""
+    return (int(rank or 0) // 2 + int(evolution_stage or 0) + int(loyalty or 0) // 40 + beast_milestone_bonus(rank)
+            + min(BEAST_INTELLIGENCE_CAP, max(0, int(intelligence or 0)) // 25))
 
 
 FORMATION_POSITIONS: dict[str, dict[str, int]] = {

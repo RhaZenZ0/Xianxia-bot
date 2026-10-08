@@ -71,7 +71,7 @@ async def law_comprehend(interaction:discord.Interaction,law:str,spend_insight:b
             action_id=f"discord:{interaction.id}:law.comprehend:{law}",
         )
     except GameEngineError as exc:
-        message=str(exc)
+        message=_explain_engine_error(exc)
         if "Insight XP" in message:
             message+=" Insight XP comes from exploring, quests, battles and the Refine stance (**/cultivation → Cultivate → Stance**)."
         await interaction.response.send_message(f"Law comprehension could not resolve: {message}",ephemeral=False);return
@@ -259,7 +259,7 @@ async def manual_study(interaction:discord.Interaction,manual:str)->None:
             action_id=f"discord:{interaction.id}:manual.study",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(str(exc),ephemeral=False);return
+        await interaction.response.send_message(_explain_engine_error(exc),ephemeral=False);return
     resolved=dict(envelope.get("result") or {});state=dict(resolved.get("state") or {})
     first=bool(resolved.get("first_study"));forbidden=bool(resolved.get("forbidden"));karma_note=""
     if first and forbidden:
@@ -290,7 +290,7 @@ async def manual_cultivate_by(interaction:discord.Interaction,manual:str)->None:
             action_id=f"discord:{interaction.id}:cultivation.manual",
         )
     except GameEngineError as exc:
-        message=str(exc)
+        message=_explain_engine_error(exc)
         if "has not been learned" in message:
             message+=" Study it first with **/cultivation → Arts → Study**."
         await interaction.followup.send(f"❌ {message}",ephemeral=False);return
@@ -388,7 +388,7 @@ async def condition_treat(interaction: discord.Interaction, condition: str) -> N
             action_id=f"discord:{interaction.id}:condition.treat:{condition}",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"Condition treatment could not resolve: {exc}", ephemeral=False)
+        await interaction.followup.send(f"Condition treatment could not resolve: {_explain_engine_error(exc)}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     roll = SimpleNamespace(**dict(result.get("roll") or {}))
@@ -639,7 +639,7 @@ async def crime_atone(interaction: discord.Interaction, crime_id: int) -> None:
             action_id=f"discord:{interaction.id}:crime.atone",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(str(exc),ephemeral=False);return
+        await interaction.response.send_message(_explain_engine_error(exc),ephemeral=False);return
     resolved=dict(envelope.get("result") or {})
     fine=int(resolved.get("fine",0));currency=str(resolved.get("currency",''));balance=int(resolved.get("balance",0))
     await interaction.response.send_message(
@@ -784,7 +784,9 @@ async def flame_refine(interaction: discord.Interaction, flame: str) -> None:
              f"Spent {spent} and {int(result.get('qi_cost') or 0)} qi. It now adds **+{int(result.get('bonus') or 0)}** to a craft roll."]
     if result.get("opens_top_grade"):
         lines.append("✨ Fully refined: while it is bound, a crafter at the sixth rank can make **Transcendent** work.")
+    progressed = await record_quest_progress(interaction.user.id, "flame_refine", game_minute=(await current_world_time()).total_minutes)
     await interaction.followup.send("\n".join(lines), ephemeral=False)
+    await announce_quest_progress(interaction, progressed)
 
 
 @registered_group_command(flame_group, name="bind", description="Bind one of your flames as the one your crafting reads")
@@ -875,4 +877,6 @@ async def spirit_settle(interaction: discord.Interaction) -> None:
              f"for {int(result.get('qi_cost') or 0)} qi. It now adds **+{int(result.get('bonus') or 0)}** to Formation and Inscription rolls."]
     if result.get("opens_top_grade"):
         lines.append("✨ Fully built: a crafter at the sixth rank can make **Transcendent** Formation and Inscription work.")
+    progressed = await record_quest_progress(interaction.user.id, "spirit_settle", game_minute=(await current_world_time()).total_minutes)
     await interaction.followup.send("\n".join(lines), ephemeral=False)
+    await announce_quest_progress(interaction, progressed)

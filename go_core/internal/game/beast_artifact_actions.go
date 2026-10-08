@@ -130,7 +130,7 @@ func canonicalBeastTrainingContext(conn *storage.Conn, userID int64, location st
 		return 0, 0, nil
 	}
 	penLevel := maxI64(0, i64(row["beast_pen_level"]))
-	return penLevel, penLevel * 2, nil
+	return penLevel, abodeFacilityRollBonus(penLevel), nil
 }
 
 func spiritBeastRow(conn *storage.Conn, userID, beastID int64) (map[string]any, error) {

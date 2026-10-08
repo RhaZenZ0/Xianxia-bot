@@ -304,6 +304,9 @@ func pvpActAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, r
 	// theirs (v1.14.0); both are read relative to the stage baseline, so the
 	// difference between the two stages is carried here.
 	attackMod := attackBase + actor.RealmIndex*2 + actor.Phase/3 + stageLead(catalog, actor.RealmIndex, actor.Phase, opp.RealmIndex, opp.Phase)
+	// A duellist the Martial Society knows strikes surer (v1.28.0); every
+	// duel fought pays it and nothing read it.
+	attackMod += standingBonus(standingTx(conn, userID, "Martial Society"), martialSocietyPer, martialSocietyCap)
 	defBase := opp.Attributes["agility"]
 	if opp.Attributes["body"] > defBase {
 		defBase = opp.Attributes["body"]

@@ -60,7 +60,9 @@ class ResultPagesAndButtons(unittest.TestCase):
     def test_hint_paths_become_the_actions_they_name(self):
         _, hubs, _ = _modules()
         actions = hubs.suggested_actions("Then **/world → City → Look**, **/economy → City Shops → Browse**, **/travel**, **/world → City → Look** again, **/world → Hunt**.")
-        self.assertEqual([a.path for a in actions], ["/city look", "/shop browse", "/travel go"])  # three at most, no repeats
+        # three at most, no repeats; a bare **/travel** is the Destinations
+        # page's first leaf, which is Cities since v1.26.0
+        self.assertEqual([a.path for a in actions], ["/city look", "/shop browse", "/travel city"])
         self.assertEqual(hubs.suggested_actions("no hints here"), [])
         self.assertEqual(hubs.suggested_actions("**/nowhere → X**"), [])
 

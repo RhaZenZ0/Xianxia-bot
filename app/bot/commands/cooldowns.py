@@ -60,6 +60,7 @@ FAMILY_LABELS: dict[str, tuple[str, str, str]] = {
     "ghost_harvest": ("👻", "Harvest death qi", "**/cultivation → Ghost → Harvest**"),
     "ghost_appease": ("🕯️", "Appease the dead", "**/cultivation → Ghost → Appease**"),
     "dao_dual_cultivation": ("❤️", "Dual cultivation", "**/character → Dao Partnership → Dual Cultivate**"),
+    "abode_focus": ("🏡", "Focus a room of your home", "**/abode → Property → Focus**"),
     # Composite families: only ever drawn while a row exists, so the subject
     # carries the meaning and the path is where that subject is worked.
     "beast_feed": ("🍖", "Feed", "**/beast → Companions → Feed**"),

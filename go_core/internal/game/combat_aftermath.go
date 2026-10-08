@@ -207,44 +207,25 @@ func applyCombatAftermathTx(conn *storage.Conn, userID int64, b battleRow, outco
 						return combatAftermathResult{}, err
 					}
 				}
+				kin := kinOfTx(conn, target)
 				if err = ReleaseNPCBondsTx(conn, target, gameMinute, now); err != nil {
 					return combatAftermathResult{}, err
 				}
+				remembering, err := RememberTheKillerTx(conn, userID, kin, target, now)
+				if err != nil {
+					return combatAftermathResult{}, err
+				}
+				if len(remembering) > 0 {
+					impacts = append(impacts, strings.Join(remembering, ", ")+" will not forget who killed "+target)
+				}
 				regionSev := maxI64(severity, 1+storage.ParseInt(n[3])/25)
-				if tableExistsTx(conn, "civilization_regions") {
-					if _, err = conn.Execute(`UPDATE civilization_regions SET security=MAX(0,security-?),unrest=MIN(100,unrest+?),prosperity=MAX(0,prosperity-?),last_game_minute=?,updated_at=? WHERE location=?`, []any{regionSev * 2, regionSev * 3, maxI64(1, regionSev), gameMinute, now, currentLoc}); err != nil {
-						return combatAftermathResult{}, err
-					}
+				marked, err := MarkKillingTx(conn, currentLoc, target, fmt.Sprint(n[1]), fmt.Sprint(n[2]), regionSev, target+" was killed by a cultivator, destabilizing local power networks.", gameMinute, now)
+				if err != nil {
+					return combatAftermathResult{}, err
 				}
-				if tableExistsTx(conn, "civilization_events") {
-					_, _ = conn.Execute(`INSERT INTO civilization_events(location,event_text,severity,game_minute,created_at) VALUES(?,?,?,?,?)`, []any{currentLoc, target + " was killed by a cultivator, destabilizing local power networks.", regionSev, gameMinute, now})
-				}
-				impacts = append(impacts, target+"'s death increased regional unrest")
-				tradeDisruption := regionSev
-				profession := strings.ToLower(fmt.Sprint(n[1]))
-				if strings.Contains(profession, "merchant") || strings.Contains(profession, "caravan") || strings.Contains(profession, "trader") || strings.Contains(profession, "auction") {
-					tradeDisruption *= 2
-				}
-				if tableExistsTx(conn, "economy_markets") {
-					if _, err = conn.Execute(`UPDATE economy_markets SET supply=MAX(1,supply-?),demand=MIN(500,demand+?),updated_at=? WHERE location=?`, []any{tradeDisruption, maxI64(1, regionSev/2), now, currentLoc}); err != nil {
-						return combatAftermathResult{}, err
-					}
-				}
-				if tableExistsTx(conn, "economy_events") {
-					_, _ = conn.Execute(`INSERT INTO economy_events(location,item_id,event_text,game_minute,created_at) VALUES(?,NULL,?,?,?)`, []any{currentLoc, "The death of " + target + " disrupted local confidence and short-term supply routes.", gameMinute, now})
-				}
-				faction := fmt.Sprint(n[2])
-				if faction != "" && faction != "Independent" {
+				impacts = append(impacts, marked...)
+				if faction := fmt.Sprint(n[2]); faction != "" && faction != "Independent" {
 					npcFaction = faction
-					if tableExistsTx(conn, "sect_politics_state") {
-						if _, err = conn.Execute(`UPDATE sect_politics_state SET influence=MAX(0,influence-?),cohesion=MAX(0,cohesion-?),resources=MAX(0,resources-?),updated_at=? WHERE sect_name=?`, []any{regionSev * 2, regionSev * 3, regionSev, now, faction}); err != nil {
-							return combatAftermathResult{}, err
-						}
-					}
-					if tableExistsTx(conn, "sect_politics_events") {
-						_, _ = conn.Execute(`INSERT INTO sect_politics_events(sect_name,event_text,severity,game_minute,created_at) VALUES(?,?,?,?,?)`, []any{faction, "The death of " + target + " damaged the sect's influence and triggered internal blame.", regionSev, gameMinute, now})
-					}
-					impacts = append(impacts, faction+" lost influence and cohesion")
 				}
 			} else {
 				if _, err = conn.Execute(`UPDATE npc_civilization_state SET activity=?,last_game_minute=?,updated_at=? WHERE npc_name=?`, []any{fmt.Sprintf("Defeated and spared by player %d", userID), gameMinute, now, target}); err != nil {
@@ -296,4 +277,73 @@ func applyCombatAftermathTx(conn *storage.Conn, userID int64, b battleRow, outco
 		}
 	}
 	return combatAftermathResult{Impacts: impacts}, nil
+}
+
+// beastDeathSecurityDrop is what a beast's kill takes off a region's security:
+// the security term of the lightest killing (MarkKillingTx at severity one).
+const beastDeathSecurityDrop = int64(2)
+
+// MarkBeastDeathTx is what a hunter killed by a beast does to the place it
+// happened (v1.31.0, on the owner's call): the region is less safe, and that is
+// all. Nobody did the killing, so no sect is blamed, no grudge is borne and the
+// market is not shaken - the unrest and the trade disruption MarkKillingTx
+// writes are about a culprit, and a beast is not one. Security is read by NPC
+// crime and a caravan's risk (v1.29.0), so the next tick feels it. A missing
+// table marks nothing and never fails the tick.
+func MarkBeastDeathTx(conn *storage.Conn, location string, gameMinute int64, now float64) error {
+	if strings.TrimSpace(location) == "" || !tableExistsTx(conn, "civilization_regions") {
+		return nil
+	}
+	_, err := conn.Execute(`UPDATE civilization_regions SET security=MAX(0,security-?),last_game_minute=?,updated_at=? WHERE location=?`,
+		[]any{beastDeathSecurityDrop, gameMinute, now, location})
+	return err
+}
+
+// MarkKillingTx is what a killing does to the place it happened and the sect
+// the dead belonged to: the region's security, unrest and prosperity, its
+// market's supply (twice over for a trader), and the sect's influence,
+// cohesion and resources. It answers the impacts it caused.
+//
+// It was written inline in a player's kill and nowhere else (v1.29.0), so a
+// robbery that ended in a body, or a feud settled with a sword, left the
+// region and the sect exactly as they were - while the content's own principle
+// says "NPC death ... may weaken families, sects, markets and regional
+// security". Both doors call this now: a player's kill at its full severity,
+// the world's own killings at one.
+func MarkKillingTx(conn *storage.Conn, location, victim, profession, faction string, severity int64, regionText string, gameMinute int64, now float64) ([]string, error) {
+	impacts := []string{}
+	if tableExistsTx(conn, "civilization_regions") {
+		if _, err := conn.Execute(`UPDATE civilization_regions SET security=MAX(0,security-?),unrest=MIN(100,unrest+?),prosperity=MAX(0,prosperity-?),last_game_minute=?,updated_at=? WHERE location=?`, []any{severity * 2, severity * 3, maxI64(1, severity), gameMinute, now, location}); err != nil {
+			return nil, err
+		}
+	}
+	if tableExistsTx(conn, "civilization_events") {
+		_, _ = conn.Execute(`INSERT INTO civilization_events(location,event_text,severity,game_minute,created_at) VALUES(?,?,?,?,?)`, []any{location, regionText, severity, gameMinute, now})
+	}
+	impacts = append(impacts, victim+"'s death increased regional unrest")
+	tradeDisruption := severity
+	trade := strings.ToLower(profession)
+	if strings.Contains(trade, "merchant") || strings.Contains(trade, "caravan") || strings.Contains(trade, "trader") || strings.Contains(trade, "auction") {
+		tradeDisruption *= 2
+	}
+	if tableExistsTx(conn, "economy_markets") {
+		if _, err := conn.Execute(`UPDATE economy_markets SET supply=MAX(1,supply-?),demand=MIN(500,demand+?),updated_at=? WHERE location=?`, []any{tradeDisruption, maxI64(1, severity/2), now, location}); err != nil {
+			return nil, err
+		}
+	}
+	if tableExistsTx(conn, "economy_events") {
+		_, _ = conn.Execute(`INSERT INTO economy_events(location,item_id,event_text,game_minute,created_at) VALUES(?,NULL,?,?,?)`, []any{location, "The death of " + victim + " disrupted local confidence and short-term supply routes.", gameMinute, now})
+	}
+	if faction != "" && faction != "Independent" {
+		if tableExistsTx(conn, "sect_politics_state") {
+			if _, err := conn.Execute(`UPDATE sect_politics_state SET influence=MAX(0,influence-?),cohesion=MAX(0,cohesion-?),resources=MAX(0,resources-?),updated_at=? WHERE sect_name=?`, []any{severity * 2, severity * 3, severity, now, faction}); err != nil {
+				return nil, err
+			}
+		}
+		if tableExistsTx(conn, "sect_politics_events") {
+			_, _ = conn.Execute(`INSERT INTO sect_politics_events(sect_name,event_text,severity,game_minute,created_at) VALUES(?,?,?,?,?)`, []any{faction, "The death of " + victim + " damaged the sect's influence and triggered internal blame.", severity, gameMinute, now})
+		}
+		impacts = append(impacts, faction+" lost influence and cohesion")
+	}
+	return impacts, nil
 }

@@ -625,7 +625,7 @@ async def battle_challenge(interaction:discord.Interaction,target:str)->None:
             source=source,target_key=source,action_id=f"discord:{interaction.id}:combat.start:{source}",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"⚔️ {exc}. Wait for that confrontation to end.",ephemeral=False);return
+        await interaction.response.send_message(f"⚔️ {_explain_engine_error(exc)}. Wait for that confrontation to end.",ephemeral=False);return
     result=dict(envelope.get("result") or {}); bid=int(result.get("battle_id") or 0)
     battle=await DB.get_active_battle(interaction.user.id)
     _card,view=await _battle_panel(interaction.user.id,c,battle or result)

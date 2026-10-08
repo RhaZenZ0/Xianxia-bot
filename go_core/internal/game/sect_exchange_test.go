@@ -149,32 +149,40 @@ func TestTheTreasuryRedeemIsUnchanged(t *testing.T) {
 	}
 }
 
-func TestMembersRiseOnWhatTheyHaveEarnedAndSpendingNeverCostsARank(t *testing.T) {
+// A credit makes a member eligible and moves no rank (v1.25.0): the rank is
+// granted by asking one of the sect's people (`sect.promote`,
+// npc_master_test.go). Spending never costs a rank, and a GM's rank above the
+// ladder is never touched.
+func TestACreditMakesAMemberEligibleAndMovesNoRank(t *testing.T) {
 	conn := sectExchangeWorld(t)
 	catalog := shippedCatalog(t)
 	ladder := catalog.SectExchange().Promotion
 	if len(ladder) < 2 {
 		t.Fatalf("the content's promotion ladder has %d rungs, want Inner and Core", len(ladder))
 	}
-	inner, core := ladder[0], ladder[1]
-	promoted, err := creditSectContributionTx(conn, catalog, 1, inner.Earned-1, 0)
-	if err != nil || promoted != "" {
-		t.Fatalf("one point short of %d promoted to %q (%v)", inner.Earned, promoted, err)
+	inner := ladder[0]
+	eligible, err := creditSectContributionTx(conn, catalog, 1, inner.Earned-1, 0)
+	if err != nil || eligible != "" {
+		t.Fatalf("one point short of %d made the member eligible for %q (%v)", inner.Earned, eligible, err)
 	}
-	if promoted, _ = creditSectContributionTx(conn, catalog, 1, 1, 0); promoted != "Inner Disciple" {
-		t.Fatalf("reaching %d earned promoted to %q, want Inner Disciple", inner.Earned, promoted)
+	if eligible, _ = creditSectContributionTx(conn, catalog, 1, 1, 0); eligible != "Inner Disciple" {
+		t.Fatalf("reaching %d earned made the member eligible for %q, want Inner Disciple", inner.Earned, eligible)
+	}
+	if rank := i64(memberRow(t, conn, 1)["rank_level"]); rank != 10 {
+		t.Fatalf("a credit moved the rank to %d; a rank is granted by somebody now", rank)
+	}
+	// Only the credit that crosses says so; the next is silent.
+	if eligible, _ = creditSectContributionTx(conn, catalog, 1, 1, 0); eligible != "" {
+		t.Fatalf("a credit past the rung, not across it, said %q", eligible)
 	}
 	// Spending every point never costs the rank.
 	setPoints(t, conn, 1, 0)
-	if promoted, _ = creditSectContributionTx(conn, catalog, 1, 1, 0); promoted != "" || i64(memberRow(t, conn, 1)["rank_level"]) != inner.RankLevel {
-		t.Fatalf("spending points lost the rank: now %v", memberRow(t, conn, 1)["rank_level"])
-	}
-	if promoted, _ = creditSectContributionTx(conn, catalog, 1, core.Earned, 0); promoted != "Core Disciple" {
-		t.Fatalf("reaching %d earned promoted to %q, want Core Disciple", core.Earned, promoted)
+	if rank := i64(memberRow(t, conn, 1)["rank_level"]); rank != 10 {
+		t.Fatalf("spending points moved the rank to %d", rank)
 	}
 	// An Elder is above the ladder, and a GM's rank is never touched.
-	if promoted, _ = creditSectContributionTx(conn, catalog, 2, core.Earned*2, 0); promoted != "" || i64(memberRow(t, conn, 2)["rank_level"]) != 50 {
-		t.Fatalf("an Elder was moved to %v", memberRow(t, conn, 2)["rank_level"])
+	if eligible, _ = creditSectContributionTx(conn, catalog, 2, ladder[len(ladder)-1].Earned*2, 0); eligible != "" || i64(memberRow(t, conn, 2)["rank_level"]) != 50 {
+		t.Fatalf("an Elder was moved to %v (eligible %q)", memberRow(t, conn, 2)["rank_level"], eligible)
 	}
 }
 

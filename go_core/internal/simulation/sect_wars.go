@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"sort"
 
+	"xianxia/core/internal/game"
 	"xianxia/core/internal/gamerng"
 	"xianxia/core/internal/storage"
 )
@@ -41,9 +42,8 @@ func (r *Runner) npcSectWars(conn *storage.Conn, steps, gm int64) (int64, error)
 	if err != nil {
 		return 0, err
 	}
-	if int64(roll) >= min64(48, warDeclareChance*max1(min64(3, steps))) {
-		return 0, nil
-	}
+	// The roll is read against the attacker's own age of the world below
+	// (v1.29.0), once it is known who is looking outward.
 
 	// Who is looking outward. Ordered, because map order must not decide who
 	// goes to war.
@@ -63,6 +63,12 @@ func (r *Runner) npcSectWars(conn *storage.Conn, steps, gm int64) (int64, error)
 		return 0, err
 	}
 	attacker := candidates[pick]
+	byWorld := r.eraModifiersOrNone(conn)
+	// "Hundred Sects Strife - open territorial war" made sieges fiercer and
+	// no sect any readier to start one (v1.29.0).
+	if int64(roll) >= min64(48, r.eraChance(byWorld, game.SectHome(r.World, attacker), "war_pressure", warDeclareChance*max1(min64(3, steps)))) {
+		return 0, nil
+	}
 
 	// What it wants: somebody else's ground, weakly held, not already contested.
 	targets, err := conn.Execute(`SELECT t.territory_key,t.controller_key FROM territory_state t
@@ -73,48 +79,53 @@ func (r *Runner) npcSectWars(conn *storage.Conn, steps, gm int64) (int64, error)
 	if err != nil || len(targets.Rows) == 0 {
 		return 0, err
 	}
-	tp, err := gamerng.Intn(len(targets.Rows))
-	if err != nil {
-		return 0, err
-	}
-	territory := fmt.Sprint(targets.Rows[tp][0])
-	defender := fmt.Sprint(targets.Rows[tp][1])
-
-	now := nowFloat()
-	ins, err := conn.Execute(`INSERT INTO territory_wars(attacker_key,defender_key,territory_key,status,created_game_minute,updated_game_minute,created_at,updated_at)
-        VALUES(?,?,?,'active',?,?,?,?)`, []any{attacker, defender, territory, gm, gm, now, now})
-	if err != nil {
-		return 0, err
-	}
-	// The same row `territory.claim` opens for a player's war - the column
-	// list is copied from `ensureWarOperationGo` (game/territory_actions.go:74)
-	// rather than written afresh, because a siege with no operation row is a
-	// war the tick cannot fight.
-	if simTableExists(conn, "territory_war_operations") {
-		if _, err = conn.Execute(`INSERT INTO territory_war_operations(war_id,siege_progress,attacker_morale,defender_morale,attacker_force,defender_force,last_tick_game_minute,winner_key,resolution,occupation_until_game_minute,updated_at) VALUES(?,0,100,100,0,0,?,'','',0,?) ON CONFLICT(war_id) DO NOTHING`,
-			[]any{ins.LastInsertID, gm, now}); err != nil {
-			return 0, err
+	// A failed attacker's truce is the war door's rule, asked rather than
+	// restated (v1.24.0); and ground taken from this sect and still under
+	// occupation is where it looks first - an occupation is the window to
+	// win it back.
+	//
+	// And two things a sect does not do (v1.27.0): move on ground an ally
+	// holds - a marriage pact or a standing high enough to fight beside each
+	// other, game.SectsAlliedTx's rule - and march into another world. Claims
+	// have always stayed in a sect's own world; the war step had no such rule,
+	// so a Mortal sect could declare on Celestial ground and two sects bound
+	// by marriage could besiege each other.
+	home := r.sectWorld(attacker)
+	open, retakes := [][]any{}, [][]any{}
+	for _, row := range targets.Rows {
+		key := fmt.Sprint(row[0])
+		if game.WarTruceUntilTx(conn, r.World, attacker, key, gm) > 0 {
+			continue
+		}
+		if game.SectsAlliedTx(conn, r.World, attacker, fmt.Sprint(row[1])) {
+			continue
+		}
+		if loc, ok := r.World.Locations[key]; ok && home != "" && loc.World != home {
+			continue
+		}
+		open = append(open, row)
+		if game.WarOccupiedFromTx(conn, key, gm) == attacker {
+			retakes = append(retakes, row)
 		}
 	}
-	r.recordWarDeclared(conn, attacker, defender, territory, gm, now)
-	return 1, nil
-}
-
-// recordWarDeclared puts it where the world can hear about it. A sect moving
-// on another's ground is the loudest thing that happens in this world.
-func (r *Runner) recordWarDeclared(conn *storage.Conn, attacker, defender, territory string, gm int64, now float64) {
-	if !simTableExists(conn, "world_history_events") {
-		return
+	if len(retakes) > 0 {
+		open = retakes
 	}
-	title := attacker + " declares on " + defender
-	summary := fmt.Sprintf("%s has moved on %s, held by %s. The border is contested.", attacker, territory, defender)
-	source := fmt.Sprintf("sect_war:%s:%s:%d", attacker, territory, gm)
-	_, _ = conn.Execute(`INSERT INTO world_history_events(
-        source_key,event_type,title,summary,significance,visibility,location,world_name,faction,
-        actor_type,actor_key,actor_name,target_type,target_key,target_name,related_user_id,
-        related_npc_name,tags,game_minute,metadata_json,created_at,updated_at)
-        VALUES(?,?,?,?,?, 'public', '','',?, 'faction',?,?, 'faction',?,?, NULL,'',?,?,?,?,?)
-        ON CONFLICT(source_key) DO NOTHING`,
-		[]any{source, "territory_war", title, summary, 78, attacker,
-			attacker, attacker, defender, defender, "territory war " + territory, gm, "{}", now, now})
+	if len(open) == 0 {
+		return 0, nil
+	}
+	tp, err := gamerng.Intn(len(open))
+	if err != nil {
+		return 0, err
+	}
+	territory := fmt.Sprint(open[tp][0])
+	defender := fmt.Sprint(open[tp][1])
+
+	// The one door for a declaration (v1.24.0): the war, its operation row,
+	// the standing between the two sects and the history row are
+	// game.DeclareWarTx's, shared with a player's territory.claim.
+	if _, err = game.DeclareWarTx(conn, r.World, attacker, defender, territory, gm, nowFloat()); err != nil {
+		return 0, err
+	}
+	return 1, nil
 }

@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 func tableExistsTx(conn *storage.Conn, name string) bool {
@@ -51,7 +53,7 @@ func mapAny(v any) map[string]any {
 	return map[string]any{}
 }
 
-func applyWorldEventEffectTx(conn *storage.Conn, eventID, title, location string, gameMinute, severity int64, effect map[string]any, now float64) ([]string, error) {
+func applyWorldEventEffectTx(conn *storage.Conn, catalog worlddata.Catalog, eventID, title, location string, gameMinute, severity int64, effect map[string]any, now float64) ([]string, error) {
 	if len(effect) == 0 {
 		return nil, nil
 	}
@@ -113,26 +115,12 @@ func applyWorldEventEffectTx(conn *storage.Conn, eventID, title, location string
 	}
 
 	sectEffect := mapAny(effect["sect"])
-	if len(sectEffect) > 0 && tableExistsTx(conn, "sect_politics_state") {
-		_, err := conn.Execute(`UPDATE sect_politics_state SET influence=MIN(100,MAX(0,influence+?)),cohesion=MIN(100,MAX(0,cohesion+?)),resources=MIN(100,MAX(0,resources+?)),recruitment_pressure=MIN(100,MAX(0,recruitment_pressure+?)),doctrine_pressure=MIN(100,MAX(0,doctrine_pressure+?)),updated_at=?`, []any{storage.ParseInt(sectEffect["influence"]), storage.ParseInt(sectEffect["cohesion"]), storage.ParseInt(sectEffect["resources"]), storage.ParseInt(sectEffect["recruitment_pressure"]), storage.ParseInt(sectEffect["doctrine_pressure"]), now})
+	if len(sectEffect) > 0 {
+		touched, err := ApplyEventSectEffectTx(conn, catalog, location, sectEffect, history, sev, gameMinute, now)
 		if err != nil {
 			return nil, err
 		}
-		names, err := conn.Execute(`SELECT sect_name FROM sect_politics_state ORDER BY sect_name`, nil)
-		if err != nil {
-			return nil, err
-		}
-		if len(names.Rows) > 0 && tableExistsTx(conn, "sect_politics_events") {
-			for _, row := range names.Rows {
-				if len(row) == 0 {
-					continue
-				}
-				if _, err = conn.Execute(`INSERT INTO sect_politics_events(sect_name,event_text,severity,game_minute,created_at) VALUES(?,?,?,?,?)`, []any{fmt.Sprint(row[0]), history, sev, gameMinute, now}); err != nil {
-					return nil, err
-				}
-			}
-		}
-		if len(names.Rows) > 0 {
+		if touched {
 			impacts = append(impacts, "sect influence, cohesion, resources, or recruitment pressure changed")
 		}
 	}
@@ -160,9 +148,120 @@ func recordWorldHistoryTx(conn *storage.Conn, sourceKey, eventType, title, summa
 	if relatedUserID != nil {
 		uid = *relatedUserID
 	}
+	world := historyWorldTx(conn, location)
 	_, err := conn.Execute(`INSERT INTO world_history_events(source_key,event_type,title,summary,significance,visibility,location,world_name,faction,actor_type,actor_key,actor_name,target_type,target_key,target_name,related_user_id,related_npc_name,tags,game_minute,metadata_json,created_at,updated_at)
         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(source_key) DO UPDATE SET event_type=excluded.event_type,title=excluded.title,summary=excluded.summary,significance=excluded.significance,visibility=excluded.visibility,location=excluded.location,faction=excluded.faction,actor_type=excluded.actor_type,actor_key=excluded.actor_key,actor_name=excluded.actor_name,target_type=excluded.target_type,target_key=excluded.target_key,target_name=excluded.target_name,related_user_id=excluded.related_user_id,related_npc_name=excluded.related_npc_name,tags=excluded.tags,game_minute=excluded.game_minute,metadata_json=excluded.metadata_json,updated_at=excluded.updated_at`,
-		[]any{sourceKey, eventType, title, summary, significance, visibility, location, "", faction, actorType, actorKey, actorName, targetType, targetKey, targetName, uid, relatedNPCName, tagText, gameMinute, string(enc), now, now})
+		[]any{sourceKey, eventType, title, summary, significance, visibility, location, world, faction, actorType, actorKey, actorName, targetType, targetKey, targetName, uid, relatedNPCName, tagText, gameMinute, string(enc), now, now})
 	return err
+}
+
+// historyWorldTx is the world a history row's place stands in, read off the
+// engine's own content table (v1.31.0). Every simulation writer passed its
+// world, and this one - the door nineteen player-side rows go through - wrote
+// an empty string; nothing read the column, so nothing noticed, and the
+// narrator's recall reads it now. A place the catalogue does not carry (a
+// household, an inner world, an abode) is left empty rather than given the
+// Mortal World: being indoors is not being in any world's public news (rc.52's
+// rule). A missing table is empty too, never an error - a history row must
+// never fail the action it records.
+func historyWorldTx(conn *storage.Conn, location string) string {
+	location = strings.TrimSpace(location)
+	if location == "" || !tableExistsTx(conn, "content_locations") {
+		return ""
+	}
+	res, err := conn.Execute(`SELECT COALESCE(world,'') FROM content_locations WHERE name=?`, []any{location})
+	if err != nil || len(res.Rows) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(fmt.Sprint(res.Rows[0][0]))
+}
+
+// EventSectTargetsTx is which sects a world event's `sect` effect reaches
+// (v1.27.0). Both writers of that effect - the event a player sets off and the
+// one the autonomous batch spawns - ran `UPDATE sect_politics_state` with no
+// WHERE, so a Demon Invasion in a Mortal village cost every sect in all four
+// worlds its resources and could drop the lot below the tribute and war floors
+// at once. An event happens somewhere, and these are the sects it is about:
+//
+//   - a sect whose home is the event's city (its seat, or a wilderness gate the
+//     event stands on) - a recruitment drive in Cloudblade City is the Azure
+//     Cloud Sect's, the rule recruitingSectFor already reads for the delegation;
+//   - else the sect holding the event's ground (`territory_state`);
+//   - else every public sect of the event's world.
+//
+// A place the catalogue does not carry (a household, an inner world) is in no
+// world, and an event there reaches no sect - never the Mortal World's by
+// default, which is the rc.52 `world_of_location` rule.
+func EventSectTargetsTx(conn *storage.Conn, catalog worlddata.Catalog, location string) []string {
+	location = strings.TrimSpace(location)
+	loc, ok := catalog.Locations[location]
+	if !ok {
+		return nil
+	}
+	city := cityOf(catalog, location)
+	names := make([]string, 0, len(catalog.Sects))
+	for name := range catalog.Sects {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	home := []string{}
+	for _, name := range names {
+		if h := SectHome(catalog, name); h != "" && (h == city || h == location) {
+			home = append(home, name)
+		}
+	}
+	if len(home) > 0 {
+		return home
+	}
+	if tableExistsTx(conn, "territory_state") {
+		r, err := conn.Execute(`SELECT controller_key FROM territory_state WHERE territory_key=? AND controller_type='sect' AND controller_key<>'' LIMIT 1`, []any{city})
+		if err == nil && len(r.Rows) > 0 {
+			return []string{fmt.Sprint(r.Rows[0][0])}
+		}
+	}
+	world := strings.TrimSpace(loc.World)
+	if world == "" {
+		return nil
+	}
+	out := []string{}
+	for _, name := range names {
+		def := catalog.Sects[name]
+		if def.Hidden {
+			continue
+		}
+		gate, ok := catalog.Locations[sectGate(catalog, name)]
+		if ok && strings.TrimSpace(gate.World) == world {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+// ApplyEventSectEffectTx applies a world event's `sect` deltas to the sects
+// EventSectTargetsTx names and writes their politics-event rows. It is the one
+// statement of the effect, called by the player-triggered event and by the
+// simulation's autonomous one, which used to carry a copy each. It reports
+// whether any sect was moved.
+func ApplyEventSectEffectTx(conn *storage.Conn, catalog worlddata.Catalog, location string, deltas map[string]any, history string, severity, gameMinute int64, now float64) (bool, error) {
+	if len(deltas) == 0 || !tableExistsTx(conn, "sect_politics_state") {
+		return false, nil
+	}
+	touched := false
+	for _, sect := range EventSectTargetsTx(conn, catalog, location) {
+		res, err := conn.Execute(`UPDATE sect_politics_state SET influence=MIN(100,MAX(0,influence+?)),cohesion=MIN(100,MAX(0,cohesion+?)),resources=MIN(100,MAX(0,resources+?)),recruitment_pressure=MIN(100,MAX(0,recruitment_pressure+?)),doctrine_pressure=MIN(100,MAX(0,doctrine_pressure+?)),updated_at=? WHERE sect_name=?`, []any{storage.ParseInt(deltas["influence"]), storage.ParseInt(deltas["cohesion"]), storage.ParseInt(deltas["resources"]), storage.ParseInt(deltas["recruitment_pressure"]), storage.ParseInt(deltas["doctrine_pressure"]), now, sect})
+		if err != nil {
+			return false, err
+		}
+		if res.RowsAffected == 0 {
+			continue
+		}
+		touched = true
+		if tableExistsTx(conn, "sect_politics_events") {
+			if _, err = conn.Execute(`INSERT INTO sect_politics_events(sect_name,event_text,severity,game_minute,created_at) VALUES(?,?,?,?,?)`, []any{sect, history, severity, gameMinute, now}); err != nil {
+				return false, err
+			}
+		}
+	}
+	return touched, nil
 }

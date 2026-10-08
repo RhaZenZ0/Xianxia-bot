@@ -20,6 +20,7 @@ from ..formatting import human_duration, roll_line
 from ..locations import _known_locations, _world_is_unlocked, current_npc_location, local_npc_autocomplete, npcs_present
 from ..registry import registered_root_command
 from ..runtime import (
+    _explain_engine_error,
     DB,
     ENGINE,
     SETTINGS,
@@ -90,7 +91,7 @@ async def sense_command(
                 "sense.status", interaction.user.id, {},
             ) or {})
         except GameEngineError as exc:
-            await respond(interaction, f"Spiritual Sense status could not resolve: {exc}", ephemeral=False)
+            await respond(interaction, f"Spiritual Sense status could not resolve: {_explain_engine_error(exc)}", ephemeral=False)
             return
         await respond(interaction, 
             "🔍 **Spiritual Sense**\n"
@@ -122,7 +123,7 @@ async def sense_command(
                 action_id=f"discord:{interaction.id}:sense.inspect:player:{target.id}",
             )
         except GameEngineError as exc:
-            await respond(interaction, f"Spiritual Sense could not resolve: {exc}", ephemeral=False)
+            await respond(interaction, f"Spiritual Sense could not resolve: {_explain_engine_error(exc)}", ephemeral=False)
             return
         sensed = dict(envelope.get("result") or {})
         roll = SimpleNamespace(**dict(sensed.get("roll") or {}))
@@ -207,7 +208,7 @@ async def sense_command(
                 action_id=f"discord:{interaction.id}:sense.inspect:npc:{npc}",
             )
         except GameEngineError as exc:
-            await respond(interaction, f"Spiritual Sense could not resolve: {exc}", ephemeral=False)
+            await respond(interaction, f"Spiritual Sense could not resolve: {_explain_engine_error(exc)}", ephemeral=False)
             return
         sensed = dict(envelope.get("result") or {})
         roll = SimpleNamespace(**dict(sensed.get("roll") or {}))
@@ -242,7 +243,7 @@ async def sense_command(
             action_id=f"discord:{interaction.id}:sense.inspect:area",
         )
     except GameEngineError as exc:
-        await respond(interaction, f"Spiritual Sense sweep could not resolve: {exc}", ephemeral=False)
+        await respond(interaction, f"Spiritual Sense sweep could not resolve: {_explain_engine_error(exc)}", ephemeral=False)
         return
     sensed = dict(envelope.get("result") or {})
     roll = SimpleNamespace(**dict(sensed.get("roll") or {}))
@@ -299,7 +300,7 @@ async def conceal_command(interaction: discord.Interaction, active: bool) -> Non
             action_id=f"discord:{interaction.id}:sense.conceal",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"Aura concealment could not change: {exc}", ephemeral=False)
+        await interaction.followup.send(f"Aura concealment could not change: {_explain_engine_error(exc)}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     strength = int(result.get("concealment_strength", 0))
@@ -344,7 +345,7 @@ async def check(
             action_id=f"discord:{interaction.id}:check.resolve",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"Check could not be resolved: {exc}", ephemeral=False)
+        await interaction.followup.send(f"Check could not be resolved: {_explain_engine_error(exc)}", ephemeral=False)
         return
     result = SimpleNamespace(**dict(envelope.get("result") or {}))
     fixed = f"Action: {action}\n{roll_line(result)}"

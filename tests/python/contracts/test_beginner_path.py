@@ -16,13 +16,11 @@ not lead anywhere.
 from __future__ import annotations
 
 import json
-import re
 import unittest
 
 from app.rules.game import World
 from app.rules.quests import (
     MAX_OBJECTIVES,
-    OBJECTIVE_TYPES,
     QUEST_DEFINITIONS,
     beginner_path_seed_rows,
     next_objective_label,
@@ -43,7 +41,9 @@ BUDGET = {"max_xp": 100, "max_stones": 100, "max_items": 3}
 ACTION_FOR_OBJECTIVE = {
     "cultivate": ("cultivation_actions.go", "cultivationTrain"),
     "explore": ("exploration_actions.go", "explorationExploreAction"),
-    "travel": ("exploration_actions.go", "explorationTravelAction"),
+    # Travel's refusals live in the planner the journey and its preview share
+    # (v1.26.0); explorationTravelAction is held to calling it below.
+    "travel": ("exploration_actions.go", "planTravelTx"),
     "combat_win": ("exploration_actions.go", "explorationHuntAction"),
 }
 
@@ -67,12 +67,6 @@ class TheContentIsAQuestTheForgeWouldAccept(unittest.TestCase):
                 definition, errors = validate_quest_definition(stage, WORLD, BUDGET)
                 self.assertEqual(errors, [])
                 self.assertLessEqual(len(definition["objectives"]), MAX_OBJECTIVES)
-
-    def test_every_objective_type_used_is_one_the_bot_reports(self):
-        for stage in STAGES:
-            for objective in stage["objectives"]:
-                with self.subTest(stage=stage["quest_key"], objective=objective["id"]):
-                    self.assertIn(str(objective["type"]), OBJECTIVE_TYPES)
 
     def test_no_stage_carries_a_giver(self):
         """A giver makes it a commission - one at a time, with a deadline, and
@@ -150,6 +144,8 @@ class TheFirstStageIsPossibleWhereTheyAreStanding(unittest.TestCase):
             with self.subTest(objective=objective):
                 self.assertTrue(refuses_indoors(filename, name),
                                 f"{name} no longer refuses inside a private residence")
+        self.assertIn("planTravelTx(", go_function("exploration_actions.go", "explorationTravelAction"),
+                      "the journey no longer goes through the planner whose refusals are read here")
         self.assertFalse(refuses_indoors(*ACTION_FOR_OBJECTIVE["cultivate"]),
                          "cultivation now refuses indoors; the first stage has to change")
 

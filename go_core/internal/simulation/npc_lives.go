@@ -59,6 +59,13 @@ var sectRankLadder = []string{
 	"Outer Disciple", "Inner Disciple", "Core Disciple", "Elder", "Grand Elder",
 }
 
+// nextSectRank is the rung above. Somebody unranked - an independent, or a
+// fresh member with no rank yet - takes the first rung; a rank the ladder does
+// not carry stays where it is. That second half is v1.25.0's: bootstrap and
+// the sect population both make a "Sect Master", which is above this ladder,
+// and the old fallback sent every unknown rank to the first rung - so the work
+// that should have become a Sect Master's influence demoted them to Outer
+// Disciple.
 func nextSectRank(current string) string {
 	current = strings.TrimSpace(current)
 	for i, rank := range sectRankLadder {
@@ -69,7 +76,10 @@ func nextSectRank(current string) string {
 			return "" // already at the top
 		}
 	}
-	return sectRankLadder[0]
+	if current == "" || strings.HasPrefix(current, "Independent") {
+		return sectRankLadder[0]
+	}
+	return ""
 }
 
 // recordNPCHistory writes a public world-history row. Best-effort: the thing
@@ -314,6 +324,7 @@ func (r *Runner) npcBreakthroughs(conn *storage.Conn, gm int64) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	byWorld := r.eraModifiersOrNone(conn)
 	now := nowFloat()
 	crossed := int64(0)
 	for _, row := range res.Rows {
@@ -324,7 +335,8 @@ func (r *Runner) npcBreakthroughs(conn *storage.Conn, gm int64) (int64, error) {
 		if err != nil {
 			return crossed, err
 		}
-		if int64(roll) >= breakthroughChance {
+		// An age of plentiful qi lifts the world's own people too (v1.29.0).
+		if int64(roll) >= r.eraChance(byWorld, fmt.Sprint(row[3]), "cultivation_gain", breakthroughChance) {
 			continue
 		}
 		name, realm := fmt.Sprint(row[0]), i64(row[1])
@@ -498,6 +510,7 @@ func (r *Runner) npcFeuds(conn *storage.Conn, gm int64) (int64, int64, error) {
 				winner+" kills "+loser,
 				fmt.Sprintf("A long grudge between %s and %s ended at %s. %s did not walk away.", a, b, location, loser),
 				location, winner, 70, gm, now)
+			r.markNPCKilling(conn, loser, location, loser+" died settling a grudge, and the quarter is uneasy.", gm, now)
 			killed++
 		} else {
 			if _, err := conn.Execute(`UPDATE npc_life_state SET health=MAX(1,health-25),injury='wounded settling a grudge',injury_severity=MIN(10,injury_severity+3),updated_at=? WHERE npc_name=?`,

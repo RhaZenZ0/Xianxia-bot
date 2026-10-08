@@ -219,9 +219,13 @@ const (
 	sectJoinPressure  = 60 // recruitment_pressure above this and the sect is hunting
 	sectLeaveCohesion = 35 // cohesion below this and people start walking out
 	sectJoinAmbition  = 45 // an NPC below this is not looking for a banner
-	sectChangeCap     = 12 // per tick, for the same reason travel is capped
-	sectJoinChance    = 30
-	sectLeaveChance   = 22
+	// Per tick, for the same reason travel is capped - for walking out only.
+	// Joining has no cap (v1.25.0, on the owner's call): every willing
+	// independent gets their roll, however many there are, so a sect
+	// recruiting hard can grow as large as the world will give it.
+	sectChangeCap   = 12
+	sectJoinChance  = 30
+	sectLeaveChance = 22
 )
 
 // npcSectChanges moves NPCs into and out of sects, and writes what happened
@@ -250,19 +254,15 @@ func (r *Runner) npcSectChanges(conn *storage.Conn, steps, gm int64) (int64, int
 
 	joined, left := int64(0), int64(0)
 	now := nowFloat()
-	changed := 0
 
 	if len(recruiting) > 0 {
 		free, err := conn.Execute(`SELECT npc_name,current_location,world_name,ambition FROM npc_civilization_state
             WHERE status='alive' AND (faction='' OR faction='Independent') AND ambition>=?
-            ORDER BY ambition DESC,npc_name LIMIT 120`, []any{sectJoinAmbition})
+            ORDER BY ambition DESC,npc_name`, []any{sectJoinAmbition})
 		if err != nil {
 			return 0, 0, err
 		}
 		for _, row := range free.Rows {
-			if changed >= sectChangeCap {
-				break
-			}
 			roll, err := gamerng.Intn(100)
 			if err != nil {
 				return joined, left, err
@@ -283,7 +283,6 @@ func (r *Runner) npcSectChanges(conn *storage.Conn, steps, gm int64) (int64, int
 			}
 			r.recordSectMove(conn, sect, name, where, "joined", gm, now)
 			joined++
-			changed++
 		}
 	}
 
@@ -300,7 +299,7 @@ func (r *Runner) npcSectChanges(conn *storage.Conn, steps, gm int64) (int64, int
 			return joined, left, err
 		}
 		for _, row := range leavers.Rows {
-			if changed >= sectChangeCap {
+			if left >= sectChangeCap {
 				break
 			}
 			roll, err := gamerng.Intn(100)
@@ -318,7 +317,6 @@ func (r *Runner) npcSectChanges(conn *storage.Conn, steps, gm int64) (int64, int
 			}
 			r.recordSectMove(conn, sect, name, where, "left", gm, now)
 			left++
-			changed++
 		}
 	}
 	return joined, left, nil

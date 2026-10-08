@@ -64,7 +64,10 @@ def test_python_go_authority_boundary_only_delegates_migrated_mechanics():
         "conceal_command": "sense.conceal",
         "explore": "exploration.explore",
         "hunt": "exploration.hunt",
-        "travel": "exploration.travel",
+        # v1.26.0: `/travel go` asks the preview, and the journey is
+        # `_travel_now`, which Go under the preview and a free walk both reach.
+        "travel": "exploration.travel_preview",
+        "_travel_now": "exploration.travel",
         "realmhub_go": "exploration.travel",
         "secret_status": "secret_realm.status",
         "secret_enter": "secret_realm.enter",
@@ -590,6 +593,9 @@ BOOKKEEPING_METHODS = {
     # v1.7.0: one market-stalls channel per world and the card per open stall - Discord ids only;
     # the stall is the player_stalls row the engine owns.
     "set_stall_channel", "remember_stall_card", "forget_stall_card",
+    # v1.24.0: one war-front channel per world and the card per war - Discord ids only;
+    # the war is the territory_wars row the engine owns.
+    "set_war_channel", "remember_war_card", "forget_war_card",
     # v1.0.0-rc.59: which release this guild has already been told about in #updates. A marker on
     # the same bookkeeping row as the channel ids, decided by `app/version.py` and nothing else -
     # no player and no rule can move it, which is what keeps it out of the engine.
@@ -718,7 +724,7 @@ PRESENTATION_WRITES: dict[str, set[str]] = {
     "set_info_message_id": {"server_config"},
     "set_bugs_channel_id": {"server_config"},
     "set_announced_release": {"server_config"},  # v1.0.0-rc.59 the release #updates has seen
-    "clear_discord_bindings": {"auction_house_channels", "auction_lot_messages", "channel_messages", "playtest_items", "realm_hub_channels", "server_config", "stall_card_messages", "stall_channels", "world_event_channels"},
+    "clear_discord_bindings": {"auction_house_channels", "auction_lot_messages", "channel_messages", "playtest_items", "realm_hub_channels", "server_config", "stall_card_messages", "stall_channels", "war_card_messages", "war_channels", "world_event_channels"},
     "set_playtest_item": {"playtest_items"},
     "clear_playtest_items": {"playtest_items"},
     "set_channel_message": {"channel_messages"},
@@ -730,6 +736,9 @@ PRESENTATION_WRITES: dict[str, set[str]] = {
     "set_stall_channel": {"stall_channels"},
     "remember_stall_card": {"stall_card_messages"},
     "forget_stall_card": {"stall_card_messages"},
+    "set_war_channel": {"war_channels"},
+    "remember_war_card": {"war_card_messages"},
+    "forget_war_card": {"war_card_messages"},
     "remember_auction_lot_message": {"auction_lot_messages"},
     "forget_auction_lot_message": {"auction_lot_messages"},
     "set_expedition_thread": {"expedition_threads"},

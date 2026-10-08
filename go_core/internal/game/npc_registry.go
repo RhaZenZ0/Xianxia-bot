@@ -58,11 +58,14 @@ const (
 	NPCOriginBirthFamily = "birth_family"
 	NPCOriginEvent       = "event"
 	NPCOriginGM          = "gm"
+	// A sect's own people, made by the politics tick to fill its hall
+	// (v1.25.0, simulation/sect_population.go).
+	NPCOriginSect = "sect"
 )
 
 func validNPCOrigin(origin string) bool {
 	switch origin {
-	case NPCOriginDescendant, NPCOriginBirthFamily, NPCOriginEvent, NPCOriginGM:
+	case NPCOriginDescendant, NPCOriginBirthFamily, NPCOriginEvent, NPCOriginGM, NPCOriginSect:
 		return true
 	}
 	return false

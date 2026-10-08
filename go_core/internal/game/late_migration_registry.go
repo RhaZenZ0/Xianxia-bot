@@ -54,6 +54,8 @@ func applyLateMigrationAction(conn *storage.Conn, catalog worlddata.Catalog, use
 		return territoryClaimActionGo(conn, catalog, userID, raw)
 	case "war.act":
 		return territoryWarActActionGo(conn, catalog, userID, raw)
+	case "war.peace":
+		return territoryWarPeaceActionGo(conn, catalog, userID, raw)
 	case "caravan.dispatch":
 		return caravanDispatchActionGo(conn, catalog, userID, raw)
 	case "caravan.settle":
@@ -70,6 +72,12 @@ func applyLateMigrationAction(conn *storage.Conn, catalog worlddata.Catalog, use
 		return sectEconomyActionGo(conn, catalog, userID, raw, op)
 	case "discipleship.request", "discipleship.resolve", "discipleship.leave":
 		return discipleshipActionGo(conn, catalog, userID, raw, op)
+	case "discipleship.npc_request":
+		return npcMasterRequestAction(conn, catalog, userID, raw)
+	case "sect.master.teach":
+		return sectMasterTeachAction(conn, catalog, userID, raw)
+	case "sect.promote":
+		return sectPromoteAction(conn, catalog, userID, raw)
 	case "sect.manor.establish", "sect.manor.upgrade":
 		return sectManorActionGo(conn, catalog, userID, raw, op)
 	case "family.simulate":

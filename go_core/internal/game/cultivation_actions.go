@@ -137,12 +137,15 @@ func eraCultivationMultiplier(conn *storage.Conn, world string) (string, float64
 	return name, mult, nil
 }
 
-func manorCultivationMultiplier(conn *storage.Conn, userID int64, location string) (string, float64, error) {
-	res, err := conn.Execute(`SELECT m.name,m.base_location,m.qi_array_level FROM sect_membership sm JOIN sect_manors m ON m.sect_name=sm.sect_name WHERE sm.user_id=?`, []any{userID})
+func manorCultivationMultiplier(conn *storage.Conn, catalog worlddata.Catalog, userID int64, location string) (string, float64, error) {
+	res, err := conn.Execute(`SELECT m.name,m.base_location,m.qi_array_level,m.sect_name FROM sect_membership sm JOIN sect_manors m ON m.sect_name=sm.sect_name WHERE sm.user_id=?`, []any{userID})
 	if err != nil {
 		return "", 1, err
 	}
 	if len(res.Rows) == 0 || fmt.Sprint(res.Rows[0][1]) != location {
+		return "", 1, nil
+	}
+	if ManorGroundTakenTx(conn, catalog, fmt.Sprint(res.Rows[0][3]), location) {
 		return "", 1, nil
 	}
 	level := storage.ParseInt(res.Rows[0][2])
@@ -323,7 +326,10 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	// the grade's other half on both branches, so excluding it here would split
 	// the root against itself.
 	rootMult := rootWorthMultiplier(catalog, bundle.Root)
-	attempted := int64(math.Round(float64(base+resonance) * timeMult * effectMult * soulMult * eraMult * stance.GainMult * worldMult * manualMult * elementMult * rootMult))
+	// A master's guidance (v1.25.0) - one of the sect's people or another
+	// player - on both paths: a teacher is not qi-path weather.
+	masterMult, masterNPC := masterCultivationMultTx(conn, catalog, userID)
+	attempted := int64(math.Round(float64(base+resonance) * timeMult * effectMult * soulMult * eraMult * stance.GainMult * worldMult * manualMult * elementMult * rootMult * masterMult))
 
 	// The ground, and what the sect built on it. The manor array and a qi
 	// storm are qi-path weather; the ground itself counts for both paths.
@@ -341,7 +347,7 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	manorMult := 1.0
 	storm := int64(0)
 	if !body {
-		manorName, manorMult, err = manorCultivationMultiplier(conn, userID, c.Location)
+		manorName, manorMult, err = manorCultivationMultiplier(conn, catalog, userID, c.Location)
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
@@ -449,7 +455,7 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		return authoritativeMutation{}, err
 	}
 	total := current + gain
-	payload := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "gain": gain, "attempted_gain": attempted, "total": total, "cost": cost, "base_gain": base, "pace": pace, "sessions_per_stage": sessionsForStage(realm), "attribute": attr, "attribute_value": attrValue, "attribute_quality": round4(quality), "resonance_bonus": resonance, "period": tm.Period, "season": tm.Season, "time_mult": timeMult, "root_resonance": tm.RootResonance, "effect_mult": effectMult, "soul_mult": soulMult, "era_name": eraName, "era_mult": eraMult, "world_name": worldName, "world_mult": worldMult, "manor_name": manorName, "manor_mult": manorMult, "storm_bonus": storm, "perfection_gain": pg, "ready": total >= cost, "stance": stance.Key, "stance_label": stance.Label, "stance_mult": stance.GainMult, "insight_xp_gain": insightGain, "deviation": deviation, "place_name": placeName, "place_mult": placeMult, "place_quality": placeQuality(placeMult), "stage_full": room == 0, "manual_name": manualName, "manual_grade": manualGrade, "manual_mult": manualMult, "manual_chosen": manualChosen, "manual_own_path": manualOwnPath, "qi_type": firstNonempty(ghostBody.QiType, spiritQiType), "corruption": ghostBody.Corruption, "corruption_gain": corruptionGain, "ghost_form_name": ghostFormAt(catalog, ghostBody.GhostForm).Name, "form_risen": formRisen, "ghost_rupture": ghostRupture, "element": absorption.Element, "element_relation": absorption.Relation, "element_label": absorption.Label, "element_note": absorption.Note, "element_mult": elementMult, "element_clash": elementClash, "root_grade": bundle.Root.Grade, "root_mult": rootMult}
+	payload := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "gain": gain, "attempted_gain": attempted, "total": total, "cost": cost, "base_gain": base, "pace": pace, "sessions_per_stage": sessionsForStage(realm), "attribute": attr, "attribute_value": attrValue, "attribute_quality": round4(quality), "resonance_bonus": resonance, "period": tm.Period, "season": tm.Season, "time_mult": timeMult, "root_resonance": tm.RootResonance, "effect_mult": effectMult, "soul_mult": soulMult, "era_name": eraName, "era_mult": eraMult, "world_name": worldName, "world_mult": worldMult, "manor_name": manorName, "manor_mult": manorMult, "storm_bonus": storm, "perfection_gain": pg, "ready": total >= cost, "stance": stance.Key, "stance_label": stance.Label, "stance_mult": stance.GainMult, "insight_xp_gain": insightGain, "deviation": deviation, "place_name": placeName, "place_mult": placeMult, "place_quality": placeQuality(placeMult), "stage_full": room == 0, "manual_name": manualName, "manual_grade": manualGrade, "manual_mult": manualMult, "manual_chosen": manualChosen, "manual_own_path": manualOwnPath, "qi_type": firstNonempty(ghostBody.QiType, spiritQiType), "corruption": ghostBody.Corruption, "corruption_gain": corruptionGain, "ghost_form_name": ghostFormAt(catalog, ghostBody.GhostForm).Name, "form_risen": formRisen, "ghost_rupture": ghostRupture, "element": absorption.Element, "element_relation": absorption.Relation, "element_label": absorption.Label, "element_note": absorption.Note, "element_mult": elementMult, "element_clash": elementClash, "root_grade": bundle.Root.Grade, "root_mult": rootMult, "master_mult": masterMult, "master_name": masterNPC}
 	if gain > 0 {
 		// The method is practised by being cultivated by (v1.11.0). A session
 		// that gathered nothing practises nothing, for the insight rule's reason
@@ -566,6 +572,13 @@ func awakenSoulMemoryGo(conn *storage.Conn, userID, amount int64, now float64) (
 	}
 	return map[string]any{"memory_seed": seed, "awakened_memory": aw}, nil
 }
+
+// masterAttentionInsight is the insight a disciple is taught on crossing a
+// realm: a point for every 20 attention, at most 15.
+func masterAttentionInsight(attention int64) int64 {
+	return minI64(15, maxI64(0, attention)/20)
+}
+
 func rewardMasterGo(conn *storage.Conn, catalog worlddata.Catalog, disciple int64, realmChanged bool, now float64) (map[string]any, error) {
 	att, contrib, influence, xp := int64(2), int64(1), int64(0), int64(3)
 	if realmChanged {
@@ -583,7 +596,7 @@ func rewardMasterGo(conn *storage.Conn, catalog worlddata.Catalog, disciple int6
 	if _, err = conn.Execute(`UPDATE sect_lineage SET attention=attention+? WHERE disciple_user_id=?`, []any{att, disciple}); err != nil {
 		return nil, err
 	}
-	promoted, err := creditSectContributionTx(conn, catalog, mid, contrib, influence)
+	eligible, err := creditSectContributionTx(conn, catalog, mid, contrib, influence)
 	if err != nil {
 		return nil, err
 	}
@@ -591,8 +604,25 @@ func rewardMasterGo(conn *storage.Conn, catalog worlddata.Catalog, disciple int6
 		return nil, err
 	}
 	out := map[string]any{"master_user_id": mid, "master_name": name, "attention": att, "contribution": contrib, "influence": influence, "insight_xp": xp}
-	if promoted != "" {
-		out["master_promoted_to"] = promoted
+	if eligible != "" {
+		out["master_eligible_for"] = eligible
+	}
+	// A master's attention is what they pass down (v1.28.0): the disciple's
+	// cultivation and donations have raised it since the lineage was written,
+	// and only the sect card read it. A disciple crossing a realm is taught
+	// what that attention has built - a point of insight for every 20.
+	if realmChanged {
+		taught := int64(0)
+		if r, e := conn.Execute(`SELECT attention FROM sect_lineage WHERE disciple_user_id=?`, []any{disciple}); e == nil && len(r.Rows) > 0 {
+			taught = masterAttentionInsight(storage.ParseInt(r.Rows[0][0]))
+		}
+		if taught > 0 {
+			granted, e := grantInsightXPTx(conn, disciple, taught, now)
+			if e != nil {
+				return nil, e
+			}
+			out["disciple_insight_xp"] = granted
+		}
 	}
 	return out, nil
 }
@@ -732,7 +762,8 @@ func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, user
 	// The Celestial World's job (v1.17.0): the heavens are nearer on the
 	// heaven-reading altar's stone, in the odds shown and in the roll alike.
 	placeName, placeBonus := breakthroughPlaceBonus(catalog, c.Location)
-	modifier := breakthroughModifier(c, mods, body, perfectBonus, resonance, innate, placeBonus)
+	masterBonus, masterName := npcMasterBreakthroughBonusTx(conn, catalog, userID)
+	modifier := breakthroughModifier(c, mods, body, perfectBonus, resonance, innate, placeBonus, masterBonus)
 	// The qi body (v1.0.0-rc.7): an attempt is fuelled from the dantian, win
 	// or lose, so a dry cultivator prepares before they try.
 	now := float64(time.Now().UnixNano()) / 1e9
@@ -817,7 +848,7 @@ func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, user
 		}
 		insightSpent = true
 	}
-	result := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "roll": roll, "success": success, "tn": tn, "modifier": modifier, "probability": probability, "realm_gate": newRealm != realm, "gate_via_insight": viaInsight, "insight_spent": insightSpent, "qi_spent": qiCost, "reroll": reroll, "reroll_cost": rerollCost, "reroll_available": rerollAvailable, "insight_xp": xpLeft, "cost": cost, "failure_loss": failureLoss, "from_realm": realmName(realms, realm), "from_stage": phase, "to_realm": realmName(realms, newRealm), "to_stage": newPhase, "from_world": oldWorld, "to_world": newWorld, "perfect_bonus": perfectBonus, "resonance_bonus": resonance, "innate_breakthrough_bonus": innate, "place": placeName, "place_bonus": placeBonus, "vitality_gain": vitalityGain, "ascended": oldWorld != newWorld, "attribute_gains": attributeGains, "world_mult": worldQiMultiplier(catalog, newWorld)}
+	result := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "roll": roll, "success": success, "tn": tn, "modifier": modifier, "probability": probability, "realm_gate": newRealm != realm, "gate_via_insight": viaInsight, "insight_spent": insightSpent, "qi_spent": qiCost, "reroll": reroll, "reroll_cost": rerollCost, "reroll_available": rerollAvailable, "insight_xp": xpLeft, "cost": cost, "failure_loss": failureLoss, "from_realm": realmName(realms, realm), "from_stage": phase, "to_realm": realmName(realms, newRealm), "to_stage": newPhase, "from_world": oldWorld, "to_world": newWorld, "perfect_bonus": perfectBonus, "resonance_bonus": resonance, "innate_breakthrough_bonus": innate, "place": placeName, "place_bonus": placeBonus, "master_bonus": masterBonus, "master_npc_name": masterName, "vitality_gain": vitalityGain, "ascended": oldWorld != newWorld, "attribute_gains": attributeGains, "world_mult": worldQiMultiplier(catalog, newWorld)}
 	if success {
 		legacy, err := awakenSoulMemoryGo(conn, userID, map[bool]int64{true: 4, false: 5}[body], now)
 		if err != nil {
@@ -844,6 +875,16 @@ func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, user
 		}
 		if master != nil {
 			result["master_reward"] = master
+		}
+		// An NPC master's gift on a qi realm crossing (v1.25.0).
+		if !body && newRealm != realm {
+			teaching, err := npcMasterRealmInsightTx(conn, catalog, userID, now)
+			if err != nil {
+				return authoritativeMutation{}, err
+			}
+			if teaching != nil {
+				result["npc_master_insight"] = teaching
+			}
 		}
 		if oldWorld != newWorld {
 			if err = recordAscensionHistory(conn, userID, c, body, oldWorld, newWorld, newRealm, realmName(realms, newRealm), p.GameMinute, now); err != nil {

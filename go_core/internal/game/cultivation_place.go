@@ -90,7 +90,7 @@ func placeMultiplierForPath(conn *storage.Conn, catalog worlddata.Catalog, userI
 		}
 		if home != nil {
 			level := max64(0, i64(home["cultivation_level"]))
-			name, mult = fmt.Sprint(home["name"]), math.Min(1.45, 1.05+0.05*float64(level))
+			name, mult = fmt.Sprint(home["name"]), homeCultivationMult(level)
 			if array := abodeArrayMultiplier(home); array > 1 {
 				mult *= array
 				name += " and its gathering array"

@@ -17,7 +17,7 @@ Three things this feature promises, each held here by reading the source:
    buttons spend one on click.
 
 The behavioural half (what a line becomes) is ``test_typed_play_router.py``;
-the bucket itself is ``test_user_budget.py``.
+the bucket itself is ``test_hub_surface.py``.
 """
 from __future__ import annotations
 

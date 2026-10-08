@@ -1,8 +1,8 @@
 package game
 
 import (
+	"encoding/json"
 	"testing"
-
 	"xianxia/core/internal/storage"
 	"xianxia/core/internal/worlddata"
 )
@@ -154,5 +154,67 @@ func TestARewardIsPaidInTheMoneyOfTheWorldItIsEarnedIn(t *testing.T) {
 				t.Fatalf("the sheet says %d while the purse holds 40", sheet)
 			}
 		})
+	}
+}
+
+// --- from abode_upgrade_currency_test.go ---
+
+// A homestead may be founded in any world, and its upgrade charged the Mortal
+// stone in all four (v1.2.1) - so above the Mortal World, where every reward
+// is paid in that world's crystal (rc.44), no upgrade could ever be afforded.
+func TestAnUpgradeIsPaidInTheMoneyOfTheWorldTheHomeStandsIn(t *testing.T) {
+	world := batch4WorldPath(t)
+	path := setupPropertyTypesDB(t)
+	batch4Exec(t, path, `UPDATE characters SET location='Jade Meridian Stone Gate' WHERE user_id=42`)
+	batch4Exec(t, path, `INSERT INTO currency_wallets(user_id,currency_id,balance) VALUES(42,'low_spirit_crystal',250)`)
+	deaconMembership(t, path)
+	if _, err := establishProperty(t, path, world, ""); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := json.Marshal(map[string]any{"facility": "herb_garden"})
+	out, err := ApplyWithWorld(path, world, ActionRequest{APIVersion: authoritativeAPIVersion, ActionID: "prop-upgrade-crystal", Operation: "abode.upgrade", ActorID: 42, Payload: raw})
+	if err != nil {
+		t.Fatalf("a Spiritual World homestead could not be upgraded with 250 crystals: %v", err)
+	}
+	built := out.Result.(map[string]any)
+	if storage.ParseInt(built["level"]) != 1 {
+		t.Fatalf("build=%#v", built)
+	}
+	if got := storage.ParseInt(actionScalar(t, path, "SELECT balance FROM currency_wallets WHERE user_id=42 AND currency_id='low_spirit_crystal'")); got != 150 {
+		t.Fatalf("crystal balance=%d want 150: the upgrade was not charged in the world's own money", got)
+	}
+}
+
+// --- from admin_grant_mirror_test.go ---
+
+// The sheet's mirror follows the base currency of the world the target stands
+// in (rc.44). The GM's grant compared the id to the Mortal stone by name
+// (v1.2.1), so a grant of crystals to somebody in the Spiritual World never
+// reached their sheet, and a grant of Mortal stones to them corrupted it.
+func TestAGrantMirrorsTheMoneyOfTheTargetsWorld(t *testing.T) {
+	path := setupAdminDB(t)
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Execute(`UPDATE characters SET location='Spirit Jade Capital' WHERE user_id=42`, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	conn.Close()
+	before := storage.ParseInt(scalar(t, path, "SELECT spirit_stones FROM characters WHERE user_id=42"))
+
+	applyAdmin(t, path, "admin.player.grant_currency", map[string]any{"user_id": 42, "currency_id": "low_spirit_crystal", "amount": 7, "reason": "test"})
+	if got := storage.ParseInt(scalar(t, path, "SELECT spirit_stones FROM characters WHERE user_id=42")); got != before+7 {
+		t.Fatalf("spirit_stones=%d want %d: a grant in the world's own money did not reach the sheet", got, before+7)
+	}
+	applyAdmin(t, path, "admin.player.grant_currency", map[string]any{"user_id": 42, "currency_id": "low_spirit_stone", "amount": 50, "reason": "test"})
+	if got := storage.ParseInt(scalar(t, path, "SELECT spirit_stones FROM characters WHERE user_id=42")); got != before+7 {
+		t.Fatalf("spirit_stones=%d want %d: Mortal stones granted in the Spiritual World moved the sheet", got, before+7)
+	}
+	if got := storage.ParseInt(scalar(t, path, "SELECT balance FROM currency_wallets WHERE user_id=42 AND currency_id='low_spirit_stone'")); got != 50 {
+		t.Fatalf("the Mortal purse should still hold the grant: %d", got)
 	}
 }

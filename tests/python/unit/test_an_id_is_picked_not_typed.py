@@ -40,7 +40,7 @@ STILL_TYPED = {
     ("birth_family_investigate", "history_id"), ("birth_family_legacy", "history_id"),
     ("birth_family_quest", "history_id"), ("birth_family_quest", "quest_id"),
     ("birth_family_claim", "history_id"), ("birth_family_conflict", "claim_id"),
-    ("war_act", "war_id"), ("caravan_events", "caravan_id"),
+    ("caravan_events", "caravan_id"),
     ("auction_bid", "auction_id"), ("auction_appraise", "auction_id"),
     ("duel_respond", "challenge_id"), ("bond_respond", "partnership_id"),
 }

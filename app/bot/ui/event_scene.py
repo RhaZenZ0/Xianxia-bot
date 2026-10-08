@@ -355,7 +355,7 @@ class EventSceneView(CardView):
                 for candidate in WORLD.unexpected_events:
                     if str(candidate.get("id") or "")==definition:
                         description=str(candidate.get("description") or "").strip(); break
-            objective=str(WORLD.event_site_objective(self.category) or "").strip()
+            objective=str(WORLD.event_site_objective(self.category, self.event_type) or "").strip()
             site=await DB.list_world_event_nodes(self.event_key)
             progress=await DB.world_event_site_progress(self.event_key)
             participants=await DB.list_world_event_participants(self.event_key, limit=10)
@@ -413,7 +413,7 @@ class EventSceneView(CardView):
                 action_id=f"discord:{interaction.id}:world_event.act:{self.event_key}:{action_key}",
             )
         except GameEngineError as exc:
-            await interaction.response.send_message(f"Event action failed: {exc}",ephemeral=False); return
+            await interaction.response.send_message(f"Event action failed: {_explain_engine_error(exc)}",ephemeral=False); return
         outcome=dict(envelope.get("result") or {})
         if action_key=="withdraw":
             await interaction.response.send_message("↩️ You withdraw from active involvement. The event continues without forcing another action from you.",ephemeral=False); return

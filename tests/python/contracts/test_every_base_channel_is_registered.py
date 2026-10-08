@@ -6,7 +6,7 @@ while a ninth base channel needs a `server_config` column, a migration, four
 edits inside one `set_server_channels`, a teardown NULL, a bindings entry, a
 dashboard mapping and a form field.
 
-`#playtest`, the eighth, got a test for exactly this (`test_playtest_board.py`)
+`#playtest`, the eighth, got a test for exactly this (`test_dashboard_implementation.py`)
 and it named `playtest` nine times. That is the right check written the wrong
 way round: it proves *that* channel is registered and says nothing about the
 next one. `#updates` is the ninth, and this walks `BASE_CHANNEL_SPECS` instead,

@@ -251,7 +251,9 @@ func explorationMineAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 		return authoritativeMutation{}, err
 	}
 	tn := maxI64(8, 12+worldTier*2-resourceBonus)
-	mod := body + insight + level + familyBonus + resourceBonus
+	// A player master's teaching (v1.25.0), in every trade.
+	masterBonus, masterName := masterTradeBonusTx(conn, catalog, userID)
+	mod := body + insight + level + familyBonus + resourceBonus + masterBonus
 	roll, err := roll2d10(mod, tn)
 	if err != nil {
 		return authoritativeMutation{}, err
@@ -312,6 +314,8 @@ func explorationMineAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 		"stones":              stones,
 		"family_bonus":        familyBonus,
 		"family_trade":        familyTrade,
+		"master_trade_bonus":  masterBonus,
+		"master_name":         masterName,
 		"profession_progress": prog,
 		"body_tempered":       bodyTempered,
 	}

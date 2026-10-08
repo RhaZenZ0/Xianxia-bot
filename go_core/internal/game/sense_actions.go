@@ -132,6 +132,10 @@ func senseExtraModifier(conn *storage.Conn, catalog worlddata.Catalog, userID, g
 	return int64(math.Round(applyStatModifiers(0, stat, mods))), nil
 }
 
+// spiritSenseSweepPerStage is what one built stage of the spirit sense adds to
+// a sweep's power and precision (v1.28.0).
+const spiritSenseSweepPerStage = int64(2)
+
 func senseStatsGo(conn *storage.Conn, catalog worlddata.Catalog, userID, gameMinute int64) (senseCharacter, int64, int64, int64, error) {
 	c, err := loadSenseCharacter(conn, catalog, userID)
 	if err != nil {
@@ -174,6 +178,15 @@ func senseStatsGo(conn *storage.Conn, catalog worlddata.Catalog, userID, gameMin
 	power += ep
 	precision += epr
 	rng += erng
+	// The spirit sense a cultivator builds (v1.28.0) - by Formation and
+	// Inscription crafts, qi meditation and scene actions, settled stage by
+	// stage - steadied only a craft roll, so somebody who had built it to the
+	// ninth stage swept a room exactly as well as on the day they began. Each
+	// built stage sharpens the sweep it is named for.
+	if stage, _, ok := loadSpiritSenseTx(conn, userID); ok && stage > 0 {
+		power += stage * spiritSenseSweepPerStage
+		precision += stage * spiritSenseSweepPerStage
+	}
 	// The price of hiding: a folded aura does not reach as far.
 	if c.ConcealmentActive {
 		power = power * concealedSenseNumerator / concealedSenseDenominator

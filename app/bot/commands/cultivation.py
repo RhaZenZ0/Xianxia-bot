@@ -85,6 +85,9 @@ async def cultivate(interaction: discord.Interaction) -> None:
     if float(result.get("root_mult", 1)) != 1.0:
         extra += (f"\n🌿 **{result.get('root_grade') or 'Common'}** spiritual root: "
                   f"**x{float(result['root_mult']):.2f}** cultivation efficiency.")
+    # A master's guidance (v1.25.0), NPC or player, named by the engine with its term.
+    if float(result.get("master_mult", 1) or 1) != 1.0:
+        extra += f"\n🎓 Your master **{result.get('master_name')}** guides the session: **x{float(result['master_mult']):.2f}**."
     if float(result.get("manual_mult", 1)) != 1.0:
         chosen = "you practise" if result.get("manual_chosen") else "the best method you have learned"
         extra += f"\n📖 **{result.get('manual_name')}** ({result.get('manual_grade')} grade, {chosen}): **x{float(result['manual_mult']):.2f}**."
@@ -197,7 +200,7 @@ async def insight(interaction: discord.Interaction) -> None:
             action_id=f"discord:{interaction.id}:cultivation.insight",
         )
     except GameEngineError as exc:
-        message = str(exc)
+        message = _explain_engine_error(exc)
         if "already banked" in message:
             message = "An insight is already banked. It is spent when you cross the realm gate at **/ascend → Main Progression → Breakthrough**."
         elif "costs" in message and "Insight XP" in message:
@@ -267,7 +270,7 @@ async def seclusion_start(
     # The literal is deliberate and cannot be the constant: `@serialized_user_action`
     # wraps the handler, so discord.py resolves this annotation against
     # `runtime.py`'s globals rather than this module's, and a name here is a
-    # NameError at import. `test_seclusion_cap.py` holds the two equal to the
+    # NameError at import. `test_cooldowns_are_the_engines.py` holds the two equal to the
     # engine's own `seclusionMaxRealMinutes`, which is the real bound - this is
     # only the picker's shape.
     minutes: app_commands.Range[int, 10, 120] = SECLUSION_MAX_REAL_MINUTES,
@@ -401,7 +404,7 @@ async def breakthrough(interaction: discord.Interaction, confirm: bool = False, 
             action_id=f"discord:{interaction.id}:cultivation.breakthrough",
         )
     except GameEngineError as exc:
-        message = str(exc)
+        message = _explain_engine_error(exc)
         if "perfection choice requires explicit confirmation" in message:
             message = "⚠️ **Stage 9 choice**\nYou can pursue **/ascend → Perfection → Start** for a stronger long-term foundation, or explicitly confirm this breakthrough to skip it."
         elif "no moment to seize" in message or "seized once already" in message:
@@ -462,6 +465,9 @@ async def breakthrough(interaction: discord.Interaction, confirm: bool = False, 
     # the engine with its bonus.
     if int(result.get("place_bonus", 0)):
         mechanical += f"\n🌠 {result.get('place')}: **{int(result['place_bonus']):+d}** to this breakthrough."
+    # An NPC master's help (v1.25.0), named by the engine with its bonus.
+    if int(result.get("master_bonus", 0)):
+        mechanical += f"\n🎓 Your master **{result.get('master_npc_name')}** steadies you: **{int(result['master_bonus']):+d}** to this breakthrough."
     if success:
         mechanical += f"\n✨ Advanced to **{next_realm}, Stage {next_phase}**."
         gains = dict(result.get("attribute_gains") or {})
@@ -480,6 +486,9 @@ async def breakthrough(interaction: discord.Interaction, confirm: bool = False, 
                 f"**{result.get('ascended_to_location')}**, the capital of {result.get('to_world')} — it is on your map now, "
                 "and the road out of it begins with **/travel**."
             )
+        teaching = dict(result.get("npc_master_insight") or {})
+        if teaching:
+            mechanical += f"\n📖 **{teaching.get('master_npc_name')}** talks you through the new realm: **+{int(teaching.get('insight_xp',0))} Insight XP**."
         master = dict(result.get("master_reward") or {})
         if master:
             mechanical += f"\n🎓 Your breakthrough feeds the master-disciple bond: **{master.get('master_name','Your master')}** receives **+{int(master.get('insight_xp',0))} Insight XP** and the lineage gains **+{int(master.get('attention',0))} Master Attention**."
@@ -586,7 +595,7 @@ async def body_breakthrough(interaction: discord.Interaction, confirm: bool = Fa
             action_id=f"discord:{interaction.id}:cultivation.body_breakthrough",
         )
     except GameEngineError as exc:
-        message = str(exc)
+        message = _explain_engine_error(exc)
         if "perfection choice requires explicit confirmation" in message:
             message = "⚠️ **Body Stage 9 choice**\nPursue **/ascend → Perfection → Start** for a stronger physical foundation, or explicitly confirm this breakthrough to skip it."
         await interaction.followup.send(f"❌ {message}" if not message.startswith("⚠️") else message, ephemeral=False)
@@ -603,6 +612,8 @@ async def body_breakthrough(interaction: discord.Interaction, confirm: bool = Fa
         text += f"\n🌿 Innate aptitude modifier: **{int(result['innate_breakthrough_bonus']):+d}**."
     if int(result.get("place_bonus", 0)):
         text += f"\n🌠 {result.get('place')}: **{int(result['place_bonus']):+d}**."
+    if int(result.get("master_bonus", 0)):
+        text += f"\n🎓 Your master **{result.get('master_npc_name')}**: **{int(result['master_bonus']):+d}**."
     if success:
         text += f"\n✨ Advanced to **{result.get('to_realm','Unknown Realm')}, Stage {int(result.get('to_stage',1))}**."
         if int(result.get("vitality_gain", 0)):
@@ -717,7 +728,7 @@ async def perfect_start(interaction: discord.Interaction, path: app_commands.Cho
             action_id=f"discord:{interaction.id}:{spec.action('start')}",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"{spec.path_name} could not begin: {exc}", ephemeral=False)
+        await interaction.followup.send(f"{spec.path_name} could not begin: {_explain_engine_error(exc)}", ephemeral=False)
         return
     # The realm road's fifth stage asks for this (v1.16.0): recorded once the
     # engine has begun the path, told after the reply.
@@ -803,7 +814,7 @@ async def perfect_quest(interaction: discord.Interaction, path: app_commands.Cho
             action_id=f"discord:{interaction.id}:{spec.action('quest')}:{action.value}",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"{spec.noun} quest could not resolve: {exc}", ephemeral=False)
+        await interaction.response.send_message(f"{spec.noun} quest could not resolve: {_explain_engine_error(exc)}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     if action.value == "prepare":
@@ -858,7 +869,7 @@ async def perfect_trial(interaction: discord.Interaction, path: app_commands.Cho
             action_id=f"discord:{interaction.id}:{spec.action('trial')}",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"Final {spec.noun} trial could not resolve: {exc}", ephemeral=False)
+        await interaction.followup.send(f"Final {spec.noun} trial could not resolve: {_explain_engine_error(exc)}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     lines = [spec.trial_heading]
@@ -869,8 +880,13 @@ async def perfect_trial(interaction: discord.Interaction, path: app_commands.Cho
             f"**{int(result['passed'])} of {len(result.get('rolls', []))}** checks held "
             f"— **{int(result['needed'])}** needed."
         )
+    progressed = []
     if bool(result.get("success")):
         lines.append(f"\n★ **PERFECT {spec.realm_name(c).upper()} ACHIEVED**\n{spec.reward_line}")
+        # Recorded once the engine has passed the trial, told after the
+        # reply (v1.28.0).
+        progressed = await record_quest_progress(
+            interaction.user.id, "perfection_complete", game_minute=(await current_world_time()).total_minutes)
     else:
         lines.append(
             f"\n⚠️ The final compression fails. **{int(result.get('training_loss',0))}% recoverable "
@@ -878,6 +894,7 @@ async def perfect_trial(interaction: discord.Interaction, path: app_commands.Cho
             f"Restore it with {spec.restore_hint} before trying again."
         )
     await reply_long(interaction, "\n".join(lines))
+    await announce_quest_progress(interaction, progressed)
 
 
 @registered_group_command(perfect_group, name="abandon", description="Abandon the active Perfect Path and lose its progress")
@@ -896,7 +913,7 @@ async def perfect_abandon(interaction: discord.Interaction, path: app_commands.C
             action_id=f"discord:{interaction.id}:{spec.action('abandon')}",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"{spec.path_name} could not be abandoned: {exc}", ephemeral=False)
+        await interaction.followup.send(f"{spec.path_name} could not be abandoned: {_explain_engine_error(exc)}", ephemeral=False)
         return
     if not bool(dict(envelope.get("result") or {}).get("abandoned")):
         await interaction.followup.send(f"No active {spec.path_name} to abandon.", ephemeral=False)
@@ -964,7 +981,7 @@ async def tribulation_prepare(interaction: discord.Interaction, path: app_comman
             action_id=f"discord:{interaction.id}:tribulation.prepare",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"Tribulation preparation could not resolve: {exc}", ephemeral=False)
+        await interaction.followup.send(f"Tribulation preparation could not resolve: {_explain_engine_error(exc)}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     currency = str(result.get("currency", "low_spirit_stone"))
@@ -989,7 +1006,7 @@ async def tribulation_attempt(interaction: discord.Interaction, path: app_comman
             action_id=f"discord:{interaction.id}:tribulation.attempt",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"Tribulation attempt could not resolve: {exc}", ephemeral=False)
+        await interaction.followup.send(f"Tribulation attempt could not resolve: {_explain_engine_error(exc)}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     # The realm road's last stage asks for the heavens survived (v1.16.0):

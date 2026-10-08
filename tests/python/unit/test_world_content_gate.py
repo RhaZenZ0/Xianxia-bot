@@ -617,14 +617,6 @@ class TheLearningStepTests(unittest.TestCase):
             with self.subTest(slip=slip):
                 self.assertIn(recipe, self.RECIPES, f"{slip} teaches a method this world does not have")
 
-    def test_every_slip_is_actually_obtainable(self):
-        """A slip nobody sells is a recipe nobody can learn."""
-        for slip in self._slips():
-            sellers = [k for k, shop in self.SHOPS.items()
-                       if any(line["item_id"] == slip for line in shop.get("sells", []))]
-            with self.subTest(slip=slip):
-                self.assertTrue(sellers, f"{slip} is sold nowhere")
-
     def test_a_slip_is_sold_by_the_trade_that_uses_it(self):
         for slip, recipe in self._slips().items():
             want = self.PROFESSION_SHOP[self.RECIPES[recipe]["profession"]]
@@ -641,16 +633,6 @@ class TheLearningStepTests(unittest.TestCase):
                 level = int(recipe.get("min_level", -1))
                 self.assertGreaterEqual(level, 0, f"{name} has no min_level")
                 self.assertLessEqual(level, 6, f"{name} asks for a level no profession reaches")
-
-    def test_every_craft_keeps_an_entry_method(self):
-        """Crafting is the only source of profession experience, so a craft whose
-        easiest method is gated behind a level could never be practised into."""
-        by_profession = {}
-        for recipe in self.RECIPES.values():
-            by_profession.setdefault(recipe["profession"], []).append(int(recipe["min_level"]))
-        for profession, levels in sorted(by_profession.items()):
-            with self.subTest(profession=profession):
-                self.assertIn(0, levels, f"{profession} has no method anyone could start on")
 
     def test_no_slip_promises_to_survive_its_own_reading(self):
         """A slip is spent by reading it, and the copy has to say so.

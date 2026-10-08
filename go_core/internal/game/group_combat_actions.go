@@ -34,7 +34,7 @@ func equipmentDefinitionsGo() map[string]equipmentDefinitionGo {
 		"immortal_gold_plate":  {"armor", 380, 1, 12, 3, -1, false},
 		"starsteel_glaive":     {"weapon", 480, 13, 1, 4, 1, false},
 		"starsteel_aegis":      {"armor", 560, 1, 17, 4, 0, false},
-		// The boots a smith makes (v1.24.0): the first Forging method that is
+		// The boots a smith makes (v1.32.0): the first Forging method that is
 		// not a blade or a cuirass, and the top of the boots ladder above it.
 		"spirit_iron_greaves":         {"boots", 130, 0, 1, 0, 2, false},
 		"starsteel_sky_treader_boots": {"boots", 520, 0, 3, 3, 7, false},

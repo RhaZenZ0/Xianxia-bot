@@ -52,9 +52,14 @@ def _modules():
 
 
 def _tracked_sources() -> list[Path]:
-    out = subprocess.run(["git", "ls-files", "app", "content"], cwd=PROJECT_ROOT,
+    # The engine's own refusals print paths too (v1.27.0): "travel there
+    # first", "(/family → Enter)". They reach a player through
+    # `_explain_engine_error` and earn a button like any reply, so they are
+    # held here like any reply - production Go only, never a test's fixture.
+    out = subprocess.run(["git", "ls-files", "app", "content", "go_core"], cwd=PROJECT_ROOT,
                          capture_output=True, text=True, check=True).stdout.split()
-    return [PROJECT_ROOT / f for f in out if f.endswith((".py", ".json"))]
+    return [PROJECT_ROOT / f for f in out
+            if f.endswith((".py", ".json")) or (f.endswith(".go") and not f.endswith("_test.go"))]
 
 
 class EveryPrintedHubPathResolves(unittest.TestCase):
@@ -66,10 +71,18 @@ class EveryPrintedHubPathResolves(unittest.TestCase):
         for path in _tracked_sources():
             for match in hubs._HINT_PATH_RE.finditer(path.read_text(encoding="utf-8")):
                 hub = match.group(1)
-                if hub in ROOT_COMMANDS:
+                steps = [s for s in re.split(r"\s*→\s*", match.group(2) or "") if s.strip()]
+                if hub in ROOT_COMMANDS and hub not in names:
+                    # A tree command (`**/quests**`) earns a button of its own
+                    # since v1.27.0; one followed by a subcommand
+                    # (`**/stall buy**`) is a slash command to type, not a path.
+                    if steps or (match.group(2) or "").strip():
+                        continue
+                    checked += 1
+                    if hubs._hint_action(hub, []) is None:
+                        broken.append(f"{path.relative_to(PROJECT_ROOT)}: {match.group(0)}")
                     continue
                 self.assertIn(hub, names, f"{path.name}: {match.group(0)} names no hub")
-                steps = [s for s in re.split(r"\s*→\s*", match.group(2) or "") if s.strip()]
                 checked += 1
                 if hubs._hint_action(hub, steps) is None:
                     broken.append(f"{path.relative_to(PROJECT_ROOT)}: {match.group(0)}")
@@ -102,6 +115,18 @@ class AStepMayNameAnActionOrAPage(unittest.TestCase):
         # The fall-through must not start inventing buttons.
         hubs = _modules()
         self.assertIsNone(hubs._hint_action("family", ["Nonsense"]))
+
+    def test_a_bare_tree_command_is_a_button_of_its_own(self):
+        # v1.27.0: `**/quests**` was printed thirty-seven times across the
+        # tree and earned no button; the bare-name match then answered it
+        # with the GM's `/admin world quests`, the one leaf of that name.
+        hubs = _modules()
+        for root in ("quests", "cooldowns", "locked", "tribute", "action"):
+            with self.subTest(root=root):
+                action = hubs._hint_action(root, [])
+                self.assertIsNotNone(action, f"/{root}")
+                self.assertEqual(action.path, root)
+                self.assertFalse(action.path.startswith("/admin"))
 
     def test_a_bare_hub_still_means_the_thing_you_do_there(self):
         hubs = _modules()

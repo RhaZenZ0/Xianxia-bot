@@ -93,6 +93,7 @@ from .hubs import (
     HubPage,
     HubStatusField,
     _HINT_PATH_RE,
+    _hint_action,
     _hub_icon,
     _leaf_actions,
     _panel_refusal,
@@ -112,11 +113,14 @@ from .hubs import (
     register_not_yet_unlocked,
     register_realm_namer,
     register_panel_gate,
+    register_read_scope,
+    register_root_hint_actions,
+    register_path_buttons,
     send_hub,
 )
 from .locations import here_summary
 from .registry import ACTIONS, EVENT_HANDLERS, registered_root_command
-from .runtime import DB, SETTINGS, WORLD, character_location_display, current_world_time, log, private_location_exit
+from .runtime import DB, PRIVATE_PREFIXES, SETTINGS, WORLD, character_location_display, current_world_time, log, private_location_exit
 from .services import GUILD, QUESTS, SIM
 from .cards import register_page_timeout
 from .status_cards import _who_is_here, cultivation_status_fields, menu_facts_line
@@ -353,7 +357,12 @@ _HUB_DEFINITIONS = (
         title="🗺 Travel Hub",
         description="Choose destinations, teleportation arrays and special movement options.",
         pages=(
-            _hub_page("travel", "Destinations", "Travel to another known normal destination, or check your in-transit status."),
+            # One picker per kind of place (v1.26.0): a city is never crowded off
+            # the list by a road site, and a road trip is previewed before it
+            # is taken. Go keeps its name - the realm road's quests name it - and
+            # is every known place in one list, as before.
+            _hub_page("travel", "Destinations", "Pick where to go by kind - a city, somewhere in this city, a road site, the wilds - and see the road's toll and risk before you leave.",
+                      order=("travel city", "travel nearby", "travel road", "travel wilds", "travel go", "travel status")),
             _hub_page("realmhub", "Realm Capitals", "Travel to and inspect the public meeting city for every realm world."),
             _hub_page("array", "Teleportation Arrays", "List and use public teleportation formations."),
         ),
@@ -419,7 +428,7 @@ _HUB_DEFINITIONS = (
             # to say they were there. Four pages, each a thing you came to do.
             _hub_page("sect", "Sect", "Your membership and where you stand in it: rank, roster, politics, the martial family and how it addresses you.",
                       only=("sect status", "sect roster", "sect politics", "sect address",
-                            "sect form", "sect family", "sect shadow")),
+                            "sect form", "sect family", "sect shadow", "sect promote")),
             _hub_page("sect", "Recruitment", "Getting in: which sects recruit, who will sponsor you, and the entrance examination.",
                       key="sect_recruitment", only=("sect recruitment",),
                       order=("sect recruitment info", "sect recruitment recommendation", "sect recruitment trial",
@@ -919,18 +928,48 @@ def _next_step(tutorial: str) -> tuple[str, HubAction] | None:
     The hub is the one the printed path names wherever that hub holds the
     leaf - `/breakthrough` is on two - and otherwise the first hub that does,
     for a bare root such as `**/hunt**`."""
-    actions = suggested_actions(tutorial)
-    if not actions:
-        return None
-    action = actions[0]
-    match = _HINT_PATH_RE.search(str(tutorial or ""))
-    named = match.group(1) if match else ""
-    if named in _HUB_BY_NAME and _daily_leaf(named, action.path) is not None:
-        return named, action
-    for definition in _HUB_DEFINITIONS:
-        if _daily_leaf(definition.name, action.path) is not None:
-            return definition.name, action
-    return None
+    steps = _next_steps(tutorial, limit=1)
+    return steps[0] if steps else None
+
+
+def _next_steps(text: str, *, limit: int = 3) -> list[tuple[str, HubAction]]:
+    """Every hub and leaf the text's printed paths name, in order (v1.27.0)."""
+    out: list[tuple[str, HubAction]] = []
+    for match in _HINT_PATH_RE.finditer(str(text or "")):
+        actions = suggested_actions(match.group(0))
+        if not actions:
+            continue
+        action = actions[0]
+        named = match.group(1)
+        hub = named if named in _HUB_BY_NAME and _daily_leaf(named, action.path) is not None else next(
+            (d.name for d in _HUB_DEFINITIONS if _daily_leaf(d.name, action.path) is not None), None)
+        if hub is None or any(found.path == action.path for _, found in out):
+            continue
+        out.append((hub, action))
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _path_buttons(text: str) -> list[discord.ui.Item]:
+    """The journal's next doors as buttons (v1.27.0): each opens its hub in
+    place and presses the leaf, as the menu's Next does; a tree command such
+    as `**/cooldowns**` is the menu's own command button."""
+    out: list[discord.ui.Item] = []
+    for hub, action in _next_steps(text):
+        button = MenuNextButton(hub, action)
+        button.label = action.label[:40]
+        button.style = discord.ButtonStyle.primary if not out else discord.ButtonStyle.secondary
+        out.append(button)
+    for match in _HINT_PATH_RE.finditer(str(text or "")):
+        name = match.group(1)
+        if len(out) >= 3 or (match.group(2) or "").strip() or name in _HUB_BY_NAME:
+            continue
+        action = _hint_action(name, [])
+        if action is not None and not action.path.startswith("/") and not any(
+                getattr(item, "command_name", "") == name for item in out):
+            out.append(MenuCommandButton(name, action.label, "▶️"))
+    return out[:3]
 
 
 class MenuCommandButton(discord.ui.Button):
@@ -1118,11 +1157,13 @@ async def menu(interaction: discord.Interaction) -> None:
     facts = ""
     shape: dict[str, Any] = {}
     if LAYOUT_COMPONENTS_AVAILABLE:
-        try:
-            facts = await _menu_facts(interaction)
-        except Exception:
-            log.exception("Menu facts unavailable")
-        shape = await menu_shape(interaction)
+        # One session for the menu's reads, as a panel refresh has (v1.31.2).
+        async with DB.reuse_connection():
+            try:
+                facts = await _menu_facts(interaction)
+            except Exception:
+                log.exception("Menu facts unavailable")
+            shape = await menu_shape(interaction)
     view = MenuView(
         owner_id=member.id, is_admin=bool(is_admin), owner_name=getattr(member, "display_name", str(member)), facts=facts,
         hidden_hubs=shape.get("hidden_hubs"), tutorial=str(shape.get("tutorial") or ""),
@@ -1209,6 +1250,23 @@ STALL_MIN_REALM_INDEX = int((WORLD.data.get("stall_system") or {}).get("min_real
 HOMESTEAD_FOUNDING_RANK = int((WORLD.data.get("abode_system") or {}).get("founding_rank_level") or 0)
 MANOR_FOUNDING_RANK = int((WORLD.data.get("sect_abode_system") or {}).get("manor_founding_rank_level") or 0)
 MANOR_CONSTRUCTION_RANK = int((WORLD.data.get("sect_abode_system") or {}).get("manor_construction_rank_level") or 0)
+# The sect rank each act asks (v1.25.0), keyed by the engine operation the way
+# `sect_system.rank_floors` is, with the phrase the engine's refusal opens with
+# (`requireSectRankTx`) and the leaves it hides. v1.19.4 opened every sect leaf
+# to any member, and the owner's call is that a member sees what their rank
+# lets them do; the realm curriculum still steps aside for a member.
+SECT_RANK_FLOORS: dict[str, int] = {
+    str(op): int(level or 0)
+    for op, level in ((WORLD.data.get("sect_system") or {}).get("rank_floors") or {}).items()
+}
+RANK_FLOOR_LEAVES: dict[str, tuple[str, tuple[str, ...]]] = {
+    "discipleship.resolve": ("taking a disciple", ("sect discipleship accept", "sect discipleship reject")),
+    "territory.claim": ("claiming territory for your sect", ("territory claim",)),
+    "war.act": ("fighting in your sect's war", ("war act",)),
+}
+# Who makes peace (v1.24.0's `war.peace`), read off the key the engine reads,
+# with the engine's own default for a file without one (`sect_war.go`).
+WAR_PEACE_RANK = int((WORLD.data.get("war_system") or {}).get("peace_min_rank_level") or 40)
 PERSONAL_WORLD_FLOOR = int((WORLD.data.get("personal_world_system") or {}).get("min_realm_index") or 0)
 PERSONAL_WORLD_LAW = int((WORLD.data.get("personal_world_system") or {}).get("space_law_comprehension") or 0)
 PROGRESSION_GATES: dict[str, tuple[str, ...]] = {
@@ -1227,7 +1285,16 @@ PROGRESSION_GATES: dict[str, tuple[str, ...]] = {
     "perfection_path": ("perfect quest", "perfect clues", "perfect trial", "perfect abandon"),
     "sect_member": ("sect roster", "sect politics", "sect address", "sect family", "sect shadow",
                     "sect manor establish", "sect manor upgrade", "sect abode", "sect treasury", "sect contribute", "sect redeem",
-                    "sect discipleship request", "sect discipleship accept", "sect discipleship reject", "sect discipleship leave"),
+                    "sect discipleship request", "sect discipleship accept", "sect discipleship reject", "sect discipleship leave",
+                    "sect promote", "sect discipleship npcmaster", "sect discipleship teach"),
+    # The sect's own people (v1.25.0): a member with a master asks no other,
+    # Teach is a master's among the sect's people, and Promote is drawn when the
+    # contribution reaches the next rung - each anticipating the engine's
+    # refusal (`npcMasterRequestAction`, `sectMasterTeachAction`,
+    # `sectPromoteAction`) with its reason.
+    "sect_has_master": ("sect discipleship npcmaster", "sect discipleship request"),
+    "sect_npc_master": ("sect discipleship teach",),
+    "sect_promote": ("sect promote",),
     "sect_outsider": ("sect recruitment recommendation", "sect recruitment trial"),
     # The way up into an allied sect (v1.18.0): a member's door, drawn at the
     # gate of the sect `ascends_to` names, at that world's floor. Each refusal
@@ -1261,6 +1328,9 @@ PROGRESSION_GATES: dict[str, tuple[str, ...]] = {
     "stall_open": ("stall open",),
     "samsara": ("family ancestry", "family legacy", "family investigate", "family quest", "family claim", "family conflict"),
 }
+PROGRESSION_GATES["war_peace_rank"] = ("war peace",)
+# One gate per rank floor (v1.25.0), named for the operation it anticipates.
+PROGRESSION_GATES.update({f"sect_rank:{op}": leaves for op, (_what, leaves) in RANK_FLOOR_LEAVES.items()})
 
 
 def _sect_ascent_refusal(sect: str, here: str, realm: int) -> str:
@@ -1317,10 +1387,10 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
         if row and int(row.get("active") or 0) and not int(row.get("completed") or 0):
             under_way = True
     if not under_way:
-        shut["perfection_path"] = "no Perfection path is under way — Start one at stage 9"
+        shut["perfection_path"] = "no Perfection path is under way — begin one at stage 9 with **/ascend → Perfection → Start**"
     membership = await DB.get_sect_membership(uid)
     if not membership:
-        shut["sect_member"] = "you are in no sect — see Recruitment"
+        shut["sect_member"] = "you are in no sect — see **/sect → Recruitment → Info**"
         shut["sect_ascent"] = "the way up is a member's — join a sect first"
     else:
         shut["sect_outsider"] = "you already belong to a sect"
@@ -1336,13 +1406,31 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
         shut["manor_founder"] = f"establishing the sect manor asks for {WORLD.sect_rank_name(MANOR_FOUNDING_RANK)}; {held}"
     if membership and MANOR_CONSTRUCTION_RANK > 0 and rank_level < MANOR_CONSTRUCTION_RANK:
         shut["manor_builder"] = f"directing manor construction asks for {WORLD.sect_rank_name(MANOR_CONSTRUCTION_RANK)}; {held}"
+    for op, (what, _leaves) in RANK_FLOOR_LEAVES.items():
+        floor = SECT_RANK_FLOORS.get(op, 0)
+        if floor > 0 and rank_level < floor:
+            shut[f"sect_rank:{op}"] = f"{what} asks for {WORLD.sect_rank_name(floor)}; {held}"
+    if membership and WAR_PEACE_RANK > 0 and rank_level < WAR_PEACE_RANK:
+        shut["war_peace_rank"] = f"peace is made by a {WORLD.sect_rank_name(WAR_PEACE_RANK)} or above; {held}"
+    if membership:
+        npc_master = await DB.get_npc_master(uid)
+        if npc_master or await DB.get_master(uid):
+            shut["sect_has_master"] = "you already have a master — leave the bond first with **/sect → Discipleship → Leave**"
+        if not npc_master:
+            shut["sect_npc_master"] = "only a master among the sect's own people teaches — ask one with **/sect → Discipleship → Npcmaster**"
+        rung = WORLD.next_promotion_rung(rank_level)
+        earned = int(membership.get("contribution_earned") or 0)
+        if not rung:
+            shut["sect_promote"] = f"no rank above {membership.get('rank_name')} is granted for contribution"
+        elif earned < rung[1]:
+            shut["sect_promote"] = f"{WORLD.sect_rank_name(rung[0])} asks {rung[1]} contribution earned; you have earned {earned}"
     abode = await DB.get_abode(uid)
     if not abode:
-        shut["abode"] = "you have no property yet — Establish one"
+        shut["abode"] = "you have no property yet — found one with **/abode → Property → Establish**"
     else:
         shut["abode_owner"] = "you already hold a property"
     if not await DB.get_personal_world(uid):
-        shut["innerworld"] = "you have no personal world yet — Create one"
+        shut["innerworld"] = "you have no personal world yet — make one with **/innerworld → Personal World → Create**"
     else:
         shut["innerworld_owner"] = "your personal world already exists"
     if PERSONAL_WORLD_FLOOR > 0 or PERSONAL_WORLD_LAW > 0:
@@ -1353,9 +1441,9 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
                 f"a personal world asks for {WORLD.realm_name(PERSONAL_WORLD_FLOOR)} and Space Law at {PERSONAL_WORLD_LAW}%; "
                 f"you stand at {WORLD.realm_name(realm)} with Space Law at {comprehension}%")
     if not await DB.get_spirit_beasts(uid):
-        shut["beast"] = "no beast is contracted yet — Tame one"
+        shut["beast"] = "no beast is contracted yet — tame one with **/beast → Companions → Tame**"
     if not await DB.get_player_family_membership(uid):
-        shut["house_member"] = "you belong to no house — Found one or answer an invitation"
+        shut["house_member"] = "you belong to no house — found one with **/family → House → Found** or answer an invitation"
     else:
         shut["house_outsider"] = "you already sit in a house"
     legacy = await DB.get_soul_legacy(uid)
@@ -1368,12 +1456,12 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
         access = max(realm, body_realm)
         if access < STALL_MIN_REALM_INDEX:
             shut["stall_open"] = f"a stall asks for {WORLD.realm_name(STALL_MIN_REALM_INDEX)}; you stand at {WORLD.realm_name(access)}"
-        shut["stall_keeper"] = "you keep no stall yet — Open one in a city's street"
+        shut["stall_keeper"] = "you keep no stall yet — open one in a city's street with **/economy → Market Stalls → Open**"
     else:
         shut["stall_open"] = f"you already keep {stall.get('name')} in {stall.get('city')}"
         stall_city = str(stall.get("city") or "")
         if stall_city and _city_of(here) != stall_city:
-            shut["stall_elsewhere"] = f"your stall stands in {stall_city}; travel there to tend it"
+            shut["stall_elsewhere"] = f"your stall stands in {stall_city}; travel there with **/travel → Destinations → Go** to tend it"
     hidden: dict[str, str] = {}
     for gate, reason in shut.items():
         hidden.update(_action_paths(reason, *PROGRESSION_GATES[gate]))
@@ -1383,7 +1471,7 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
         base = str(abode.get("base_location") or "")
         if here != base:
             why = ("you are already inside" if here == str(abode.get("location_key") or "")
-                   else f"your property stands at {base}; travel there")
+                   else f"your property stands at {base}; travel there with **/travel → Destinations → Go**")
             hidden.update(_action_paths(why, "abode enter"))
     return hidden
 
@@ -1452,8 +1540,8 @@ LOCATION_GATES: dict[str, tuple[str, ...]] = {
 
 # The prefixes of a place that is somebody's own rather than the world's.
 # `exploration_actions.go` writes these four out at every handler that refuses
-# inside one; `private_location_exit` is their Python twin.
-PRIVATE_PREFIXES = ("birth_family:", "sect_abode:", "abode:", "personal_world:")
+# inside one; `private_location_exit` is their Python twin, and `PRIVATE_PREFIXES`
+# is read off its table in `runtime` (one list, since v1.31.2) and imported above.
 
 
 def envoys_hall(city: str) -> str:
@@ -1522,11 +1610,11 @@ async def _location_hidden_actions(interaction: discord.Interaction, c: dict) ->
         shut["private_room"] = f"you are inside {description}; step out with {command}"
     if not _shop_at(here):
         if any(str(shop.get("city") or "") == city for shop in WORLD.shops.values()):
-            shut["shop_counter"] = f"asked for inside a shop — find {city}'s with Here, then /travel in"
+            shut["shop_counter"] = f"asked for inside a shop — find {city}'s with **/economy → City Shops → Here**, then walk in with **/world → City → Enter**"
         else:
-            shut["shop_counter"] = "no shops here; travel to a city and find one with Here"
+            shut["shop_counter"] = "no shops here; travel to a city with **/travel → Destinations → Go** and find one with **/economy → City Shops → Here**"
     if WORLD.auction_house_at(here) is None:
-        shut["auction_floor"] = "asked for on an auction floor — step inside one with Enter"
+        shut["auction_floor"] = "asked for on an auction floor — step inside one with **/economy → Auction House → Enter**"
     if not _auction_entrance_here(here):
         shut["auction_door"] = ("step out of the shop first" if place.get("shop") and not place.get("road_site")
                                 else "no auction house opens onto this street")
@@ -1554,7 +1642,7 @@ async def _location_hidden_actions(interaction: discord.Interaction, c: dict) ->
     if not any(str(realm.get("location") or "") == here for realm in WORLD.secret_realms.values()):
         shut["realm_entrance"] = "no secret realm opens here"
     if not _public_sect_gate_here(here):
-        shut["sect_gate"] = "the entrance trial is sat at a sect's gate — /world → City → Envoys names them"
+        shut["sect_gate"] = "the entrance trial is sat at a sect's gate — **/world → City → Envoys** names them"
     if not any(boss_lair(boss, WORLD.secret_realms)[0] == here for boss in BOSS_TEMPLATES.values()):
         shut["boss_lair"] = "no great beast keeps its lair here"
     shop = WORLD.shops.get(_shop_at(here)) or {}
@@ -1562,7 +1650,7 @@ async def _location_hidden_actions(interaction: discord.Interaction, c: dict) ->
         shut["exam_hall"] = "an examination is sat inside a hall of its trade"
     flames = dict((WORLD.data.get("flame_system") or {}).get("flames") or {})
     if not any(str(f.get("location") or "") == here for f in flames.values()):
-        shut["flame_source"] = "a flame is captured where it burns, at a world's forge terraces — /craft → Flames → Status names them"
+        shut["flame_source"] = "a flame is captured where it burns, at a world's forge terraces — **/craft → Flames → Status** names them"
     if here.startswith("birth_family:"):
         shut["property_ground"] = "a property is founded outside the household you were born into; step out into the town first"
     elif here.startswith(("abode:", "sect_abode:", "personal_world:")) or WORLD.auction_house_at(here) is not None:
@@ -1586,7 +1674,7 @@ async def _location_hidden_actions(interaction: discord.Interaction, c: dict) ->
     if not await _black_market_post_here(here):
         shut["black_market_post"] = "no black-market trading post is open here"
     if not await _array_departs_here(here):
-        shut["array_here"] = "no teleportation array stands here — /array list names the ones the world has"
+        shut["array_here"] = "no teleportation array stands here — **/travel → Teleportation Arrays → List** names the ones the world has"
     hidden: dict[str, str] = {}
     for gate, reason in shut.items():
         hidden.update(_action_paths(reason, *LOCATION_GATES[gate]))
@@ -1736,6 +1824,9 @@ async def _panel_gate(user: "discord.abc.User", path: str) -> str | None:
 
 
 register_panel_gate(_panel_gate)
+# A refresh reads inside one database session (v1.31.2): every `DB.get_x()` the
+# providers and the status card make reuses it instead of opening its own.
+register_read_scope(DB.reuse_connection)
 # How long a panel may sit idle (v1.0.12), injected because the layering puts
 # `hubs` and `runtime` in one tier - the shape `register_hidden_actions` and its
 # three siblings above already use.
@@ -1846,6 +1937,27 @@ def _tree_command(name: str) -> Any:
     one (v1.7.4: `/stall`), else the bound root. `ACTIONS.root` knows no
     groups, which is why the tuple could only ever name roots."""
     return _GROUP_ACTION_ROOTS.get(name) or ACTIONS.root(name)
+
+
+def _root_hint_actions() -> dict[str, HubAction]:
+    """The tree roots a printed `**/quests**` resolves to (v1.27.0): every one
+    that is a bound root rather than a hub, a group or a hub leaf. Its path is
+    the bare name, the way the command tree passes it to the panel gate."""
+    hubs = set(_HUB_BY_NAME) | {"admin"}
+    out: dict[str, HubAction] = {}
+    for name in TREE_COMMANDS:
+        if name in hubs or name in _GROUP_ACTION_ROOTS or name in DAILY_ACTIONS:
+            continue
+        command = ACTIONS.root(name)
+        out[name] = HubAction(
+            command=command, handler=ACTIONS.handler_for(command), path=name,
+            label=name.replace("_", " ").title(), description=str(getattr(command, "description", "") or ""),
+        )
+    return out
+
+
+register_root_hint_actions(_root_hint_actions())
+register_path_buttons(_path_buttons)
 
 
 def register_command_surface(client: XianxiaBot) -> None:

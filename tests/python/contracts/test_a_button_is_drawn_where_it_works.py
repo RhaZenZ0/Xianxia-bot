@@ -148,7 +148,10 @@ class TheRoomGetsTheRightPanel(unittest.TestCase):
         for leaf in ("/explore", "/hunt", "/travel go", "/auction enter", "/battle challenge"):
             self.assertNotIn(leaf, shut, f"{leaf} works on Greenriver's street")
         self.assertIn("/shop browse", shut)
-        self.assertIn("find Greenriver Town's with Here", shut["/shop browse"])
+        # The reason names the city's shops and the door to them as paths a
+        # panel draws as buttons (v1.27.0), not the bare word "Here".
+        self.assertIn("Greenriver Town's", shut["/shop browse"])
+        self.assertIn("**/economy → City Shops → Here**", shut["/shop browse"])
         self.assertIn("/seclusion start", shut, "Greenriver Town is deliberately rough ground")
 
     def test_a_shop_draws_its_counter_and_its_examination(self):

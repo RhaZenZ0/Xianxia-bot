@@ -16,6 +16,63 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.31.2)** — *A hub press made about ninety engine round trips.* The panel refresh after
+  every press opened a session per one-row read (thirty-two of them), read the clock once per circuit
+  walker to draw the Here line (twelve), and looked a plain town up in three private-property tables.
+  One `reuse_connection` scope per refresh (`hubs.register_read_scope`), the clock read once in
+  `npcs_present` and handed down, a lookup only for a private key, and a per-scope memo of the character
+  and membership reads; `test_a_panel_refresh_is_bounded.py` holds it.
+- **deferred (design)** — *One engine query for the panel's gate state.* After v1.31.2 a refresh is one
+  session, about sixteen SELECTs and seven engine actions in production. A single `panel.gates` query in
+  Go, or the sixteen SELECTs through `/v1/db/batch`, would make it about ten round trips; not built,
+  because each `get_x` is its own repository method and a batched read changes that shape for a saving
+  that no longer dominates a press.
+- **fixed (v1.27.0)** — *Missing system links.* Three read-only audits, re-checked against v1.26.0.
+  Navigation: every objective type has a door (`OBJECTIVE_PATHS`), bare tree commands, empty pickers,
+  padlock reasons and engine refusals earn buttons, forty-eight handlers that printed the engine's bare
+  words go through `_explain_engine_error`, the journal draws each quest's next door, and dashboard
+  names open their records. Engine: a world event's sect effect is scoped to its city's or world's
+  sects, war history reaches the Forge and RAG, the war step spares allies and other worlds, a
+  player's claim is told to the world, and an artifact bond needs the artifact.
+- **fixed (v1.28.0)** — *Built things that did nothing.* A homestead's Defensive Formation and
+  Storage, beast intelligence, the spirit sense in `/sense`, the hunting musk and the beast in the hunt,
+  six reputations no rule read, sect influence and master attention each have a reader; a bounty
+  surrender and capture cost restitution; a sponsor rolls the household and karma; six objective types.
+- **fixed (v1.31.0)** — *What v1.27–v1.30 left alone.* Focusing the Defensive Formation, the
+  storehouse, the herb garden, the beast pen or the merchant hall granted nothing; every room has an
+  effect now, made of stats a rule reads, and a focus lasts four real hours with one more before the
+  next (on the owner's call; it was four world hours). `world_history_events.world_name` was never
+  written by the engine's history door and read by nothing; it is filled from `content_locations`
+  and the narrator's recall leaves out another world's public news. A hunter killed by a beast marks
+  the region's security, and nothing else, because nobody did the killing.
+- **deferred (design)** — *A focus's end moves if the world's rate changes mid-focus.* `active_effects`
+  keeps only a game-minute deadline, so the four real hours are converted at the scale the focus was
+  taken at; a GM changing the rate during one stretches or shortens it, and at a stopped clock it lasts
+  until the clock moves. A real-time column would fix it for this one effect at a schema change; it is
+  left until a second effect wants a real-time end.
+- **fixed (v1.30.0)** — *A home says what is in it.* The homestead's and the sect residence's
+  status list every facility with what it does at its level, what the next level adds and costs,
+  and what it still asks, read through `property.overview` off the helpers the rules use.
+- **fixed (v1.29.0)** — *The world's feedback.* Held territory stocks its sect's treasury, a war's
+  end and a member's contribution move the sect, recruitment pressure eases the trial, a manor under a
+  rival's banner lends nothing, caravans and market trades move their cities, era terms reach five NPC
+  rolls, the world's own killings mark their region and sect, a slain NPC's kin remember the killer,
+  and a household's year reads its real relations and branches.
+- **fixed (v1.24.0)** — *Expand the war system.* Asked for in three words, then a war channel and
+  fighting beside an allied sect were asked for mid-build. Reading the system found four faults: the
+  world's own sieges were fought for the attacker alone, so a defender with no players could never
+  hold; a territory's defense was never written; a war act earned nothing; and nothing followed a war
+  - no truce, no occupation window, no standing lost, no history of its end. On the owner's asks: act
+  and victory pay in sect contribution, allied sects fight beside their ally, walls that rise and
+  fall, truces and occupations, a two-walled siege tick, and a read-only war-front channel per world,
+  in a ⚔️ Sect Wars category of its own, with a live card per war (schema 78).
+- **fixed (v1.24.0)** — *What a war does beyond its ground.* Three things the release's first push left
+  alone, then fixed on the owner's call: the world's own sects fight beside an ally (half their
+  strength, capped, and the world hears them march); a war can be ended in peace - by a Deacon of a
+  warring sect for 100 contribution once it is three days old, or by the world's own sects when
+  morale breaks - on terms the siege sets; and a sect's NPC disciples add to its strength and are
+  named at the siege.
+
 - **fixed (v1.22.0)** — *A better menu layout for all the menus.* Researched and the first three of six
   steps taken on the owner's call: a jump to any system on every multi-system hub panel, the menu's
   tools row (the tutorial's next step pressed, the quest journal, the cooldowns) and Daily buttons
@@ -240,7 +297,7 @@ deferred half and not the half that says what was done about it.
   `reset_database.sh` drove the bot with `wget` inside an image that has none;
   `ENGINE_SHUTDOWN_GRACE_SECONDS` was documented and passed by nothing; `search_catalog` treated `_`
   and `%` as wildcards; and a grave's claim ignored its own guarded UPDATE's row count. Each has a
-  test; `test_every_engine_key_reaches_the_engine.py` is the gate for the compose class.
+  test; `test_engine_boundary.py` is the gate for the compose class.
 - **fixed (v1.2.3)** — *The review's eight deferred claims, read.* Six held. VACUUM stalled ten
   seconds behind a session's open transaction and failed (`SessionManager.InTransaction`, a
   `sessions_busy` refusal; `server_vacuum_session_test.go` reproduced the stall). The sect manor's
@@ -265,7 +322,7 @@ deferred half and not the half that says what was done about it.
   minute; `ai_router` spent a route slot before the shared budget could end the walk; `health.py`
   dropped a control request whose body timed out; an upper-world rebirth got no send-off
   (`sendoffArchetypeFor`, below) and its sheet mirror was 0 outside the Mortal World; `mining.go`
-  kept a literal world list. `review_second_tier_test.go` and `test_the_second_tier.py` hold them.
+  kept a literal world list. `review_second_tier_test.go` and `test_review_decisions.py` hold them.
 - **fixed (v1.3.0)** — *Which Mortal house an upper-world house sends its child off as.* v1.2.3 read
   a Mortal counterpart off the kind in each of the thirty-three upper-world templates' ids; on the
   owner's call all thirty-three houses have `birth_family_sendoff` entries of their own in
@@ -326,8 +383,8 @@ deferred half and not the half that says what was done about it.
   and `karma_preference` off the sect's recruitment block, the bonus rides both rolls and the base
   TN is the sect's own (14 to 20; the literal was 15 for all); the karma preference refuses a
   notorious applicant at an orthodox gate without a sponsor, as `trial_modifier` in Python has
-  claimed since it was written. `sect_trial_tuning_test.go` lends the dice and holds each term;
-  `test_the_trial_reads_its_tuning.py` holds that the engine reads every key the notes print.
+  claimed since it was written. `sect_doors_test.go` lends the dice and holds each term;
+  `test_sect.py` holds that the engine reads every key the notes print.
 - **fixed (v1.3.1)** — *A catalogue sponsor's position was checked by the bot.* `npcWhereaboutsTx`
   is the engine's own answer to where a catalogue NPC stands - the circuit a wandering master walks,
   the simulation's row, the daily schedule while they are at home, the registry, a running event's
@@ -696,7 +753,7 @@ deferred half and not the half that says what was done about it.
   before it denies `@everyone` (rc.52); and it **merges** rather than replaces, because
   `set_permissions(**perms)` would have taken `send_messages=False` off `@everyone` with it and
   left two read-only anchors writable to everybody holding the role. The name-family trap this
-  entry called out is now `test_the_role_names_never_collide.py`. See CLAUDE.md, "A room for people
+  entry called out is now `test_server_layout.py`. See CLAUDE.md, "A room for people
   who have played".
 - **fixed (v1.0.1)** — *The release after a live pass would have deleted it.* The checklist is named
   after `RELEASE_VERSION`, so the filename held still across all fifty-nine release candidates of
@@ -967,3 +1024,14 @@ deferred half and not the half that says what was done about it.
   numbers into a second table. Moving those six definitions into `content/world.json` (an
   `array_effect` block on each disk, read by both sides) would let the menu print them; it is a
   content move of its own, so it waits for the owner's word.
+- **fixed (v1.25.0)** — *A sect's doors by rank, its people, NPC masters and promotion by asking.*
+  The owner's calls: a member sees only the doors their rank may use (the engine refuses below it
+  too); each sect keeps a hall of about twenty-five NPCs; a member may take one as a master
+  (breakthrough +1, insight on a realm crossing, ×1.05 cultivation, the sect's next art once a life)
+  and is raised a rank by their master or an Elder once their contribution reaches it; and a player
+  master gives their disciple +1 on every trade roll and ×1.05 cultivation, where before a player bond
+  gave the disciple nothing.
+- **deferred (decision)** — *Registry NPCs cannot sponsor a sect recommendation.* `resolveRecommenderTx`
+  accepts catalogue NPCs and a running event's cast only, so a sect's generated Elders - who now stand
+  at its gate - cannot vouch for an applicant. Whether they should is a decision about how open the
+  door into a sect is, not a wiring.

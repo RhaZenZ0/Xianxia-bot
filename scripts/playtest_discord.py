@@ -553,6 +553,37 @@ async def quiet_the_periodic_workers(bot: Any, env: Any) -> list[str]:
     return stopped
 
 
+def stop_every_view_but(bot: Any, message_id: int) -> int:
+    """Stop every live view except the one on `message_id`; answer how many.
+
+    The idle-window step jumps the clock past one panel's timeout, and SimCord
+    walks that jump timer by timer, settling after each. Every other view the
+    run has left behind with a timeout of its own - a picker's step view
+    (180 s), an empty picker's next-step buttons (120 s, v1.27.0), a result
+    card's pages - wakes inside the same jump, and a view's timeout task that
+    wakes a hair short of its deadline sleeps the remainder again, a wake near
+    enough to count as runnable, which is a settle that never completes (rc.35,
+    v1.0.13). v1.27.0 added views of that kind to every empty picker, and from
+    v1.28.0 the step failed three runs out of three with "the clock jump never
+    landed". Nothing the step holds is about those views, so they are stopped
+    first, the way a player who closed them would: `View.stop` cancels its
+    timeout task, and the panel the step is about is left alone.
+    """
+    store = getattr(getattr(bot, "_connection", None), "_view_store", None)
+    if store is None:
+        return 0
+    keep = store._synced_message_views.get(int(message_id))
+    views = {id(item.view): item.view for items in list(store._views.values()) for item in items.values() if item.view}
+    views.update({id(v): v for v in store._synced_message_views.values()})
+    stopped = 0
+    for view in views.values():
+        if view is keep or view.is_persistent() or view.is_finished():
+            continue
+        view.stop()
+        stopped += 1
+    return stopped
+
+
 async def settle_patiently(env: Any, *, attempts: int = 8) -> None:
     """Wait for the bot's outstanding work in short settles rather than one
     long one (see the note at `simcord.run`). A leaf that asks the engine for
@@ -671,6 +702,7 @@ async def run(url: str, token: str, db_path: str, shard: tuple[int, int] | None 
         SERVER_EVENT_CATEGORY,
         SERVER_STALL_CATEGORY,
         SERVER_REALM_CATEGORY,
+        SERVER_WAR_CATEGORY,
         SERVER_WORLD_CATEGORY,
     )
     from app.bot.runtime import CULTIVATOR_ROLE_NAME, DB, ENGINE, WORLD
@@ -852,6 +884,16 @@ async def run(url: str, token: str, db_path: str, shard: tuple[int, int] | None 
                 expect(getattr(overwrites.get(access), "send_messages", None) is False
                        and getattr(overwrites.get(live.default_role), "send_messages", None) is False,
                        f"#{market} is not read-only")
+                # v1.24.0: the world's war front, in its own category, read-only too.
+                front = str(hub["war_channel_name"])
+                expect(front in made, f"no war-front channel for {world}")
+                expect(getattr(made[front].category, "name", None) == SERVER_WAR_CATEGORY,
+                       f"#{front} sits in {getattr(made[front].category, 'name', None)!r}")
+                front_overwrites = made[front].overwrites or {}
+                expect(getattr(front_overwrites.get(access), "view_channel", None) is True
+                       and getattr(front_overwrites.get(access), "send_messages", None) is False
+                       and getattr(front_overwrites.get(live.default_role), "send_messages", None) is False,
+                       f"#{front} is not a read-only channel for {_realm_access_role_name(world)}")
             auctions = sorted(c.name for c in live.text_channels
                               if getattr(c.category, "name", None) == SERVER_AUCTION_CATEGORY)
             expect(len(auctions) == 9, f"{len(auctions)} auction channels, expected 9: {auctions}")
@@ -859,6 +901,8 @@ async def run(url: str, token: str, db_path: str, shard: tuple[int, int] | None 
             expect(rows == set(REALM_HUBS), f"bound worlds {sorted(rows)}")
             markets = {str(r["world_name"]) for r in await DB.get_stall_channels(guild.id)}
             expect(markets == set(REALM_HUBS), f"bound markets {sorted(markets)}")
+            fronts = {str(r["world_name"]) for r in await DB.get_war_channels(guild.id)}
+            expect(fronts == set(REALM_HUBS), f"bound war fronts {sorted(fronts)}")
 
             # The gate actually closed, not merely "no exception". SimCord gives
             # the bot every permission except administrator, so a channel
@@ -1569,6 +1613,7 @@ async def run(url: str, token: str, db_path: str, shard: tuple[int, int] | None 
                    "HUB_PANEL_IDLE_MINUTES is 0 for this run, so no panel ever expires and this step "
                    "cannot be driven; PANEL_IDLE_MINUTES at the top of this file sets it")
             panel = await open_hub(player, channels["begin-here"], "family")
+            stop_every_view_but(bot, panel.message_id)
             # The jump settles before it moves the clock and again after; a
             # settle that gives up on the way in leaves the clock where it was,
             # and one on the way out leaves the workers the jump woke still
@@ -1576,14 +1621,22 @@ async def run(url: str, token: str, db_path: str, shard: tuple[int, int] | None 
             # gave up, wait the workers out and jump once more (a second jump
             # past the same deadline changes nothing the step holds).
             await settle_patiently(env)
+            jumped, jump_error = False, ""
             for _ in range(2):
                 try:
                     await env.advance_time(int(window) + 1)
+                    jumped = True
                     break
-                except TimeoutError:
+                except TimeoutError as exc:
+                    jump_error = str(exc)
                     await settle_patiently(env)
             await settle_patiently(env)
             text = panel.text()
+            # A jump that gave up both times never moved the clock, and the
+            # panel then still taking presses says nothing about its timeout;
+            # say which it was rather than blaming the panel.
+            expect(jumped or "Reopen" in panel.labels(),
+                   "the clock jump never landed - both tries timed out settling: " + jump_error[:600])
             if "Reopen" in panel.labels():
                 reopened = await player.click(panel.message(), label="Reopen")
                 await settle_patiently(env)

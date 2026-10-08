@@ -57,11 +57,18 @@ def scheduled_location(npc_name: str, period: str) -> str:
     return str(schedule.get(period) or "").strip()
 
 
-async def current_npc_location(npc_name: str, period: str | None = None) -> str | None:
+async def current_npc_location(npc_name: str, period: str | None = None, *, world_time: Any = None) -> str | None:
     """Resolve the mechanical NPC location from initialized simulation state.
 
     Daily world.json schedules still shape an NPC's routine while they remain in
     their home region, but there is no legacy no-simulation fallback anymore.
+
+    `world_time` is the clock a caller has already read (v1.31.2). The circuit
+    branch below needs the full game minute, so handing it only `period` did
+    not spare it a clock read - and `npcs_present` resolved every circuit walker
+    in the catalogue through here, eleven identical `world.clock` round trips
+    on every panel header. A caller with the clock in hand passes it; one
+    without still reads it here, once.
     """
     # A hidden master who walks the road is wherever their circuit puts them
     # this month, and that answer outranks both the daily schedule and the
@@ -70,7 +77,7 @@ async def current_npc_location(npc_name: str, period: str | None = None) -> str 
     # canonical clock, so nothing has to tick to move them.
     walking = WORLD.npcs.get(npc_name, {}).get("circuit")
     if walking:
-        wt = await current_world_time()
+        wt = world_time if world_time is not None else await current_world_time()
         stop = circuit_stop(
             walking, int(getattr(wt, "total_minutes", 0)),
             months=int(WORLD.npcs[npc_name].get("circuit_months", 2) or 2),
@@ -81,7 +88,7 @@ async def current_npc_location(npc_name: str, period: str | None = None) -> str 
 
     sim_state = await SIM.npc_status(npc_name)
     if period is None:
-        period = (await current_world_time()).period
+        period = (world_time if world_time is not None else await current_world_time()).period
     status = str((sim_state or {}).get("status") or "")
     if sim_state and status not in ("", "alive", "missing"):
         return DEAD
@@ -169,8 +176,12 @@ async def npcs_present(location: str, period: str | None = None) -> list[str]:
     where = str(location or "")
     if not where:
         return []
+    # The clock is read once here and handed to every resolve below (v1.31.2):
+    # the period for the schedules, the minute for the circuit walkers. Before
+    # this each walker's resolve read it again, and there are eleven of them.
+    wt = await current_world_time()
     if period is None:
-        period = (await current_world_time()).period
+        period = wt.period
     present: list[str] = []
     seen: set[str] = set()
     engine_rows: list[dict[str, Any]] = []
@@ -209,7 +220,7 @@ async def npcs_present(location: str, period: str | None = None) -> list[str]:
         # cost nothing to resolve and are the one group the engine cannot rule
         # on at all.
         if (definition or {}).get("circuit"):
-            if await current_npc_location(name, period) == where:
+            if await current_npc_location(name, period, world_time=wt) == where:
                 present.append(name)
                 seen.add(name)
             continue
@@ -225,7 +236,7 @@ async def npcs_present(location: str, period: str | None = None) -> list[str]:
             continue
         # Content says here, so the engine gets the last word - it may have
         # walked them away, or buried them.
-        if await current_npc_location(name, period) == where:
+        if await current_npc_location(name, period, world_time=wt) == where:
             present.append(name)
             seen.add(name)
     return sorted(present)
@@ -263,6 +274,14 @@ def _world_is_unlocked(character: dict[str, Any], world_name: str) -> bool:
 async def _known_locations(user_id: int, character: dict[str, Any]) -> set[str]:
     rows = await DB.get_discovered_locations(int(user_id))
     known = {str(row.get("location")) for row in rows if row.get("location")}
+    # A known part of a city is a known city - the twin of the rule
+    # `knownLocationsTx` has kept since v1.19.0 and this side never had, so a
+    # gate a sponsor revealed was on the engine's map and the picker's city
+    # list was missing the city it stands in (v1.26.0).
+    for place in list(known):
+        city = _city_of_location(place)
+        if city and city != place:
+            known.add(city)
     current = str(character.get("location") or "")
     if current and not current.startswith(("abode:", "personal_world:")):
         known.add(current)
@@ -275,7 +294,10 @@ async def _known_locations(user_id: int, character: dict[str, Any]) -> set[str]:
             known.add(city)
             current_data = WORLD.locations.get(city) or {}
         for name, data in WORLD.locations.items():
-            if data.get("district") and str(data.get("outside_location")) == city:
+            # A private part - a sect's hidden gate - is a sponsor's to reveal,
+            # not the street's (`knownLocationsTx` skips it too, v1.19.0); the
+            # picker offered it and the engine refused it until v1.26.0.
+            if data.get("district") and str(data.get("outside_location")) == city and not data.get("private"):
                 known.add(name)
         # At a road-side site (v0.39.0) the road runs both ways: both ends
         # of its leg are known, and every other site on that leg.
@@ -592,6 +614,39 @@ def door_allows(current: str, destination: str) -> bool:
     if dest.get("district"):
         return origin == str(dest.get("outside_location") or "")
     return True
+
+
+# The four kinds of place the travel menu picks from (v1.26.0), in the order
+# the Destinations page draws them. One picker held every known place in one
+# list of 25, and every road site anywhere outranked every city, so a player
+# who had walked the roads could not pick most cities at all: from the Azure
+# Crown capital even the four cities one road away fell off the end.
+DESTINATION_KINDS: tuple[tuple[str, str], ...] = (
+    ("city", "Cities"),
+    ("here", "This city"),
+    ("road", "Road sites"),
+    ("wilds", "Wilds and gates"),
+)
+
+
+def destination_kind(emoji: str) -> str:
+    """Which kind a `destination_groups` row is, by the group it was drawn in:
+    the streets, parts and shops of the city you stand in; a road site; a city
+    by road (or a capital, or a road's end); anything else - a wild place, a
+    sect gate, a road-less spot."""
+    if emoji in ("🚪", "🏙️", "🏪"):
+        return "here"
+    if emoji == "🛤️":
+        return "road"
+    if emoji in ("🛣️", "🌀"):
+        return "city"
+    return "wilds"
+
+
+def destinations_of_kind(current: str, known: set[str] | list[str], realm_index: int, kind: str) -> list[tuple[str, str, str, int]]:
+    """The rows of one kind, in `destination_groups`' own order - so a city is
+    nearest first and nothing of another kind can push it off a list of 25."""
+    return [row for row in destination_groups(current, known, realm_index) if destination_kind(row[1]) == kind]
 
 
 def destination_groups(current: str, known: set[str] | list[str], realm_index: int) -> list[tuple[str, str, str, int]]:
