@@ -2691,6 +2691,12 @@ async def run(url: str, token: str, db_path: str) -> Report:
     for status in ("acked", "fetching", "installing"):
         await audited("admin.server.update_status", {"nonce": nonce, "status": status, "detail": "playtest"},
                       name=f"the watcher reports {status}")
+    # The updater stops the stack this engine runs in, so while an install is
+    # under way the watcher cannot be heard; the request's own last report is
+    # what shows it is not abandoned. A cancel here would refuse the closing
+    # report below, and `done` is the step that fails if it were accepted.
+    await step(report, "an install that has just reported is not cancelled under the updater",
+               gm("admin.server.cancel_update", {"reason": "playtest"}), expect_error="the update is already")
     await audited("admin.server.update_status",
                   {"nonce": nonce, "status": "done", "detail": "playtest", "installed_version": "0.0.0-playtest"},
                   name="the watcher reports done")

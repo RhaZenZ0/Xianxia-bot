@@ -529,7 +529,21 @@ parent directory, so a second copy exits at once; `update.sh`'s own lock still s
 a manual `./update.sh`. It never touches `.env`: a release that adds a key is refused by
 `update.sh`'s preflight before anything is stopped, and the card reports *"needs ./migrate_env.sh"* -
 that step stays yours, because the file holds the tokens. A GM who opens the world by hand while an
-update is running is not stopped; the watcher reopens it at the end either way.
+update is running is not stopped; the watcher reopens it at the end either way. A scheduled
+`--oneshot` run slower than every fifteen minutes will show *"watcher not running"* between runs,
+and the button waits for the next one; run it at least that often, or use the loop.
+
+**Cancel.** A request nobody has picked up (`requested`) can be cancelled at any time. One the
+watcher has picked up cannot, for two hours after its last report: `update.sh` stops the whole
+stack - the engine and the dashboard with it - and rebuilds it, so the watcher cannot send a
+heartbeat while an install runs and a quiet watcher is the normal state of one, not a sign it has
+died. The engine decides this itself (`updateInstallLeaseSeconds`, held equal to the card's by a
+test) from the request's own last report, which the watcher writes just before it starts
+`update.sh`; the card shows *installing* with how long ago that was. Past two hours with the
+watcher also silent for fifteen minutes, Cancel appears and the Request button returns. If the
+watcher itself died mid-install, look in `update_watch.log` first: once `update.sh` has finished,
+starting `update_watch.sh` again reports the request failed, which closes it at once. Cancelling
+does not stop `update.sh`, and anything it installed stays installed.
 
 ## Daily route check (v0.27.0)
 
