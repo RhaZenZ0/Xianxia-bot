@@ -1443,12 +1443,23 @@ async def run(url: str, token: str, db_path: str) -> Report:
     await step(report, "an overwhelming cultivator", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 7, "phase": 9, "reason": "playtest"}))
     targets = await step(report, "combat.targets in the town", query("combat.targets", PLAYER, {"location": town}))
     candidates = [r for r in list((targets or {}).get("targets") or (targets or {}).get("rows") or []) if isinstance(r, dict) and r.get("name")]
-    npcs = [r for r in candidates if str(r.get("kind") or r.get("type") or "npc") == "npc"] or candidates
-    opponent = str(min(npcs, key=lambda r: int(r.get("realm_index") or 0)).get("name")) if npcs else ""
+    # `target_type` is the column the engine's rows carry; the `kind`/`type` this
+    # used to read are keys no row has, so the default kept every row.
+    npcs = [r for r in candidates if str(r.get("target_type") or "npc") == "npc"] or candidates
+    opponent_row = min(npcs, key=lambda r: int(r.get("realm_index") or 0)) if npcs else {}
+    opponent = str(opponent_row.get("name") or "")
     if not opponent:
         report.add("FAIL", "combat.start", f"nobody to challenge in {town}: {str(targets)[:200]}")
     else:
-        battle = await step(report, f"combat.start against {opponent}", act("combat.start", PLAYER, {"kind": "challenge", "npc_name": opponent, "source": "playtest"}))
+        # A challenge names whom it means and nothing else: the engine finds
+        # them among those standing here and fights them at their own realm.
+        battle = await step(report, f"combat.start against {opponent}", act("combat.start", PLAYER, {"kind": "challenge", "npc_name": opponent}))
+        if battle is not None:
+            report.add("PASS" if present(battle.get("npc_realm_index")) == present(opponent_row.get("realm_index"), 0)
+                       and present(battle.get("npc_stage")) == present(opponent_row.get("phase"), 1) else "FAIL",
+                       "a challenge fights the opponent at the world's realm and stage, not one a caller states",
+                       f"battle {battle.get('npc_realm_index')}/{battle.get('npc_stage')} source={battle.get('source')} "
+                       f"row {opponent_row.get('realm_index')}/{opponent_row.get('phase')}")
         battle_id = int((battle or {}).get("battle_id") or 0)
         if battle_id:
             await step(report, "combat.recovery_item", act("combat.recovery_item", PLAYER, {"battle_id": battle_id, "item_id": "recovery_pill"}))
@@ -1475,7 +1486,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
             if spared is not None and won:
                 report.add("PASS" if int(spared.get("sword_intent") or 0) >= 1 else "FAIL",
                            "a Sword Cultivator's win banks sword intent", f"sword_intent={spared.get('sword_intent')}")
-        second = await step(report, "combat.start again for the GM's lever", act("combat.start", PLAYER, {"kind": "challenge", "npc_name": opponent, "source": "playtest"}))
+        second = await step(report, "combat.start again for the GM's lever", act("combat.start", PLAYER, {"kind": "challenge", "npc_name": opponent}))
         if second is not None:
             second_id = int(second.get("battle_id") or 0)
             if second_id and won:
@@ -2413,7 +2424,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         report.add("SKIP", "combat.technique with a qualified Law", f"nobody to challenge in {town}")
     else:
         foe = str(min(rows, key=lambda r: int(r.get("realm_index") or 0)).get("name"))
-        duel = await step(report, f"combat.start against {foe} for the Law", act("combat.start", PLAYER, {"kind": "challenge", "npc_name": foe, "source": "playtest"}))
+        duel = await step(report, f"combat.start against {foe} for the Law", act("combat.start", PLAYER, {"kind": "challenge", "npc_name": foe}))
         duel_id = int((duel or {}).get("battle_id") or 0)
         if duel_id:
             crushed = await step(report, "combat.technique spatial_strangulation",
@@ -2530,11 +2541,11 @@ async def run(url: str, token: str, db_path: str) -> Report:
         report.add("PASS" if studied.get("forbidden") else "FAIL", "the scripture is forbidden, and the first study costs a point of karma", f"first_study={studied.get('first_study')} karma={studied.get('karma_score')}")
     targets = await step(report, "combat.targets for a witnessed fight", query("combat.targets", PLAYER, {"location": town}))
     candidates = [r for r in list((targets or {}).get("targets") or (targets or {}).get("rows") or []) if isinstance(r, dict) and r.get("name")]
-    marks = [r for r in candidates if str(r.get("kind") or r.get("type") or "npc") == "npc"] or candidates
+    marks = [r for r in candidates if str(r.get("target_type") or "npc") == "npc"] or candidates
     mark = str(min(marks, key=lambda r: int(r.get("realm_index") or 0)).get("name")) if marks else ""
     pursuit: dict[str, Any] = {}
     if mark:
-        fight = await step(report, f"combat.start against {mark}", act("combat.start", PLAYER, {"kind": "challenge", "npc_name": mark, "source": "playtest"}))
+        fight = await step(report, f"combat.start against {mark}", act("combat.start", PLAYER, {"kind": "challenge", "npc_name": mark}))
         palm = await step(report, "manual.technique Blood Sea Palm, in the open", act("manual.technique", PLAYER, {"technique_id": "blood_sea_palm"})) if fight is not None else None
         if palm is not None:
             report.add("PASS" if palm.get("witnessed") and palm.get("forbidden") else "FAIL", "unconcealed, the palm is witnessed with certainty", f"witnessed={palm.get('witnessed')} exposure={palm.get('exposure')} crime={str(palm.get('crime'))[:80]}")

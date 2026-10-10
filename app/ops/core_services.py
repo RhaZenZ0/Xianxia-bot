@@ -594,20 +594,24 @@ class CombatService:
         ))
 
     async def start(
-        self, user_id: int, *, kind: str, npc_name: str, source: str, action_id: str,
-        npc_realm_index: int = 0, npc_stage: int = 1, severity: int = 0, target_key: str = "",
+        self, user_id: int, *, kind: str, npc_name: str, action_id: str,
+        source: str = "", severity: int = 0, target_key: str = "",
     ) -> dict[str, Any]:
         """Open a new battle. Go owns the opponent's starting HP/realm/stage curve
         and the player's HP snapshot (read from the caller's own canonical
         characters row) - Python only identifies *which* opponent and *why*.
+
+        A challenge names whom it means and nothing else: the engine finds that
+        person among those standing where the caller stands and takes their
+        realm, stage and name, and the battle's source and lock, from the world.
+        There is no realm or stage to state and a challenge passes no source.
+        An event still states its own `source`, and `severity` scales it.
         """
         return await self.engine.authoritative_action(
             "combat.start", int(user_id),
             {
                 "kind": str(kind),
                 "npc_name": str(npc_name),
-                "npc_realm_index": int(npc_realm_index),
-                "npc_stage": int(npc_stage),
                 "severity": int(severity),
                 "source": str(source),
                 "target_key": str(target_key),
