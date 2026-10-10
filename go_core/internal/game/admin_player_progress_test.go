@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"xianxia/core/internal/gamerng"
 	"xianxia/core/internal/storage"
 )
 
@@ -162,6 +163,9 @@ func TestTheRootLeverTakesAMutationTheCatalogueCarries(t *testing.T) {
 // takes the rank back and leaves the row, because the successes an examination
 // reads are the craft's.
 func TestAnUndoKeepsWhatACraftEarnedOnTheLeversRow(t *testing.T) {
+	// The craft is a roll; the dice are lent so the successes the undo must
+	// leave alone are there to be left.
+	defer gamerng.UseRoller(highDice)()
 	path := setupBatch4AuthorityDB(t)
 	setupCraftAuthorityTables(t, path)
 	batch4Exec(t, path, perfectionAuditDDL)
@@ -258,6 +262,9 @@ func TestAnUndoOfALawLeavesTheSittingsTheGMLeftAlone(t *testing.T) {
 
 // The balance is the lever's; the lifetime count promotion reads is play's.
 func TestAnUndoOfAContributionLeavesTheCountTheGMLeftAlone(t *testing.T) {
+	// The donation's points are sect-value arithmetic, and the dice are lent
+	// anyway so nothing on the sect path can answer zero by chance.
+	defer gamerng.UseRoller(highDice)()
 	path := filepath.Join(t.TempDir(), "contribution.sqlite3")
 	conn, err := storage.Open(path)
 	if err != nil {

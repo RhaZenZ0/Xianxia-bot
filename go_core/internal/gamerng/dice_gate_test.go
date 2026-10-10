@@ -53,6 +53,7 @@ var diceAllowed = map[string]string{
 	"TestFamilyRoadNeighborCanBeTravelledAndIsPersistentlyDiscovered": "the same len(location.Roads) on the authored map, read out of the catalogue before the travel it sets up",
 	"TestStarterHouseholdsAreSharedStableAndCoLocatedPlayersCanMeet":  "counts the starter household offers, which are the content file's own list and are the same list twice by design",
 	"TestAWaystationKeepsAStallAndStandsOnTheMerchantsRoad":           "the stall's stock is ensureShopStockTx writing max64(1, line.Quantity) per authored ware, so an empty stall is a content fault and not a miss",
+	"TestEveryShippedObjectiveIsMetByItsOwnTarget":                    "the zero-check is `targeted`, a count of the objectives content/world.json authors with a target, read off the file before any report; every quest is held at count 1000 so no report completes anything",
 
 	// A floor in the production code makes the zero the test guards against
 	// unreachable, whatever the dice say.
