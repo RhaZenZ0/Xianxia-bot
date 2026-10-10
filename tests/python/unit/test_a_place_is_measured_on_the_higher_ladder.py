@@ -25,7 +25,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import discord
 
-ENV = {"DISCORD_TOKEN": "test-token", "GUILD_ID": "123456789012345678",
+from tests.support import PROJECT_ROOT
+
+ENV ={"DISCORD_TOKEN": "test-token", "GUILD_ID": "123456789012345678",
        "ENGINE_AUTH_TOKEN": "test-engine-token-1234567890", "DATABASE_PATH": "data/test.sqlite3"}
 
 
@@ -79,6 +81,25 @@ class TheFixtureIsARealBodyCultivator(unittest.TestCase):
         self.assertIs(locations.access_realm_index, hubs.access_realm_index)
         exploration = _module("app.bot.commands.exploration")
         self.assertIs(exploration.access_realm_index, hubs.access_realm_index)
+
+
+class TheTwinIsHeldToTheEngine(unittest.TestCase):
+    """The rule is stated in Go; the Python copy is a display twin, and a twin
+    is only as honest as the test that reads the original."""
+
+    def test_the_engine_still_answers_the_higher_of_the_two_ladders(self):
+        source = (PROJECT_ROOT / "go_core" / "internal" / "game" / "aptitude_actions.go").read_text(encoding="utf-8")
+        start = source.index("func (c mechanicsCharacter) accessRealmIndex() int64 {")
+        body = source[start:source.index("\n}\n", start)]
+        self.assertIn("c.BodyRealmIndex > c.RealmIndex", body, "the engine's rule moved; the twin in rules/realm_hubs.py is held to a rule that is gone")
+        self.assertIn("return c.BodyRealmIndex", body)
+        self.assertIn("return c.RealmIndex", body)
+
+    def test_the_twin_answers_the_same_for_every_pair(self):
+        hubs = _module("app.rules.realm_hubs")
+        for qi in range(0, 12):
+            for body in range(0, 12):
+                self.assertEqual(hubs.access_realm_index({"realm_index": qi, "body_realm_index": body}), max(qi, body))
 
 
 class TheArrayPickerOffersWhatTheEngineWillCarry(unittest.TestCase):
