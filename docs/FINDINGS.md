@@ -6613,3 +6613,1169 @@ deployed array's multiplier is read by `deployedArrayMultiplier` for `cultivatio
 `placeMultiplierForPath` withholds that from the body path on purpose (v1.2.3). A stat authored on
 a disk that no reader fetches is rc.58's dead modifier; the disk carries body +2 and will +1, which
 reach everybody standing in it through `canonicalAdditiveEffectBonus`.
+
+### The file every session paid for (v1.33.0)
+
+**Found by counting, not by playing.** `CLAUDE.md` is loaded into every session and into every subagent a
+session starts, and it was **560,727 bytes - about 140,000 tokens** - after growing by roughly 4 KB with
+each release. A deep review starts eight to twenty-five subagents, so the file was paid for twenty-five
+times over before anyone read a line of code. Measured by section: the header and commands 4.5 KB, the
+architecture core 3.5 KB, thirteen subsystem essays 30.6 KB, the testing conventions 5.4 KB, the release
+delivery 1.4 KB, and **"What each release found" - 149 write-ups - 515 KB, 91.9% of the file**. The
+history was written once, in the order the faults were found, and was read rarely: the rules it taught
+were in it, and so was the 4 KB of how each one was drilled.
+
+**Nothing measured it, and the one gate that read the file read one sentence.** `test_release_version.py`
+holds `Current schema version is N;` and nothing else about `CLAUDE.md`; no test asked how big it was,
+and Claude Code's own large-memory warning sits at 40,000 characters, which the file passed long before
+anybody looked. A file that is written to by every release and read by none of the gates grows exactly as
+`VERSIONS.md` does, except that this one is charged to every task.
+
+**The history was moved, not summarised.** Ninety-six percent of it appears nowhere else - `VERSIONS.md` is
+the changelog and the code cites sections by release label about 3,900 times - so deleting it would have
+cut the references. `docs/FINDINGS.md` holds "What each release found" byte for byte, every `###`
+heading unchanged, under a preamble that says new findings are appended there; `docs/ARCHITECTURE.md`
+holds the thirteen subsystem essays, with the two "above"/"below" references that pointed into the
+history re-pointed at it; `docs/TODO.md`'s nineteen `See CLAUDE.md, "<title>"` pointers now name
+`docs/FINDINGS.md`. The move is its own commit so the distillation can be reviewed on its own, and a
+script compared the moved ranges to the original: the only changed lines are the two cross-references.
+
+**What stayed is what is true on every task.** `CLAUDE.md` is 28,485 characters: what this is, the
+commands (with "It is a script, not CI" restored beside the playtests it is about), the authority split,
+the design rules, the layouts and the schema sentence, one line per subsystem essay, the testing
+conventions unchanged, and the release delivery with its stamp list written out instead of pointing at
+the history. Between them sit **30 Standing rules**, one line each, each naming the release that found it
+- "a bound that lives in the client is not a bound (rc.48)" - grouped as doors and bounds, values and
+failures, reach, and gates and drills. A session that meets an old label greps `docs/FINDINGS.md`; the
+rule is the lesson, the section is how it was found.
+
+**Four sentences are quoted from code and had to stay.** The status-read limit is quoted by the
+curriculum's authoring script and its gate, and had survived only inside the history; `npc_consignments`
+is cited by the town's stall step and its fixture; "It is a script, not CI" is cited by the github-ci
+skill; and the schema sentence is held by `test_release_version.py`. `test_claude_md_stays_small.py`
+holds each present in `CLAUDE.md` *and* still quoted by each file that cites it, so the table cannot go
+stale in either direction.
+
+**The gate, and what each drill prints.** It asks the file to stay under 40,000 characters, to carry no
+heading with a release label, to import nothing, to say the four sentences, to name only paths that
+exist, to note every `###` section of `docs/ARCHITECTURE.md` in one line and nothing else, to cite only
+releases `docs/FINDINGS.md` mentions, and every `docs/FINDINGS.md, "<title>"` pointer in `docs/TODO.md`,
+`docs/ARCHITECTURE.md` and `CLAUDE.md` to name a real `###` heading. A 41,000-character file prints
+*"CLAUDE.md is 41,000 characters; the cap is 40,000 (Claude Code warns above it, and every session and
+subagent pays for the file)..."*; restoring `### The NPC life cycle (v1.0.0-rc.24)` prints *"the heading
+... carries a release label; a release is a section of docs/FINDINGS.md, not a heading here"*; breaking a
+TODO pointer prints *"docs/TODO.md points at docs/FINDINGS.md, "The first hour is a long list", which is
+not a section there"*; dropping the status-read sentence names it and the two files that cite it;
+dropping "It is a script, not CI" names the skill; an `@docs/FINDINGS.md` line prints *"line 344 imports
+a file"*; a path that does not exist is named; and deleting a subsystem note prints *"docs/ARCHITECTURE.md
+has a section "Narration routing" that CLAUDE.md does not note in one line"*. The readers are asked for
+something known before they are trusted (rc.57): blanking the heading regex fails *"the heading reader
+cannot find CLAUDE.md's rules"* before any assertion it would have made vacuous. The negative cases also
+run inside the suite, so each rule is shown to see the fault it was written for on every run.
+
+**Two readings of the plan's number were wrong, and the gate found one.** The standing rules were planned
+at about twenty-three and are thirty, because the history taught more than one lesson per item the plan
+listed; and the first version of the label check asked every release the *whole* file cites to be in
+`docs/FINDINGS.md` and failed on `v1.0.0-rc.42` - the dice gate's own record lives only in the testing
+conventions, which is where it stays - and on the example versions in the delivery steps. It reads the
+Standing rules section now, which is the one place a release label is a pointer.
+
+**What is deliberately not built.** No nested `CLAUDE.md` (Claude Code loads them on demand, which would
+bring the weight back) and no `@import` of either file, both held by the gate. The testing conventions
+were not stripped further: option C of the plan, relying on git for the history, was set aside because
+code cites the history by label.
+
+### The coin of whoever claims (`raidRewardCurrency`, v1.33.0)
+
+v1.17.0 paid a raid in the money of the world it stands in, and read "stands in" off the wrong
+party. `bossClaimActionGo` called `characterBaseCurrencyTx`, which is the coin of wherever the
+**raider** is when they press Claim, and a claim is tied to no place and no time: `boss.claim` asks
+only for an unclaimed `boss_reward_claims` row. So the Iron-Tusk Boar King (120 Mortal stones),
+won in Greenriver Town and claimed on the Thousand Beast Steppe, paid 120 spirit crystals, a
+hundred times the stones; the Hundred-Horn Ancestor Stag (300 crystals) claimed from the
+household paid 300 stones, a hundredth. A claim away from the lair is not exotic: a party leaves
+the lair the moment the boss falls, a household has no world and reads as the Mortal stone, and
+the raid card says "Claim reward" for as long as the row is open.
+
+`raidRewardCurrency(catalog, lair, templateKey)` is the one statement of which coin a raid pays:
+the world of the lair stored on the encounter row (`boss_encounters.location`, NOT NULL, written by
+`boss.start` from `bossLair`), else the world of the template's current lair, else no answer. It
+pays through `walletDeltaTx`, naming the coin, never `characterWalletDeltaTx`; rc.44's mirror rule
+in `walletDeltaTx` then keeps the sheet's one number local, so a Mortal raid claimed on the steppe
+lands in the purse (where `crossWorldsPurseTx` converts it at the next crossing) and leaves the
+sheet alone. A claim with a coin to pay and no lair that resolves is **refused, and the reward stays
+claimable**: answering the Mortal stone would be the fault itself, "a fallback that looks like a
+value is not a sentinel" (`seller_user_id=0`, `gradeIndex`, `clanRelationOpeningScore`). `raidCoinOf`
+is the resolver under it and asks one thing more than `worldBaseCurrency` does: that the coin it
+found is a tier-1 coin *of that world*, because `worldBaseCurrency` answers the Mortal stone for a
+world with none.
+
+**Why nothing caught it.** v1.17.0 wrote `TestARaidIsPaidInTheMoneyOfItsWorld`, and it claims the
+Stag with the raider standing at the Stag's lair - the one place where "the raider's world" and
+"the raid's world" are the same world. It is a test of the fix the author had in mind, and it stays
+green against the broken tree (rc.47: a gate that cannot see what it forbids). It also could not
+have found the second half, that the fixture's `boss_encounters` declared no foreign key to
+`parties`, which production does (`ON DELETE CASCADE`); it carries it now, and every fixture that
+plants an encounter has to plant its party first.
+
+**What each drill prints.** Putting `characterBaseCurrencyTx` back in the claim fails four tests:
+`TestARaidIsPaidInItsLairsCoinWhereverItIsClaimed` prints nine wrong-coin lines, one of them
+`iron_tusk_boar_king (lair "Greenriver Town", Mortal World) claimed at "Thousand Beast Steppe" says
+it paid "low_spirit_crystal", want "low_spirit_stone"` and one the Nine-Echo Sword Wraith, whose lair
+is a secret realm's entrance (`Cloudspine Foothills`) rather than a place its template names;
+`TestAClaimAwayFromTheLairLeavesTheSheetAlone` and `TestARaidPaysTheEncountersLairBeforeTheTemplates`
+each fail on their own sentence; and `TestARaidWithNoWorldIsRefusedNotPaidInStones` prints the map the
+claim answered with. `TestARaidIsPaidInTheMoneyOfItsWorld` stays green, which is the point of the
+rest. `false &&` on the encounter's-lair branch fails the precedence test with *"a Boar King fought
+on the steppe paid "low_spirit_stone"; the encounter's lair is the steppe's"*; on the template
+branch, *"a stag whose stored lair left the map was refused though its template still has one"* (the
+two branches agree on every untampered row, so the sweep cannot tell which one paid: rc.53). Returning
+`fallbackBaseCurrency, true` for an unresolved lair fails the refusal test and the pure resolver test
+(*"Coinless Hollow" was answered "low_spirit_stone"*). Dropping the `amt != 0` guard fails the
+item-only case (*"an item-only reward was refused for want of a coin it does not use"*): an item
+needs no coin, so a lair the map lost does not strand a reward that is only an item. Dropping
+`raidCoinOf`'s tier-1-of-that-world check fails only the pure resolver test, which is why that test
+exists. Writing the sheet by hand after the claim fails `TestAClaimAwayFromTheLairLeavesTheSheetAlone`
+(*"the sheet moved from 0 to 120 for a coin the raider's world does not use"*) and
+`TestThePurseHasOneDoor` (*"group_combat_actions.go"*).
+
+**The card is the same rule in Python.** `raid_card` named the coin off `boss_lair(template)` alone,
+so a Boar King *stored* at the steppe would be drawn in stones and paid in crystals. It reads the
+encounter's stored lair first and the template's second, the claim's own order; a raid whose lair
+neither resolves is one the engine refuses, so the card names "coin" rather than the Mortal stone it
+used to default to (`or "Mortal World"`). The Python side only names; which coin is paid is the
+engine's. `test_the_raid_card_names_each_lairs_coin` computes the expected coin from the raw content
+(`currencies`, `secret_realms`, `locations`) for every entry of `BOSS_TEMPLATES`, with and without a
+stored lair, requires four distinct coins before it trusts the sweep, and plants a Boar King at the
+steppe. Reading the template's lair alone prints `'**120** Low Spirit Crystal' not found in '**120**
+Low-Grade Spirit Stone + **Low Beast Core ×2**'`; reading the stored lair alone prints
+`'**120** Low-Grade Spirit Stone' not found in '**120** coin + ...' : iron_tusk_boar_king with no
+stored lair`.
+
+**What is deliberately not built.** No clawback of past overpayments and no migration: the stored
+reward amounts are right, only the coin was wrong, nothing was ever denominated wrongly in the
+database, and migration 53 settled drift upwards for the same reason (handing somebody stones they
+might not have earned is the lesser fault). The `boss.claim` rows in `domain_events` carry `currency`
+and `encounter_id` for anyone who wants to audit. Converting at the claim was rejected:
+`crossWorldsPurseTx` already converts at the next crossing, and a second converter would be two
+copies of one rule. Refusing a claim made away from the lair was rejected: it strands rewards.
+
+**The stale statements.** `CLAUDE.md`'s "Each world has a job" section says the raid claim "pays
+`characterBaseCurrencyTx`'s coin now" and that the raid card names "the lair's world's coin". The
+first is the fault this finding corrects; reword it to "pays `raidRewardCurrency`'s coin" when
+CLAUDE.md is next edited (the line sits in the paragraph beginning "And the raid paid the Mortal
+stone in every world"). `docs/TODO.md` (v1.17.0 `fixed` entry) says a raid's reward is "paid in the
+money of the world it is fought in", which is true now and was not.
+
+### The columns a rebirth did not name (`incarnationScopedLaterColumns`, v1.33.0)
+
+Samsara keeps the `characters` row. It is the account's, and `reincarnateAction` writes the new body over it in place with one `UPDATE characters SET name=?,origin=?,...,attributes_json=?,updated_at=? WHERE user_id=?`. That statement names the columns that existed when it was written: 32 of the 47 the bootstrap makes today. Thirteen of the rest are the soul's (the account's identity and display name, the row's creation time, the karma the wheel reads, the death count, the address style, the declared Dao and the six moderation flags). The other two are the life's and were never named: `vitality_recovered_game_minute` (schema 59, the anchor the body's mending counts from) and `path_resource` (schema 72, the sword intent a Sword Cultivator banks, capped at 3). So a reborn soul came back with the intent the last body had earned and the last body's mending clock, in a body that had done neither.
+
+`clearIncarnationStateTx` was the one door for the life's *rows* and could not reach it: it only deletes rows from other tables, and v1.12.3 had already found the same fault there for `character_flames` and `character_spirit_sense`, which were added to it as a later list "skipped when the table is not there yet". The fault was the same and the fix stopped at tables. **A column added to a row a rebirth keeps is one the rewrite never heard of.**
+
+The second half is a bond, and it is v1.25.0's. A player's NPC master is `npc_mentorships` (schema 79), keyed on `disciple_user_id`, foreign-keyed to `characters`, and read by the breakthrough bonus, the cultivation term, a retreat's carried terms and the insight on a realm crossing. Neither wipe list named it and neither door out of a sect touched it. A rebirth left the Elder paying their terms to a child who never knelt to anyone, and `sect.ascend` (v1.18.0) deleted the old `sect_lineage` bond with a comment saying the disciple bond is the old sect's, and left the NPC one, so an Azure Cloud Elder went on teaching a disciple of the Jade Meridian Sect. `discipleship.leave` was the only door that ended it.
+
+**The fix is a guarded column list in the one wipe door.** `incarnationScopedLaterColumns` is `{column, reset}` pairs beside `incarnationScopedLaterTables` (`vitality_recovered_game_minute` to `NULL`, `path_resource` to `0`), and `clearIncarnationStateTx` runs `UPDATE characters SET <col>=<reset> WHERE user_id=?` for each one that `tableHasColumns` finds. The install literal is left alone, deliberately: in the compose stack the engine is healthy before db-init migrates, and an install naming a column the world has not got yet would refuse every rebirth in that window. Then `severNPCMasterTx` runs from the wipe, and from `sect.ascend` after its `sect_lineage` delete.
+
+**Why nothing saw it.** The Go fixture builds `characters` by hand and `setupBatch4AuthorityDB` has neither column, so a wipe test could not fail the way production fails (the `npc_consignments` rule). `test_samsara_wipes_real_tables` (v1.12.3) holds the two *table* lists against the real schema and says nothing about a column. And nothing compared the install's SET list with the columns the bootstrap makes, so the day schema 72 added a column to the kept row there was nowhere for the omission to show.
+
+**The gate is the real schema.** `TheRebirthWipesRealTables` (`test_engine_boundary.py`) bootstraps a database and holds every column of `characters` to being reset - by the install's SET list, read off `reincarnateAction`, or by `incarnationScopedLaterColumns` - or named in `SAMSARA_KEEPS_COLUMNS` with the reason it is the soul's. Thirteen are kept: `user_id`, `discord_name`, `created_at`, `karma_score`, `true_death_count`, `address_style`, `concept`, and the six moderation columns (`is_muted`, `is_frozen`, `moderation_reason`, `muted_until`, `frozen_until`, `is_banned`). A column a later schema adds is neither until somebody decides, which is the point. Five checks: the reader found the install (more than 25 columns, the realm and the purse among them, and both later columns - asserted before anything is trusted); every reset is a real column; columns minus resets minus keeps is empty; every keep is real and none is also reset; and a later column reset to `NULL` is nullable, because a `NOT NULL` column set to `NULL` would refuse every rebirth.
+
+Two things about the reader. The install `UPDATE` is inside `reincarnateAction`, which is the **last function in `lifecycle_actions.go`**, so the slice runs to the next top-level `func` *or the end of the file* - a slice that needed a following `func` to stop would read nothing, and the first draft of the idea did. And `incarnationScopedLaterColumns` is a literal that spans lines, so it is read by brace depth, not by line.
+
+**What the drills print.**
+- the later-columns list emptied: `a reincarnation left 3 sword intent banked in the new body: the intent was earned by a body that is gone` and `a reincarnation kept the mending anchor: 500`;
+- `severNPCMasterTx` taken out of the wipe: `a reincarnation left 1 bond(s) with the sect's people for the reborn soul`;
+- taken out of `sect.ascend`: `a member who climbed to the Jade Meridian Sect still has a master among the Azure Cloud Sect's people (1 row)`;
+- the column guard disabled (`err != nil || false && !ok`): `no such column: vitality_recovered_game_minute`, from three tests - the migration-window test is the drill for the guard, because the fixture has neither column;
+- the `path_resource` entry dropped from the Go list: `['path_resource']` in "neither resets nor keeps"; `insight_xp=0` dropped from the install: `['insight_xp']`;
+- the typo `path_resources`: `a rebirth resets path_resources, which is not a column the bootstrap makes`;
+- `realm_index` added to the keeps: `kept and reset at once: ['realm_index']`;
+- the literal reshaped to keyed fields (`{Column: ..., Reset: ...}`): `incarnationScopedLaterColumns parsed to nothing; the reader is broken, not the tree`, before any assertion it would have made vacuous;
+- `path_resource` reset to `NULL`: `is reset to NULL and the column is NOT NULL: every rebirth would be refused`;
+- the install reader made to need a following `func`: `reincarnateAction holds 0 UPDATE characters SET statements`.
+
+**Deliberately not done.** No repair migration: both resets are guarded, so only a rebirth or an ascent after the upgrade is fixed. Intent carried by an earlier rebirth (at most 3) cannot be told from intent banked in this life and a win re-earns it. A stale NPC bond left by an earlier rebirth or ascent pays its terms until the player presses Leave, which is drawn once they are in a sect, and the `sect_has_master` padlock names it. The optional migration 80 (delete bonds whose disciple is not a member of the bond's sect) was offered and declined.
+
+### A place is measured on the higher ladder (`accessRealmIndex`, v1.33.0)
+
+**A place the road had just let a body cultivator into, refused at the door.** `accessRealmIndex`
+(`aptitude_actions.go`) is the higher of the qi and body ladders, and its own comment states why: the
+world-crossing tribulation is gated on either ladder, so a body cultivator clears the Mortal Body
+Ascension and breaks into the Spiritual World's body realm exactly as a qi cultivator clears theirs,
+and a place is measured on whichever ladder carried them there. Travel, the realm capitals, discovery,
+the search area, the stalls and a raised gate's `opened_realm_index` all read it. Three doors in the
+engine did not, and the first was reported as a single line in a review: `sect.ascend` compared the
+allied gate's floor with `c.RealmIndex`, so a member at body 8 with the qi ladder still at 3 was walked
+to the Jade Meridian Stone Gate by the rule that admits them and refused at it by the rule that does
+not (*"the way up into Jade Meridian Sect asks for Spirit Body Transformation; you stand at Core
+Formation"*). The panel's twin `_sect_ascent_refusal` was handed the qi realm and padlocked the leaf with
+the same wrong reason.
+
+**The audit that followed found the same fault at two more engine doors and four Python ones, and the
+engine ones were the expensive ones.**
+
+- `array.use` (`teleportArrayActionGo`) selected `characters.realm_index` alone and refused
+  `i64(ch["realm_index"]) < d.MinRealmIndex`. The crossing arrays carry floors of 8, 16 and 24, and the
+  return arrays out of the three upper capitals carry them too, so a body cultivator who reached the
+  Spiritual World by the body tribulation could use neither the way up nor the way down. A raised gate
+  borrows the authored crossing's floor and stores the opener's `accessRealmIndex`, so **the body-path
+  cultivator who tore a gate could not step through it** while a qi-path opener could.
+- `caravan.dispatch` (`caravanDispatchActionGo`) handed `i64(c["realm_index"])` to `canonicalRoadRoute`,
+  which drops every place whose floor is above the realm it is given - **the origin included**. So in
+  every world above the Mortal one, where the capital's floor is 8, 16 or 24, a body cultivator standing
+  in it was told "no canonical road route connects the caravan destination" about a road travel had just
+  walked them along. That is a whole system (`/economy -> Caravans -> Dispatch`) dead for the body path
+  from the Spiritual World up. It is also the one the first design missed: the design claimed "every
+  caller passes accessRealmIndex today", which is false, and its AST prototype could not have seen it
+  because the qi read there is a **call argument**, not a comparison.
+- Python: the array list (marks an array *sealed* that the engine will carry the player through) and its
+  picker (leaves it out), the realm-capital picker and status card (hide a capital that `travel` in hub
+  mode takes the body stage to), and `_sync_realm_access_roles` (never grants the world's access role,
+  so the cultivator is let into the world and kept out of its channels). `_progression_hidden_actions`
+  also padlocked `/tribulation prepare` and `attempt` unless the **qi** realm was a gate realm, though
+  `eligibleTribulation` takes either ladder's gate stage.
+
+**Why nothing caught it.** Every shipped test of these doors seats a cultivator with `body_realm_index`
+at 0: `ascentDB` sets `realm_index` alone, `_hidden` in `test_the_way_up_into_a_sect.py` builds
+`"body_realm_index": 0`, and the array and caravan fixtures never touch the column. rc.53's lesson in a
+new place - a fixture that cannot fail the way production fails (a body cultivator is exactly a
+character whose two ladders differ) tests only the half of the players the rule agrees about. And the
+rule had been written down *once*, at the stall, where v1.5.0 got it right, and nothing said it was a
+class: a stated rule enforced at the sites known when it was written does not reach the site written
+next.
+
+**The fix applies the rule that was already there; it adds no door.** Each engine site asks
+`accessRealmIndex()`. `array.use` and `caravan.dispatch` load the character through
+`loadMechanicsCharacter` (the door `sect.ascend` and `stall.open` already use) instead of a raw SELECT, so
+there is no second reader of the row to drift; the caravan takes its agility from the loaded
+`c.Attributes`, which is `rowAttributes`' own computation. Python keeps its twin and moves it:
+`access_realm_index` lives in `app/rules/realm_hubs.py` (the runtime cannot import `locations`, and
+`rules` is below both), `locations.py` re-imports it, so there is still one definition, and
+`TheTwinIsHeldToTheEngine` reads the Go body and compares the twin over every pair of stages.
+
+**What the refusal names is the qi ladder's stage at the access index**, as the stall's does
+(*"a stall asks for X; you stand at Y"* with Y = `realmNameGo(access)`). Both lines of the sect refusal
+had to change together: reverting only the comparison prints *"asks for Spirit Body Transformation; you
+stand at Spirit Body Transformation"*, which is a refusal that contradicts itself.
+
+**Strength floors stay on the qi ladder, deliberately.** What a place asks and what a fight, a Law or a
+flame asks are different questions: a secret realm's rooms roll on `stageLead(c.RealmIndex)`, a flame is
+captured against the qi stage, a Law is comprehended on the qi ladder and a technique is read off it, a
+raid member is held to the boss's realm, and a personal world asks Dao Saint and Space Law at 100. None of
+those reads a place's floor. They are listed in `docs/TODO.md` as a decision, not a backlog, and the gate's
+allowlist is empty.
+
+**The gate (`TestAPlaceFloorIsMeasuredOnTheHigherLadder`) has two clauses, and the second is the
+caravan's.**
+
+- **(a)** no comparison pairs a place floor - a `MinRealmIndex` read off `Locations` or `TeleportArrays`
+  (directly, through a variable assigned from one, or a variable assigned from such a read) or
+  `worldMinRealm` - with a qi-only read: `.RealmIndex`, a `"realm_index"` map read (bare or under `i64`,
+  `int64`, `ParseInt` or `intFromDB`) or a variable assigned from one.
+- **(b)** no call hands a qi-only read to the realm parameter of a place-floor helper:
+  `canonicalRoadRoute` 3, `canonicalRoadRouteRiding` 3, `canonicalRoadNeighbors` 2, `roadSiteHop` 3,
+  `roadSiteCandidates` 3, `roadFrontierTx` 2, `wildsCandidates` 3, `discoveryCandidates` 3,
+  `exploreSearchArea` 2, `searchHereTx` 4.
+- **Self-checks, asserted before anything is trusted (rc.57):** every listed parameter is still named
+  `realmIndex` at its position, the walk saw floor comparisons in `sectAscendActionGo`,
+  `teleportArrayActionGo` and `planTravelTx`, and it saw the caravan's route call. And
+  `TestThePlaceFloorGateSeesWhatItForbids` runs the same scan over synthetic source that carries each shape
+  the gate forbids (a floor var against `.RealmIndex`, a teleport array against a `"realm_index"` row read,
+  a variable-to-variable comparison, two helper calls with a qi argument) and the shapes it must accept
+  (`accessRealmIndex()` arguments, a secret realm's floor against the qi ladder), so a quietly emptied walk
+  cannot pass for a clean tree.
+- **It is a shape detector, not a type checker**, and says so in its comment: it cannot tell two variables
+  sharing a name apart, so the empty allowlist is what keeps a false positive from being carried.
+
+**What each drill prints.**
+
+- Revert only the sect comparison to `c.RealmIndex`: the gate prints `sect_ascend.go:88:53
+  sectAscendActionGo: a place floor is compared with the qi ladder alone` and the body test prints *"the
+  way up into Jade Meridian Sect asks for Spirit Body Transformation; you stand at Spirit Body
+  Transformation"*.
+- Revert only the name: `want a refusal containing "you stand at Ascension Realm", got ... you stand at
+  Core Formation`.
+- Revert the array comparison: the gate prints `property_storage_actions.go:666:5 teleportArrayActionGo:
+  a place floor is compared with the qi ladder alone`, and both array tests print *"your realm cannot
+  withstand this transit"* (the authored arrays, and the gate a body cultivator tore).
+- Revert the caravan's route argument: the gate prints `territory_actions.go:440 caravanDispatchActionGo
+  -> canonicalRoadRoute` and the behavioural test prints *"no canonical road route connects the caravan
+  destination"*.
+- Python, one site at a time (each fails only its own test): the ascent call handed `realm` ->
+  `'the way up into Jade Meridian Sect asks f...tion' != ''` and *"'you stand at Ascension Realm' not found
+  in ... you stand at Core Formation"*; the tribulation padlock back to `realm not in ASCENSION_GATES` ->
+  `'only at a world-crossing gate (realms 7, 15, 23)' != ''`; the array picker -> `'imperial_spirit' not
+  found in ['imperial_greenriver']`; the array list -> `'sealed' unexpectedly found in '... *sealed: needs
+  Spirit Body Transformation*'`; the realmhub picker -> `'Spiritual World' not found in ['Mortal World']`;
+  the realmhub status -> the card lists only the Mortal capital; the role sync -> `Lists differ: [] !=
+  ['Xianxia • Spiritual World']`.
+
+**Two assertions are shaped on purpose.** The Python panel tests assert `hidden.get(path, "") == ""` and
+read the one entry, never `assertNotIn` on the hidden-actions dict, which dumps all of the panel's lock
+lines on failure (v1.0.8's dashboard finding). And the tribulation padlock keeps the spelling `realm not
+in ASCENSION_GATES` (now `... and body_realm not in ASCENSION_GATES`), because
+`test_the_gates_read_the_same_state_the_engine_reads` pins that substring.
+
+### The opponent a challenge fought was whatever the payload said it was (v1.33.0)
+
+`combat.start kind=challenge` took the opponent's realm and stage off the payload -
+`npcRealm = maxI64(0, p.NPCRealmIndex)` - under a comment saying the caller had "already resolved
+a real NPC", and stored `source` and `target_key` exactly as sent. `battle.py` did resolve one
+(`SIM.combat_target`, which filters `combat.targets` by casefolded name) and forwarded what it
+found, so nothing a player does could forge it, which is precisely why it lasted twenty-odd
+releases: **a bound that lives in the client is not a bound** (rc.48), and this one had grown
+expensive. Since v1.14.0 the opponent's realm is worth a stage-lead on every faced roll of the
+fight; it feeds the defeat's `gap` and `defeatFatalChance`, the insight reward (`5+NPCRealm`) and
+`severity = 1+NPCRealm/4+NPCStage/3`, and severity drives the karma and reputation deltas, the mercy
+fate point, grudge intensity and, through `MarkKillingTx`'s `regionSev`, the region's security,
+unrest and prosperity and the sects' influence. The kill's aftermath also marks
+`npc_civilization_state` dead **by the payload's name, wherever that NPC stands**.
+
+The engine never asked who was named, either. `npc_name` was checked for being non-empty and
+nothing else - not present at the caller's location, not alive, not a real hidden master - so
+`combatTargetsGo`, the rule the picker is drawn from, was a rule the engine did not apply to the
+one request that mattered. Scratch proof against v1.32.0: a realm-0 porter challenged with payload
+30/9 was stored as realm 30; a realm-20 elder standing in Cloudblade City, challenged from
+Greenriver Town with payload 0/1, was accepted and stored as realm 0 stage 1.
+
+**And the same action trusted two more fields.** `source` and `target_key` were stored verbatim.
+`combatFinalizeAction` branches on the source prefix - `event:` depletes a world-event node and
+pays its reward, `auction:` skips karma - so a "challenge" carrying `event:K|node:N` would have
+been settled as an event kill. The lock was whatever key the caller sent, so one person under two
+spellings was two locks.
+
+**Why nothing caught it.**
+- `TestCombatStartChallengeComputesServerSideHPFromCanonicalCharacter` sent realm 5, stage 7 and
+  asserted `npc_hp == 46`: **the suite encoded the defect**. Its name even claimed the opposite
+  ("computes server side"), and what it computed server side was the HP curve from a number the
+  caller had chosen.
+- The fixtures could not fail the way production fails (the `npc_consignments` rule): `setupCombatStartDB`
+  and `setupViolenceDB` declared no `npc_civilization_state` and no `birth_families` at all, and their
+  `battles` carried no foreign key and no NOT NULLs, so a challenge could not have been refused for
+  naming nobody - there was no one to find.
+- The engine playtest sent `{"kind": "challenge", "npc_name": opponent, "source": "playtest"}` with no
+  realm at all, so it fought realm 0 / stage 1 whoever it named - and its choice of opponent read
+  `r.get("kind") or r.get("type") or "npc"`, keys **no row carries** (`combat.targets` rows say
+  `target_type`), so the default kept every row. It was a harness that could not tell the case it
+  claimed to cover from the one it did.
+- `docs/TODO.md` and the plans for rc.48's sweep named `game_minute`, the waits and `minutes_per_day`;
+  this was the same class of field on a different action and no sweep listed *every payload field an
+  engine action takes from a caller*, so the next instance was found by reading the action rather
+  than by a gate. That sweep is the sibling finding below (F12b), and it is the right next gate.
+
+**The fix.** One rule for who may be challenged, stated once: `combatTargetRows(conn, catalog,
+location, capped)` is `combatTargetsGo`'s body with the 50-row and 25-head caps applied only when
+`capped`; `combatTargetsGo` wraps it capped (the picker, unchanged) and `resolveChallengeTargetTx`
+reads it whole. A Discord select holds twenty-five and a crowded square should not ship hundreds of
+rows, but a name past the cap is a person standing there all the same - the old bot-side lookup
+walked the capped list, so somebody past row 50 could never have been challenged and now can.
+
+`combatStartAction` resolves in this order: alive, safe zone, then presence. The safe zone stays
+ahead of presence so a protected place refuses on its own account before it can say who is or is not
+standing in it. The resolver walks the uncapped rows, the first `strings.EqualFold` match wins with
+NPCs ahead of family heads (the picker's own dedupe order), and the **canonical name, realm, stage,
+source and lock** come from that row: `challenge:npc:<name>` for a person and
+`challenge:family_head:<family_id>` for a head - the shape `battle.py` has always built, now the
+engine's. A head is locked by the house, not the name, because a head can change and the house
+cannot.
+
+**One sentence for four causes.** Absent, standing elsewhere, dead, missing and a real hidden master
+all refuse with `challengeTargetAbsent`: "that living NPC or family head is not mechanically present
+here, or cannot be openly challenged". The hidden master is the case the picker was built not to
+reveal (`combat.targets` omits them so the list cannot become a hidden-power detector), and a
+separate sentence for any of the five would have turned the refusal into exactly that. A test holds
+the five strings equal rather than checking that each is a refusal.
+
+**The fields stay on the wire.** `npc_realm_index` and `npc_stage` remain on `combatStartPayload`
+under rc.48's "accepted for wire compatibility and deliberately ignored" comment: an older bot
+mid-upgrade still sends them, and a request refused for carrying a field would turn a rolling deploy
+into an outage. They are deliberately **not** in `callerOwnedNothing`, which refuses.
+`source is required` now applies to `kind=event` only - an event has no row to derive it from.
+
+**Python stopped stating it.** `CombatService.start` takes and sends no realm or stage and its
+`source` defaults to empty; `/battle challenge` drops the `SIM.combat_target` pre-check (a second
+copy of "who is here", a round trip, and the fifty-row cap), sends `npc_name` and prints the
+engine's sentence through `_explain_engine_error`, adding "Wait for that confrontation to end." only
+for a lock. `WorldSimulator.combat_target` is deleted: with its one caller gone the v0.32
+production-caller gate would have named it.
+
+**The gates, and what each drill prints.** Every Go test goes through `ApplyWithWorld` against the
+shipped content, so the hidden masters are the real ones and the dispatch is production's; the
+fixture is `setupBatch4AuthorityDB` with the production DDL for `battles` (foreign key included),
+`npc_civilization_state` and `birth_families`.
+- `TestAChallengesOpponentIsTheWorldsNotTheCallers` (Elder Feng, payload `elder feng` at 0/1, source
+  and key `event:forged|node:x`). Old line restored: *"the battle stood at realm 0 stage 1 - the
+  payload's 0/1, not Elder Feng's 20/9"*. Source not derived: `source="event:forged|node:x", want
+  challenge:npc:Elder Feng - a challenge carrying an event's source would be settled as an event kill`.
+  Field added to `callerOwnedNothing`: *"a challenge carrying a realm and stage was refused rather than
+  ignored: client-supplied npc_realm_index is forbidden"*.
+- `TestAChallengeNamesSomebodyStandingHere` (someone elsewhere, dead, missing, Old Beggar Chen - a real
+  hidden master standing in the room - and nobody). Location predicate dropped: *"a challenge to "Far
+  Elder" from Greenriver Town was accepted"*. Hidden-master exclusion dropped: *"a challenge to "Old
+  Beggar Chen" from Greenriver Town was accepted"*, with `TestCombatTargetsHideRealMastersAndDeduplicate`
+  failing beside it - the refactor is held by a test that already existed.
+- `TestAChallengedFamilyHeadIsTheHousesHead`: *"the head stood at 0/1, want the house's 2/4"* with the
+  old line.
+- `TestAChallengeIsNotCappedAtThePickersFiftyRows` (55 people in the square, the 55th typed in
+  lower case). Resolver reading the picker capped: *"the fifty-fifth person in the square cannot be
+  challenged: that living NPC or family head is not mechanically present here..."*.
+- `TestTwoSpellingsOfOneNameShareOneLock`: *"a second spelling of the same opponent was not locked
+  out: <nil>"* when the source is taken from the payload.
+- `TestAnOlderBotsChallengeIsStillAnswered`: the previous bot's request - realm, stage, source, lock -
+  is answered from the row.
+- `TestAHeadAndAnNPCSharingANameResolveToTheNPC`, `TestAnEventStillNeedsItsSource` and
+  `TestCombatTargetRowsAreOneRuleForThePickerAndTheEngine` hold the dedupe order, the one `kind` that
+  keeps `source is required`, and the refactor.
+- `tests/python/contracts/test_a_challenge_is_the_engines.py` reads `CombatService.start`, every
+  `COMBAT.start` call under `app/`, `battle_challenge` and the engine harness by AST, after asserting
+  each reader found something (rc.57), and *drives* the service for the payload it really sends -
+  a source read cannot see a key built in a loop. Drills: `npc_realm_index=0` put back in `battle.py`
+  prints `['app/bot/commands/battle.py:623 passes npc_realm_index'] != []`; the parameter back on the
+  service prints "TypeError not raised : the realm parameter is back on the service"; the key back in
+  the payload prints "a challenge sent npc_realm_index" with the dict it sent; a challenge passing
+  `source` names `battle.py:623`; `SIM.combat_target` put back prints "battle_challenge resolves the
+  opponent itself again"; the harness sending a realm names `scripts/playtest_engine.py:2427`; the bot
+  wording its own absence sentence prints "the bot words its own absence refusal again".
+
+**Four fixtures moved, and one deleted a pin on the defect.** `combat_start_test.go`'s fixture gains
+the production `npc_civilization_state`, `birth_families` and `battles` (with its foreign key) and
+seeds Iron Bandit 5/7, Named Opponent, First Foe and Second Foe at Greenriver Town; the HP test now
+sends 0/1 and still gets 46 - from the row - and is the test that pinned the defect.
+`violence_suppression_test.go` seeds a Wandering Swordsman at the fixture's location (the safe zone
+stays ahead of presence, so the suppression test still sees suppression and the wilds test still
+sees a challenge allowed).
+
+**The harness.** The engine playtest's four `combat.start` calls stop sending the ignored `source`;
+both town fights now filter on `target_type` and fight the real weakest NPC (Magistrate Xu Wenbo,
+realm 0 stage 2 - still a sure win at 7/9); the first fight holds that the battle's realm and stage
+equal the chosen row's. 1117 steps, 0 failed.
+
+### An undo writes back what its lever wrote (`admin_undo_rows.go`, v1.33.0)
+
+Found by a review of the undo door, and confirmed by driving real play between a lever and its
+undo, which no test had. `admin.audit.undo_last` reverses a GM lever from the audit row's
+`before_json` / `after_json`. The perfection lever picked **which columns to write** from whichever
+snapshot it happened to be reading, and since v1.23.1 `before` carries the whole quest state whenever
+the row existed. Four faults came out of that one choice:
+
+- **Undoing a bar below 100 erased the player's quests.** A bar below 100 writes `progress` and
+  nothing else, but its `before` holds `quest_index`, `completed_quests`, `discovered_json`, so the
+  undo upserted all six columns. Start the path, the GM sets 50, the player walks a quest, the GM undoes
+  the set: `[58 1 1 0 1 ["…"]]` becomes `[0 1 0 0 0 []]`, the quest the player finished after the
+  lever gone.
+- **Undoing a made row deleted whatever play had put on it.** A lever that made the row was undone by
+  `DELETE`, so a path the player started on the GM's bar, or a realm whose trial was passed and whose
+  permanent reward was paid, went with it - and `perfection.start` accepted the realm again, a second
+  reward.
+- **A redo after that delete was an UPDATE on nothing.** `after` of a bar below 100 carries no
+  `existed`, so the redo fell through to `UPDATE … SET progress` on a deleted row, matched zero rows,
+  and the audit row recorded it as a successful `(redo)` with `rows_affected: 0`.
+- **Undoing a fill after the trial was passed reopened the realm.** The fill's undo put `active=1`
+  back on a `completed=1` row, and `perfection.quest` and `perfection.trial` read `active` alone, so the
+  path was open for a second permanent reward.
+
+The same fault class was in five more doors, all confirmed by driving them: `set_profession`'s undo
+deleted a trade the character had never had **with the `successes` the examination reads**; `set_law`
+restored `insights` (which the lever records on both sides whether or not the GM gave one) over sittings
+taken since, and `insights` feeds the samsara law echo; `set_sect_contribution` did the same to
+`contribution_earned`, the count promotion reads; the root's redo was an UPDATE on a row its undo had
+deleted; and a redo of a tribulation clear wrote `attempts = i64(nil)` = 0 over the real count, because a
+clear's `after` carries no `attempts` and **a fallback that looks like a value is not a sentinel** - the
+`seller_user_id=0` lesson in the reversal of a lever. A seventh, found while reading the rest: the physique
+reversal wrote `physique_id` from `before`, which always carries it, though the forward writes it only
+when the GM gives one - so a samsara between the lever and the undo would have put the old life's
+identity back over the new one.
+
+**Why no gate saw it.** Every undo test drove the lever and the undo back to back, so "restore what the
+lever wrote" and "restore the whole row the lever read" were indistinguishable: there was nothing for
+play to have changed. `TestUndoingAFullBarPutsThePathBack` pinned that a fresh row is deleted - true,
+and the fault was that it is deleted *whatever is on it*. `TestBelowAFullBarTheQuestsAreLeftAlone`
+checked the forward action only. And the claim the v1.23.1 comment made - "the audit row carries the
+quest state it replaced, so the undo puts the path back exactly" - was right of a fill and read as a
+statement about every set. This is the `npc_consignments` rule met in a test's choice of *sequence*
+rather than its schema: a test that cannot fail the way production fails.
+
+**The rule, and where it is read from.** An undo writes back exactly the columns its forward action
+wrote, onto the same row, as an `UPDATE` - it does not bring back a row play has since removed. It
+deletes a row the lever made only when every column on it is back at the value its DDL gives a row
+nobody has touched (`deleteIfIdle`). A redo is the forward action's own upsert, so it lands even on a row
+its undo removed. And no direction writes `active` onto a perfected realm. The forward action did not
+change: its audit rows already say what it wrote, for every vintage.
+
+- `after` carries `completed_quests` only on a fill (and before v1.23.1 not even then), so
+  `filled := after has completed_quests` says whether the quest columns were written.
+- `before` carries `existed: false` exactly when the lever made the row; a row from before v1.23.1
+  carries no `existed` at all and is undone on its bar alone, **as it was written**.
+- A value equal on both sides is one the GM left blank (`insights`, `contribution_earned`).
+- `after` names the tribulation columns the call wrote, and the physique identity only when given.
+
+Reading the keys the audit rows already carry, rather than adding a flag to `afterSnap`, is what lets the
+fix repair the rows already sitting in `admin_audit_log` from v1.23.1 to v1.32.0: a new `filled: true`
+would have been a second signal, left every old row broken and still needed the snapshot fallback.
+
+**The idle row is a list, and a list is the thing that goes stale.** `perfectionRowDefaults`,
+`professionRowDefaults` and `lawRowDefaults` name every non-key column with the value its DDL gives. A
+column added to one of those tables and missed would be deleted with the row whatever play had put in it,
+and no Go test could notice - the Go fixtures build their tables by hand and would not carry it.
+`tests/python/contracts/test_an_undo_deletes_only_an_idle_row.py` holds each list equal to the
+bootstrapped schema, and asserts its reader found all three lists (and that `completed` is in the
+perfection one) in `setUpClass`, ahead of every check, so a reader that finds nothing fails the class
+rather than making every assertion vacuous (rc.57).
+
+**The gate walks from the map, not from a list of files.**
+`TestAReversalDeletesARowOnlyThroughDeleteIfIdle` parses the package, finds the `reversibleAdminActions`
+literal, resolves each entry (a function literal, or a named function) and closes over the same-package
+functions it calls. Every string literal matching `delete from` in that closure must sit in `deleteIfIdle`
+or in an allowlisted entry with its reason (`adjust_item`: an inventory row carries only the quantity; the
+root: every character carries a root row, so a made row exists only in fixtures). A reversal added next
+week is read without anybody adding it to a list. Its self-checks run first: the map was found, every key
+resolved to a body, `deleteIfIdle`'s own literal was found (rc.57), the three reversals that make rows
+still call `deleteIfIdle`, and an allowlist entry that no longer holds a DELETE is stale and fails.
+
+**What each drill prints** (every one run against the broken tree and restored from a copy):
+
+- `filled` read off `before`: *"completed_quests=0 after undo: a bar below 100% wrote the progress alone,
+  and the undo erased the quest the player finished after it"*, and `1 row(s) left after undoing a path
+  the lever made` from the old full-bar test.
+- The redo falling through to the undo UPDATE: *"the redo left progress <nil> and reported
+  rows_affected=0; a redo of a bar its undo removed must put the bar back"*.
+- `deleteIfIdle` unconditional: *"active=<nil> after undo: the player started the path on the row the
+  lever made, and the undo deleted it"*, *"training_progress=<nil> after undo: the player trained on the
+  row the lever made…"*, *"the undo deleted the row the player crafted on: the 2 success(es) an
+  examination reads went with it"*, *"water is <nil> after the undo, want 0:1"*.
+- The CASE replaced by `active=?`: *"after the undo a perfected realm's quests took a step (<nil>); its
+  trial has paid a permanent reward, and the path is open for a second"*. The redo's CASE replaced by
+  `excluded.active`: *"after undo and redo a perfected realm's quests took a step (all perfection quests
+  are complete); the redo opened the path for a second reward"*.
+- `completed` dropped from the idle list: *"completed=<nil> after undo: the undo deleted a perfected
+  realm whose reward was already paid"* (Go) and *"perfectionRowDefaults no longer names `completed`"*
+  (Python, before any other check).
+- A missing `existed` read as a made row: *"progress=0, want 30"*.
+- The undo of a fill made an upsert: *"1 row(s) after the undo: it brought back a path the player had
+  abandoned"*.
+- The bare `DELETE` back in `reverseSetProfession`: the craft test above **and** the gate, *"reverseSetProfession
+  removes a row with a DELETE of its own (admin_player_progress.go:277:22)"*.
+- `insights` restored unconditionally: *"fire is 20:6 after the undo, want comprehension 20 and the 7
+  sittings play made (the undo erased the sitting)"*; `contribution_earned` likewise: *"contribution_earned=0
+  after undo, want the 9 play earned"*.
+- The root redo as an UPDATE: *"root is "<nil>" after the redo (rows_affected 0)"*; `attempts` written
+  whatever `after` carries: *"after the redo the gate is 0:0:1:cleared, want 0:3:1:cleared: the clear never
+  wrote the attempts and the redo zeroed them"*; the identity written whenever `before` has one: *"physique
+  is ordinary_mortal_body:0:10:100 after the undo, want the new life's identity kept…"*.
+- The gate's own regexp broken: *"the walk found no DELETE in deleteIfIdle; the gate is broken, not the
+  tree"*. A column dropped from a list, or a default changed, fails the Python contract naming the table,
+  the list and the DDL's value.
+
+**Two of the drills caught the first draft of the gate, and are the usual shape.** The Python contract's
+reader assertion first lived in a test method, which pytest runs in alphabetical order - so breaking the
+regexp failed `test_each_default_is_the_one_the_ddl_gives` with a `KeyError` before the self-check
+ran. It is in `setUpClass` now. And the physique drill first removed the `wroteIdentity` term outright,
+which left the variable unused and broke the build, which proves nothing about the test aimed at it; it is a
+disabled term (`wroteIdentity || !wroteIdentity`).
+
+**What is deliberately not changed.** The restore stays absolute (a bar is put back to what it replaced,
+not as a delta), which is every other reversal's semantics; a perfected realm's written columns do go back,
+so its restored pre-lever bar shows on the dashboard and not in the bot, which draws a perfected realm
+without one. `rows_affected` of an undo that resets and then deletes an idle made row reads 2 (UPDATE then
+DELETE of the same row); nothing reads it. The root's made-row `DELETE` is allowlisted rather than routed
+through `deleteIfIdle`: every character has a root row from creation, samsara and the boot backfill, so
+that branch is fixture-only.
+
+**Damage already done cannot be undone.** An undo already run under the old code that erased quests, a
+started path, sittings or earned points left nothing recording what it overwrote. A realm reopened by an
+old fill undo stays reopened until a GM fixes it; a release-note check finds any:
+`SELECT user_id, realm_index FROM realm_perfection WHERE active=1 AND completed=1` (and the same on
+`body_realm_perfection`).
+
+### The street that told its own secret (v1.33.0)
+
+**Found by reading the arrival line**, after v1.26.0 had half-fixed the report. The two demonic sects'
+gates (Blood River Gorge in Riverguard City, Corpse Lantern Necropolis in Ashenwall City) are `private`
+districts of their seats since v1.19.0, and the rule is two halves: the street never shows one, and a
+sponsor's word (a discovery row) or standing in it does. v1.26.0 taught the travel menu both. Every other
+door of the city page went on telling it, and the biggest was not in Python at all:
+
+- **The road in named the gate.** `exploration.travel` returned `"city_parts": cityPartsOf(catalog,
+  p.Destination)`, the whole city, and the bot printed *"Inside the walls: Blood River Gorge, ..."* to
+  everyone walking into Riverguard City (one road from Greenriver Town) or Ashenwall. The map that same
+  travel is checked against (`knownLocationsTx`) already kept the gate off, so the engine disagreed with
+  itself in one function pair and the only reader of the wider list was a line of prose. The design
+  missed it because it looked for the bot's copy of the rule; this was the engine's.
+- **City -> Look's seat line named it** (`, at **Blood River Gorge**`), and the header counted it
+  (`here_summary` said "3 districts" over a Look that listed two).
+- **City -> Enter drew no way out of a private gate.** `_places_to_enter` returned `[]` when
+  `here_data.get("private")`, a v1.12.1 clause from when these gates were wilderness places; since
+  v1.19.0 they are districts, so a cultivator standing in one was shown no street, no inn and no city
+  gate, all of which the engine allows (proved by driving `exploration.travel` out of the gate).
+- **A sponsored cultivator was never offered their gate**, although the engine walks them in (the
+  recommendation's discovery row) and `sect.py`'s reply tells them to use **/world -> City -> Enter**.
+  That sentence is true unedited now.
+
+**One rule, stated once in each language.** Go: `cityPartsInPlainSight(catalog, city)` is `cityPartsOf`
+less the `Private` parts, and both `knownLocationsTx` and the travel result's `city_parts` read it
+(`cityPartsOf` stays for the rules that walk the whole city: the envoys' hall, the road-site sweep).
+Python: `_city_parts(city, known=())` moved to `app/bot/locations.py` (`exploration.py` imports it, since
+a second definition fails `test_every_top_level_name_is_defined_exactly_once`): a part is shown unless it
+is private and not in `known`. `_known_private_parts(user_id, character, city)` is the player's half: the
+private parts of that city their own map holds (a discovery row, or standing in it), answering at once
+with no read for every city with nothing to hide (all but two), and never raising (a failed read leaves
+plain sight, which under-offers rather than leaks). The seat line, City -> Look's gates and districts,
+both Enter pickers, `_places_to_enter`, `_known_locations` and (through it) `destination_groups` and
+`npc_whereabouts` all read it; the header counts plain sight, since it has no viewer.
+
+**The sect is still named on its seat (D2).** Only its route is private: the header says "seat of the
+Blood River Sect" and the seat line keeps that, minus the gate's name. A known gate is shown on Look and
+Enter (D1) and the arrival line and header stay plain sight. The boards keep posting the private sects'
+commissions (D3): their objectives never need the gate.
+
+**Why nothing caught it.** `test_a_sect_keeps_its_seat_in_a_city.py` held the engine half by spelling
+(`cityPartsOf(catalog, city)` and `.Private` both inside `knownLocationsTx`), which is true of a tree
+whose *other* reader of the same list is unfiltered; the travel result was in no test's reach. The
+Python gates each pinned one door's spelling (`"_seat_lines(city)"`, `"_places_to_enter(here)"`, the
+inline loop in `_known_locations`) and so held three doors while the fourth and fifth went unasked - the
+v1.0.8 shape, where a gate pins how a rule is written and fails exactly when the rule is moved. The four
+spelling pins moved to the rule (`_known_locations` asks `_city_parts(city)` plain; `city_look` asks for
+the seat lines and the places of `city`/`here`; the engine's two readers both call
+`cityPartsInPlainSight`, whose body reads `.Private`), and the doors themselves are driven by
+behaviour in `test_a_private_gate_is_shown_only_to_who_knows_it.py`.
+
+**The Go gates and what each drill prints.** `TestTheRoadIntoASeatNamesNoPrivateGate` walks Greenriver
+Town -> Riverguard City through `ApplyWithWorld` on the shipped content (`roadEncounterIntn` pinned): put
+`cityPartsOf` back in the result and it prints *"the road into Riverguard City listed Blood River Gorge
+inside the walls"*. `TestACityShowsOneListOfItsPartsEverywhere` sweeps every city in the catalogue and
+holds `cityPartsInPlainSight` equal to what `knownLocationsTx` marks known from standing there (it
+asserts it met >= 40 cities and >= 2 private parts before trusting an empty answer); disabling the
+helper's filter prints *"Riverguard City: Blood River Gorge private=true inSight=true"*.
+`TestAPrivateGateIsWalkedOnlyByWhoKnowsIt`: an unsponsored cultivator is refused, a discovery row lets
+them in, and anybody standing in the gate walks out to the street and a district; the same disabled
+filter prints *"a cultivator nobody had sponsored walked from Riverguard City into Blood River Gorge"*.
+
+**The Python gates.** Self-check first (rc.57): >= 2 private `sect_gate` districts of non-hidden sects,
+and the bot's loaded world agrees with the file. The twin is held to a third computation off the raw
+`world.json` for every city, with and without each private gate known, plus a gate known in one city
+never appearing in another. Drills: `or name in known` dropped prints a `Lists differ` missing
+`Corpse Lantern Necropolis`; unconditional `, at **{gate}**` prints *"'Blood River Gorge' unexpectedly
+found in '**Seat:** the **Blood River Sect** keeps its gate here, at **Blood River Gorge**.' : City ->
+Look told the street the name of Blood River Gorge"*; the old early return prints *"standing in Blood
+River Gorge there is no way out drawn"*; an unfiltered header comprehension prints `(2, 3) != (2, 2)`;
+dropping the no-private-part short-circuit prints *"2 != 0 : a city with nothing to hide paid for a
+discovery read"*; dropping the `try` lets `RuntimeError: engine away` out.
+
+**The first version of the Look test passed against a half-broken door**, which is the finding about the
+gate. It asserted `gate in text` over the whole page, and a Look that passed `known` to `_places_to_enter`
+but not to `_seat_lines` (or not to `_city_parts`) still named the gate on the other line - the drills
+`look-seat` and `look-parts` printed nothing at all. Each line is asserted on its own now
+(`**Districts:**`, `**Seat:**`, the buttons), and the drills print *"the Seat line hides Blood River
+Gorge: **Seat:** the **Blood River Sect** keeps its gate here."* and *"the Districts line hides Blood
+River Gorge: **Districts:** Riverguard Inn, Riverguard River Landings"*. The Go-source contract's failure
+messages also printed their whole haystack (a function body, a 2,000-line file); they are `assertTrue`
+over a search now, as v1.0.8 settled for the dashboard.
+
+**Amend CLAUDE.md's v1.19.0 section** ("A sect keeps its seat in a city"): where it says a private gate
+is "not in plain sight from the street" add that this is one function in Go (`cityPartsInPlainSight`)
+and one in Python (`_city_parts`, lifted by the cultivator's own map through `_known_private_parts`),
+and that the arrival line, the seat line, the header, Look and Enter all read it.
+
+### The report that named the type and not the thing (v1.33.0)
+
+Found by reading the Player Editor's Quests card against `progressQuest`, with the realm road in mind: the card's own text tells a GM that a realm-road stage for a realm the player has already entered "still asks for that breakthrough: report it next", and the card could not report it.
+
+`progressQuest` (`core/contracts.go`) counts an objective with no target against any event of its type, and an objective that names a target only against an event naming the same thing (case-insensitively) - "an event with no target at all is not a wildcard". The card did not know the difference. `quest_journal` sent each objective's `id`, `type`, `label`, `count` and `progress` and dropped its `target`; `fillObjectives` grouped the pending objectives by **type** (`[...new Set(pending.map(o=>o.type))]`), one option per type; and `reportQuest` posted `{objective_type, amount}`. So the card could advance only an untargeted objective, and the shipped content has 524 objectives across 205 quests, of which **459 name a target** - 375 of them in the commission pool, 71 on the realm road, 11 in the household errands and 2 on the beginner path. The one objective the card's text sends a GM to report, `breakthrough` -> "Qi Refining", was refused with *"has no objective of type "breakthrough" left to advance"*, which is the wrong sentence twice over: the objective was there, and it was not "left to advance" in any sense the GM could act on.
+
+**Why nothing saw it: the engine's own tests send the target the card never did.** `TestAGMReportAdvancesOnlyTheNamedObjective` drives `admin.player.quest_progress` with untargeted objectives (`family_lesson`, `cultivate`), and the engine playtest sends `target` on every report it makes. The lever was right and so was the match; the two ends were never asked about each other (v1.0.3's craft-roll seam, in a dashboard). The gate `test_the_player_editor_owns_every_per_player_lever` holds that the card posts `user_id:uid` and never `Number(EDIT_UID)`, and that is all it holds about this payload.
+
+**The fix is the card's, and the engine's matching stays as it is.** The lever is a replay of a player's report; a second matching rule (an `objective_id` path) would be two statements of what meets an objective. `quest_journal` sends `target` (`None` for an untargeted objective, never `""`: a placeholder that looks like a value is not a sentinel). The picker lists **one option per pending objective**, valued by the objective's place in `q.objectives` - not its id (the engine never receives it) and not its type (two `talk` objectives of one quest are two options) - and labelled `label · type → target (progress/count)`. `reportQuest` resolves that one objective and posts its own `type` and `target`. `user_id:uid` is unchanged, so no snowflake goes through `Number()`.
+
+**An empty picker reports nothing, and that needed a guard of its own.** `val('questObjective')` of a `<select>` with no options is `''`, and `Number('')` is `0`, so a quest with nothing left to report would otherwise report `objectives[0]`. The handler asks `pick===''` before it reads, and says so in the result box.
+
+**The refusal names what the objective names.** A report that misses is refused by `questReportMissTx` now: when the quest has objectives of the reported type that name targets, the error lists them and says what the report named (*`road's "breakthrough" objective names "Qi Refining", and a report naming no target meets none of them: report the objective by what it names`*); when none does the type really is one the quest does not ask for, and the old sentence stands. An open tab still running the old `app.js` keeps posting type-only reports, and now learns why. `activeQuestTermsTx` is `questProgressTx`'s own read of the row and its pinned terms, extracted unchanged (SELECT error -> `found=false`, terms error -> `found=true`), so the refusal reads the terms the match used rather than a second copy of how to find them.
+
+**The audit row records the target.** A quest may ask for two things of one type (two talks, two travels), so `after.objective_type` alone did not say which objective a GM's report moved. `after.target` is the target the GM named, and is absent when the report named none.
+
+**The gates, and what each drill prints.**
+
+- `TestEveryShippedObjectiveIsMetByItsOwnTarget` (Go) walks the content file raw - a roster the catalogue does not parse still counts - seeds all 205 quests as pinned and active at counts of 1000, and reports each of the 524 objectives with its own type and target through `applyAdminRaw`. It asserts that objective moved by exactly one and **no other** moved. Its self-check is that the walk finds at least 200 quests, `realm_road_1`, and 400 targeted objectives, else *"the reader is broken, not the tree"*. 1.7 s. Drill: `target != "" && false` in the lever prints *"459 shipped objectives are not met by their own target alone, so the Quests card cannot report them"*.
+- `TestAReportMissingItsTargetSaysWhatTheObjectiveNames` plants `breakthrough -> Qi Refining`, an untargeted `cultivate` and two `talk` objectives. A report with no target is refused naming "Qi Refining" and not saying "no objective of type"; a wrong target lists both talk targets and quotes the wrong one; a type the quest does not ask for keeps the old sentence; refusals move nothing and write no audit row; an untargeted objective accepts a report that names a target (replay semantics); `"qi refining"` advances the objective in any case, and the audit row carries it. Drills: the old `fmt.Errorf` restored prints *"a report missing its target was refused with road has no objective of type "breakthrough" left to advance; it must name what the objective asks for, not deny the objective exists"*; the audit line deleted prints *"the audit row does not say which objective the report named"*.
+- `TestAQuestNamingACityIsMetAtItsGate` gained `namesBoth` (a travel to the gate **and** a travel to its city): the gate's report must not be rewritten to the city. The guard `namesPlace` had no test - no shipped quest names both, so the walk above cannot see it, which is rc.53's `!ok` shape (belt-and-braces against today's content). Drill: `(namesPlace && false) || !namesCity` prints *"a quest naming both "Azure Crown Imperial City North Gate" and its city had the gate's report rewritten to "Azure Crown Imperial City""*; before this case the function stayed green under that drill.
+- `TheQuestReportNamesItsObjective` (Python contracts) reads the card's source: the report payload takes `objective_type` and `target` from **one** variable, `fillObjectives` has no `new Set(`, `user_id:uid` is untouched, and the handler asks whether the picker was empty before it indexes an objective and before it posts. `_function`'s brace loop is `_braced` now, shared. The gate needs the second check beside the first on purpose: with only the payload check, a half-applied change (a new `reportQuest` over the old `fillObjectives`) passes and the card silently reports nothing, because `Number('breakthrough')` is `NaN`. Drills: dropping the target prints *"the report names no target, so the engine counts it against untargeted objectives only"*; restoring the old payload prints *"the report takes its objective type from no objective, so it cannot name its target"*; the old picker prints *"the picker collapses objectives by type again, so two objectives of one type cannot be told apart and none of their targets can be sent"*; removing the guard prints *"the Report handler never asks whether the picker was empty"*.
+- The integration test for the journal gained `"target": None` in its exact dict and two rows with a targeted objective, one from **pinned terms** (which win over the definition) and one from the **definition fallback**. Drill: removing the `"target"` line fails it with *"the journal must carry every objective's target - None for an untargeted one - for the card to report it"*.
+
+**Two facts the design got wrong, recorded so the next reader does not rely on them.** The design counted 183 quests and 489 objectives; the design's own walker finds 205 and 524 (459 targeted), and this test fails below 200. And the design said the validator does not dedupe objective ids; it does (`seen_ids`, `quests.py:672`). The index is still the right picker value, but because the engine never receives it, not because ids could collide.
+
+**Verified under node, not committed.** The Quests card block was run under stubs: three pending objectives (two `talk`, one untargeted `cultivate`) give three options valued 0/1/3 with their targets in the labels; picking each posts that objective's own type and target (`""` for the untargeted one); a quest with nothing pending draws an empty picker and the Report press posts nothing and says so; and the snowflake `1456074443989188610` leaves as the string it arrived as. The repo has no JS runner, so this stays a one-off and the Python gate reads the source.
+
+### A banner sits on a whole place (`TerritoryGround`, v1.33.0)
+
+Reported as one case of a migration: migration 74 (v1.19.0) moved a sect's claim on its gate onto the
+seat city and set the gate neutral once the seat carried the banner, and it never read
+`territory_wars` - so a war that was on over the gate was still on over a district nobody held, and
+an attacker's win in `ResolveWarTx` planted a rival banner inside the seat city. Reading it found that
+the migration was the smallest of four ways in, and the reported one only because it was the one
+somebody had looked at.
+
+**The rule was stated once and obeyed once.** `TerritoryIsWholePlace` (v1.12.0) says a sect claims a
+city, not one of its streets - `cityOf` is the rule, so a gate, a district, a shop, an auction hall and
+a sect's gate inside its seat all answer their city - and the readers of a banner have always
+assumed it: `EventSectTargetsTx` looks at the city's row, the caravan toll credits the controller of
+the destination city, the city page's `_seat_lines` read the city. The only writer that asked was the
+world's own claim step (`claimTarget`). Three others took any row. `territory.claim` took any key
+whose `region` equalled the player's exact location, and `seed_world_territories` gives every one of
+the 484 locations a row - **375 of them are parts** of 48 cities, up to 13 parts in one city - so a
+player standing at a gate, a district, a shop or an inn claimed *that* row, was paid 8 contribution for
+it (v1.28.0), and could do the same from the next street for 8 more. Both banner branches of
+`ResolveWarTx` (the `ceded` branch added in v1.24.0 and the attacker's fall) wrote
+`controller_type='sect'` onto `territory_key` unconditionally. And since v1.24.0 `npcSectWars` targeted
+every sect-held row in the attacker's world, so the world's own sieges moved on a held street too. A
+held street also paid weekly tribute (v1.29.0) beside the city, so the state had an economic effect
+nobody read.
+
+**Why no gate saw it.** The class gate for v1.12.0's rule asked about the claim step, which obeyed it;
+nothing asked what *else* writes a banner. The migration-74 test seeded a gate beside a neutral seat
+and a gate beside a contested seat and inserted no war. The war tests ran on `the_ford` against an
+empty catalogue, where nothing is a part. And the one place a part could be told from a whole place -
+the catalogue - is exactly what a migration may not read, so the repair could not live in the
+migration (and the migration is frozen; v1.19.0's pairs hold).
+
+**The fix is the rule at its doors, and a sweep for what it let through.**
+`game.TerritoryGround(catalog, key) (whole, part)` is the one statement: a part answers its city, a
+whole place answers itself, and a key the catalogue does not carry answers itself and is left alone
+(a renamed location, a fixture's invented ground), because guessing at it is how a repair eats real
+data.
+
+- `WarVerdict` is asked first inside `ResolveWarTx`, so the tick, `war.act` and `war.peace` all
+  inherit it: a war over a part ends `set_aside` with no winner, and nothing it would have moved
+  moves - no banner, walls, unrest, truce, occupation, victory pay, standing or sect politics. The
+  history row is public at significance 50, below the Quest Forge's floor. `war.act` and `war.peace`
+  ask the same function before they answer, so the reply reports the verdict the war door writes
+  instead of the occupation the blow would have won; a peace over a part costs nothing, because there
+  are no terms to make.
+- `DeclareWarTx` refuses a part ("X is part of Y; a war is fought over a whole place"), and
+  `npcSectWars` skips parts so that refusal never ends the tick (one system's error ends it).
+- `territory.claim` redirects a part to its city and checks the region as `cityOf(region)==cityOf(here)`
+  - a gate is its city (v1.0.9) - so an older bot that still names the part keeps working and the
+  contribution farm closes ("your sect already controls that territory" from the next street).
+- `SetAsidePartialHoldingsTx` runs every maintenance pass, outside the automation flags and ahead of
+  `advanceWars`, in `FillSecretRealmSitesTx`'s shape: it sets aside every active war over a part,
+  folds the sole holder of a city's streets into the city (only where nobody holds the city and no war
+  is on it; `RecordTerritoryClaimedTx` tells the world), and releases every held part. Two sects holding
+  streets of one city are both released and nobody is given the city. It is idempotent: a clean world
+  is two reads. Releasing a part ends the tribute it paid.
+- Python reads the city's row for `/territory status` and `/territory claim` (`city_of_place`), and the
+  war card, `/war act`, `/war peace` and `/war status` tell a set-aside war as one.
+
+**Verified against the real migration, not only the fixture.** The Go tests carry production's war
+tables (`territory_wars` foreign-keyed to `territory_state`, every connection `foreign_keys=ON`) and
+drive the shipped catalogue; `test_a_war_over_the_gate_is_left_active_over_a_neutral_district` runs
+migration 74 over a schema-73 world with a war on the gate and pins what it leaves (gate neutral, seat
+the sect's, war active, the foreign key present) - which is what `TestAWarOverAGateIsSetAside` seeds.
+Ad hoc, not committed: a schema-79 database built that way plus a rival on the East Gate and Jade
+Meridian on both streets of Emberforge was run through the real `RunDue`: the war became
+`resolved/set_aside`, Emberforge went to Jade, the rival's street was released, and the second tick
+changed nothing (`partial_holdings=4`, then `0`).
+
+**What each drill prints** (production reverted, the test run, the production restored from memory):
+removing the wars loop from the sweep gives *the war over the gate reads "active||" after the repair:
+the tick would fight it, and an attacker's win would plant a rival inside the seat city*; removing the
+one-holder check gives *two sects held streets of one city and the repair gave it to "sect:Crimson
+Furnace Sect"*; disabling `WarVerdict` (`&& false`) gives *attacker_occupation on a street left it
+reading "sect:Crimson Furnace Sect|30|30"; no banner, wall or unrest moves* and, through `war.act`,
+*a breach of a street's walls reads status=resolved resolution=attacker_occupation winner=Crimson
+Furnace Sect; want resolved, set_aside, nobody*; removing only `ResolveWarTx`'s own call fails the same
+direct-call tests while the `war.act`/`war.peace` replies still pass, which is why the guard has tests
+of its own; disabling `DeclareWarTx`'s refusal gives *a declaration over Cloudblade City East Gate:
+<nil>; want a refusal naming Cloudblade City*; disabling the claim redirect gives *a claim from
+Cloudblade City East Gate answered claimed=true for Cloudblade City East Gate; want the city*, and
+restoring the exact-region check gives *Cloudblade City is claimed from Cloudblade City; you are at
+Cloudblade City East Gate*; deleting the redirect block from `territoryClaimActionGo` fails the AST
+gate with *territoryClaimActionGo writes a sect's banner onto a territory row and never asks
+TerritoryGround, TerritoryIsWholePlace or WarVerdict*; skipping the release loop gives *Cloudblade City
+East Gate reads "sect:Jade Meridian Sect" after the repair; a street is released once the city carries
+the banner*; removing the war step's filter makes the tick itself error (*the war step ended the tick:
+Cloudblade City East Gate is part of Cloudblade City; a war is fought over a whole place*); putting the
+sweep after `advanceWars` gives *the repair runs at statement 20, after the siege tick at 18*, and
+wrapping it in an automation flag gives *advancedMaintenance does not run game.SetAsidePartialHoldingsTx
+as a statement of its own*; restoring the peace cost on a set-aside war gives *suing for peace costs 100
+sect contribution; you hold 0*; and on the Python side, reverting the status read prints `Lists differ:
+['Cloudblade City East Gate'] != ['Cloudblade City']`, and each of the card, the act text and the peace
+text falls through to its generic ending (*'War set aside' not found in '... War resolved: **** holds.'*).
+
+**The gates caught themselves three times.** The AST writer gate's first regex matched
+`advanceOccupations`, because `controller_type='sect'` appears in its WHERE clause (it reads the banner,
+and writes only unrest); the scan cuts each statement at WHERE now and asks what is *set*. The first
+repair test counted what changed before it looked at the war, so its drill said "changed 0 thing(s)"
+and not what was wrong; it names the war first. And the Python builder for the ad hoc world copied a
+WAL-mode database by file bytes and produced an empty territory table - the first scratch run printed
+no banners and passed; it uses the backup API now. A scratch world seeded with gate names the
+catalogue does not carry also showed the other half of the rule at work: Emberforge's "East Gate" and
+"West Gate" do not exist (the gates are North and South), so those rows were left exactly as they were.
+
+**Known limit, recorded and not fixed.** A rival that *held* the gate when migration 74 ran was given
+the seat city by its first statement (it copies whatever banner the gate carried onto a neutral seat),
+so that sect's home city went to its rival. The repair cannot know that was wrong - a city held by a
+sect is a legitimate state - and migration 74 is frozen. It needs a GM lever (see TODO).
+
+### More actions stranded a page that fit again (v1.33.0)
+
+**Found by walking the panel, not by reading it.** On `/admin -> Player Edit` (17 actions) show a
+result, press More actions, then press Refresh: the page drew 6 of 17 actions, offered no More
+actions to reach the rest, and its meta line still said 17.
+
+`LayoutHubView.rebuild` recomputes the plain-button capacity on every redraw (the result block, its
+row of next steps, the v1.27.0 lock row and a door closing each change the budget) and reset the
+More-actions offset in only one case, when it had run past the end of the list. Refresh clears the
+result and never touched the offset, so the grid grew back from eleven buttons to fourteen, `paged`
+turned false, and the offset - 11 - went on slicing the tail off a page that no longer had any way
+to move it. The reset ran before `paged` was even computed, so the rule it should have stated -
+*an offset exists only while the page pages* - was nowhere.
+
+**Refresh is not the only door.** An exhaustive walk of Player Edit's state machine with the real
+buttons (More, Refresh, result-page Next, a new result with 0 to 3 next steps, three `hidden_paths`
+sets) found 420 states and 638 stranding transitions on the old code: a **new press's result with
+fewer next steps** strands the same way, and so does a door closing (6 of 14 drawn). With the fix:
+392 states, 0 problems. No state duplicated an action or went past Discord's 40-component cap.
+
+**Why nothing caught it.** The compact-page tests draw each page once, in a fresh view
+(`test_every_page_shows_every_action_with_nothing_else_on_the_card`), and the wrap test pages
+throughout under one result, so the offset was never carried across a redraw that changed the
+budget. The Discord sweep's `find_leaf_button` walks More until the `actions X-Y of N` offset
+repeats or More is gone, and never presses Refresh - every no-More state it met was reached from
+offset 0.
+
+**The fix is one rule at the one door every redraw passes through.** `paged` is computed before the
+reset (still after all the budget arithmetic: the result block and its row, the lock row and the
+second `_grid_capacity(budget - 1)` for More actions' own component), and the offset resets when
+the page does not page. It is `CardView._page_row`'s rule (`if count <= 1: self.page = 0`) for the
+hub. **Deliberately not realigned:** while the page *still* pages and the step shrinks (offset 11
+at a step of 8 shows actions 15 to 17), the offset stays where the player put it - More actions
+wraps through every action, and realigning would move the player's place for nothing.
+
+**Siblings checked, none with the fault.** `CommandHubView` (classic) has no grid or offset.
+`SceneActionLayoutView` has the same reset shape but its page is a constant ten and Next is drawn
+exactly when there are more than ten, so it cannot strand. `HubResultPageButton` and
+`_result_text` clamp or wrap, `creation.py` wraps a fixed list, and `dashboard/app.js` has no
+cursor. `LayoutHubView.page`'s fallback (a hidden page falls back to the first) carried a stale
+offset to another page; the rebuild-level reset covers it.
+
+**The gates, and what each drill prints.** Two tests in `ThePageIsCompact`, and both ship because
+neither catches what the other does:
+
+- `test_refresh_after_more_actions_draws_every_action_again` walks the report with the real
+  buttons - More, then Refresh under `refresh_status` patched out - as sub-tests over 0 to 3 next
+  steps under a short result. It asserts More is present first (*"the walk is vacuous"*), then that
+  the offset moved. Reverting `rebuild` prints *"6 != 17 : after Refresh the page drew 6 of 17
+  actions, with no More actions to reach the rest: the offset outlived the paging"* (7, 8 and 9 of
+  17 for the other sub-tests).
+- `test_a_page_that_offers_no_more_actions_draws_every_action` covers the doors that are not
+  Refresh: for every page of every hub (and the admin hub), with and without the fullest result,
+  that shows no More actions and holds at least two plain buttons, it sets the offset to the last
+  plain button, rebuilds, and requires every action drawn. The failures go into **one list**
+  asserted equal to `[]`, not one sub-test each - a message to scroll past is one nobody reads
+  (v1.0.8) - and `checked > 0` is asserted first (rc.57). Reverting `rebuild` prints a list of 81
+  entries, starting `'/character -> Overview: 4 of 7'`. Its docstring says most of those offsets
+  cannot be reached today, so nobody deletes it as dead.
+- **A Refresh-only reset** (the obvious smaller fix: zero the offset in the Refresh button) passes
+  the first test and fails the second with the same 81 entries, which is why both ship.
+
+### Craft All carried a crafter past three examinations that could then never be sat (schema 80, v1.33.0)
+
+**Found by reading what a batch does to a rule written before batches existed.** v1.21.0 made
+`craft.resolve` up to fifty crafts in one press. A rank rises on crafting alone (rc.45: the
+examination "never blocks a level"), a unit earns 12-22 XP against a 60 XP first step, and the ranks
+cost `60 + 40*L` a step, so before batches one press could never cross two ranks and the rule
+"`profession.exam` sits the rank held now" lost nothing. After them a fresh crafter's fifty units end
+at rank 4 to 6 about nine runs in ten - past all three ranks the content examines (1 to 3), in every
+trade. Re-proved in scratch on v1.32.0: one `craft.resolve {recipe:"Recovery Pill", all:true}`
+ended at level 6 with the quests for ranks 1, 2 and 3 all `active`; `profession.exam` at an
+apothecary answered *"no examination is held in Alchemy at this rank"*; `tradeCertifiedTx(Alchemy)`
+was false for the rest of the life (so the stall certificate and the crafted-donation multiplier
+stayed shut), `teachRankRecipesTx` never ran, and the craft reply told the player the halls would
+examine them. The batch did not create the gap - a GM's lever, the household's tutoring and a rank
+reached by a long run of single crafts all left it - it made it the ordinary result of the button
+the game now advertises.
+
+**Why the gates missed it.** `offerProfessionExamTx` carried the comment that settled it: *"A craft
+generous enough to cross two ranks offers the higher one: the examination certifies what the
+candidate now is, and the action itself only ever sits the rank they currently hold."* That sentence
+is a decision about a case that could not occur when it was written, and nothing re-asked it when
+the case became common. v1.7.1 met the symptom from the other side - `stallCertificateTx` accepts a
+pass at *any* rank because "a rank rises on crafting alone and somebody can reach the second without
+sitting the first" - and widened the certificate instead of asking why a rank could be reached
+without its examination. Every test drove one rank at a time: `TestReachingARankOffersItsExamination`
+called the offer with the rank it had just set, and `craft_batch_test.go` asserts the batch is N
+crafts and each is recorded, never what the batch hands over. The playtest's trade leg crafts a
+single rank (the household's tutoring has already made it rank 1, so the loop breaks at once and the
+log has always read `offered=nothing`) and then sits it.
+
+**The fix is a rule, not a rank.** `professionExamsOpenTx` is every examination the content authors
+at or below the rank held that this life has not passed, lowest first - and it is the one question
+both doors ask. The hall sits `open[0]` strictly (the payload carries no rank, the wait and the
+record and the recipes taught are that examination's own, the roll is still `score + held +
+steadiness` so a candidate is no worse for having climbed). The craft that raises a rank, and the
+hall's counter, hand over every open examination's quest (`offerProfessionExamsTx`); the counter
+call sits after every refusal and before the roll, and it is what catches a crafter whose rank came
+by another road (a household's tutoring, `family.tutor`, `admin.player.set_profession`). Nothing
+open is two different facts and is answered as two: *"you already hold every certificate the %s
+halls give up to your rank"* when the trade examines at or below the rank held and all are passed,
+*"no examination is held in %s at this rank"* otherwise. The craft result gains `exams_offered`
+(quest key, rank, rank name, hall, lowest first, across the whole batch); `exam_offered` stays as
+its first key; the exam result gains `rank_held` and `exams_remaining`.
+
+**And the engine half alone would have made it worse - that is the other finding.** The twelve
+examinations' objectives were untargeted, and an untargeted objective takes any event of its type
+(`progressQuest`: "an objective with no target accepts any event of its type"). Measured with the
+engine fix and the old content: one Tier 1 pass report completed and paid **every** examination
+quest the crafter held - all three of a trade's, and the other trades' - so the player who is now
+holding three quests at once collected thirty XP three times for one demonstration. The targeting
+therefore ships with it: each of the twelve objectives names its own `quest_key`, the bot reports a
+pass under the engine's `quest_key`, the validator knows the target kind `profession_exam` (a key
+the content carries, labelled `<rank_name> examination in <trade>`), and **migration 80** gives a
+running world the same, because `sync_commission_pool` is insert-only: `quest_definitions`
+(`json_set(objectives_json,'$[0].target',quest_key)` where `source_key LIKE 'profession_exam:%'`,
+the objective is a `profession_exam` and no target is set) and the terms a player already pinned in
+`character_quests` (the same at `$.objectives[0]`, active rows with pinned terms only). A GM-set
+target, a completed quest (kept as it was paid) and `realm_road_21` - whose objective merely asks
+for a pass and is not an examination - are left alone. This is the first Python migration to read
+JSON in SQL; the engine already does (`json_extract` in a dozen queries), and the engine playtest's
+bootstrap runs it through the Go transport on a fresh database.
+
+**A third fault in the same neighbourhood, found by running the validator.** The dashboard's
+`_QuestWorld` hands `validate_quest_definition` three tables and nothing else. Every target kind
+added since v1.16.0 (`realm`, `flame`, `boss`, `secret_realm`, `law`, `law_technique`) reads
+`world.data`, `world.realms` or `world.secret_realms`, so the GM workbench has refused to save any
+realm-road stage since the road shipped (*"unknown realm 'Qi Refining'"*, measured on all 31
+stages), and the new kind would have added the twelve examinations to that list - something an
+untargeted objective let through. `_QuestWorld` carries the content pack now; a contract test saves
+all twelve examinations and every realm-road stage through it.
+
+**What each drill prints.** (Go, `profession_exam_test.go`) Restoring the held-rank sit: *"a
+crafter carried to rank 6 by one Craft All could not sit the rank-1 examination: no examination is
+held in Alchemy at this rank"* and *"a candidate holding rank 2 with nothing passed sat rank=2
+(held 2, passed false), want rank 1"*. Teaching `level` instead of the rank passed: *"passing rank 1
+while holding rank 2 taught [Longevity Pill Marrow-Tempering Pill Spirit Condensation Pill], want
+exactly the rank-1 methods [Heart Calming Pill Moonveil Recovery Pill Qi Replenishment Pill]"*.
+Recording `Rank: level`: *"sitting 2: rank=1 held=6 passed=true"* and *"an immediate retry: <nil>"*.
+Offering only the rank held: *"reaching Tier 2 with nothing passed handed over
+[exam_alchemy_journeyman]"*. Dropping the counter's offer: *"the counter handed over 0 quests; a
+pass has nothing to complete"*. Taking the craft's offer out: *"one Craft All to rank 6 reported
+the examinations it handed over as ranks [], want [1 2 3]"* and *"the craft that raises a rank
+offers no examination"*. Deleting one content target: *"a pass of exam_alchemy_apprentice left 2
+quests completed, want 1: [exam_alchemy_apprentice exam_inscription_journeyman] - its objective, or
+one still waiting, names no target"*; deleting all twelve (the engine half alone): *"... left 12
+quests completed, want 1"*. (Python, `test_an_examination_is_never_lost.py`) A target removed from
+the content names the trade and rank (*"Formation rank 3's objective takes any pass, so one Tier 1
+pass completes it and pays it"*); `law.py` reporting no target: *"a pass reported without a target
+completes every examination quest the crafter holds"*; a target read from the wrong field: *"the
+target must come from the engine's `quest_key`, not be invented here"*; the craft reply back on
+`exam_offered`: *"the craft reply no longer says which examinations it handed over"*; migration 80
+without the pinned-terms update: *"a crafter already holding the quest still completes it with any
+pass"*, without the `status='active'` guard: *"a completed quest was rewritten after it paid"*,
+without the `source_key` guard: `'target' unexpectedly found in {... 'target': 'realm_road_21'}`,
+and without the no-target guard a GM's own target is overwritten; `_QuestWorld` without `data`:
+*"objective 1: unknown examination 'exam_forging_apprentice'"*. (Engine playtest) Restoring the
+held-rank sit fails *"a candidate holding rank 3 with nothing passed is examined for rank 1 -
+rank=3 held=3 passed=True remaining=2"* and *"profession.exam then sits rank 2 - no examination is
+held in Alchemy at this rank"*.
+
+**Its own gates caught three things on the way.** (1) The plan's test 3 prototype drove the offer
+at a single rank and so could not have seen `exam.Rank != held` filtering the batch's earlier ranks
+out; `TestReachingARankOffersEveryOpenExamination` hands over from Tier 2 with nothing passed and
+holds the pair. (2) The first draft of the "only its own quest completes" test would have been green
+over a tree where the targets had never been needed (rc.47's shape); it now runs the same twelve
+reports on content with the targets taken off and requires all twelve quests to complete, so the
+reader proves it can see the fault. (3) The teach drill is only visible at rank 2: the Mortal World's
+third Alchemy examination teaches nothing (its makings are on no Mortal shelf), so a candidate staged
+at rank 3 would print an empty list for a wrong teacher and look green.
+
+**Deliberately not done.** No clawback of payouts a stranded crafter already collected through the
+old untargeted report (owner decision 6) - the three fees and three payouts a stranded crafter now
+collects close together are the same total as an on-time crafter's. No Craft All stop at an exam
+rank (owner decision 4). `world_cross` and `ascension_gate` are untargeted in the same way and fire
+on any world change, a descent included (`abode.py`, `cultivation.py`): a separate finding.
+
+### The heartbeat that could not be sent (v1.33.0)
+
+**Found by reading the watcher against the engine's cancel rule**, and reproduced before it was
+believed: a request at `fetching` with the watcher's heartbeat at fifteen minutes and a minute could
+be cancelled, and the watcher's closing `done` was then refused with "no update is in progress".
+
+`adminServerCancelUpdate` (v1.12.3) lets a GM close a request past `requested` once the watcher
+has not been heard from for `updateWatcherStaleSeconds` (fifteen minutes), and the card's
+`can_cancel` was the same sentence in Python. The premise is that a silent watcher is a dead one.
+It is false for exactly one thing, the install: `update_watch.sh` heartbeats only at the end of a
+poll, `run_update` blocks inside `update.sh` and sends nothing, and `update.sh` stops the whole
+stack - the engine and the dashboard with it - and rebuilds it, so no heartbeat could reach the
+engine for most of an install even if the watcher sent one. A heartbeat is stale by the time a GM
+looks at the card, in a loop it can be stale after nine and a half minutes (five-minute beat plus
+the poll interval already elapsed when `update.sh` starts), and the card then said "watcher not
+running - restart `update_watch.sh`" over a Cancel button. Cancelling made the watcher's closing
+report arrive at a closed request, which the engine refuses by design (v1.12.3), so `update_result`
+was never written, the Request button returned, and a second request could run `update.sh` again
+over the first. The advice on the card was worse than the button: SIGKILLing the watcher mid-install
+orphans `update.sh`.
+
+**The signal that holds during an install is the request's own last report.** `fetching` writes
+`updated_at` just before `update.sh` starts, and it survives a rollback because the database copy
+a rollback restores is taken after it. `updateInstallUnderway(request, heartbeat, now)` is the one
+statement: false unless the request is open and past `requested`; otherwise the watcher is heard
+from **or** the request has reported inside `updateInstallLeaseSeconds` (two hours, longer than a
+cold image build plus the rollback restart). The new condition is the old one AND a new clause, so
+it is strictly tighter; the only exit that moves is the dead-watcher one, from fifteen minutes to
+the lease. An absent `updated_at` decodes to 0, an age of fifty years, and is not protected - the
+`seller_user_id=0` lesson in a timestamp: a value nobody wrote is not a report. The card's twin
+(`install_underway` in `app/dashboard/server.py`) asks the same question and reports it as
+`unknown` rather than as an age when the stamp is absent; the lease constant is held equal to the
+Go by a test that reads the Go.
+
+**A background heartbeat was considered and rejected**, and the reasons are worth keeping. It cannot
+reach the engine while the stack is down. Beating through a hung `update.sh` would keep
+`updateWatcherRunning` true for ever, which is the v1.12.3 wedge with no exit. And SIGKILL runs no
+EXIT trap under dash or bash, so an orphaned beater would make a dead watcher look alive.
+`update_watch.sh` is unchanged.
+
+**The refusal says what is true.** Both refusals keep the `the update is already <status>` prefix
+the playtest matches. The lease refusal says how long ago the request last reported and that it can
+be cancelled after the lease; it sends a GM to restart `update_watch.sh` only once `update.sh` has
+finished ("check `update_watch.log`; once `update.sh` has finished, starting `update_watch.sh` again
+closes it" - a restarted watcher reports the request `failed`). The card shows an `installing` pill
+with the minutes since the last report and "Cancel offered after N min" (N read from
+`install_lease_seconds`, never spelled in JS), and the Cancel confirm branches on
+`updReq.status==='requested'`: past that it no longer claims "Nothing is installed", says Cancel
+does not stop `update.sh`, and names `update_watch.log`.
+
+**Why the gates missed it.** `TestAnInstallInProgressIsNotCancellableWhileTheWatcherLives` and
+`test_an_install_whose_watcher_has_gone_quiet_can_be_cancelled` each held the rule as written -
+a stale heartbeat frees the request - and each *named* the premise in its title. The Go test
+aged the heartbeat to stale+5 and expected a cancel, the card test passed a request with no
+timestamp at all. Nothing asked what the watcher is doing while the heartbeat ages, and the
+playtest drove `acked`, `fetching`, `installing`, `done` back to back so no step ever sat in an
+install long enough to be stale. A test that holds the rule it was written with fails exactly
+when the rule is corrected (v1.0.8): both moved.
+
+**The gates, and what each drill prints.**
+
+- `TestAnInstallTheWatcherCannotBeHeardFromIsNotCancelledUnderIt`: acked, fetching, heartbeat
+  sixteen minutes old, request last reported twenty minutes ago - the cancel is refused with the
+  prefix, the minutes and "once update.sh has finished", the request is unchanged, no audit row is
+  written, and then `done` lands and `update_result` holds 9.9.9. Drill (lease clause disabled):
+  *"a GM cancelled an install under the updater: the watcher had been quiet for sixteen minutes,
+  which is all an install ever is"*.
+- `TestAnInstallSilentPastTheLeaseCanBeCancelled`: inside the lease refused; past the lease with a
+  live heartbeat refused; past the lease with a stale heartbeat allowed. Drill (lease clause always
+  true): the final cancel is refused with the lease message. Drill (heartbeat clause dropped):
+  *"an install a watcher was heard from inside the window was cancelled"*.
+- `TestTheCancelRuleIsOneStatement`: a table - requested, done, failed, cancelled, no request, a live
+  watcher with an old request, stack down mid-install, acked with no heartbeat, inside the lease,
+  exactly at the lease, past it, undated. Drill (lease clause disabled): *"stack down mid-install:
+  underway=false, want true"*, *"acked with no heartbeat ever written: underway=false, want true"*.
+  Drill (the `requested` exit removed): *"not yet picked up: underway=true, want false"*.
+- The two moved Go tests now age the request with `lastReportedAgo`: refused at stale+5 and allowed
+  only after the lease; refused fresh with no heartbeat ever written, allowed after the lease.
+- Card tests (`test_the_server_update_card.py`): reported 3600 s ago with a stale heartbeat gives
+  `can_cancel` False and `install_underway` True; an undated request gives True and
+  `install_reported_seconds_ago` None; the lease boundary (`lease-1` under way, `lease` and
+  `lease+1` not); a `requested` request is never an install; a live watcher with an old request is
+  still one. Drill (the old `can_cancel` put back): *"True is not false : the card offered Cancel for
+  an install that reported an hour ago"*.
+- Lease parity, in the existing engine-agreement test: Drill (Go factor changed to `3*60*60`):
+  *"10800 != 7200"*. Drill (Go constant renamed): *"the engine's install lease could not be read;
+  this gate is broken, not the tree"*.
+- JS wire: the card reads `upd.install_underway&&!upd.watcher_running`, draws an `installing` pill,
+  reads `upd.install_lease_seconds` and spells no lease length; the confirm branches on
+  `updReq.status==='requested'`. Drills: unconditional "Nothing is installed" restored gives
+  *"the confirm does not tell a request nobody picked up from an install"*; the phrase put back into
+  the install branch gives *"the confirm still promises that nothing is installed"*; the pill's
+  condition replaced with `false` gives *"the card does not say an install is under way when the
+  watcher cannot be heard"*. These use `assertTrue` over a search, not `assertIn`, because the
+  haystack is one 500-character line (v1.0.8's dashboard finding).
+- Engine playtest: after `acked`/`fetching`/`installing` and before `done`, a cancel is held to a
+  refusal containing `the update is already`. Drill (the old engine): the step fails with *"expected
+  a refusal mentioning 'the update is already', got {... 'previous_status': 'installing', 'status':
+  'cancelled'}"*, then `the watcher reports done` fails with *"no update is in progress"* and the
+  closing report is `{}` - the production symptom, three steps.
+
+**Left deliberately.** A watcher restarted after a SIGKILL mid-install: `interrupted()` and
+`reopen_world 1` ignore `update.sh`'s own lock, so the new watcher reports `failed` and reopens the
+world while `update.sh` is still installing. A separate finding (see TODO), and the reason the
+refusal's restart advice is conditional: the lease makes "restart the watcher" tempting.
+
+**Pointer for the v1.12.3 paragraph in CLAUDE.md** (F13 owns the file): after "a server-update
+request could wedge for good with nothing to clear it", add "(what it may close became the request's
+own last report rather than the watcher's heartbeat in v1.33.0: see docs/FINDINGS.md)".
+
+### The menu's Next button asked a spent answer for a form (v1.33.0)
+
+`MenuDailyButton.callback` (v1.3.2) opens its hub in place and presses the leaf, and v1.22.0 made
+the menu's `Next:` button and v1.27.0 the journal's door buttons the same callback
+(`MenuNextButton.callback is MenuDailyButton.callback`, held by `test_the_menus_say_where_to_go`).
+Opening in place is the press's one answer: `open_hub_in_place` ends in
+`interaction.response.edit_message`. The leaf is then pressed on the same interaction, and a leaf
+whose first input is free text ends `_present_input_step` in `interaction.response.send_modal`.
+Discord takes a modal only as an interaction's first answer, so discord.py raised
+`InteractionResponded` and the player, who had watched the hub open, saw "This interface hit an
+unexpected error". v1.22.0's open-then-press was safe for the leaves it was written for, which have
+no input at all, or a picker whose reply is a followup; v1.27.0 reused it for the journal without
+asking the same question of the leaves the journal names.
+
+Seven tutorial steps reach a form-first leaf: `realm_road_3`, `4`, `7`, `11`, `19` and `27` name
+**/combat -> Boss Raids -> Claim** and `realm_road_30` names **/innerworld -> Personal World ->
+Create**. The journal's doors reach the same two leaves (`OBJECTIVE_PATHS` has `raid_win` and
+`personal_world`). Twenty-eight leaves in the hubs are form-first in all; the other twenty-six of
+them are not named by a quest, so they were only ever one hub-page press away from a fresh
+interaction, which is why the crash lived on the road and nowhere else.
+
+Why the gates missed it: every test that drove `_present_input_step` or a hub's quick button used
+a fake interaction whose `response` was an `AsyncMock`, which takes a second answer without
+complaint, and no test pressed a `MenuNextButton` at all - `test_the_menus_say_where_to_go` holds
+that the button is built and that its callback is the Daily callback, which is true and says
+nothing about what the callback does to a form. The daily five are all input-less or picker
+leaves, so the playtest never met a form behind the menu either. "A surface must not offer what
+the engine will refuse (rc.46)" has a presentation twin: a surface must not ask Discord for what
+Discord will refuse, and the refusal is one the library raises, which is why the new test's
+response is discord.py's own `InteractionResponse` with only the HTTP calls stubbed.
+
+The fix is one predicate and one branch, in the one function every form passes through.
+`_form_can_answer(interaction)` is False when the response is spent or the interaction is itself a
+modal submit (the second answer Discord refuses a form for), and `_present_input_step` then replies
+with the existing `HubContinueInputView` carrying every input still to ask. The Continue press is a
+fresh interaction, re-runs `_present_input_step` and opens the form. `MenuDailyButton` and
+`MenuNextButton` are unchanged: the press still opens the hub where the menu was and presses the
+leaf, and the maintenance and seclusion gate stays where it was, at the form's submit
+(`_invoke_action` asks `_panel_refusal`), as it is for a form leaf pressed on a panel. The siblings
+were walked: the other `send_modal` calls (`creation.py`, `event_scene.py`, `commands/scene.py`)
+are the callbacks of their own fresh component presses, and `_HubResponseProxy.send_modal` has no
+caller.
+
+`tests/python/unit/test_a_form_waits_for_a_fresh_press.py` holds it, six tests on a response that is
+discord.py's own: a spent response is handed a Continue and no form was attempted; the Continue
+press opens the form (a `HubActionModal` whose inputs are `['name']`); a fresh press still opens
+the form at once and sends no Continue; a modal's own submit gets a Continue and never a form;
+every Next and journal door built from the seeded quests and `OBJECTIVE_PATHS` that opens a form
+answers; and every form-first leaf of every hub answers the menu's press. Both sweeps require that
+they found something to press, so a classifier that finds nothing cannot pass.
+
+Drills, each run and restored from a copy of the fixed file:
+
+- Guard removed (`if not _form_can_answer(interaction):` -> `if False:`): five of the six fail. The
+  first three print "/innerworld create sent a form as the answer to an interaction that was
+  already answered (a modal is only ever an interaction's first answer)", the door sweep prints
+  "These doors cannot open the form they lead to; offer Continue, a form is only an interaction's
+  first answer." with four entries (`menu` and `journal` x `/boss claim` and `/innerworld create`,
+  each "raised InteractionResponded"), and the leaf sweep prints "These leaves are form-first and
+  crash when the menu's Next presses them." with 28 entries. Only the fresh-press test stays
+  green, as it should.
+- Guard always on (`if True:`): the fresh-press test prints "0 != 1 : ['send_message(HubContinueInputView)']"
+  and the Continue test prints "Continue did not open the form: ['edit_message(HubContinueInputView)']"
+  (a Continue that answers with another Continue would never end), and both sweeps fail on their
+  at-least-one check.
+- `modal_submit` clause dropped from the predicate: exactly one test fails, "a form was sent as the
+  answer to a form's own submit".
+- The test's classifier blanked (`_form_first` always False): both sweeps fail first with "no door
+  that opens a form was found: the reader found nothing, so nothing was held" and "no form-first
+  leaf was found: the classifier found nothing, so nothing was held".
+
+Not fixed, and recorded in `docs/TODO.md`: `/boss claim` has no picker (it is in `STILL_TYPED`), so
+the raid door asks the player to type an encounter id before any raid exists; the classic
+journal's in-place edit does not clear the message's content and embed; and `QuestDashboardView`
+has no `interaction_check` and `MenuNextButton` checks no owner, so another member can press a
+public journal's door.

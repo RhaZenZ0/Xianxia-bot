@@ -16,6 +16,153 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **deferred (design)** — *Quest rewards follow the player's feet, not the quest's world.*
+  `grantQuestRewardTx` (`actions.go`) and `payCommissionRewardTx` (`commission_actions.go`) pay a
+  quest's `spirit_stones` through `characterWalletDeltaTx`, the coin of wherever the player stands
+  when the last objective is reported. Six realm-road stages end in a `raid_win`, reported at the
+  claim, so a stage finished by a claim made outside the quest's own world pays in the wrong coin by
+  the same factor of a hundred v1.33.0 closed for the raid itself; every other quest has the same
+  exposure in principle and low reach in practice. A quest has no world of its own to name, so it
+  would have to take one from its giver, its stage or its last objective's place - a decision, not a
+  wiring. `SettleBountyTx` has the same shape and v1.28.0 states it as deliberate.
+- **deferred (design)** — *A GM's set_sect leaves the NPC master bond.* `admin.player.set_sect`
+  (remove or change) leaves `sect_lineage` and `npc_mentorships` in place, and `livingNPCMasterTx`
+  checks only that the master is alive, not that they are in the disciple's sect, so a player a GM
+  moves out of a sect keeps the master's terms until they press Leave. Either the lever ends the
+  bonds, as `sect.ascend` does since v1.33.0, or the readers require membership; the owner has not
+  chosen.
+- **deferred (design)** — *A table-level samsara gate.* v1.33.0's gate holds every column of
+  `characters` to being reset or kept by a rebirth. The rows of other tables have no such gate: about
+  fifty tables carry a `user_id` and are in neither wipe list (`soul_legacy`, `reincarnation_state` and
+  `event_log` are meant to survive; `character_qi_body`, `alchemy_state` and `character_fate` are
+  per-body and are neither wiped nor rewritten). `npc_mentorships` is keyed `disciple_user_id`, so a
+  gate that looked for `user_id` would have missed it; the key columns need naming first.
+- **deferred (design)** — *Which strength floors should read the higher ladder.* v1.33.0 moved the
+  floors of a *place* (the sect ascent's gate, the transit arrays, the caravan's road, and the panels
+  that anticipate them) onto `accessRealmIndex`, the higher of the qi and body ladders. The floors of
+  a cultivator's *strength* stay on the qi ladder: a secret realm's entry and its rooms, the realm draw
+  and the unexpected-event bands, flames, Laws and their techniques, manuals, a raid member's realm,
+  the residence facility floor, the personal world, and the curriculum and commission bands. A body
+  cultivator ahead of their qi stage can be walked into a world they cannot yet fight in, which is
+  the point of the split; whether any of these should follow the higher ladder is a decision for each.
+- **deferred (design)** — *Which world a cultivator's strength puts them in is read off the qi ladder.*
+  `realmWorldGo(realm_index)` chooses the hidden sect's branch, `currentWorld` falls back to the qi
+  realm for a character at a place the catalogue does not carry, and `/sense` reads
+  `WORLD.realm_world(realm_index)`; a body cultivator in the Spiritual World at qi 3 reads as Mortal
+  there. Left because each is "which world am I from" rather than "may I enter".
+- **deferred (design)** — *A world-event battle's severity and node are the caller's.* `combat.start
+  kind=event` takes `severity`, `source` and the node key off the payload; `severity` scales the
+  opponent and `source` (`event:<key>|node:<node>`) is what `combatFinalizeAction` branches on to
+  deplete the node and pay its reward, while `world_event.engage` checks three things here that
+  `combat.start` checks none of (the event is active, the caller is at it, the node is a beast with
+  something left). v1.33.0 made the challenge the engine's and left this, because the event scene's
+  Battle button also sends a hostile-manifestation battle with no node, so "which battle is this"
+  needs a decision of its own.
+- **deferred (design)** — *The samsara wait is the caller's.* `combat.turn`, `combat.technique` and
+  `lifecycle.true_death` take `minutes_per_year`, `base_samsara_years` and `max_wait_seconds` off the
+  payload, and `samsara.status` and `family.simulate` take `minutes_per_year` - rc.56's class
+  (`minutes_per_day` is already in `callerOwnedNothing`). Moving them to the engine means three more
+  compose passthroughs and a decision about whether the `REINCARNATION_*` keys stay the `.env`
+  baseline. `duel.challenge`'s `ttl_seconds` has no ceiling either, a bound the client owns. A sweep
+  the next release can build: every payload field an engine action reads from a caller, held against
+  a list of what a caller may state, so the class stops being found one action at a time.
+- **fixed (v1.33.0)** — *An undo wrote back columns its lever never wrote.* The perfection lever's
+  reversal restored the whole quest state from whichever snapshot it read, deleted a row it had made
+  whatever play had put on it, reopened a perfected realm, and redid a deleted row as an UPDATE on
+  nothing; the trade, Law and contribution levers erased the crafts, sittings and points of play, and
+  the physique undo wrote an identity the call had not. An undo restores the columns the audit row
+  shows its action wrote, as an UPDATE, and removes a made row only through `deleteIfIdle`;
+  `TestAReversalDeletesARowOnlyThroughDeleteIfIdle` and `test_an_undo_deletes_only_an_idle_row.py`
+  hold it. Audit rows from v1.23.1 onward are repaired by the same keys; rows from before carry their
+  bar-only reversal.
+- **deferred (design)** — *`admin.player.force_end_scene` writes more than its undo restores.* The
+  forward action writes `scene_key`, `channel_id` and `metadata_json` as well as the type and label,
+  and snapshots only the two its undo puts back, so an undone force-end leaves a scene with its old
+  type and label and none of its key, channel or metadata - the opposite shape to the undo fault
+  v1.33.0 closed, and putting it right widens what the audit row records.
+- **deferred (design)** — *A realm an old undo reopened stays open.* Undos run under v1.23.1 to
+  v1.32.0 could put `active=1` back on a `completed=1` perfection row, which the quest and trial
+  actions read as an open path. No migration writes it back, because nothing records whether a GM
+  meant a realm to be reopened; `SELECT user_id, realm_index FROM realm_perfection WHERE active=1
+  AND completed=1` (and the same on `body_realm_perfection`) finds any, and the Player Editor sets
+  one right.
+- **deferred (design)** — *Python's map skips a city part's own roads; the engine's does not.*
+  `_known_locations` walks only the city's `roads`, while `knownLocationsTx` adds the road neighbours
+  of both the part and the city. On the shipped content the two agree (none of the 477 parts carries
+  `roads`), but a district authored with its own roads would put a neighbour on the engine's map and
+  not the picker's. A content gate that no part carries `roads`, or the twin walking both, is the
+  fix, and which is the owner's call.
+- **deferred (design)** — *A Discord GM quest-report lever.* The Player Editor is the only door to
+  `admin.player.quest_progress`; there is no `/admin player` counterpart, so a GM away from the
+  dashboard cannot unstick a quest. Decided no for v1.33.0: the lever stays a replay of a player's
+  report and the dashboard is where a GM works one character's quests. If a Discord door is wanted it
+  should be the same picker over `quest_journal`'s objectives, not a typed type-and-target pair.
+- **deferred (design)** — *The report lever matches like a player's report.* `progressQuest`
+  accepts any event of its type for an objective with no target, so a GM reporting `talk -> Elder
+  Pine` moves an untargeted `talk` objective of the same quest as well. No shipped quest has such a
+  pair (`TestEveryShippedObjectiveIsMetByItsOwnTarget` would name it), and an engine `objective_id`
+  path would be a second matching rule. Revisit only if a quest is authored with both.
+- **fixed (v1.33.0)** — *A banner sat on a street.* `territory.claim`, both banner branches of
+  `ResolveWarTx` and the war step's targets ignored v1.12.0's whole-place rule, and migration 74 left
+  an active war over each gate it neutralised. `game.TerritoryGround` is the one statement; a claim
+  from a part claims the city, a war over a part is set aside with no victor, and
+  `SetAsidePartialHoldingsTx` puts a running world right every maintenance pass.
+  `territory_ground_test.go` and `test_war_fronts.py` hold it.
+- **deferred (design)** — *A rival that held the gate when migration 74 ran was given the seat city.*
+  The migration's first statement copies the gate's banner onto a neutral seat whoever held the gate,
+  so a sect whose gate had been taken in a v1.12-v1.18 war lost its home city to the rival. The repair
+  cannot tell that from a city honestly held, and migration 74 is frozen. Only worlds that ran NPC wars
+  across those releases are affected, and it cannot be found from here; an audited
+  `admin.territory.set_controller` lever (a new operation, with playtest coverage and a dashboard
+  card) is how a GM would hand the city back, and is not built until a world shows the state.
+- **deferred (harness)** — *The playtests claim from a whole place only.* `playtest_engine.py` claims
+  the hills and `playtest_discord.py` presses `/territory claim` wherever the sweep's player stands;
+  neither claims from a gate or a street, so the redirect is held by the Go tests and the Python
+  commands test and not by a real server. A leg that stands at a city's gate, claims, and holds that
+  the city's row (not the gate's) carries the banner would drive it end to end.
+- **deferred (design)** — *A repaired street forgets what it paid.* Releasing a held part ends the
+  tribute it paid (a lot a week, v1.29.0) and folds a sole holder into the whole city; a sect that
+  held several streets of a city loses the extra lots. The city pays its own tribute once folded,
+  which is the rule; whether a fold should carry the sum is a balance decision nobody has asked for.
+- **fixed (v1.33.0)** — *One Craft All could strand a trade's three examinations.* A batch of up to
+  fifty crafts crosses ranks 1 to 3 in one press and the hall sat only the rank held, so the quests
+  were handed over and could not be finished, the methods never taught and the trade never certified.
+  `professionExamsOpenTx` is the one rule (every examined rank at or below the rank held that this
+  life has not passed); the hall sits the lowest, the craft and the counter hand over every open
+  quest, and each examination's objective names its own quest key so a pass completes only that one
+  (migration 80 carries it onto a running world). `test_an_examination_is_never_lost.py` and
+  `profession_exam_test.go` hold it.
+- **deferred (design)** — *`world_cross` and `ascension_gate` objectives are untargeted and fire on
+  any world change.* The leak the examinations had: an untargeted objective takes every event of
+  its type, so a descent through an array reports `world_cross` and completes a quest that asks to
+  cross *up*; `abode.py` and `cultivation.py` report them without a target. The right target (the
+  world crossed into, or the gate's key) is a content decision.
+- **deferred (design)** — *The dashboard quest editor suggests scene actions for a target it has no
+  picker for.* `loadQuestEditor` binds a `<datalist>` for `location` and `npc` targets and falls
+  back to the scene-action list for every other kind (`realm`, `flame`, `boss`, `secret_realm`,
+  `law`, `law_technique`, now `profession_exam`), which suggests wrong values rather than none. The
+  validator accepts the right ones, so nothing breaks; a picker per kind off `vocabulary` is the fix.
+- **deferred (design)** — *A watcher restarted after a SIGKILL mid-install reports it failed while
+  `update.sh` is still working.* `interrupted()` and `reopen_world 1` in `update_watch.sh` do not
+  consult `update.sh`'s own lock, so a watcher started again after the first was SIGKILLed (no EXIT
+  trap runs) closes the request `failed` and reopens the world over an install still running. The
+  v1.33.0 refusal tells a GM to restart the watcher only once `update.sh` has finished, which holds
+  the advice honest and not the script; the fix is for `interrupted()` to wait on, or report only
+  after, the updater's lock.
+- **deferred (rare)** — *A truly dead install holds the Request button for up to two hours.* The
+  lease is the exit for a watcher that died mid-install (it was fifteen minutes). Shorter would free
+  the button sooner and let a GM cancel an install that is merely slow on a cold NAS build; the
+  length is `updateInstallLeaseSeconds` (and the card's twin) if the owner wants it moved.
+- **deferred (design)** — *A picker for `/boss claim`.* It is the one leaf the Realm Road sends a
+  player to before any raid exists, and it still asks for a typed encounter id; taking it out of
+  `STILL_TYPED` wants a provider that lists the player's open encounters, and the Next label could
+  then say where the encounter comes from.
+- **deferred (design)** — *The classic journal's door edit.* `open_hub_in_place` edits the classic
+  (non-layout) journal message without `content=None, embed=None`; if Discord refuses that edit the
+  door opens a new panel and never presses the leaf. Not verified live.
+- **deferred (design)** — *The journal has no owner check.* `QuestDashboardView` has no
+  `interaction_check` and `MenuNextButton` checks no owner, so another member can press a public
+  journal's door and turn it into their own hub. Needs a decision on whether the journal is public.
 - **fixed (v1.31.2)** — *A hub press made about ninety engine round trips.* The panel refresh after
   every press opened a session per one-row read (thirty-two of them), read the clock once per circuit
   walker to draw the Here line (twelve), and looked a plain town up in three private-property tables.
@@ -148,7 +295,8 @@ deferred half and not the half that says what was done about it.
   district kind of its own read by one rule (`world_jobs.go`), a raid boss in the wilds of one of
   its cities, a secret realm at that wild place, and a key to it on its array workshops' shelves;
   and a raid's reward is paid in the money of the world it is fought in, where `boss.claim` paid
-  the Mortal stone everywhere (rc.44's class, found at a sixteenth site).
+  the Mortal stone everywhere (rc.44's class, found at a sixteenth site; true only for a
+  raider standing at the lair until v1.33.0 paid the lair's world's coin from anywhere).
 - **fixed (v1.19.2)** — *Commission realm bands above the Mortal World.* The entry said the band
   was stored and read nowhere, and that was wrong: the offer an NPC makes in conversation reads it
   (`realm_band_allows`), so none of the seventy-eight upper-world city commissions, banded "2-4" or
