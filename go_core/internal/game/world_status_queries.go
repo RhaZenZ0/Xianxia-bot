@@ -289,6 +289,17 @@ func applyWorldStatusQuery(conn *storage.Conn, worldPath string, req ActionReque
 // a hidden-power detector; they still enter battles through explicit events
 // or GM actions.
 func combatTargetsGo(conn *storage.Conn, catalog worlddata.Catalog, location string) ([]map[string]any, error) {
+	return combatTargetRows(conn, catalog, location, true)
+}
+
+// combatTargetRows is the one rule for who can be challenged where. The picker
+// reads it capped, because a Discord select holds twenty-five and a crowded
+// square should not ship hundreds of rows; `combat.start` reads it whole,
+// because a name past the cap is a person who is standing there all the same.
+// Two statements of "who is here" would be free to disagree, and a picker that
+// offers somebody the engine then refuses is worse than either being wrong
+// alone (rc.28).
+func combatTargetRows(conn *storage.Conn, catalog worlddata.Catalog, location string, capped bool) ([]map[string]any, error) {
 	hiddenReal := map[string]bool{}
 	for name, npc := range catalog.NPCs {
 		if npc.HiddenMaster != nil && npc.HiddenMaster.Kind == "real" {
@@ -306,8 +317,12 @@ func combatTargetsGo(conn *storage.Conn, catalog worlddata.Catalog, location str
 			rows = append(rows, row)
 		}
 	}
-	res, err = conn.Execute(`SELECT head_name AS name,head_realm_index AS realm_index,head_phase AS phase,'family_head' AS target_type,family_id,family_name
-		FROM birth_families WHERE location=? AND line_status='active' AND head_name!='Vacant Ancestral Seat' ORDER BY influence DESC LIMIT 25`, []any{location})
+	heads := `SELECT head_name AS name,head_realm_index AS realm_index,head_phase AS phase,'family_head' AS target_type,family_id,family_name
+		FROM birth_families WHERE location=? AND line_status='active' AND head_name!='Vacant Ancestral Seat' ORDER BY influence DESC`
+	if capped {
+		heads += ` LIMIT 25`
+	}
+	res, err = conn.Execute(heads, []any{location})
 	if err != nil {
 		return nil, err
 	}
@@ -321,7 +336,7 @@ func combatTargetsGo(conn *storage.Conn, catalog worlddata.Catalog, location str
 		}
 		seen[name] = true
 		unique = append(unique, row)
-		if len(unique) >= 50 {
+		if capped && len(unique) >= 50 {
 			break
 		}
 	}

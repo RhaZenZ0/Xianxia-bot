@@ -495,6 +495,12 @@ func addFateGo(conn *storage.Conn, userID int64, reason string, gameMinute int64
 	return points, e
 }
 
+// NPCRealmIndex and NPCStage are accepted for wire compatibility and
+// deliberately ignored: an older bot mid-upgrade still sends them, and a
+// request refused for carrying a field would turn a rolling deploy into an
+// outage (rc.48's rule for the minute). A challenge's opponent is read off the
+// world (`resolveChallengeTargetTx`) and an event's off the caller's own
+// character, so nothing a payload says about either is read.
 type combatStartPayload struct {
 	Kind          string `json:"kind"`
 	NPCName       string `json:"npc_name"`
@@ -515,21 +521,74 @@ func counterDefenceTN(realm, stage, defence, lawBonus, companion, resonance int6
 	return 10 + realm*2 + stage/3 + defence + lawBonus + companion + resonance
 }
 
+// challengeTargetAbsent is the one sentence for every way a challenge can fail
+// to find somebody: not standing here, dead, missing, or a real hidden master.
+// A second sentence for any of them would let a caller tell the cases apart,
+// and the hidden master is exactly the case the picker was built not to
+// reveal (`combatTargetRows`).
+const challengeTargetAbsent = "that living NPC or family head is not mechanically present here, or cannot be openly challenged"
+
+// challengeTarget is who a challenge is against, as the world has them.
+type challengeTarget struct {
+	Name       string
+	RealmIndex int64
+	Phase      int64
+	Type       string
+	FamilyID   int64
+}
+
+// key is the battle's source and its lock: one living opponent, one fight.
+// A family head is keyed by the house rather than the name, because a head
+// can change and the house cannot.
+func (t challengeTarget) key() string {
+	if t.Type == "family_head" {
+		return fmt.Sprintf("challenge:family_head:%d", t.FamilyID)
+	}
+	return "challenge:npc:" + t.Name
+}
+
+// resolveChallengeTargetTx finds the person a challenge names among those
+// standing where the caller stands, by the rule the picker draws its list
+// from. The first match wins, case-insensitively, with the people ahead of the
+// family heads - the order the picker's own list deduplicates in - so the
+// picker and the engine cannot answer differently about one name.
+func resolveChallengeTargetTx(conn *storage.Conn, catalog worlddata.Catalog, location, name string) (challengeTarget, bool, error) {
+	rows, err := combatTargetRows(conn, catalog, location, false)
+	if err != nil {
+		return challengeTarget{}, false, err
+	}
+	for _, row := range rows {
+		if !strings.EqualFold(fmt.Sprint(row["name"]), name) {
+			continue
+		}
+		return challengeTarget{
+			Name:       fmt.Sprint(row["name"]),
+			RealmIndex: i64(row["realm_index"]),
+			Phase:      i64(row["phase"]),
+			Type:       fmt.Sprint(row["target_type"]),
+			FamilyID:   i64(row["family_id"]),
+		}, true, nil
+	}
+	return challengeTarget{}, false, nil
+}
+
 // combatStartAction is the authoritative counterpart to Python's former
 // Database.create_battle: it decides the opponent's starting stats and
 // creates the battle row server-side, instead of trusting a client-computed
 // npc_hp. Two encounter kinds are supported, matching the two call sites
 // that previously computed this in Python:
 //
-//   - "challenge": npc_realm_index/npc_stage identify a real, already
-//     server-resolved NPC/family-head opponent (resolution of *which* NPC
-//     is still a Python/simulation concern - out of scope here); Go owns
-//     the HP curve derived from that realm/stage.
+//   - "challenge": the engine finds the named person among those standing
+//     where the caller stands and takes their realm, stage, canonical name and
+//     the battle's source and lock from that row. A caller says whom it means
+//     and nothing else: a bound that lives in the client is not a bound
+//     (rc.48), and the opponent's realm is worth a stage-lead on every roll
+//     of the fight, the severity of the kill and the region it marks.
 //   - "event": the opponent is an ad-hoc "hostile manifestation" scaled off
 //     the player's own realm/phase and an event severity - Go derives the
 //     opponent's realm/stage itself from the caller's own canonical
 //     character row rather than trusting client-supplied npc_realm_index/
-//     npc_stage for this kind.
+//     npc_stage for this kind. Its severity and source are still the caller's.
 //
 // Player HP/HP-max are always read from the caller's own canonical
 // characters row, never from the payload, closing the trust gap the old
@@ -548,7 +607,9 @@ func combatStartAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		return authoritativeMutation{}, errors.New("npc_name is required")
 	}
 	source := strings.TrimSpace(p.Source)
-	if source == "" {
+	// A challenge's source is derived from whom it names, so only an event has
+	// one to be missing.
+	if kind == "event" && source == "" {
 		return authoritativeMutation{}, errors.New("source is required")
 	}
 	targetKey := strings.TrimSpace(p.TargetKey)
@@ -584,10 +645,21 @@ func combatStartAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	var npcRealm, npcStage, npcHP int64
 	switch kind {
 	case "challenge":
-		// realm/stage identify a real NPC already resolved server-side by
-		// the caller; Go still owns and clamps the resulting HP curve.
-		npcRealm = maxI64(0, p.NPCRealmIndex)
-		npcStage = maxI64(1, minI64(9, p.NPCStage))
+		// Whom the caller names is the only thing the caller says. The safe
+		// zone was asked first, above, so a protected place refuses before it
+		// can say who is or is not standing in it.
+		target, found, e := resolveChallengeTargetTx(conn, catalog, c.Location, npcName)
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		if !found {
+			return authoritativeMutation{}, errors.New(challengeTargetAbsent)
+		}
+		npcName = target.Name
+		source = target.key()
+		targetKey = source
+		npcRealm = maxI64(0, target.RealmIndex)
+		npcStage = maxI64(1, minI64(9, target.Phase))
 		npcHP = maxI64(10, 12+npcRealm*4+npcStage*2)
 	case "event":
 		sev := maxI64(0, p.Severity)

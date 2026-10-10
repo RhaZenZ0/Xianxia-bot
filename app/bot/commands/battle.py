@@ -614,18 +614,21 @@ async def battle_challenge(interaction:discord.Interaction,target:str)->None:
         await interaction.response.send_message("🛡️ Violence is suppressed in this protected location.",ephemeral=False);return
     if await DB.get_active_battle(interaction.user.id):
         await interaction.response.send_message("Finish your current battle first.",ephemeral=False);return
-    info=await SIM.combat_target(str(c.get("location","")),target)
-    if not info:
-        await interaction.response.send_message("That living NPC/family head is not mechanically present here or cannot be openly challenged.",ephemeral=False);return
-    ri=max(0,int(info.get("realm_index",0))); st=max(1,min(9,int(info.get("phase",1))))
-    source=f"challenge:{info.get('target_type','npc')}:{info.get('family_id') or info.get('name')}"
+    # The engine finds the person among those standing here and takes their
+    # realm, stage, canonical name and the battle's lock from that row; this
+    # side names whom it means and nothing else. It refuses an absent, dead,
+    # missing or hidden opponent with one sentence, which is printed as it is.
+    target=target.strip()
     try:
         envelope=await COMBAT.start(
-            interaction.user.id,kind="challenge",npc_name=str(info["name"]),npc_realm_index=ri,npc_stage=st,
-            source=source,target_key=source,action_id=f"discord:{interaction.id}:combat.start:{source}",
+            interaction.user.id,kind="challenge",npc_name=target,
+            action_id=f"discord:{interaction.id}:combat.start:challenge:{target.casefold()}",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"⚔️ {_explain_engine_error(exc)}. Wait for that confrontation to end.",ephemeral=False);return
+        text=_explain_engine_error(exc)
+        text=text[:1].upper()+text[1:]
+        if "already locked" in text: text=f"{text}. Wait for that confrontation to end."
+        await interaction.response.send_message(f"⚔️ {text}",ephemeral=False);return
     result=dict(envelope.get("result") or {}); bid=int(result.get("battle_id") or 0)
     battle=await DB.get_active_battle(interaction.user.id)
     _card,view=await _battle_panel(interaction.user.id,c,battle or result)

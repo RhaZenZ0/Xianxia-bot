@@ -70,20 +70,23 @@ CREATE TABLE characters(
 	body_realm_index INTEGER, body_phase INTEGER, cultivation INTEGER, body_cultivation INTEGER,
 	life_status TEXT, vitality INTEGER, vitality_max INTEGER, updated_at REAL
 );
-CREATE TABLE battles(
-	battle_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, npc_name TEXT,
-	npc_realm_index INTEGER, npc_stage INTEGER, player_hp INTEGER, player_hp_max INTEGER,
-	npc_hp INTEGER, npc_hp_max INTEGER, status TEXT, location TEXT, source TEXT,
-	target_key TEXT, npc_suppressed_turns INTEGER DEFAULT 0, version INTEGER DEFAULT 0,
-	created_at REAL, updated_at REAL
-);
-`); err != nil {
+` + challengeWorldDDL); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := conn.Execute(
 		`INSERT INTO characters(user_id,name,gender,path,spiritual_root,location,attributes_json,realm_index,phase,body_realm_index,body_phase,cultivation,body_cultivation,life_status,vitality,vitality_max,updated_at)
 		 VALUES(7,'Tester','','Sword Cultivator','Fire',?,'{"body":5,"agility":5,"spirit":5}',3,4,0,1,0,0,'alive',20,20,0)`,
 		[]any{location},
+	); err != nil {
+		t.Fatal(err)
+	}
+	// Somebody to challenge, standing where the tester stands. The safe zone is
+	// asked ahead of presence, so a protected place still refuses on its own
+	// account; where violence is allowed the challenge needs a person to find.
+	if _, err := conn.Execute(
+		`INSERT INTO npc_civilization_state(npc_name,home_location,current_location,world_name,profession,realm_index,phase,updated_at)
+		 VALUES('Wandering Swordsman',?,?,'Mortal World','Swordsman',2,3,0)`,
+		[]any{location, location},
 	); err != nil {
 		t.Fatal(err)
 	}

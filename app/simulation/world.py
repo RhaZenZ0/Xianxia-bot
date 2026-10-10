@@ -155,12 +155,6 @@ class WorldSimulator:
         result = await self._query("combat.targets", {"location": str(location)})
         return [dict(row) for row in list((result or {}).get("targets") or [])]
 
-    async def combat_target(self, location: str, target_name: str) -> dict[str, Any] | None:
-        for row in await self.combat_targets(location):
-            if str(row.get("name", "")).casefold() == str(target_name).casefold():
-                return row
-        return None
-
     async def civilization_status(self, location: str) -> dict[str, Any] | None:
         return self._found(await self._query("civilization.status", {"location": str(location)}))
 
