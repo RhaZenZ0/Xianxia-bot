@@ -107,12 +107,7 @@ func TestARaidIsPaidInItsLairsCoinWhereverItIsClaimed(t *testing.T) {
 			if got := purseOf(t, path, want); got != tpl.RewardCurrency {
 				wrong = append(wrong, fmt.Sprintf("%s claimed at %q: the purse holds %d %s, want %d", key, at, got, want, tpl.RewardCurrency))
 			}
-			var strays int64
-			for _, coin := range []string{mortal, spiritual, "low_spirit_crystal"} {
-				if coin != want {
-					strays += purseOf(t, path, coin)
-				}
-			}
+			strays := storage.ParseInt(actionScalar(t, path, `SELECT COALESCE(SUM(balance),0) FROM currency_wallets WHERE user_id=42 AND currency_id<>?`, want))
 			if strays != 0 {
 				wrong = append(wrong, fmt.Sprintf("%s claimed at %q left %d in a coin of another world", key, at, strays))
 			}
