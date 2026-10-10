@@ -396,15 +396,11 @@ func caravanDispatchActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	if p.Escort < 0 || p.Escort > 20 {
 		return authoritativeMutation{}, errors.New("caravan escort must be between 0 and 20")
 	}
-	r, e := conn.Execute(`SELECT realm_index,location,attributes_json,life_status,path,phase FROM characters WHERE user_id=?`, []any{userID})
+	c, e := loadMechanicsCharacter(conn, catalog, userID)
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	c := firstRowMap(r)
-	if c == nil {
-		return authoritativeMutation{}, errors.New("character not found")
-	}
-	if !strings.EqualFold(strings.TrimSpace(fmt.Sprint(c["life_status"])), "alive") {
+	if !strings.EqualFold(strings.TrimSpace(c.LifeStatus), "alive") {
 		return authoritativeMutation{}, errors.New("only a living incarnation can dispatch a caravan")
 	}
 	// A caravan leaves from the city the cultivator is standing in (v1.1.0).
@@ -413,7 +409,7 @@ func caravanDispatchActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	// which is where a walk into a city ends - found no road and refused, at
 	// 429 of the catalogue's 477 places. The same fault v1.0.9 found in the
 	// household door, in a second place.
-	origin := cityOf(catalog, fmt.Sprint(c["location"]))
+	origin := cityOf(catalog, c.Location)
 	if p.Destination == "" || p.Destination == origin {
 		return authoritativeMutation{}, errors.New("choose a different destination")
 	}
@@ -437,7 +433,11 @@ func caravanDispatchActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	// `high_` at realm 7, which nothing has ever credited: dispatch was dead
 	// from realm 4 up. See worldBaseCurrency.
 	currency := worldBaseCurrency(catalog, catalog.Locations[origin].World)
-	plan, found := canonicalRoadRoute(catalog, origin, p.Destination, i64(c["realm_index"]))
+	// The road is a place's too: canonicalRoadRoute drops every place above the
+	// realm it is handed, the origin included, so the qi ladder alone refused a
+	// body cultivator at the capital of every world above the Mortal one with
+	// "no canonical road route" while travel walked them out of it.
+	plan, found := canonicalRoadRoute(catalog, origin, p.Destination, c.accessRealmIndex())
 	if !found {
 		return authoritativeMutation{}, errors.New("no canonical road route connects the caravan destination")
 	}
@@ -469,8 +469,7 @@ func caravanDispatchActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	}
 	payout := max64(1, int64(float64(base*p.Quantity)*mult))
 	risk := clamp(plan.MaxDanger+10, 5, 85)
-	attrs := rowAttributes(catalog, c)
-	conceal := max64(0, i64(attrs["agility"])/2)
+	conceal := max64(0, c.Attributes["agility"]/2)
 	cargo, _ := json.Marshal(map[string]any{
 		p.ItemID:          p.Quantity,
 		"_payout":         payout,

@@ -80,9 +80,13 @@ func sectAscendActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	}
 	// The gate stands in the world above and carries that world's floor; a
 	// GM's teleport can put somebody there below it, and the sect reads the
-	// floor as its own.
-	if floor := catalog.Locations[gate].MinRealmIndex; c.RealmIndex < floor {
-		return authoritativeMutation{}, fmt.Errorf("the way up into %s asks for %s; you stand at %s", to, realmNameGo(catalog, floor), realmNameGo(catalog, c.RealmIndex))
+	// floor as its own. It is a place floor, so it is measured on the ladder
+	// that carried the cultivator there (accessRealmIndex): a body cultivator
+	// at the allied gate was walked in by the same rule that refused them
+	// here, and a refusal that names the qi stage at the access index says the
+	// stage the way in was measured at, as the stall does.
+	if floor := catalog.Locations[gate].MinRealmIndex; c.accessRealmIndex() < floor {
+		return authoritativeMutation{}, fmt.Errorf("the way up into %s asks for %s; you stand at %s", to, realmNameGo(catalog, floor), realmNameGo(catalog, c.accessRealmIndex()))
 	}
 	now := nowSeconds()
 	rankName, rankLevel := "Outer Disciple", int64(10)

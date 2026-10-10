@@ -13,6 +13,7 @@ from discord import app_commands
 
 from ...ops.game_engine import GameEngineError
 from ..formatting import focus_reply, player_property_emoji, player_property_facility_lines, player_property_unbuilt, property_overview_lines
+from ..locations import access_realm_index
 from ..pickers import usable_item_autocomplete
 from ..registry import registered_group_command, registered_root_command
 from ..character_state import record_quest_progress, announce_quest_progress
@@ -267,8 +268,9 @@ async def array_list(interaction:discord.Interaction)->None:
     anchored=await _arrays_here(str(c['location']))
     if not anchored: await interaction.response.send_message("No public teleportation array is anchored at this location.",ephemeral=False);return
     # An array your realm cannot withstand is listed as what it is rather
-    # than offered and then refused by the engine.
-    realm=int(c.get('realm_index') or 0)
+    # than offered and then refused by the engine. The floor is a place's, so
+    # it is the higher of the two ladders that answers, as `array.use` reads it.
+    realm=access_realm_index(c)
     lines=[f"🌀 **Teleportation Arrays — {c['location']}**"]
     for d in anchored:
         line=f"• **{d['name']}** → {d['to']} • {d['cost']} {WORLD.currency_name(str(d['currency']))}"
@@ -283,7 +285,7 @@ async def array_list(interaction:discord.Interaction)->None:
 async def array_destination_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[str]]:
     c=await DB.get_character(interaction.user.id); needle=current.casefold().strip(); out=[]
     if c:
-        realm=int(c.get('realm_index') or 0)
+        realm=access_realm_index(c)
         for d in await _arrays_here(str(c['location'])):
             if realm<int(d.get('min_realm_index') or 0): continue
             if not needle or needle in str(d['to']).casefold() or needle in str(d['name']).casefold(): out.append(app_commands.Choice(name=f"{d['name']} → {d['to']}"[:100],value=str(d['array_id'])[:100]))

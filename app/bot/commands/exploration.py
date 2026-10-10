@@ -1503,7 +1503,7 @@ async def realmhub_world_autocomplete(interaction: discord.Interaction, current:
     needle = current.casefold().strip()
     worlds = [
         world for world, hub in REALM_HUBS.items()
-        if int(c.get("realm_index", 0)) >= int(hub.get("min_realm_index", 0))
+        if access_realm_index(c) >= int(hub.get("min_realm_index", 0))
         and (not needle or needle in world.casefold() or needle in str(hub.get("display_name", "")).casefold())
     ]
     return [app_commands.Choice(name=f"{world} — {REALM_HUBS[world]['display_name']}"[:100], value=world) for world in worlds[:25]]
@@ -1517,7 +1517,7 @@ async def realmhub_status(interaction: discord.Interaction) -> None:
     mappings = {str(r['world_name']): r for r in (await DB.get_realm_hub_channels(interaction.guild.id) if interaction.guild else [])}
     lines=["🏙️ **Known Realm Capitals**"]
     for world,hub in REALM_HUBS.items():
-        if int(c.get('realm_index',0)) < int(hub['min_realm_index']):
+        if access_realm_index(c) < int(hub['min_realm_index']):
             continue
         row=mappings.get(world); channel=f"<#{int(row['channel_id'])}>" if row else "*Discord channel not provisioned yet*"
         lines.append(f"• **{world} — {hub['display_name']}** • {channel}")
