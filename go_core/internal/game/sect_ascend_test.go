@@ -79,6 +79,51 @@ func TestTheWayUpIsRefusedAwayFromTheGateBelowTheFloorAndToNobody(t *testing.T) 
 	}
 }
 
+// A place floor is measured on the ladder that carried the cultivator there.
+// Travel admits a body cultivator to the gate at the body ladder's stage, so a
+// member who walked in at body 8 with the qi ladder still at 3 must be let
+// through the door they were walked to (the qi-only comparison refused them
+// with "asks for Spirit Body Transformation; you stand at Core Formation").
+func TestABodyCultivatorAtTheAlliedGateIsTakenIn(t *testing.T) {
+	catalog := crossingCatalog(t)
+	gate := sectGate(catalog, "Jade Meridian Sect")
+	floor := catalog.Locations[gate].MinRealmIndex
+	if floor < 5 {
+		t.Fatalf("the gate's floor is %d; the fixture needs a qi stage well below it", floor)
+	}
+	path := ascentDB(t, "Azure Cloud Sect", gate, 3)
+	batch4Exec(t, path, fmt.Sprintf(`UPDATE characters SET body_realm_index=%d WHERE user_id=42`, floor))
+	out := batch4Result(t, batch4Apply(t, path, batch4WorldPath(t), "sect.ascend", 1, map[string]any{}))
+	if out["to"] != "Jade Meridian Sect" {
+		t.Fatalf("a body cultivator at body %d / qi 3 was not taken in: %v", floor, out)
+	}
+	if row := actionScalar(t, path, `SELECT sect_name FROM sect_membership WHERE user_id=42`); fmt.Sprint(row) != "Jade Meridian Sect" {
+		t.Fatalf("membership after the ascent: %v", row)
+	}
+}
+
+// Below the floor on both ladders, the refusal names the stage the way was
+// measured at - the higher ladder's - as the stall's does, rather than the qi
+// stage the cultivator is not being measured by.
+func TestTheRefusalNamesTheStageTheWayWasMeasuredAt(t *testing.T) {
+	catalog := crossingCatalog(t)
+	gate := sectGate(catalog, "Jade Meridian Sect")
+	floor := catalog.Locations[gate].MinRealmIndex
+	path := ascentDB(t, "Azure Cloud Sect", gate, 3)
+	batch4Exec(t, path, fmt.Sprintf(`UPDATE characters SET body_realm_index=%d WHERE user_id=42`, floor-1))
+	_, err := batch4ApplyErr(path, batch4WorldPath(t), "sect.ascend", 42, 1, map[string]any{})
+	want := "you stand at " + realmNameGo(catalog, floor-1)
+	if err == nil || !strings.Contains(err.Error(), want) {
+		t.Fatalf("want a refusal containing %q, got %v", want, err)
+	}
+	if strings.Contains(err.Error(), realmNameGo(catalog, 3)) {
+		t.Fatalf("the refusal names the qi stage the cultivator was not measured at: %v", err)
+	}
+	if row := actionScalar(t, path, `SELECT sect_name FROM sect_membership WHERE user_id=42`); fmt.Sprint(row) != "Azure Cloud Sect" {
+		t.Fatalf("a refused ascent moved the membership to %v", row)
+	}
+}
+
 // Every sect below the top world names a sect whose gate stands in the world
 // above its own, so the way up is a road and never a sidestep; the top
 // world's sects and the hidden one name nothing.
