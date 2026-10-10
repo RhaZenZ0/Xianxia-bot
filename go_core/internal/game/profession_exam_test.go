@@ -109,7 +109,7 @@ func TestEveryExaminationHasAHallAndSomethingToTeach(t *testing.T) {
 	}
 }
 
-func TestAnExaminationIsSatAtItsOwnHallAndAtTheRankYouHold(t *testing.T) {
+func TestAnExaminationIsSatAtItsOwnHall(t *testing.T) {
 	path := examDB(t)
 	catalog := crossingCatalog(t)
 
@@ -216,59 +216,331 @@ func TestAFailedExaminationCostsTheFeeAndAWorldDay(t *testing.T) {
 	}
 }
 
-// The offer, which is the half that makes any of it reachable.
-func TestReachingARankOffersItsExamination(t *testing.T) {
-	path := examDB(t)
+// seedExamDefinitions seeds the quests the halls hand over, the way the bot's
+// seeder does from the same file: approved, giver-less, with the objective list
+// the content authors. `stripTargets` takes the target off every objective,
+// which is the content as it stood before an examination named its own quest -
+// the reader the targeted case is held against.
+func seedExamDefinitions(t *testing.T, path string, stripTargets bool, trades ...string) {
+	t.Helper()
 	catalog := crossingCatalog(t)
-	key := ""
-	for _, exam := range catalog.ProfessionExams["Forging"] {
-		if exam.Rank == 1 {
-			key = exam.QuestKey
+	for _, trade := range trades {
+		for _, exam := range catalog.ProfessionExams[trade] {
+			objectives := make([]any, 0, len(exam.Objectives))
+			for _, raw := range exam.Objectives {
+				objective, _ := raw.(map[string]any)
+				copied := map[string]any{}
+				for key, value := range objective {
+					if stripTargets && key == "target" {
+						continue
+					}
+					copied[key] = value
+				}
+				objectives = append(objectives, copied)
+			}
+			encodedObjectives, _ := json.Marshal(objectives)
+			encodedRewards, _ := json.Marshal(exam.Rewards)
+			batch4Exec(t, path, `INSERT INTO quest_definitions(quest_key,title,status,source_type,source_key,objectives_json,rewards_json,created_at,updated_at) VALUES(?,?,'approved','system',?,?,?,0,0)`,
+				exam.QuestKey, exam.Title, "profession_exam:"+trade, string(encodedObjectives), string(encodedRewards))
 		}
 	}
-	if key == "" {
-		t.Fatal("content authors no Forging Apprentice examination")
-	}
-	batch4Exec(t, path, `INSERT INTO quest_definitions(quest_key,title,status,created_at,updated_at) VALUES(?,'The Apprentice''s Billet','approved',0,0)`, key)
+}
 
-	var offered string
+// markPassed writes a pass the way the hall does, so a test can stand a
+// candidate at the point of a world that already holds one.
+func markPassed(t *testing.T, path, trade string, rank, life int64) {
+	t.Helper()
+	payload, _ := json.Marshal(professionExamRecord{Trade: trade, Rank: rank, Life: life, GameMinute: 0, Passed: true})
+	batch4Exec(t, path, `INSERT INTO event_log(user_id,event_type,payload_json,created_at) VALUES(42,?,?,0)`, professionExamEvent, string(payload))
+}
+
+func setProfessionLevel(t *testing.T, path, trade string, level int64) {
+	t.Helper()
+	batch4Exec(t, path, `INSERT INTO profession_progress(user_id,profession,level,xp,successes,failures,quality_points,updated_at)
+		VALUES(42,?,?,0,0,0,0,0) ON CONFLICT(user_id,profession) DO UPDATE SET level=excluded.level`, trade, level)
+}
+
+func offeredRanks(offered []map[string]any) []int64 {
+	ranks := []int64{}
+	for _, exam := range offered {
+		ranks = append(ranks, i64(exam["rank"]))
+	}
+	return ranks
+}
+
+// One Craft All is up to fifty crafts, and a fresh crafter's fifty end at rank
+// 4 to 6 - past all three ranks the content examines. The hall used to sit the
+// rank held *now*, so the three examinations were handed over as quests, could
+// never be sat, and left the trade uncertified for the life.
+func TestOneCraftAllCannotStrandAnExamination(t *testing.T) {
+	path := examDB(t)
+	setupCraftAuthorityTables(t, path)
+	catalog := crossingCatalog(t)
+	world := batch4WorldPath(t)
+	seedExamDefinitions(t, path, false, "Alchemy")
+	batch4TeachRecipe(t, path, 42, "Recovery Pill")
+	batch4Exec(t, path, `INSERT INTO inventory(user_id,item_id,quantity) VALUES(42,'spirit_herb',100),(42,'beast_core',50)`)
+	defer gamerng.UseRoller(func(int) int { return 9 })()
+
+	result, err := craftBatchApply(t, path, world, "f2-all", map[string]any{"recipe": "Recovery Pill", "all": true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prog, _ := result["profession_progress"].(map[string]any)
+	held := i64(prog["level"])
+	offered, _ := result["exams_offered"].([]map[string]any)
+	if held < 4 {
+		t.Fatalf("the setup did not carry the crafter past the last examined rank: level %d", held)
+	}
+	if got := offeredRanks(offered); len(got) != 3 || got[0] != 1 || got[1] != 2 || got[2] != 3 {
+		t.Fatalf("one Craft All to rank %d reported the examinations it handed over as ranks %v, want [1 2 3]", held, got)
+	}
+	if result["exam_offered"] != "exam_alchemy_apprentice" {
+		t.Fatalf("exam_offered is the first of them: %v", result["exam_offered"])
+	}
+	if n := i64(actionScalar(t, path, `SELECT COUNT(*) FROM character_quests WHERE user_id=42 AND status='active' AND quest_key LIKE 'exam_alchemy_%'`)); n != 3 {
+		t.Fatalf("the crafter holds %d of the three examination quests", n)
+	}
+
+	hall := oneHallOf(t, catalog, "apothecary")
+	batch4Exec(t, path, `UPDATE characters SET location=? WHERE user_id=42`, hall.Location)
+	for want := int64(1); want <= 3; want++ {
+		out, err := sitExam(t, path, catalog, "Alchemy", 100*want)
+		if err != nil {
+			t.Fatalf("a crafter carried to rank %d by one Craft All could not sit the rank-%d examination: %v", held, want, err)
+		}
+		if i64(out["rank"]) != want || out["passed"] != true || i64(out["rank_held"]) != held {
+			t.Fatalf("sitting %d: rank=%v held=%v passed=%v", want, out["rank"], out["rank_held"], out["passed"])
+		}
+	}
+	if _, err := sitExam(t, path, catalog, "Alchemy", 900); err == nil || !strings.Contains(err.Error(), "already hold") {
+		t.Fatalf("a fourth sitting after three passes: %v", err)
+	}
+	certified := false
 	if err := crossingApply(t, path, func(conn *storage.Conn) error {
-		var err error
-		offered, err = offerProfessionExamTx(conn, catalog, 42, "Forging", 1, 500)
-		return err
+		var e error
+		certified, e = tradeCertifiedTx(conn, 42, soulLifeTx(conn, 42), "Alchemy")
+		return e
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if offered != key {
-		t.Fatalf("reaching Apprentice offered %q", offered)
+	if !certified {
+		t.Fatal("three passes and the trade is still uncertified")
 	}
-	if n := i64(actionScalar(t, path, `SELECT COUNT(*) FROM character_quests WHERE user_id=42 AND quest_key=?`, key)); n != 1 {
+}
+
+// The hall sits the lowest rank this life has reached and not passed, whatever
+// rank the candidate holds, and the pass teaches that rank's methods and no
+// other's.
+func TestTheLowestUncertifiedRankIsSatFirst(t *testing.T) {
+	path := examDB(t)
+	catalog := crossingCatalog(t)
+	// Rank 2 and not 3: the Mortal World's third Alchemy examination teaches
+	// nothing at all (its makings are not on any Mortal shelf), so a drill
+	// that taught the wrong rank would print an empty list and look green.
+	setProfessionLevel(t, path, "Alchemy", 2)
+	hall := oneHallOf(t, catalog, "apothecary")
+	batch4Exec(t, path, `UPDATE characters SET location=? WHERE user_id=42`, hall.Location)
+	// The shared fixture's character is a giant who passes on two ones.
+	batch4Exec(t, path, `UPDATE characters SET attributes_json='{"body":1,"agility":1,"spirit":1,"insight":1,"will":1,"presence":1}' WHERE user_id=42`)
+
+	restore := gamerng.UseRoller(func(int) int { return 0 })
+	first, err := sitExam(t, path, catalog, "Alchemy", 100)
+	restore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if i64(first["rank"]) != 1 || i64(first["rank_held"]) != 2 || first["passed"] != false {
+		t.Fatalf("a candidate holding rank 2 with nothing passed sat rank=%v (held %v, passed %v), want rank 1", first["rank"], first["rank_held"], first["passed"])
+	}
+	if i64(first["exams_remaining"]) != 2 {
+		t.Fatalf("a failed sitting leaves both examinations owed: %v", first["exams_remaining"])
+	}
+	// The wait is the lowest rank's, and the higher rank is not a way round it.
+	if _, err := sitExam(t, path, catalog, "Alchemy", 700); err == nil || !strings.Contains(err.Error(), "look at you again") {
+		t.Fatalf("an immediate retry: %v", err)
+	}
+
+	defer gamerng.UseRoller(func(int) int { return 9 })()
+	second, err := sitExam(t, path, catalog, "Alchemy", 100+professionExamRetryGameMinutes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if i64(second["rank"]) != 1 || second["passed"] != true || i64(second["exams_remaining"]) != 1 {
+		t.Fatalf("the sitting a day later: rank=%v passed=%v remaining=%v", second["rank"], second["passed"], second["exams_remaining"])
+	}
+	// What a pass teaches is the rank passed, not the rank held.
+	teachable, _ := rankRecipesWhereTheyCanBeMade(catalog, "Alchemy", 1, hall.World)
+	higher, _ := rankRecipesWhereTheyCanBeMade(catalog, "Alchemy", 2, hall.World)
+	if len(teachable) == 0 || len(higher) == 0 {
+		t.Fatalf("the Mortal World teaches %v at rank 1 and %v at rank 2; the setup cannot tell the ranks apart", teachable, higher)
+	}
+	learned := queryRows(t, path, `SELECT recipe FROM character_recipes WHERE user_id=42 AND source='exam' ORDER BY recipe`)
+	if strings.Join(learned, ",") != strings.Join(teachable, ",") {
+		t.Fatalf("passing rank 1 while holding rank 2 taught %v, want exactly the rank-1 methods %v", learned, teachable)
+	}
+	// And the record is the rank passed: the next sitting is rank 2.
+	third, err := sitExam(t, path, catalog, "Alchemy", 100+2*professionExamRetryGameMinutes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if i64(third["rank"]) != 2 || i64(third["exams_remaining"]) != 0 {
+		t.Fatalf("after passing rank 1 the hall sat rank=%v (remaining %v), want rank 2 and nothing owed", third["rank"], third["exams_remaining"])
+	}
+	if _, err := sitExam(t, path, catalog, "Alchemy", 100+3*professionExamRetryGameMinutes); err == nil || !strings.Contains(err.Error(), "already hold every certificate") {
+		t.Fatalf("a sitting with nothing owed: %v", err)
+	}
+}
+
+// A rank reached hands over every examination it has opened, not only its own,
+// and one this life has passed is never handed over again.
+func TestReachingARankOffersEveryOpenExamination(t *testing.T) {
+	path := examDB(t)
+	catalog := crossingCatalog(t)
+	seedExamDefinitions(t, path, false, "Alchemy")
+	offerAt := func(trade string, held int64) []string {
+		keys := []string{}
+		if err := crossingApply(t, path, func(conn *storage.Conn) error {
+			offered, err := offerProfessionExamsTx(conn, catalog, 42, trade, held, 500)
+			for _, exam := range offered {
+				keys = append(keys, exam.QuestKey)
+			}
+			return err
+		}); err != nil {
+			t.Fatal(err)
+		}
+		return keys
+	}
+	// A tutored Tier 1 rising to Tier 2 is owed both, because tutoring raised
+	// the first rank without a craft that could have offered it.
+	if got := offerAt("Alchemy", 2); strings.Join(got, ",") != "exam_alchemy_apprentice,exam_alchemy_journeyman" {
+		t.Fatalf("reaching Tier 2 with nothing passed handed over %v", got)
+	}
+	// Offered once: the row is the memory.
+	if got := offerAt("Alchemy", 2); len(got) != 0 {
+		t.Fatalf("offered twice: %v", got)
+	}
+	if n := i64(actionScalar(t, path, `SELECT COUNT(*) FROM character_quests WHERE user_id=42`)); n != 2 {
 		t.Fatalf("character_quests rows=%d", n)
 	}
-	// Offered once: the row is the memory, as it is for every other quest a
-	// path hands over without asking.
+	// A pass is never offered again, even where the quest row is gone.
+	batch4Exec(t, path, `DELETE FROM character_quests WHERE user_id=42`)
+	markPassed(t, path, "Alchemy", 1, 1)
+	if got := offerAt("Alchemy", 3); strings.Join(got, ",") != "exam_alchemy_journeyman,exam_alchemy_expert" {
+		t.Fatalf("with rank 1 passed, reaching Tier 3 handed over %v", got)
+	}
+	// Silence rather than an error where there is nothing to hand over: a trade
+	// the content examines nobody in, and a definition that is not seeded.
+	if got := offerAt("Foraging", 3); len(got) != 0 {
+		t.Fatalf("a trade with no examination offered %v", got)
+	}
+	if got := offerAt("Forging", 3); len(got) != 0 {
+		t.Fatalf("a definition not seeded yet offered %v", got)
+	}
+}
+
+// A crafter whose rank came by another road - the household's tutoring, a GM's
+// lever - raised nothing in a craft, so nothing was offered. The counter is the
+// other door.
+func TestTheCounterHandsOverItsExamination(t *testing.T) {
+	path := examDB(t)
+	catalog := crossingCatalog(t)
+	seedExamDefinitions(t, path, false, "Alchemy")
+	setProfessionLevel(t, path, "Alchemy", 1)
+	hall := oneHallOf(t, catalog, "apothecary")
+	batch4Exec(t, path, `UPDATE characters SET location=? WHERE user_id=42`, hall.Location)
+	if n := i64(actionScalar(t, path, `SELECT COUNT(*) FROM character_quests WHERE user_id=42`)); n != 0 {
+		t.Fatalf("the setup already holds %d quests", n)
+	}
+	defer gamerng.UseRoller(func(int) int { return 9 })()
+	out, err := sitExam(t, path, catalog, "Alchemy", 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out["passed"] != true {
+		t.Fatalf("not passed: %+v", out)
+	}
+	if n := i64(actionScalar(t, path, `SELECT COUNT(*) FROM character_quests WHERE user_id=42 AND quest_key='exam_alchemy_apprentice' AND status='active'`)); n != 1 {
+		t.Fatalf("the counter handed over %d quests; a pass has nothing to complete", n)
+	}
+	target := "exam_alchemy_apprentice"
 	if err := crossingApply(t, path, func(conn *storage.Conn) error {
-		var err error
-		offered, err = offerProfessionExamTx(conn, catalog, 42, "Forging", 1, 900)
-		return err
+		_, _, e := questProgressTx(conn, catalog, 42, questPayload{QuestKey: target, ObjectiveType: "profession_exam", Target: &target}, false)
+		return e
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if offered != "" {
-		t.Fatalf("offered twice: %q", offered)
+	if status := fmt.Sprint(actionScalar(t, path, `SELECT status FROM character_quests WHERE user_id=42 AND quest_key=?`, target)); status != "completed" {
+		t.Fatalf("the pass report left the quest %s", status)
 	}
-	// A rank the content examines nobody at is silence, not an error - which
-	// is what keeps a craft from failing because a quest could not be handed
-	// over.
-	if err := crossingApply(t, path, func(conn *storage.Conn) error {
-		var err error
-		offered, err = offerProfessionExamTx(conn, catalog, 42, "Forging", 6, 900)
-		return err
-	}); err != nil {
-		t.Fatal(err)
+}
+
+// What a pass reports is the examination it sat. Untargeted, one Tier 1 pass
+// completed and paid every examination quest a crafter held - all three of a
+// trade's, and the other trades' - which is how the engine half of this fix
+// alone would have made it worse.
+func TestAPassCompletesOnlyItsOwnExaminationQuest(t *testing.T) {
+	trades := []string{"Alchemy", "Forging", "Inscription", "Formation"}
+	catalog := crossingCatalog(t)
+	grantAll := func(path string) []string {
+		keys := []string{}
+		if err := crossingApply(t, path, func(conn *storage.Conn) error {
+			for _, trade := range trades {
+				for _, exam := range catalog.ProfessionExams[trade] {
+					if _, err := grantOrdinaryQuestTx(conn, 42, exam.QuestKey, 10); err != nil {
+						return err
+					}
+					keys = append(keys, exam.QuestKey)
+				}
+			}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+		return keys
 	}
-	if offered != "" {
-		t.Fatalf("an unexamined rank offered %q", offered)
+	report := func(path, passed string) {
+		active := queryRows(t, path, `SELECT quest_key FROM character_quests WHERE user_id=42 AND status='active'`)
+		for _, key := range active {
+			held := key
+			if err := crossingApply(t, path, func(conn *storage.Conn) error {
+				_, _, e := questProgressTx(conn, catalog, 42, questPayload{QuestKey: held, ObjectiveType: "profession_exam", Target: &passed}, false)
+				return e
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	completed := func(path string) []string {
+		return queryRows(t, path, `SELECT quest_key FROM character_quests WHERE user_id=42 AND status='completed' ORDER BY quest_key`)
+	}
+
+	// The shipped content: each pass completes itself and nothing else, for
+	// all twelve, one after another.
+	path := examDB(t)
+	seedExamDefinitions(t, path, false, trades...)
+	keys := grantAll(path)
+	if len(keys) != 12 {
+		t.Fatalf("the content authors %d examinations, want 12", len(keys))
+	}
+	done := 0
+	for _, key := range keys {
+		report(path, key)
+		done++
+		if got := completed(path); len(got) != done {
+			t.Fatalf("a pass of %s left %d quests completed, want %d: %v - its objective, or one still waiting, names no target", key, len(got), done, got)
+		}
+	}
+
+	// The reader, held against the content as it was: with the targets taken
+	// off, one Tier 1 pass completes all twelve. A gate that could not see
+	// that would be green over a tree where the targets had never been needed.
+	stripped := examDB(t)
+	seedExamDefinitions(t, stripped, true, trades...)
+	grantAll(stripped)
+	report(stripped, "exam_forging_apprentice")
+	if got := completed(stripped); len(got) != 12 {
+		t.Fatalf("untargeted, one pass completed %d of 12 quests; the reader cannot see the fault it exists for", len(got))
 	}
 }
 

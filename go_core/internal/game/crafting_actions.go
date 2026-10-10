@@ -521,7 +521,10 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	// uncontrolled allocation whatever bound sits before it.
 	crafts := []map[string]any{}
 	successes := int64(0)
-	examOffered := ""
+	// Every examination the batch handed over, in the order it did (v1.33.0):
+	// a batch can cross several ranks, and the reply used to keep only the
+	// last offer, so the others were handed over silently.
+	examsOffered := []map[string]any{}
 	var senseGain map[string]any
 	senseGained := int64(0)
 	var unit craftUnit
@@ -541,8 +544,9 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		for k, v := range unit.returned {
 			totalReturned[k] += v
 		}
-		if unit.examOffered != "" {
-			examOffered = unit.examOffered
+		for _, exam := range unit.examsOffered {
+			examsOffered = append(examsOffered, map[string]any{
+				"quest_key": exam.QuestKey, "rank": exam.Rank, "rank_name": exam.RankName, "hall": exam.Hall})
 		}
 		// The rank the next unit is rolled at: a unit that crossed a rank
 		// makes the rest of the batch at the new one, as the next press would.
@@ -588,9 +592,12 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		"output":        totalOutput,
 		"returned":      totalReturned,
 		// The cost of one unit, stated here so the reply never restates it.
-		"cost_per_unit":        recipe.Cost,
-		"profession_progress":  prog,
-		"exam_offered":         examOffered,
+		"cost_per_unit":       recipe.Cost,
+		"profession_progress": prog,
+		// `exam_offered` is the first of them (a truthy key, as it always was);
+		// `exams_offered` is every one, lowest rank first.
+		"exam_offered":         firstOfferedKey(examsOffered),
+		"exams_offered":        examsOffered,
 		"profession_bonus":     unit.level,
 		"grade":                craftGradeLabel(catalog, unit.gradeIndex),
 		"grade_reached":        craftGradeLabel(catalog, unit.gradeReached),
@@ -648,7 +655,7 @@ type craftUnit struct {
 	gradeReachedOpener string
 	output             map[string]int64
 	returned           map[string]int64
-	examOffered        string
+	examsOffered       []worlddata.ProfessionExam
 }
 
 // summary is the unit as the reply reads it: the whole roll (v1.0.3), never
@@ -742,11 +749,12 @@ func craftOneUnitTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 	// this is the only caller whose trade has examinations at all, and the
 	// only one holding the catalogue and the canonical minute.
 	//
-	// A craft generous enough to cross two ranks offers the higher one: the
-	// examination certifies what the candidate now is, and the action itself
-	// only ever sits the rank they currently hold.
+	// A craft generous enough to cross two ranks - and a Craft All is fifty of
+	// them - offers every examination the new rank has reached and this life
+	// has not passed, lowest first, because the hall sits them in that order
+	// and none of them is lost by being climbed past.
 	if rankAfter := i64(prog["level"]); rankAfter > rankBefore {
-		if u.examOffered, err = offerProfessionExamTx(conn, catalog, userID, profession, rankAfter, gameMinute); err != nil {
+		if u.examsOffered, err = offerProfessionExamsTx(conn, catalog, userID, profession, rankAfter, gameMinute); err != nil {
 			return u, nil, err
 		}
 	}
@@ -1228,4 +1236,13 @@ func recipeLearnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	return authoritativeMutation{Result: out, Event: eventledger.Event{
 		Domain: "crafting", EventType: "recipe.learn", EntityType: "character",
 		EntityID: fmt.Sprint(userID), GameMinute: gameMinute, Payload: out}}, nil
+}
+
+// firstOfferedKey is the quest key of the first examination a craft handed
+// over, or "" when it handed over none.
+func firstOfferedKey(offered []map[string]any) string {
+	if len(offered) == 0 {
+		return ""
+	}
+	return fmt.Sprint(offered[0]["quest_key"])
 }

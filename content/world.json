@@ -73529,6 +73529,7 @@
           {
             "id": "sit",
             "type": "profession_exam",
+            "target": "exam_forging_apprentice",
             "count": 1,
             "label": "Sit the Tier 1 Forge Apprentice examination in Forging - **/craft → Profession → Exam**"
           }
@@ -73552,6 +73553,7 @@
           {
             "id": "sit",
             "type": "profession_exam",
+            "target": "exam_forging_journeyman",
             "count": 1,
             "label": "Sit the Tier 2 Forge Adept examination in Forging - **/craft → Profession → Exam**"
           }
@@ -73575,6 +73577,7 @@
           {
             "id": "sit",
             "type": "profession_exam",
+            "target": "exam_forging_expert",
             "count": 1,
             "label": "Sit the Tier 3 Forge Artisan examination in Forging - **/craft → Profession → Exam**"
           }
@@ -73600,6 +73603,7 @@
           {
             "id": "sit",
             "type": "profession_exam",
+            "target": "exam_alchemy_apprentice",
             "count": 1,
             "label": "Sit the Tier 1 Pill Apprentice examination in Alchemy - **/craft → Profession → Exam**"
           }
@@ -73623,6 +73627,7 @@
           {
             "id": "sit",
             "type": "profession_exam",
+            "target": "exam_alchemy_journeyman",
             "count": 1,
             "label": "Sit the Tier 2 Pill Adept examination in Alchemy - **/craft → Profession → Exam**"
           }
@@ -73646,6 +73651,7 @@
           {
             "id": "sit",
             "type": "profession_exam",
+            "target": "exam_alchemy_expert",
             "count": 1,
             "label": "Sit the Tier 3 Pill Artisan examination in Alchemy - **/craft → Profession → Exam**"
           }
@@ -73671,6 +73677,7 @@
           {
             "id": "sit",
             "type": "profession_exam",
+            "target": "exam_inscription_apprentice",
             "count": 1,
             "label": "Sit the Tier 1 Talisman Apprentice examination in Inscription - **/craft → Profession → Exam**"
           }
@@ -73694,6 +73701,7 @@
           {
             "id": "sit",
             "type": "profession_exam",
+            "target": "exam_inscription_journeyman",
             "count": 1,
             "label": "Sit the Tier 2 Talisman Adept examination in Inscription - **/craft → Profession → Exam**"
           }
@@ -73717,6 +73725,7 @@
           {
             "id": "sit",
             "type": "profession_exam",
+            "target": "exam_inscription_expert",
             "count": 1,
             "label": "Sit the Tier 3 Talisman Artisan examination in Inscription - **/craft → Profession → Exam**"
           }
@@ -73742,6 +73751,7 @@
           {
             "id": "sit",
             "type": "profession_exam",
+            "target": "exam_formation_apprentice",
             "count": 1,
             "label": "Sit the Tier 1 Array Apprentice examination in Formation - **/craft → Profession → Exam**"
           }
@@ -73765,6 +73775,7 @@
           {
             "id": "sit",
             "type": "profession_exam",
+            "target": "exam_formation_journeyman",
             "count": 1,
             "label": "Sit the Tier 2 Array Adept examination in Formation - **/craft → Profession → Exam**"
           }
@@ -73788,6 +73799,7 @@
           {
             "id": "sit",
             "type": "profession_exam",
+            "target": "exam_formation_expert",
             "count": 1,
             "label": "Sit the Tier 3 Array Artisan examination in Formation - **/craft → Profession → Exam**"
           }

@@ -95,6 +95,9 @@ func TestAPassedExaminationWithholdsWhatTheWorldCannotMake(t *testing.T) {
 	catalog := crossingCatalog(t)
 	batch4Exec(t, path, `INSERT INTO profession_progress(user_id,profession,level,xp,successes,failures,quality_points,updated_at)
 		VALUES(42,'Alchemy',2,0,0,0,0,0) ON CONFLICT(user_id,profession) DO UPDATE SET level=2`)
+	// The hall sits the lowest rank not yet passed, so a candidate who holds
+	// rank 2 and is here for its examination has passed rank 1.
+	markPassed(t, path, "Alchemy", 1, 1)
 	apothecary := oneHallOf(t, catalog, "apothecary")
 	batch4Exec(t, path, `UPDATE characters SET location=? WHERE user_id=42`, apothecary.Location)
 	defer gamerng.UseRoller(func(int) int { return 9 })()
