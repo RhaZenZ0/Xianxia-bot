@@ -25,6 +25,7 @@ import asyncio
 import importlib
 import json
 import os
+import re
 import sqlite3
 import tempfile
 import unittest
@@ -219,11 +220,15 @@ class EverySurfaceNamesTheSeat(unittest.TestCase):
         source = EXPLORATION_GO.read_text(encoding="utf-8")
         start = source.index("func knownLocationsTx(")
         body = source[start: source.index("\n}\n", start)]
-        self.assertIn("cityPartsInPlainSight(catalog, city)", body)
-        self.assertNotIn("cityPartsOf(", body, "knownLocationsTx marks a private gate known from the street")
+        # assertTrue over a search, never assertIn: a failure of the latter
+        # prints its whole haystack, a function body or a 2,000-line file.
+        self.assertTrue("cityPartsInPlainSight(catalog, city)" in body and "cityPartsOf(" not in body,
+                        "knownLocationsTx marks a private gate known from the street")
         helper = source.index("func cityPartsInPlainSight(")
-        self.assertIn(".Private", source[helper: source.index("\n}\n", helper)], "the plain-sight list no longer leaves out a private gate")
-        self.assertRegex(source, r'"city_parts":\s+cityPartsInPlainSight\(', "the road in names every part of the city, a private gate too")
+        self.assertTrue(".Private" in source[helper: source.index("\n}\n", helper)],
+                        "the plain-sight list no longer leaves out a private gate")
+        self.assertTrue(re.search(r'"city_parts":\s+cityPartsInPlainSight\(', source),
+                        "the road in names every part of the city, a private gate too")
 
 
 if __name__ == "__main__":

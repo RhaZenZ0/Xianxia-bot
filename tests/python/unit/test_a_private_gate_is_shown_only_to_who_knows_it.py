@@ -251,6 +251,36 @@ class TheKnowledgeIsReadOnlyWhereItCanMatter(unittest.TestCase):
                              "a failed read must leave the street's answer, not cost the city page")
 
 
+class TheJournalNamesTheGateOnlyToWhoKnowsIt(unittest.TestCase):
+    """`npc_whereabouts` asks `_known_locations`, which asks `_city_parts`: an
+    NPC standing at a private gate is "somewhere you have not been" to a
+    stranger and is named to somebody a sponsor told."""
+
+    def _says(self, sponsored):
+        _ex, loc = _modules()
+        _sect, gate, seat = _private_gates()[0]
+
+        class Sim:
+            async def npc_status(self, _name):
+                return {"status": "alive"}
+
+        async def where(_name, period=None):
+            return gate
+
+        db = _Db(discovered=[gate] if sponsored else [])
+        with patch.object(loc, "SIM", Sim()), patch.object(loc, "current_npc_location", where), patch.object(loc, "DB", db):
+            return gate, asyncio.run(loc.npc_whereabouts(7, {"location": seat, "realm_index": 0, "phase": 1}, "Anyone"))
+
+    def test_a_stranger_is_not_told_where_the_gate_is(self):
+        gate, said = self._says(False)
+        self.assertNotIn(gate, said)
+        self.assertIn("somewhere you have not been", said)
+
+    def test_a_sponsored_cultivator_is(self):
+        gate, said = self._says(True)
+        self.assertIn(gate, said)
+
+
 class _Interaction:
     def __init__(self):
         self.user = type("User", (), {"id": 7})()
@@ -316,10 +346,16 @@ class TheDoorsAskWhatThePlayerKnows(unittest.TestCase):
         for sponsored in (False, True):
             gate, shown, _result, interaction = self._door(look, sponsored=sponsored)
             text = shown.get("text") or "\n".join(str(m.get("content")) for m in interaction.sent)
+            districts = next((line for line in text.splitlines() if line.startswith("**Districts:**")), "")
+            seat = next((line for line in text.splitlines() if line.startswith("**Seat:**")), "")
             with self.subTest(sponsored=sponsored):
                 self.assertTrue(text, "City -> Look said nothing")
-                self.assertEqual(gate in text, sponsored, text)
-                self.assertEqual(gate in shown.get("places", []), sponsored, shown)
+                self.assertTrue(districts and seat, f"the Districts or the Seat line is missing: {text}")
+                # Each line is its own door: a Look that told one and not the
+                # other is half a fix.
+                self.assertEqual(gate in districts, sponsored, f"the Districts line {'hides' if sponsored else 'names'} {gate}: {districts}")
+                self.assertEqual(gate in seat, sponsored, f"the Seat line {'hides' if sponsored else 'names'} {gate}: {seat}")
+                self.assertEqual(gate in shown.get("places", []), sponsored, f"the Look buttons {'lack' if sponsored else 'offer'} {gate}: {shown}")
 
     def test_both_enter_pickers_offer_the_gate_only_to_a_sponsored_cultivator(self):
         async def autocomplete(ex, interaction):
@@ -333,7 +369,8 @@ class TheDoorsAskWhatThePlayerKnows(unittest.TestCase):
                 gate, _shown, offered, _i = self._door(door, sponsored=sponsored)
                 with self.subTest(door=door.__name__, sponsored=sponsored):
                     self.assertTrue(offered, "the picker offered nothing from the city's own streets")
-                    self.assertEqual(gate in offered, sponsored, offered)
+                    self.assertEqual(gate in offered, sponsored,
+                                     f"{'a sponsored cultivator was not offered' if sponsored else 'a stranger was offered'} {gate}: {offered}")
 
     def test_from_inside_the_gate_both_pickers_draw_the_way_out(self):
         async def autocomplete(ex, interaction):
