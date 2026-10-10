@@ -2871,12 +2871,17 @@ class LayoutHubView(_LayoutHubBase):
         if len(rest) > grid_limit:
             # More actions takes a component of its own.
             grid_limit = _grid_capacity(budget - 1)
-        if self.action_offset >= len(rest):
+        # The budget is recomputed on every rebuild - a result cleared, a
+        # shorter row of next steps, the lock row, a door closing, the page
+        # falling back to the first - so an offset must not outlive the paging
+        # it belonged to. Unpaged, every action is drawn from the top;
+        # `CardView._page_row` states the same rule for a card.
+        paged = len(rest) > grid_limit
+        if not paged or self.action_offset >= len(rest):
             self.action_offset = 0
         grid = rest[self.action_offset : self.action_offset + grid_limit]
         self.grid_limit = max(1, grid_limit)
         self.row_limit = len(featured) + grid_limit
-        paged = len(rest) > grid_limit
         span = (
             (len(featured) + self.action_offset + 1, len(featured) + self.action_offset + len(grid))
             if paged else None
