@@ -568,6 +568,21 @@ class QuestsWorkbenchTests(unittest.IsolatedAsyncioTestCase):
         coverage = (await self.store.quests())["coverage"]
         self.assertEqual([t["target"] for t in coverage["unknown_targets"]], ["Atlantis"])
 
+    async def test_coverage_reports_an_examination_quest_that_names_no_examination(self):
+        # An examination is named by its quest key (v1.33.0); a key the content
+        # does not carry strands the quest, and one it does carry does not.
+        for key, target in (("dead_exam", "exam_nobody_at_all"), ("live_exam", "exam_alchemy_apprentice")):
+            await self.db.save_quest_definition(
+                {"quest_key": key, "title": "Sit The Examination",
+                 "description": "It asks for an examination by its key.",
+                 "objectives": [{"id": "sit", "type": "profession_exam", "target": target, "count": 1}],
+                 "rewards": {}},
+                status="draft", origin="gm_prompt", created_by=1)
+            await self.db.set_quest_definition_status(key, "approved")
+        coverage = (await self.store.quests())["coverage"]
+        self.assertEqual([(t["quest_key"], t["expects"]) for t in coverage["unknown_targets"]],
+                         [("dead_exam", "profession_exam")])
+
     async def test_held_rows_say_whether_the_terms_are_pinned(self):
         self.assertTrue(await seed_character(
             self.db, user_id=1, discord_name="holder", name="Tester", origin=self.location,

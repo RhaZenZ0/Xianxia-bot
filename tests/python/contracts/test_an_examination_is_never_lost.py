@@ -108,6 +108,28 @@ class EveryExaminationNamesItsOwnQuest(unittest.TestCase):
         self.assertNotIn("target", definition["objectives"][0])
 
 
+class TheWorkbenchCanStillSaveAnExamination(unittest.TestCase):
+    def test_a_hand_edit_of_every_examination_passes_the_dashboards_own_world(self):
+        """A hand edit goes through the same validator against the dashboard's
+        own slimmer world. Before it carried the content pack, every target
+        kind added since v1.16.0 was "unknown" there, so the workbench refused
+        to save a realm-road stage - and an examination, once its objective
+        named its key, would have joined them."""
+        from app.dashboard.server import _QuestWorld
+
+        world = _QuestWorld(CONTENT)
+        stages = list(CONTENT.get("realm_road") or [])
+        self.assertGreater(len(stages), 20, "the realm road came back short; the reader is broken, not the tree")
+        for trade, exam in EXAMS:
+            with self.subTest(quest=exam["quest_key"]):
+                _definition, errors = validate_quest_definition(exam, world, BUDGET)
+                self.assertEqual(errors, [])
+        for stage in stages:
+            with self.subTest(quest=stage["quest_key"]):
+                _definition, errors = validate_quest_definition(stage, world, BUDGET)
+                self.assertEqual(errors, [])
+
+
 class ThePassIsReportedUnderTheExaminationSat(unittest.TestCase):
     def test_the_command_reports_the_engines_quest_key(self):
         """Read by AST, not by spelling: the call must pass `target=` and the
