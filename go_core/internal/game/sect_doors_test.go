@@ -583,3 +583,145 @@ func TestAnOrthodoxSectRefusesANotoriousApplicantWithoutASponsor(t *testing.T) {
 		t.Fatalf("karma_adjustment=%d, want -2 (%v)", got, fmt.Sprint(tuning))
 	}
 }
+
+// The street shows a city's parts and never a private one (v1.19.0), and the
+// road in is a street: walking into Riverguard City from Greenriver Town used
+// to print "Inside the walls: Blood River Gorge, ..." to everybody, because the
+// travel result listed the whole city while the map the same travel is checked
+// against kept the private gate off it. cityPartsInPlainSight is the one list
+// both read.
+func TestTheRoadIntoASeatNamesNoPrivateGate(t *testing.T) {
+	catalog := shippedSectCatalog(t)
+	seat := sectSeat(catalog, "Blood River Sect")
+	gate := sectGate(catalog, "Blood River Sect")
+	if seat == "" || gate == "" || !catalog.Locations[gate].Private {
+		t.Fatalf("Blood River Sect keeps seat %q gate %q private=%v; the fixture is broken, not the rule", seat, gate, catalog.Locations[gate].Private)
+	}
+	path := setupBatch5AuthorityDB(t)
+	world := batch4WorldPath(t)
+	sectDoorTables(t, path)
+	batch4Exec(t, path, `UPDATE characters SET location='Greenriver Town', spirit_stones=500, vitality=100 WHERE user_id=42`)
+	syncPurse(t, path)
+	previous := roadEncounterIntn
+	roadEncounterIntn = func(n int) (int, error) { return n - 1, nil }
+	defer func() { roadEncounterIntn = previous }()
+
+	result := batch4Result(t, batch4Apply(t, path, world, "exploration.travel", 1, map[string]any{"destination": seat, "mode": "known"}))
+	if result["destination"] != seat {
+		t.Fatalf("the road into %s ended at %v; the fixture is broken, not the rule", seat, result["destination"])
+	}
+	parts, _ := result["city_parts"].([]string)
+	want := []string{}
+	for _, part := range cityPartsOf(catalog, seat) {
+		if !catalog.Locations[part].Private {
+			want = append(want, part)
+		}
+	}
+	for _, part := range parts {
+		if catalog.Locations[part].Private {
+			t.Errorf("the road into %s listed %s inside the walls", seat, part)
+		}
+	}
+	if len(want) == 0 || strings.Join(parts, ",") != strings.Join(want, ",") {
+		t.Fatalf("the road into %s named %v inside the walls, want exactly the parts in plain sight %v", seat, parts, want)
+	}
+}
+
+// A city page is the street, wherever the street is read: the map a traveller
+// is checked against and the list the arrival names are one function's answer,
+// for every city in the catalogue.
+func TestACityShowsOneListOfItsPartsEverywhere(t *testing.T) {
+	catalog := shippedSectCatalog(t)
+	path := setupBatch5AuthorityDB(t)
+	sectDoorTables(t, path)
+	private := 0
+	cities := 0
+	for city := range catalog.Locations {
+		all := cityPartsOf(catalog, city)
+		if len(all) == 0 {
+			continue
+		}
+		cities++
+		inSight := map[string]bool{}
+		for _, part := range cityPartsInPlainSight(catalog, city) {
+			inSight[part] = true
+		}
+		for _, part := range all {
+			if catalog.Locations[part].Private {
+				private++
+			}
+			if catalog.Locations[part].Private == inSight[part] {
+				t.Errorf("%s: %s private=%v inSight=%v", city, part, catalog.Locations[part].Private, inSight[part])
+			}
+		}
+		batch4Exec(t, path, `UPDATE characters SET location=? WHERE user_id=42`, city)
+		conn, err := storage.Open(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		c, err := loadMechanicsCharacter(conn, catalog, 42)
+		if err != nil {
+			conn.Close()
+			t.Fatal(err)
+		}
+		known, err := knownLocationsTx(conn, catalog, 42, c)
+		conn.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, part := range all {
+			if known[part] != inSight[part] {
+				t.Errorf("standing in %s, %s is known=%v but in plain sight=%v", city, part, known[part], inSight[part])
+			}
+		}
+	}
+	if cities < 40 || private < 2 {
+		t.Fatalf("the sweep met %d cities and %d private parts; the content read is broken, not the tree", cities, private)
+	}
+}
+
+// A private gate is walked into only by somebody who has been told it (a
+// sponsor's word is a discovery row), and walked out of by anybody standing in
+// it: the street, and the city's other parts, are a step away.
+func TestAPrivateGateIsWalkedOnlyByWhoKnowsIt(t *testing.T) {
+	catalog := shippedSectCatalog(t)
+	seat := sectSeat(catalog, "Blood River Sect")
+	gate := sectGate(catalog, "Blood River Sect")
+	if seat == "" || gate == "" || !catalog.Locations[gate].Private {
+		t.Fatalf("Blood River Sect keeps seat %q gate %q; the fixture is broken, not the rule", seat, gate)
+	}
+	district := ""
+	for _, part := range cityPartsInPlainSight(catalog, seat) {
+		if catalog.Locations[part].District != "sect_gate" {
+			district = part
+			break
+		}
+	}
+	if district == "" {
+		t.Fatalf("%s has no part in plain sight; the fixture is broken, not the rule", seat)
+	}
+
+	path := setupBatch5AuthorityDB(t)
+	world := batch4WorldPath(t)
+	sectDoorTables(t, path)
+	batch4Exec(t, path, `UPDATE characters SET location=? WHERE user_id=42`, seat)
+	if _, err := batch4ApplyErr(path, world, "exploration.travel", 42, 1, map[string]any{"destination": gate, "mode": "known"}); err == nil {
+		t.Fatalf("a cultivator nobody had sponsored walked from %s into %s", seat, gate)
+	}
+	batch4Exec(t, path, `INSERT INTO character_location_discoveries(user_id,location,discovery_kind,discovered_game_minute,created_at) VALUES(42,?,'recommendation',0,0)`, gate)
+	out, err := batch4ApplyErr(path, world, "exploration.travel", 42, 2, map[string]any{"destination": gate, "mode": "known"})
+	if err != nil {
+		t.Fatalf("a sponsored cultivator was refused %s from %s: %v", gate, seat, err)
+	}
+	if got := batch4Result(t, out)["destination"]; got != gate {
+		t.Fatalf("a sponsored cultivator asked for %s and arrived at %v", gate, got)
+	}
+	for i, dest := range []string{seat, district} {
+		path := setupBatch5AuthorityDB(t)
+		sectDoorTables(t, path)
+		batch4Exec(t, path, `UPDATE characters SET location=? WHERE user_id=42`, gate)
+		if _, err := batch4ApplyErr(path, world, "exploration.travel", 42, 10+i, map[string]any{"destination": dest, "mode": "known"}); err != nil {
+			t.Fatalf("out of %s to %s was refused: %v", gate, dest, err)
+		}
+	}
+}
