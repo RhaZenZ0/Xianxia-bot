@@ -22,6 +22,13 @@ import (
 // carry (craft echo, the one thing samsara does remember of a trade, is a
 // scaled echo and not a flame). The fixture gives every listed table a row for
 // the reborn soul and another for somebody else.
+//
+// The same list was missing from the character row (v1.33.0): a rebirth
+// rewrites it in place, the rewrite names the columns that existed when it was
+// written, and the sword intent a Sword Cultivator had banked (schema 72) and
+// the anchor the body's mending counts from (schema 59) passed into the next
+// life. The bond with a master among the sect's people is a row of its own that
+// neither wipe named.
 
 func setupIncarnationDB(t *testing.T, withLater bool) string {
 	t.Helper()
@@ -84,8 +91,9 @@ func TestARebirthLeavesNeitherFlameNorSpiritSense(t *testing.T) {
 }
 
 // In the compose stack the engine is healthy before db-init migrates, so a
-// rebirth can run on a world that has not got the two later tables yet. It is
-// not refused over a table a later schema owns.
+// rebirth can run on a world that has not got the two later tables - or the two
+// later columns of the character row - yet. It is not refused over a table or a
+// column a later schema owns.
 func TestARebirthOnAWorldWithoutTheLaterTablesStillWipesTheRest(t *testing.T) {
 	path := setupIncarnationDB(t, false)
 	batch4Exec(t, path, `INSERT INTO inventory(user_id,item_id,quantity) VALUES(42,'spirit_herb',3)`)
@@ -94,6 +102,55 @@ func TestARebirthOnAWorldWithoutTheLaterTablesStillWipesTheRest(t *testing.T) {
 	}
 	if n := rowsFor(t, path, "inventory", 42); n != 0 {
 		t.Fatalf("the wipe stopped at the missing table and left %d inventory row(s)", n)
+	}
+}
+
+// A new life starts the columns of the character row that belong to the life
+// where the soul's own are kept. Production DDL for both columns, added the way
+// the migrations add them, and a second soul to hold the wipe to one.
+func TestARebirthTakesTheLifesColumnsWithIt(t *testing.T) {
+	path := setupIncarnationDB(t, true)
+	batch4Exec(t, path, `ALTER TABLE characters ADD COLUMN vitality_recovered_game_minute INTEGER`)
+	batch4Exec(t, path, `ALTER TABLE characters ADD COLUMN path_resource INTEGER NOT NULL DEFAULT 0`)
+	batch4Exec(t, path, `UPDATE characters SET path_resource=3,vitality_recovered_game_minute=500 WHERE user_id IN (42,43)`)
+	karma := actionScalar(t, path, `SELECT karma_score FROM characters WHERE user_id=42`)
+	if err := wipeFor(t, path, 42); err != nil {
+		t.Fatal(err)
+	}
+	if n := i64(actionScalar(t, path, `SELECT path_resource FROM characters WHERE user_id=42`)); n != 0 {
+		t.Errorf("a reincarnation left %d sword intent banked in the new body: the intent was earned by a body that is gone", n)
+	}
+	if v := actionScalar(t, path, `SELECT vitality_recovered_game_minute FROM characters WHERE user_id=42`); v != nil {
+		t.Errorf("a reincarnation kept the mending anchor: %v; the new body has not been hurt, and an old anchor banks time it never spent", v)
+	}
+	if n := i64(actionScalar(t, path, `SELECT path_resource FROM characters WHERE user_id=43`)); n != 3 {
+		t.Errorf("somebody else holds %d sword intent after the wipe, want 3: it is scoped to one soul", n)
+	}
+	if v := i64(actionScalar(t, path, `SELECT vitality_recovered_game_minute FROM characters WHERE user_id=43`)); v != 500 {
+		t.Errorf("somebody else's mending anchor is %d after the wipe, want 500", v)
+	}
+	// The soul's own columns are not the wipe's: karma is what the wheel reads.
+	if got := actionScalar(t, path, `SELECT karma_score FROM characters WHERE user_id=42`); fmt.Sprint(got) != fmt.Sprint(karma) {
+		t.Errorf("the wipe moved the karma from %v to %v; karma is the soul's, and the wheel reads it", karma, got)
+	}
+}
+
+// The bond with a master among the sect's people is the old life's. It is a
+// table of its own (schema 79) and names the disciple by account, so a rebirth
+// that left it would go on paying its terms to a new body that never knelt to
+// anyone. Production DDL, foreign key included.
+func TestARebirthEndsTheBondWithTheSectsPeople(t *testing.T) {
+	path := setupIncarnationDB(t, true)
+	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS npc_mentorships(disciple_user_id INTEGER PRIMARY KEY,master_npc_name TEXT NOT NULL,sect_name TEXT NOT NULL,accepted_game_minute INTEGER NOT NULL DEFAULT 0,attention INTEGER NOT NULL DEFAULT 0,created_at REAL NOT NULL,FOREIGN KEY(disciple_user_id) REFERENCES characters(user_id) ON DELETE CASCADE)`)
+	batch4Exec(t, path, `INSERT INTO npc_mentorships(disciple_user_id,master_npc_name,sect_name,created_at) VALUES(42,'Elder Test Qiu','Azure Cloud Sect',0),(43,'Elder Test Qiu','Azure Cloud Sect',0)`)
+	if err := wipeFor(t, path, 42); err != nil {
+		t.Fatal(err)
+	}
+	if n := i64(actionScalar(t, path, `SELECT COUNT(*) FROM npc_mentorships WHERE disciple_user_id=42`)); n != 0 {
+		t.Errorf("a reincarnation left %d bond(s) with the sect's people for the reborn soul: the master taught a body that is gone", n)
+	}
+	if n := i64(actionScalar(t, path, `SELECT COUNT(*) FROM npc_mentorships WHERE disciple_user_id=43`)); n != 1 {
+		t.Errorf("somebody else holds %d bond(s) after the wipe, want 1: it is scoped to one soul", n)
 	}
 }
 

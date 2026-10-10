@@ -108,6 +108,13 @@ func sectAscendActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID in
 			return authoritativeMutation{}, err
 		}
 	}
+	// A master among the old sect's people is the old sect's too: the bond is a
+	// row of its own (v1.25.0), not a sect_lineage row, so the delete above
+	// never reached it and the Azure Cloud Elder went on paying a disciple of
+	// the Jade Meridian Sect.
+	if _, err = severNPCMasterTx(conn, userID); err != nil {
+		return authoritativeMutation{}, err
+	}
 	if _, err = conn.Execute(`INSERT OR IGNORE INTO character_sect_discoveries(user_id,sect_name,discovery_kind,source_key,discovered_game_minute,created_at) VALUES(?,?,?,?,?,?)`,
 		[]any{userID, to, sectAscentAttempt, "sect:" + from, p.GameMinute, now}); err != nil {
 		return authoritativeMutation{}, err
