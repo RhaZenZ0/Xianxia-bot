@@ -3,6 +3,8 @@ package game
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -237,5 +239,173 @@ func TestAGMCanHandAPlayerTheirNextQuest(t *testing.T) {
 	}
 	if got := len(auditRows(t, path, "admin.player.quest_grant")); got != 1 {
 		t.Fatalf("%d audit rows; a refused grant must write none", got)
+	}
+}
+
+// shippedQuestObjectives walks the content file raw - a quest roster the Go
+// catalogue does not parse still counts - for every objective list sitting
+// beside a quest_key: the commission pool, the realm road, the household
+// errands and the beginner path.
+func shippedQuestObjectives(t *testing.T) map[string][]map[string]any {
+	t.Helper()
+	raw, err := os.ReadFile(batch4WorldPath(t))
+	if err != nil {
+		t.Fatalf("content: %v", err)
+	}
+	var doc any
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("content: %v", err)
+	}
+	found := map[string][]map[string]any{}
+	var walk func(any)
+	walk = func(node any) {
+		switch v := node.(type) {
+		case map[string]any:
+			key, _ := v["quest_key"].(string)
+			if list, ok := v["objectives"].([]any); ok && key != "" {
+				for _, o := range list {
+					if m, ok := o.(map[string]any); ok {
+						found[key] = append(found[key], m)
+					}
+				}
+			}
+			for _, child := range v {
+				walk(child)
+			}
+		case []any:
+			for _, child := range v {
+				walk(child)
+			}
+		}
+	}
+	walk(doc)
+	return found
+}
+
+// What the Player Editor's Report sends is the objective's own type and its
+// own stored target, verbatim (v1.33.0). That is a fix only if the engine's
+// report matching meets every shipped objective by exactly that echo - after
+// the grade strip and the gate-is-its-city rewrite - and moves nothing else.
+// Reported from the dashboard: the card sent the type alone, 459 of the 524
+// shipped objectives name a target, and `progressQuest` counts a targeted
+// objective only against a report naming the same thing, so the card could not
+// advance the realm-road breakthrough its own text tells a GM to report.
+func TestEveryShippedObjectiveIsMetByItsOwnTarget(t *testing.T) {
+	quests := shippedQuestObjectives(t)
+	if len(quests["realm_road_1"]) == 0 || len(quests) < 200 {
+		t.Fatalf("the content walk found %d quests and realm_road_1 has %d objectives; the reader is broken, not the tree", len(quests), len(quests["realm_road_1"]))
+	}
+	keys := make([]string, 0, len(quests))
+	for key := range quests {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	path := questAdminDB(t)
+	conn := beginnerConn(t, path)
+	for _, key := range keys {
+		for _, o := range quests[key] {
+			o["count"] = 1000 // nothing completes, so every report lands on an active quest
+		}
+		encoded, _ := json.Marshal(quests[key])
+		if _, err := conn.Execute(`INSERT INTO character_quests(user_id,quest_key,status,created_at,updated_at,terms_json) VALUES(42,?,'active',0,0,?)`,
+			[]any{"echo_" + key, `{"objectives":` + string(encoded) + `,"rewards":{}}`}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := conn.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	var bad []string
+	targeted := 0
+	for _, key := range keys {
+		held := "echo_" + key
+		for _, o := range quests[key] {
+			id, kind := fmt.Sprint(o["id"]), fmt.Sprint(o["type"])
+			target := ""
+			if o["target"] != nil {
+				target = fmt.Sprint(o["target"])
+				targeted++
+			}
+			_, before := questStatus(t, path, 42, held)
+			if _, err := applyAdminRaw(t, path, "admin.player.quest_progress", 1, map[string]any{"user_id": 42, "quest_key": held, "objective_type": kind, "target": target, "amount": 1}); err != nil {
+				bad = append(bad, fmt.Sprintf("%s/%s (%s %q): %v", key, id, kind, target, err))
+				continue
+			}
+			_, after := questStatus(t, path, 42, held)
+			for _, other := range quests[key] {
+				oid := fmt.Sprint(other["id"])
+				want := before[oid]
+				if oid == id {
+					want++
+				}
+				if after[oid] != want {
+					bad = append(bad, fmt.Sprintf("%s: reporting %s moved %s from %d to %d", key, id, oid, before[oid], after[oid]))
+				}
+			}
+		}
+	}
+	if targeted < 400 {
+		t.Fatalf("only %d targeted objectives came out of the content; the reader is broken, not the tree", targeted)
+	}
+	if len(bad) > 0 {
+		t.Fatalf("%d shipped objectives are not met by their own target alone, so the Quests card cannot report them:\n%s", len(bad), strings.Join(bad[:min(len(bad), 10)], "\n"))
+	}
+}
+
+// A report that reaches a targeted objective without its target is refused
+// with what the objective names, not with a denial that the objective exists
+// (v1.33.0). The lever is a replay of a player's report, so the match is
+// progressQuest's: the same target in any case, an untargeted objective
+// meeting any event of its type - and the audit row says which was named.
+func TestAReportMissingItsTargetSaysWhatTheObjectiveNames(t *testing.T) {
+	path := questAdminDB(t)
+	conn := beginnerConn(t, path)
+	objs := `[{"id":"gate","type":"breakthrough","target":"Qi Refining","count":1},{"id":"sit","type":"cultivate","count":1},{"id":"pine","type":"talk","target":"Elder Pine","count":1},{"id":"qiao","type":"talk","target":"Steward Qiao","count":1}]`
+	if _, err := conn.Execute(`INSERT INTO character_quests(user_id,quest_key,status,created_at,updated_at,terms_json) VALUES(42,'road','active',0,0,?)`, []any{`{"objectives":` + objs + `,"rewards":{}}`}); err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	report := func(extra map[string]any) error {
+		payload := map[string]any{"user_id": 42, "quest_key": "road", "reason": "missed"}
+		for k, v := range extra {
+			payload[k] = v
+		}
+		_, err := applyAdminRaw(t, path, "admin.player.quest_progress", 1, payload)
+		return err
+	}
+	err := report(map[string]any{"objective_type": "breakthrough"})
+	if err == nil || !strings.Contains(err.Error(), "Qi Refining") || strings.Contains(err.Error(), "no objective of type") {
+		t.Fatalf("a report missing its target was refused with %v; it must name what the objective asks for, not deny the objective exists", err)
+	}
+	err = report(map[string]any{"objective_type": "talk", "target": "Nobody"})
+	if err == nil || !strings.Contains(err.Error(), "Elder Pine") || !strings.Contains(err.Error(), "Steward Qiao") || !strings.Contains(err.Error(), `"Nobody"`) {
+		t.Fatalf("a report naming the wrong target was refused with %v; it must list what the objectives name and say what the report named", err)
+	}
+	if err := report(map[string]any{"objective_type": "combat_win"}); err == nil || !strings.Contains(err.Error(), "no objective of type") {
+		t.Fatalf("a type the quest does not ask for: %v", err)
+	}
+	if _, p := questStatus(t, path, 42, "road"); p["gate"] != 0 || p["pine"] != 0 || p["qiao"] != 0 || p["sit"] != 0 {
+		t.Fatalf("the refused reports moved %v", p)
+	}
+	if rows := auditRows(t, path, "admin.player.quest_progress"); len(rows) != 0 {
+		t.Fatalf("a refused report wrote %d audit rows", len(rows))
+	}
+	if err := report(map[string]any{"objective_type": "cultivate", "target": "Anywhere"}); err != nil {
+		t.Fatalf("an objective with no target accepts any event of its type, so this report must land: %v", err)
+	}
+	if err := report(map[string]any{"objective_type": "breakthrough", "target": "qi refining"}); err != nil {
+		t.Fatalf("a report naming the objective's target in another case was refused: %v", err)
+	}
+	if _, p := questStatus(t, path, 42, "road"); p["gate"] != 1 || p["sit"] != 1 || p["pine"] != 0 || p["qiao"] != 0 {
+		t.Fatalf("the reports moved %v, want the breakthrough and the untargeted sitting only", p)
+	}
+	rows := auditRows(t, path, "admin.player.quest_progress")
+	if len(rows) != 2 {
+		t.Fatalf("%d audit rows, want one for each landed report", len(rows))
+	}
+	if after := fmt.Sprint(rows[1]["after_json"]); !strings.Contains(after, `"target":"qi refining"`) {
+		t.Fatalf("the audit row does not say which objective the report named: %s", after)
 	}
 }

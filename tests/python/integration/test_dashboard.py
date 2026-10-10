@@ -224,7 +224,8 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(journal["stuck_lesson"]["title"], "The Last Lesson")
         self.assertEqual(journal["stuck_lesson"]["status"], "active")
         self.assertEqual(journal["stuck_lesson"]["objectives"],
-                         [{"id": "x", "type": "family_lesson", "target": None, "label": "Take the lesson", "count": 1, "progress": 0}])
+                         [{"id": "x", "type": "family_lesson", "target": None, "label": "Take the lesson", "count": 1, "progress": 0}],
+                         "the journal must carry every objective's target - None for an untargeted one - for the card to report it")
         self.assertEqual([(o["type"], o["target"]) for o in journal["road_stage"]["objectives"]],
                          [("breakthrough", "Foundation Establishment")],
                          "the pinned terms are what the player accepted, so their target is the one to report")

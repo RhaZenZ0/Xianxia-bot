@@ -509,6 +509,53 @@ func questProgress(conn *storage.Conn, catalog worlddata.Catalog, userID int64, 
 	return transition, nil
 }
 
+// activeQuest is the row a report acts on and the terms its player accepted.
+type activeQuest struct {
+	row      map[string]any
+	progress map[string]int64
+	terms    questTerms
+}
+
+// activeQuestTermsTx reads an active quest's row and the terms it is judged
+// by: what questProgressTx matches a report against, and what the GM lever
+// names when a report meets nothing (questReportMissTx). found is false when
+// the player holds no active quest by that key, with a nil error; an error
+// from reading the row comes back found=false, one from reading its terms
+// found=true - the two answers questProgressTx has always given.
+func activeQuestTermsTx(conn *storage.Conn, userID int64, questKey string, gameMinute int64) (activeQuest, bool, error) {
+	// v0.24.0: the terms come off the player's own row, not out of the payload.
+	// `terms_json` is selected only when it exists, so an engine pointed at a
+	// database Python has not migrated yet still runs - it simply falls back to
+	// reading the definition, which is all it could ever do before.
+	pinnedTerms, err := tableHasColumns(conn, "character_quests", questTermsColumn)
+	if err != nil {
+		return activeQuest{}, false, err
+	}
+	columns := `progress_json,commission,variant_index`
+	if pinnedTerms {
+		columns += `,` + questTermsColumn
+	}
+	res, err := conn.Execute(
+		`SELECT `+columns+` FROM character_quests WHERE user_id=? AND quest_key=? AND status='active'`,
+		[]any{userID, questKey})
+	if err != nil {
+		return activeQuest{}, false, err
+	}
+	row := firstRowMap(res)
+	if row == nil {
+		return activeQuest{}, false, nil
+	}
+	progress := map[string]int64{}
+	if text, ok := row["progress_json"].(string); ok && text != "" {
+		_ = json.Unmarshal([]byte(text), &progress)
+	}
+	terms, err := acceptedQuestTermsTx(conn, userID, questKey, i64(row["variant_index"]), row[questTermsColumn], gameMinute)
+	if err != nil {
+		return activeQuest{}, true, err
+	}
+	return activeQuest{row: row, progress: progress, terms: terms}, true, nil
+}
+
 // questProgressTx is one quest report inside the caller's transaction, and the
 // one statement of what finishing a quest does: a commission's resolution, or
 // an ordinary quest's reward, household standing and follow-on, then the
@@ -524,36 +571,14 @@ func questProgressTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	if err != nil {
 		return nil, false, err
 	}
-	// v0.24.0: the terms come off the player's own row, not out of the payload.
-	// `terms_json` is selected only when it exists, so an engine pointed at a
-	// database Python has not migrated yet still runs - it simply falls back to
-	// reading the definition, which is all it could ever do before.
-	pinnedTerms, err := tableHasColumns(conn, "character_quests", questTermsColumn)
+	active, found, err := activeQuestTermsTx(conn, userID, p.QuestKey, gameMinute)
 	if err != nil {
-		return nil, false, err
+		return nil, found, err
 	}
-	columns := `progress_json,commission,variant_index`
-	if pinnedTerms {
-		columns += `,` + questTermsColumn
-	}
-	res, err := conn.Execute(
-		`SELECT `+columns+` FROM character_quests WHERE user_id=? AND quest_key=? AND status='active'`,
-		[]any{userID, p.QuestKey})
-	if err != nil {
-		return nil, false, err
-	}
-	row := firstRowMap(res)
-	if row == nil {
+	if !found {
 		return map[string]any{"touched": false, "complete": false}, false, nil
 	}
-	progress := map[string]int64{}
-	if text, ok := row["progress_json"].(string); ok && text != "" {
-		_ = json.Unmarshal([]byte(text), &progress)
-	}
-	terms, err := acceptedQuestTermsTx(conn, userID, p.QuestKey, i64(row["variant_index"]), row[questTermsColumn], gameMinute)
-	if err != nil {
-		return nil, true, err
-	}
+	row, progress, terms := active.row, active.progress, active.terms
 	var transition map[string]any
 	if forceComplete {
 		transition = forcedQuestTransition(terms.Objectives)
