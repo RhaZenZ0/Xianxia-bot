@@ -145,11 +145,12 @@ func TestAWarOverAGateIsSetAside(t *testing.T) {
 	if got := groundBanner(t, path, groundGate); got != "neutral:" {
 		t.Fatalf("the fixture is not the state migration 74 leaves: the gate reads %q", got)
 	}
-	if changed := groundSweep(t, path, cat); changed != 1 {
-		t.Fatalf("the repair changed %d thing(s); want the one war", changed)
-	}
+	changed := groundSweep(t, path, cat)
 	if got := fmt.Sprint(actionScalar(t, path, `SELECT w.status||'|'||o.resolution||'|'||o.winner_key FROM territory_wars w JOIN territory_war_operations o USING(war_id)`)); got != "resolved|set_aside|" {
 		t.Fatalf("the war over the gate reads %q after the repair: the tick would fight it, and an attacker's win would plant a rival inside the seat city", got)
+	}
+	if changed != 1 {
+		t.Fatalf("the repair changed %d thing(s); want the one war", changed)
 	}
 	if got := groundBanner(t, path, groundGate); got != "neutral:" {
 		t.Fatalf("the gate reads %q: a war set aside moves no banner", got)
