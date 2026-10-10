@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import itertools
 import os
 import unittest
 from types import SimpleNamespace
@@ -211,6 +212,95 @@ class TheReplySaysWhatTheEngineDid(unittest.TestCase):
             "operations": {"siege_progress": 0, "winner_key": "Holding Sect", "resolution": "defender_holds"}})
         for needle in ("as an ally", "+**8**", "+**120**", "Inner Disciple", "Holding Sect", "walls **52**"):
             self.assertIn(needle, text)
+
+
+class ABannerSitsOnTheWholePlace(unittest.TestCase):
+    """A sect holds a city, not one of its streets. The engine redirects a claim
+    made from a part to the city and sets a war over a part aside with no
+    victor; the panel reads the city's row for the same reason, and says what
+    happened in the engine's own words. The rule itself is held in Go
+    (`TestAClaimFromAnyPartClaimsItsCity`, `TestNoResolverHandsOverAPart`)."""
+
+    PART = "Cloudblade City East Gate"
+    CITY = "Cloudblade City"
+    _players = itertools.count(7000)  # one player a call: the action meter is per player
+
+    def _territory(self):
+        with patch.dict(os.environ, ENV):
+            import importlib
+            return importlib.import_module("app.bot.commands.territory")
+
+    def _interaction(self, sent):
+        async def send_message(text, **kwargs):
+            sent.append(text)
+        return SimpleNamespace(user=SimpleNamespace(id=next(self._players)), id=1, guild=None,
+                               response=SimpleNamespace(send_message=send_message, is_done=lambda: False))
+
+    def _run(self, handler_name, engine_result=None):
+        territory = self._territory()
+        asked, sent, payloads = [], [], []
+        row = {"territory_key": self.CITY, "name": self.CITY, "controller_type": "neutral", "controller_key": "",
+               "resource_type": "mixed", "prosperity": 50, "defense": 50, "unrest": 0}
+
+        async def get_territories(region=None):
+            asked.append(region)
+            return [row]
+
+        async def require_character(interaction):
+            return {"location": self.PART}
+
+        async def authoritative_action(op, user_id, payload, **kwargs):
+            payloads.append((op, dict(payload)))
+            return {"result": engine_result or {"sect_name": "Azure Cloud Sect", "claimed": True}}
+
+        command = getattr(territory, handler_name)
+        with patch.object(territory, "require_character", require_character), \
+                patch.object(territory.DB, "get_territories", get_territories), \
+                patch.object(territory.ENGINE, "authoritative_action", authoritative_action):
+            asyncio.run(command.callback(self._interaction(sent)))
+        return asked, sent, payloads
+
+    def test_the_status_and_the_claim_read_the_citys_row_from_a_part(self):
+        for handler in ("territory_status", "territory_claim"):
+            with self.subTest(handler=handler):
+                asked, sent, payloads = self._run(handler)
+                self.assertEqual(asked, [self.CITY],
+                                 f"{handler} asked for the territory of {asked}: a gate has no banner of its own, the city does")
+                self.assertIn(self.CITY, sent[0])
+        _, _, payloads = self._run("territory_claim")
+        self.assertEqual(payloads, [("territory.claim", {"territory_key": self.CITY})],
+                         "the claim named a street; the engine would redirect it, and an older engine would not")
+
+    def test_both_commands_still_ask_the_rule_by_name(self):
+        for handler in ("territory_status", "territory_claim"):
+            self.assertIn("city_of_place(", _code(TERRITORY, handler), f"{handler} reads the row of the exact place again")
+
+    def test_a_war_set_aside_is_told_as_one(self):
+        territory = self._territory()
+        act = territory.war_act_text(3, "Assault", {
+            "fights_for": "Crimson Furnace Sect", "points": 8, "territory_defense": 50, "status": "resolved",
+            "victory_points": 0, "victors_paid": 0,
+            "operations": {"siege_progress": 100, "winner_key": "", "resolution": "set_aside"}})
+        self.assertIn("War set aside", act)
+        for needle in ("takes the ground", "holds.", "Victory", "unknown"):
+            self.assertNotIn(needle, act, "a war over a street was reported as won")
+        peace = territory.war_peace_text({"war_id": 3, "resolution": "set_aside", "attacker_key": "A", "defender_key": "D",
+                                          "territory_name": "The Gate", "siege_progress": 70, "cost": 0, "sued_by": "A"})
+        self.assertIn("is set aside", peace)
+        self.assertIn("**0** sect contribution", peace)
+        self.assertNotIn("cedes", peace)
+        self.assertNotIn("keeps", peace)
+
+    def test_the_war_card_says_so_once_the_war_is_over(self):
+        with patch.dict(os.environ, ENV):
+            import importlib
+            feed = importlib.import_module("app.bot.war_feed")
+        card = feed.war_card({"war_id": 3, "status": "resolved", "attacker_key": "A", "defender_key": "D",
+                              "territory_name": "Azure Cloud Mountain Gate",
+                              "operations": {"resolution": "set_aside", "winner_key": ""}})
+        text = card.text()
+        self.assertIn("set aside", text)
+        self.assertNotIn("The war is over", text, "the card fell through to its generic ending")
 
 
 if __name__ == "__main__":
