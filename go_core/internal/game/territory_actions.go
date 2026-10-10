@@ -69,6 +69,17 @@ func territoryClaimActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 		return authoritativeMutation{}, e
 	}
 	p.TerritoryKey = strings.TrimSpace(p.TerritoryKey)
+	// A sect holds a city, not one of its streets (v1.12.0's rule, which only
+	// the world's own claim step obeyed): a claim made from a gate, a district,
+	// a shop or an inn is a claim on the city it stands in, so an older bot
+	// that still names the part keeps working and nobody can raise a banner
+	// the rest of the game never reads.
+	if whole, part := TerritoryGround(catalog, p.TerritoryKey); part {
+		if whole == "" {
+			return authoritativeMutation{}, fmt.Errorf("%s is no ground a sect can hold", p.TerritoryKey)
+		}
+		p.TerritoryKey = whole
+	}
 	mem, e := sectMembershipRow(conn, userID)
 	if e != nil {
 		return authoritativeMutation{}, e
@@ -95,7 +106,9 @@ func territoryClaimActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	if region := strings.TrimSpace(fmt.Sprint(t["region"])); region != c.Location {
+	// The ground is the city's row, so standing anywhere in the city is
+	// standing on it: a gate is its city (v1.0.9).
+	if region := strings.TrimSpace(fmt.Sprint(t["region"])); cityOf(catalog, region) != cityOf(catalog, c.Location) {
 		return authoritativeMutation{}, fmt.Errorf("%s is claimed from %s; you are at %s", fmt.Sprint(t["name"]), region, c.Location)
 	}
 	controller := strings.TrimSpace(fmt.Sprint(t["controller_key"]))
@@ -285,6 +298,9 @@ func territoryWarActActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 		winner = fmt.Sprint(war["defender_key"])
 		resolution = "defender_holds"
 	}
+	// A war over a part of a city ends with no victor (`WarVerdict`); the
+	// reply says what the war door will write, not what the blow would have won.
+	winner, resolution = WarVerdict(catalog, territory, winner, resolution)
 	// A defender's fortify raises the walls for good, not only this siege's
 	// numbers (v1.24.0): `territory_state.defense` was written by nothing.
 	defense := territoryDefenseTx(conn, territory)
@@ -335,7 +351,7 @@ func territoryWarActActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	status := "active"
 	occupation := int64(0)
 	spoils := []WarSpoil{}
-	if winner != "" {
+	if resolution != "" {
 		var ended bool
 		if spoils, ended, e = ResolveWarTx(conn, catalog, p.WarID, winner, resolution, p.GameMinute, now); e != nil {
 			return authoritativeMutation{}, e
