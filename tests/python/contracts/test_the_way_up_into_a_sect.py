@@ -75,8 +75,8 @@ class _Db:
         return nothing
 
 
-def _hidden(surface, *, sect: str | None, here: str, realm: int) -> dict[str, str]:
-    character = {"location": here, "realm_index": realm, "phase": 1, "body_realm_index": 0, "body_phase": 1}
+def _hidden(surface, *, sect: str | None, here: str, realm: int, body_realm: int = 0) -> dict[str, str]:
+    character = {"location": here, "realm_index": realm, "phase": 1, "body_realm_index": body_realm, "body_phase": 1}
     interaction = SimpleNamespace(user=SimpleNamespace(id=7))
     with patch.object(surface, "DB", _Db(sect)):
         return asyncio.run(surface._progression_hidden_actions(interaction, character))
@@ -154,6 +154,21 @@ class ThePanelAnticipatesTheEnginesRefusals(unittest.TestCase):
     def test_a_member_at_the_allied_gate_is_shown_the_door(self):
         hidden = _hidden(self.surface, sect=self.below, here=self.gate, realm=self.floor)
         self.assertNotIn("/sect recruitment ascend", hidden, hidden.get("/sect recruitment ascend"))
+
+    def test_a_body_cultivator_at_the_allied_gate_is_shown_the_door(self):
+        """The floor is a place's, so it is measured on the higher ladder - the
+        one that walked the member to the gate (v1.33.0). Asserted on the one
+        entry rather than on the dict, which holds every lock line on the panel."""
+        hidden = _hidden(self.surface, sect=self.below, here=self.gate, realm=3, body_realm=self.floor)
+        self.assertEqual(hidden.get("/sect recruitment ascend", ""), "",
+                         "a body cultivator at the gate was padlocked: the panel compared the qi ladder alone")
+
+    def test_the_higher_stage_is_the_one_named_below_the_floor(self):
+        hidden = _hidden(self.surface, sect=self.below, here=self.gate, realm=3, body_realm=self.floor - 1)
+        reason = hidden.get("/sect recruitment ascend", "")
+        self.assertIn(f"you stand at {self.surface.WORLD.realm_name(self.floor - 1)}", reason,
+                      "the refusal does not name the stage the way was measured at")
+        self.assertNotIn(self.surface.WORLD.realm_name(3), reason)
 
     def test_a_member_in_the_street_is_told_where_the_way_up_is_taken(self):
         hidden = _hidden(self.surface, sect=self.below, here="Greenriver Town", realm=self.floor)

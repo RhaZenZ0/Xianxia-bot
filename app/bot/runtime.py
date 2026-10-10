@@ -55,7 +55,7 @@ from ..database import Database
 from ..rules.game import World
 from ..ops.game_engine import GameEngineClient, GameEngineError
 from ..ops.user_budget import UserBudget
-from ..rules.realm_hubs import REALM_HUBS, presence_world_for, realm_presence_role_name
+from ..rules.realm_hubs import REALM_HUBS, access_realm_index, presence_world_for, realm_presence_role_name
 from ..rules.worldtime import from_game_minutes, MINUTES_PER_YEAR
 
 
@@ -477,7 +477,7 @@ async def _sync_realm_access_roles(
         return
     unlocked = {
         world for world, hub in REALM_HUBS.items()
-        if int(character.get("realm_index", 0)) >= int(hub.get("min_realm_index", 0))
+        if access_realm_index(character) >= int(hub.get("min_realm_index", 0))
     }
     current_ids = {role.id for role in member.roles}
     add_roles = [role for world, role in available.items() if world in unlocked and role.id not in current_ids]

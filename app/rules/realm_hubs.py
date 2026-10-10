@@ -105,6 +105,21 @@ def realm_hub(world_name: str) -> dict[str, Any] | None:
     return dict(hub) if hub else None
 
 
+def access_realm_index(character: dict[str, Any]) -> int:
+    """The cultivation a *place* is measured against.
+
+    The world-crossing tribulation is gated on either ladder - a body
+    cultivator clears the Mortal Body Ascension and breaks into the Spiritual
+    World's body realm exactly as a qi cultivator clears theirs - but every
+    location check read `realm_index` alone, so a body cultivator could
+    ascend into a world and then be locked out of it. Mirrors the engine's
+    `mechanicsCharacter.accessRealmIndex`. It lives here, below the bot, so the
+    runtime's role sync and the panels read the one definition the locations
+    helpers do.
+    """
+    return max(int(character.get("realm_index", 0) or 0), int(character.get("body_realm_index", 0) or 0))
+
+
 def city_of_place(location: Any, locations: Mapping[str, Any] | None = None) -> str:
     """The city a place is part of - the engine's `cityOf`, twinned.
 

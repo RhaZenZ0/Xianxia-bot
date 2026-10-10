@@ -25,7 +25,7 @@ from typing import Any, Sequence
 import discord
 from discord import app_commands
 
-from ..rules.realm_hubs import REALM_HUBS
+from ..rules.realm_hubs import REALM_HUBS, access_realm_index
 from ..rules.sense import circuit_stop
 from .runtime import DB, WORLD, current_world_time, log
 from .services import SIM
@@ -252,19 +252,6 @@ def _world_min_realm_index(world_name: str) -> int:
         if str(data.get("world")) == str(world_name)
     ]
     return min(candidates) if candidates else 0
-
-
-def access_realm_index(character: dict[str, Any]) -> int:
-    """The cultivation a *place* is measured against.
-
-    The world-crossing tribulation is gated on either ladder - a body
-    cultivator clears the Mortal Body Ascension and breaks into the Spiritual
-    World's body realm exactly as a qi cultivator clears theirs - but every
-    location check read `realm_index` alone, so a body cultivator could
-    ascend into a world and then be locked out of it. Mirrors the engine's
-    `mechanicsCharacter.accessRealmIndex`.
-    """
-    return max(int(character.get("realm_index", 0) or 0), int(character.get("body_realm_index", 0) or 0))
 
 
 def _world_is_unlocked(character: dict[str, Any], world_name: str) -> bool:
