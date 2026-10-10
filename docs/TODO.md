@@ -4,7 +4,7 @@ What is open, and what each open thing became. Every entry is either **fixed** i
 or **deferred** with the reason; nothing is left open without one of those two words, and
 `tests/python/contracts/test_playtest_gate.py` holds the file to that. A fixed entry is **kept**
 rather than deleted: it is the record of what the item turned into, and the release write-ups in
-`CLAUDE.md` cite these by name.
+`docs/FINDINGS.md` cite these by name.
 
 Newest first. Add to it as findings come in — from the live pass (`docs/playtest/`), from a review,
 or from a sweep of the tree.
@@ -275,7 +275,7 @@ deferred half and not the half that says what was done about it.
   homestead's `merchant` facility had been buildable, raisable and printed to the narrator since it
   was written and read by no rule; `stallSlotsAndFee` is that rule. On the owner's call anyone at
   Foundation Establishment may open one and the town buys too, bounded: never the last unit, never
-  above one coin under the cheapest shelf, out of its own wealth, three a city a day. See CLAUDE.md,
+  above one coin under the cheapest shelf, out of its own wealth, three a city a day. See docs/FINDINGS.md,
   "A stall in the city". Two omissions with reasons: no rename (close returns everything and open
   again names it) and no `admin.stall.close` lever until a GM asks for one - a GM's erasure and reset
   already take a stall with the character.
@@ -335,7 +335,7 @@ deferred half and not the half that says what was done about it.
   Foundation Establishment - these things are enough"* and *"I still forget where to go what to do"*.
   The curriculum is retuned to that list (120 of 250 leaves at Body Tempering, down from 142), the
   menu leaves off the hubs with no lever open yet and names the tutorial's next step, and `/mine` is
-  built. See CLAUDE.md, "The first hour is a short list".
+  built. See docs/FINDINGS.md, "The first hour is a short list".
 - **fixed (v1.2.0)** — *A road put a cultivator in transit for a real half hour.* `TRAVEL_TIME_PERCENT`,
   default 0; the old pace is 100. The toll, the encounter and the road-side discoveries are untouched.
 - **fixed (v1.2.2)** — *"Journeyman sounds medieval."* v1.2.0 made the ladder Unranked, Grade 1-5 and
@@ -366,11 +366,11 @@ deferred half and not the half that says what was done about it.
   everybody by the beginner path - asked for exactly that and had no reachable reporter; no sect work
   was open to an outsider; and the recommendation's "+N" was never added to a roll. The recommendation
   and the trial also took their gate from the caller, which writes a road-less place onto a travel
-  list. All of it is the engine's now. See CLAUDE.md, "The door into a sect".
+  list. All of it is the engine's now. See docs/FINDINGS.md, "The door into a sect".
 - **fixed (v1.1.0)** — *A button was drawn where the engine would only refuse it because of where you
   stand.* Reported from play as `/economy → City Shops → Browse` in the birth household. Every leaf
   refused purely by place is a locked line naming why and where it works, asked with the engine's own
-  predicate; City Shops' Here is always drawn. See CLAUDE.md, "A button is drawn where it works".
+  predicate; City Shops' Here is always drawn. See docs/FINDINGS.md, "A button is drawn where it works".
 - **fixed (v1.1.0)** — *A caravan could not leave from a city's gate.* `caravan.dispatch` planned from
   the raw location while travel uses `cityOf`, so it refused at every gate and district of the city it
   was standing in - v1.0.9's household-door fault in a second handler.
@@ -419,7 +419,7 @@ deferred half and not the half that says what was done about it.
   Damage and Dantian Damage take their severity off Spirit (Soul Wound off both), so the cure grew
   harder exactly as the ailment grew worse; a failure mended nothing and still spent the pill. Every
   treatment mends now (one level on a failure, two on a success, three on a strong success), the TN is
-  `10 + severity`, and the condition being treated is left out of its own roll. See CLAUDE.md, "A
+  `10 + severity`, and the condition being treated is left out of its own roll. See docs/FINDINGS.md, "A
   treatment always mends".
 - **fixed (v1.0.17)** — *A keeper paid a Saint what it paid a beggar.* Reported from play as the Qi
   Nourishing Pill selling for 11 and buying back for 4. The third itself is the authored rule and is
@@ -428,7 +428,7 @@ deferred half and not the half that says what was done about it.
   found was on the crafting side - three Mortal recipes (the Qi Nourishing Pill, the Spirit-Iron Sword,
   the Spirit-Iron Lamellar) sold back for less than their own ingredients. On the owner's call a rank
   in the item's trade now adds 2 of the shop's coin per rank above Novice to what the keeper pays,
-  never reaching the cheapest shelf price in that coin, and shelf prices are untouched. See CLAUDE.md,
+  never reaching the cheapest shelf price in that coin, and shelf prices are untouched. See docs/FINDINGS.md,
   "A keeper pays a craftsman by rank".
 - **fixed (v1.3.0)** — *The Starfall Talisman was a profit for anybody who could make it.* On the
   owner's call the Celestial Mandate talisman hall's `buys` line is 96, beside the other Celestial
@@ -442,7 +442,7 @@ deferred half and not the half that says what was done about it.
   the Mortal World's four town apothecaries shelve it, and
   `test_a_method_can_be_made_where_it_is_sold.py` holds every world that sells a method to offering
   what it needs. The craft refusal names where each short material is sold, from where the player
-  stands. See CLAUDE.md, "A method can be made where it is sold".
+  stands. See docs/FINDINGS.md, "A method can be made where it is sold".
 - **fixed (v1.3.0)** — *A higher trade examination taught methods its own world cannot supply.* On
   the owner's call a hall teaches only what its own world can make (`rankRecipesWhereTheyCanBeMade`,
   off `worldOffers`), names what it withheld, and the slip or a hall in a world that can teaches the
@@ -466,7 +466,7 @@ deferred half and not the half that says what was done about it.
   phase. It had no Python reader anywhere in the tree, no dashboard view and no `/admin` panel, and
   the only place `resets_used`/`resets_remaining` had ever appeared was the reply to the reset
   itself. `character.reset_status` is the one door; `/admin player inspect` and the dashboard's
-  Player Editor ask it. See CLAUDE.md, "The allowance nobody could look up".
+  Player Editor ask it. See docs/FINDINGS.md, "The allowance nobody could look up".
 - **fixed (v1.3.0)** — *A player could not see how many restarts they had left before spending one.*
   On the owner's call `/reset`'s "Are you sure?" names the count, read through `character.reset_status`
   by a confirm-note provider (`register_confirm_note`); an engine that does not answer prints
@@ -476,7 +476,7 @@ deferred half and not the half that says what was done about it.
   wants one `talisman_paper` and one `spirit_ink`. `character_recipes` had four writers and no
   Python reader; `get_recipe_definition` parsed a recipe's `cost` and nothing printed it; and the
   engine computed the exact shortfall and refused with the bare words "missing materials", which the
-  bot replaced with a vaguer line of its own. See CLAUDE.md, "A method that could not say what it
+  bot replaced with a vaguer line of its own. See docs/FINDINGS.md, "A method that could not say what it
   needed".
 - **fixed (v1.0.1)** — *A player could not reset a character without a GM.* `/begin` refuses while a
   `characters` row exists, dying is not a reset (`lifecycle.true_death` has three callers and none is
@@ -484,7 +484,7 @@ deferred half and not the half that says what was done about it.
   `admin.player.erase` — a data-protection lever being used as a restart button. `character.reset`
   is the player's own door, on `/reset` and `/character → Samsara`, bounded by the anonymise
   disposition (no reset once the character is named on a row a shared world keeps) and by an
-  allowance of three counted from rows the sweep keeps. See CLAUDE.md, "Starting over without a GM".
+  allowance of three counted from rows the sweep keeps. See docs/FINDINGS.md, "Starting over without a GM".
 - **fixed (v1.0.2)** — *The reset was briefly uncapped, and the line to Samsara was held by
   accident.* The allowance is three per Discord account, ever — not per character, not per life —
   counted from `event_log` rows the sweep is told to keep. And `TestAResetIsNotASmallSamsara` now
@@ -583,7 +583,7 @@ deferred half and not the half that says what was done about it.
   not being repeated. The three neighbouring behaviours this entry named as working are untouched.
   The gate this entry asked for exists, and writing it found that rc.59's own fixture stubbed
   `release_notes_for` with a lambda - so the parse was never driven from `announce_release_if_new`
-  at all; it pins a temporary `VERSIONS.md` now. See CLAUDE.md, "A server is told what it missed".
+  at all; it pins a temporary `VERSIONS.md` now. See docs/FINDINGS.md, "A server is told what it missed".
 - **fixed (v1.0.8)** — *The NPC picker offered whoever sorted first in the world, not whoever was
   standing here.* `local_npc_autocomplete` searched all 574 catalogue NPCs, took the alphabetically
   first twenty-five, and only then filtered by location — so `/talk`, `/npcinfo` and `/sense`
@@ -629,7 +629,7 @@ deferred half and not the half that says what was done about it.
   `beast_encounter_rate` and `recovery_rate` each occurred exactly once in `go_core`, in their own
   declaration — so the Beast Tide Era did nothing whatever to beasts. Two are wired
   (`beast_encounter_rate` on the hunt margin, `recovery_rate` on v1.0.4's vitality recovery) and two
-  are refused. See CLAUDE.md, "An era belongs to one world".
+  are refused. See docs/FINDINGS.md, "An era belongs to one world".
 - **fixed (v1.3.4)** — *`secret_realm_frequency` has nowhere honest to land.* Deleted from the vocabulary on
   the owner's call; `unreadEraModifiers` is empty. Was: It would weight the
   `kind: "secret_realm"` branch of `eligibleUnexpectedEvents`, whose weights rc.53 deliberately
@@ -703,7 +703,7 @@ deferred half and not the half that says what was done about it.
   wilds* rather than sanctuary — gating the hunter on it would end the bounty system rather than
   give it a refuge. `door_rule` is retired: it restated the second half of the same sentence, no
   house's prose can differ, and the engine already ends the protection at the door by standing the
-  ambush outside. See CLAUDE.md, "The protection only the bot believed in".
+  ambush outside. See docs/FINDINGS.md, "The protection only the bot believed in".
 - **fixed (v1.0.12)** — *The Discord sweep could not see the curriculum, and had not been run since
   v1.0.8.* v1.0.9 gave a page a third state - a door the curriculum has not introduced yet, which
   prints one collapsed line per page and no per-leaf lock line - and `press_leaf` knows two, so 97 of
@@ -711,7 +711,7 @@ deferred half and not the half that says what was done about it.
   the player past the roster's own ceiling (read off `feature_unlocks`, never written down) before
   the sweep, so every leaf is pressed again, and asserts the curriculum first at realm 0 on the page
   the roster says holds the most back. `test_playtest_coverage.py` was green throughout because it
-  only asked about the deferral set; it holds all three of those now. See CLAUDE.md, "The curriculum
+  only asked about the deferral set; it holds all three of those now. See docs/FINDINGS.md, "The curriculum
   the sweep could not see".
 - **fixed (v1.0.12)** — *Every GM lever addressed an id a float had rounded off.* `decodeMap` is
   `json.Unmarshal` into `map[string]any`, so a JSON number became a float64 - and a Discord snowflake
@@ -720,7 +720,7 @@ deferred half and not the half that says what was done about it.
   just drawn. Player actions were never affected, because `ActionRequest.ActorID` is a typed field.
   `UseNumber()` is the fix and **no reader changed** - `storage.ParseInt` has had a `case
   json.Number` since it was written and nothing could ever produce one. Found by the playtest, not by
-  reading. See CLAUDE.md, "An id too big for a float".
+  reading. See docs/FINDINGS.md, "An id too big for a float".
 - **fixed (v1.0.12)** — *A hub panel went quiet after fifteen minutes, and the number was written
   out five times.* Asked for in play. `HUB_PANEL_IDLE_MINUTES` (`0` = never) replaces a bare
   `timeout=900` in five files; injected into `hubs.py` because the layering refuses a `runtime`
@@ -744,7 +744,7 @@ deferred half and not the half that says what was done about it.
   `dashboard/app.js` stopped keeping a third copy in `gradeOpts` - both cards are pickers fed from
   the content file by `_aptitude_catalogue`. The finding underneath is the fixture: `Apply` passes
   an **empty world path** and every admin test went through it, so a lever that refused everything
-  would have passed all of them. See CLAUDE.md, "The writer a human drives is the one nothing held".
+  would have passed all of them. See docs/FINDINGS.md, "The writer a human drives is the one nothing held".
 - **fixed (v1.0.11)** — *🗺️ Cultivation World is gated behind having played.* One generated role
   (`Xianxia • Cultivator`), granted at creation ahead of the first private thread, kept in step by
   `require_character`, revoked at `admin.player.erase` - the one moment nothing else can notice -
@@ -753,7 +753,7 @@ deferred half and not the half that says what was done about it.
   before it denies `@everyone` (rc.52); and it **merges** rather than replaces, because
   `set_permissions(**perms)` would have taken `send_messages=False` off `@everyone` with it and
   left two read-only anchors writable to everybody holding the role. The name-family trap this
-  entry called out is now `test_server_layout.py`. See CLAUDE.md, "A room for people
+  entry called out is now `test_server_layout.py`. See docs/FINDINGS.md, "A room for people
   who have played".
 - **fixed (v1.0.1)** — *The release after a live pass would have deleted it.* The checklist is named
   after `RELEASE_VERSION`, so the filename held still across all fifty-nine release candidates of
@@ -966,7 +966,7 @@ deferred half and not the half that says what was done about it.
   input steps by taking the first select on the **result's** message. The tell was in the payload all
   along, as `disabled`, and the sweep never read it. The skip is in `select_by_placeholder`, the one
   helper both answerers reach; a disabled **leaf button** is deliberately still a failure, because
-  that one means the panel timed out. See CLAUDE.md, "A disabled control is not a question".
+  that one means the panel timed out. See docs/FINDINGS.md, "A disabled control is not a question".
 - **fixed (v1.0.13)** — *Two more copies of the fifteen minutes, and only one of them spelled.*
   v1.0.12 removed a bare `timeout=900` from five production files and its drill then found a sixth
   pinned as a string in `test_gui_integrity.py`; both are in that release. The seventh was not the
