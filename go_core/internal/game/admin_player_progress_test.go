@@ -1,6 +1,8 @@
 package game
 
 import (
+	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -145,5 +147,178 @@ func TestTheRootLeverTakesAMutationTheCatalogueCarries(t *testing.T) {
 	}
 	if _, err := applyAdminRaw(t, path, "admin.player.set_spiritual_root", 0, map[string]any{"user_id": 42, "grade": "Heaven", "purity": 60, "mutation": "Old Freeform"}); err != nil {
 		t.Fatalf("saving the card unchanged was refused over a value already stored: %v", err)
+	}
+}
+
+// --- what an undo takes back (admin_undo_rows.go) ---
+//
+// Each of the three levers wrote a pair of numbers on a row play was already
+// writing to, and their undo restored the whole snapshot - the column the lever
+// left alone included. Every test lets real play happen between the lever and
+// the undo, because an undo driven straight after its lever cannot tell the two
+// apart.
+
+// A trade the character never had, set by the lever and crafted on: the undo
+// takes the rank back and leaves the row, because the successes an examination
+// reads are the craft's.
+func TestAnUndoKeepsWhatACraftEarnedOnTheLeversRow(t *testing.T) {
+	path := setupBatch4AuthorityDB(t)
+	setupCraftAuthorityTables(t, path)
+	batch4Exec(t, path, perfectionAuditDDL)
+	world := batch4WorldPath(t)
+	batch4Exec(t, path, "DELETE FROM profession_progress WHERE user_id=42")
+	applyAdmin(t, path, "admin.player.set_profession", map[string]any{"user_id": 42, "profession": "Alchemy", "level": 1, "xp": 0, "reason": "fault"})
+	batch4TeachRecipe(t, path, 42, "Recovery Pill")
+	batch4Exec(t, path, `INSERT INTO inventory(user_id,item_id,quantity) VALUES(42,'spirit_herb',4),(42,'beast_core',2)`)
+	if _, err := craftBatchApply(t, path, world, "undo-craft", map[string]any{"recipe": "Recovery Pill", "quantity": 2}); err != nil {
+		t.Fatal(err)
+	}
+	if a := lastAuditAction(t, path); a != "admin.player.set_profession" {
+		t.Fatalf("the last audit row is %q; a craft must not write one", a)
+	}
+	crafted := storage.ParseInt(actionScalar(t, path, "SELECT successes FROM profession_progress WHERE user_id=42 AND profession='Alchemy'"))
+	if crafted < 1 {
+		t.Fatalf("successes=%d after two crafts by a giant; the fixture no longer lets a craft land", crafted)
+	}
+	undoLast(t, path)
+	row := actionScalar(t, path, "SELECT level||':'||xp||':'||successes FROM profession_progress WHERE user_id=42 AND profession='Alchemy'")
+	if row == nil {
+		t.Fatalf("the undo deleted the row the player crafted on: the %d success(es) an examination reads went with it", crafted)
+	}
+	if want := fmt.Sprintf("0:0:%d", crafted); row != want {
+		t.Fatalf("row=%v after undo, want %s: the rank the lever set goes back and the successes stay", row, want)
+	}
+	// A redo is the forward upsert, and lands on the row that is there.
+	undoLast(t, path)
+	if got := storage.ParseInt(actionScalar(t, path, "SELECT level FROM profession_progress WHERE user_id=42 AND profession='Alchemy'")); got != 1 {
+		t.Fatalf("level=%d after the redo, want the 1 the lever set", got)
+	}
+}
+
+// An undo is an UPDATE: it does not bring back a trade a samsara has since wiped.
+func TestAnUndoOfATradeDoesNotBringBackARowAResetRemoved(t *testing.T) {
+	path := setupProgressDB(t)
+	if _, err := storageExec(path, `INSERT INTO profession_progress(user_id,profession,level,xp,updated_at) VALUES(42,'Forging',2,10,0)`); err != nil {
+		t.Fatal(err)
+	}
+	applyAdmin(t, path, "admin.player.set_profession", map[string]any{"user_id": 42, "profession": "Forging", "level": 5, "xp": 3, "reason": "fault"})
+	if _, err := storageExec(path, `DELETE FROM profession_progress WHERE user_id=42`); err != nil {
+		t.Fatal(err)
+	}
+	undoLast(t, path)
+	if got := storage.ParseInt(scalar(t, path, "SELECT COUNT(*) FROM profession_progress WHERE user_id=42")); got != 0 {
+		t.Fatalf("%d row(s) after the undo: it brought back a trade the life had wiped", got)
+	}
+}
+
+func TestAnUndoOfALawLeavesTheSittingsTheGMLeftAlone(t *testing.T) {
+	path := setupBatch4AuthorityDB(t)
+	world := batch4WorldPath(t)
+	batch4Exec(t, path, perfectionAuditDDL)
+	batch4Exec(t, path, "UPDATE characters SET realm_index=8,phase=3 WHERE user_id=42")
+	batch4Exec(t, path, "INSERT INTO law_progress(user_id,law_id,comprehension,insights,updated_at) VALUES(42,'fire',20,6,0)")
+	sitting := func(law string, seq int) {
+		t.Helper()
+		batch4Exec(t, path, "DELETE FROM cooldowns WHERE user_id=42")
+		batch4Apply(t, path, world, "law.comprehend", seq, map[string]any{"law": law, "game_minute": 200})
+	}
+	read := func(law string) string {
+		return fmt.Sprint(actionScalar(t, path, "SELECT comprehension||':'||insights FROM law_progress WHERE user_id=42 AND law_id='"+law+"'"))
+	}
+
+	// The count of sittings was never the lever's: a GM who gave only the
+	// comprehension left it, and a sitting taken since stays taken.
+	applyAdmin(t, path, "admin.player.set_law", map[string]any{"user_id": 42, "law_id": "fire", "comprehension": 55, "reason": "fault"})
+	sitting("fire", 1)
+	undoLast(t, path)
+	if got := read("fire"); !strings.HasSuffix(got, ":7") || !strings.HasPrefix(got, "20:") {
+		t.Fatalf("fire is %s after the undo, want comprehension 20 and the 7 sittings play made (the undo erased the sitting)", got)
+	}
+	redo := undoLast(t, path)
+	if got := read("fire"); !strings.HasPrefix(got, "55:") || !strings.HasSuffix(got, ":7") {
+		t.Fatalf("fire is %s after the redo (%v), want comprehension 55 and the same 7 sittings", got, redo)
+	}
+
+	// A Law the character never sat with: the undo takes the comprehension and
+	// keeps the row a sitting has since been logged on.
+	applyAdmin(t, path, "admin.player.set_law", map[string]any{"user_id": 42, "law_id": "water", "comprehension": 30, "reason": "fault"})
+	sitting("water", 2)
+	undoLast(t, path)
+	if got := read("water"); got != "0:1" {
+		t.Fatalf("water is %s after the undo, want 0:1 - the row the player sat on is kept with its one sitting", got)
+	}
+
+	// Untouched by play, the row the lever made goes with its undo.
+	applyAdmin(t, path, "admin.player.set_law", map[string]any{"user_id": 42, "law_id": "sword", "comprehension": 30, "insights": 4, "reason": "fault"})
+	undoLast(t, path)
+	if got := storage.ParseInt(actionScalar(t, path, "SELECT COUNT(*) FROM law_progress WHERE user_id=42 AND law_id='sword'")); got != 0 {
+		t.Fatalf("%d row(s) for a Law nobody sat with after its lever was undone", got)
+	}
+}
+
+// The balance is the lever's; the lifetime count promotion reads is play's.
+func TestAnUndoOfAContributionLeavesTheCountTheGMLeftAlone(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "contribution.sqlite3")
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.ExecScript(sectExchangeSchema + perfectionAuditDDL); err != nil {
+		conn.Close()
+		t.Fatal(err)
+	}
+	conn.Close()
+
+	applyAdmin(t, path, "admin.player.set_sect_contribution", map[string]any{"user_id": 1, "contribution_points": 5, "reason": "fault"})
+	// A real donation, through the production door into creditSectContributionTx.
+	play, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := addInventoryTx(play, 1, map[string]int64{"qi_pill": 1}); err != nil {
+		play.Close()
+		t.Fatal(err)
+	}
+	out, err := sectOp(t, play, "sect.contribute", 1, map[string]any{"item_id": "qi_pill", "quantity": 1})
+	if err != nil {
+		play.Close()
+		t.Fatal(err)
+	}
+	if err := play.Commit(); err != nil {
+		play.Close()
+		t.Fatal(err)
+	}
+	play.Close()
+	earned := i64(out["points"])
+	if earned < 1 {
+		t.Fatalf("a donation earned %d points; the fixture no longer pays one", earned)
+	}
+	if got := storage.ParseInt(scalar(t, path, "SELECT contribution_earned FROM sect_membership WHERE user_id=1")); got != earned {
+		t.Fatalf("contribution_earned=%d after the donation, want %d", got, earned)
+	}
+
+	undoLast(t, path)
+	if got := storage.ParseInt(scalar(t, path, "SELECT contribution_points FROM sect_membership WHERE user_id=1")); got != 0 {
+		t.Fatalf("contribution_points=%d after undo, want the 0 the lever replaced", got)
+	}
+	if got := storage.ParseInt(scalar(t, path, "SELECT contribution_earned FROM sect_membership WHERE user_id=1")); got != earned {
+		t.Fatalf("contribution_earned=%d after undo, want the %d play earned: the lever left the count alone and the undo erased the points", got, earned)
+	}
+}
+
+// The lever on a count the GM did set: both sides differ, so the undo restores it.
+func TestAnUndoOfAContributionRestoresACountTheGMSet(t *testing.T) {
+	path := setupProgressDB(t)
+	applyAdmin(t, path, "admin.player.set_sect_contribution", map[string]any{"user_id": 42, "contribution_points": 500, "contribution_earned": 9000, "reason": "fault"})
+	if _, err := storageExec(path, `UPDATE sect_membership SET contribution_points=contribution_points+10,contribution_earned=contribution_earned+10 WHERE user_id=42`); err != nil {
+		t.Fatal(err)
+	}
+	undoLast(t, path)
+	if got := storage.ParseInt(scalar(t, path, "SELECT contribution_earned FROM sect_membership WHERE user_id=42")); got != 120 {
+		t.Fatalf("contribution_earned=%d after undo, want the 120 the lever replaced", got)
+	}
+	redo := undoLast(t, path)
+	if got := storage.ParseInt(scalar(t, path, "SELECT contribution_earned FROM sect_membership WHERE user_id=42")); got != 9000 {
+		t.Fatalf("contribution_earned=%d after redo (%v), want 9000", got, redo)
 	}
 }
