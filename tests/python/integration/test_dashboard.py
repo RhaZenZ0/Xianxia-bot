@@ -202,12 +202,36 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
                 "VALUES('stuck_lesson','The Last Lesson','[{\"id\":\"x\",\"type\":\"family_lesson\",\"count\":1,\"label\":\"Take the lesson\"}]','{}','approved',0,0)")
             await db.execute(
                 "INSERT INTO character_quests(user_id,quest_key,status,progress_json,created_at,updated_at) VALUES(11,'stuck_lesson','active','{}',0,0)")
+            # A targeted objective is met only by a report naming the same
+            # thing (v1.33.0), so the journal must carry the target back to the
+            # card - from the terms the player accepted, and, for a row with no
+            # pinned terms, from the definition.
+            await db.execute(
+                "INSERT OR REPLACE INTO quest_definitions(quest_key,title,objectives_json,rewards_json,status,created_at,updated_at) "
+                "VALUES('road_stage','A Road Stage','[{\"id\":\"cross\",\"type\":\"breakthrough\",\"target\":\"Qi Refining\",\"count\":1,\"label\":\"Cross\"},"
+                "{\"id\":\"sit\",\"type\":\"cultivate\",\"count\":2}]','{}','approved',0,0)")
+            await db.execute(
+                "INSERT INTO character_quests(user_id,quest_key,status,progress_json,created_at,updated_at,terms_json) "
+                "VALUES(11,'road_stage','active','{}',0,0,"
+                "'{\"objectives\":[{\"id\":\"cross\",\"type\":\"breakthrough\",\"target\":\"Foundation Establishment\",\"count\":1}]}')")
+            await db.execute(
+                "INSERT OR REPLACE INTO quest_definitions(quest_key,title,objectives_json,rewards_json,status,created_at,updated_at) "
+                "VALUES('unpinned_stage','An Unpinned Stage','[{\"id\":\"talk\",\"type\":\"talk\",\"target\":\"Elder Pine\",\"count\":1}]','{}','approved',0,0)")
+            await db.execute(
+                "INSERT INTO character_quests(user_id,quest_key,status,progress_json,created_at,updated_at) VALUES(11,'unpinned_stage','active','{}',0,0)")
             await db.commit()
         journal = {q["quest_key"]: q for q in (await self.store.player_detail(11))["quests"]}
         self.assertEqual(journal["stuck_lesson"]["title"], "The Last Lesson")
         self.assertEqual(journal["stuck_lesson"]["status"], "active")
         self.assertEqual(journal["stuck_lesson"]["objectives"],
-                         [{"id": "x", "type": "family_lesson", "label": "Take the lesson", "count": 1, "progress": 0}])
+                         [{"id": "x", "type": "family_lesson", "target": None, "label": "Take the lesson", "count": 1, "progress": 0}],
+                         "the journal must carry every objective's target - None for an untargeted one - for the card to report it")
+        self.assertEqual([(o["type"], o["target"]) for o in journal["road_stage"]["objectives"]],
+                         [("breakthrough", "Foundation Establishment")],
+                         "the pinned terms are what the player accepted, so their target is the one to report")
+        self.assertEqual([(o["type"], o["target"]) for o in journal["unpinned_stage"]["objectives"]],
+                         [("talk", "Elder Pine")],
+                         "a row with no pinned terms reads its target off the definition")
 
     async def test_new_dashboard_api_routes_return_json(self):
         settings = DashboardSettings(self.path, "127.0.0.1", 0, "gm", "a-very-long-private-dashboard-token", admin_writes=False)

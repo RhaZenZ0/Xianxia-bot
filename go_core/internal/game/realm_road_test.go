@@ -193,6 +193,14 @@ func TestAQuestNamingACityIsMetAtItsGate(t *testing.T) {
 	if got := questTargetCity(catalog, gate, "travel", namesGate); got != "" {
 		t.Fatalf("a quest naming the gate itself had its report rewritten to %q", got)
 	}
+	// A quest naming the place and its city in one type is met at the place
+	// as it stands (v1.33.0): the GM's report echoes an objective's own target,
+	// and rewriting the gate to the city would meet the wrong objective. No
+	// shipped quest does this, so the shipped walk cannot see the guard.
+	namesBoth := []map[string]any{{"id": "gate", "type": "travel", "target": gate}, {"id": "city", "type": "travel", "target": city}}
+	if got := questTargetCity(catalog, gate, "travel", namesBoth); got != "" {
+		t.Fatalf("a quest naming both %q and its city had the gate's report rewritten to %q", gate, got)
+	}
 	otherType := []map[string]any{{"id": "speak", "type": "talk", "target": city}}
 	if got := questTargetCity(catalog, gate, "travel", otherType); got != "" {
 		t.Fatalf("an objective of another type made the report read as %q", got)

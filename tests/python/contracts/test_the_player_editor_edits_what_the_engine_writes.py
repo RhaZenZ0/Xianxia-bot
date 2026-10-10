@@ -39,11 +39,8 @@ def _go_sources() -> str:
     return "\n".join(p.read_text(encoding="utf-8") for p in GAME.glob("*.go") if not p.name.endswith("_test.go"))
 
 
-def _function(source: str, name: str) -> str:
-    match = re.search(rf"(?:async\s+)?function\s+{re.escape(name)}\s*\(", source)
-    if not match:
-        raise AssertionError(f"{name} is gone from app.js; the gate is broken, not the tree")
-    start = source.index("{", match.end() - 1)
+def _braced(source: str, start: int, what: str) -> str:
+    """The balanced `{...}` whose opening brace sits at `start`."""
     depth = 0
     for i in range(start, len(source)):
         if source[i] == "{":
@@ -52,7 +49,14 @@ def _function(source: str, name: str) -> str:
             depth -= 1
             if depth == 0:
                 return source[start : i + 1]
-    raise AssertionError(f"{name}'s body never closes; the gate is broken, not the tree")
+    raise AssertionError(f"{what}'s body never closes; the gate is broken, not the tree")
+
+
+def _function(source: str, name: str) -> str:
+    match = re.search(rf"(?:async\s+)?function\s+{re.escape(name)}\s*\(", source)
+    if not match:
+        raise AssertionError(f"{name} is gone from app.js; the gate is broken, not the tree")
+    return _braced(source, source.index("{", match.end() - 1), name)
 
 
 class TheVocabulariesAgreeWithTheEngine(unittest.TestCase):
@@ -137,6 +141,63 @@ class EveryCatalogueFieldIsAPicker(unittest.TestCase):
     def test_the_catalogue_is_read_off_the_player_response(self):
         self.assertTrue("p.editor_catalogue" in self.body)
         self.assertFalse("d.editor_catalogue" in self.body, "the /api/admin snapshot carries no catalogue")
+
+
+class TheQuestReportNamesItsObjective(unittest.TestCase):
+    """The Quests card's Report sends the objective's own type and target (v1.33.0).
+
+    `progressQuest` counts a targeted objective only against a report that
+    names the same target, and 459 of the 524 objectives the shipped content
+    authors name one. The card used to group the pending objectives by type and
+    post the type alone, so it could advance only the untargeted fifth - and
+    the realm-road breakthrough its own text tells a GM to report was not one.
+    Nothing saw it because the engine's own tests send a target, which the card
+    never did.
+    """
+
+    def setUp(self):
+        self.body = _function(APP_JS, "loadPlayerEditor")
+        handler = re.search(r"on\('reportQuest',", self.body)
+        fill = re.search(r"const fillObjectives=\(\)=>", self.body)
+        self.assertIsNotNone(handler, "the Report handler moved; the gate is broken, not the tree")
+        self.assertIsNotNone(fill, "fillObjectives moved; the gate is broken, not the tree")
+        self.handler = _braced(self.body, self.body.index("{", handler.end()), "the Report handler")
+        self.fill = _braced(self.body, self.body.index("{", fill.end()), "fillObjectives")
+        call = re.search(r"run\('player\.quest_progress',\{", self.handler)
+        self.assertIsNotNone(call, "the Report handler no longer posts player.quest_progress")
+        self.payload = _braced(self.handler, call.end() - 1, "the report payload")
+
+    def test_the_reader_works(self):
+        self.assertIn("questObjective", self.fill, "the brace reader did not return fillObjectives")
+        self.assertIn("quest_key", self.payload, "the brace reader did not return the report payload")
+
+    def test_the_report_names_the_target_of_the_objective_it_types(self):
+        kind = re.search(r"objective_type:\s*(\w+)\.type\b", self.payload)
+        target = re.search(r"\btarget:\s*(\w+)\.target\b", self.payload)
+        self.assertIsNotNone(kind, "the report takes its objective type from no objective, so it cannot name its target")
+        self.assertIsNotNone(target, (
+            "the report names no target, so the engine counts it against untargeted objectives only"))
+        self.assertEqual(kind.group(1), target.group(1), "the type and the target come from two different objectives")
+
+    def test_the_report_leaves_the_id_to_the_server(self):
+        # `user_id:uid` is the string the server returned; a snowflake through
+        # Number() loses its last digits (v1.0.12).
+        self.assertRegex(self.payload, r"user_id:\s*uid\b")
+        self.assertNotIn("Number(uid", self.payload)
+
+    def test_the_picker_offers_objectives_not_types(self):
+        self.assertNotIn("new Set(", self.fill, (
+            "the picker collapses objectives by type again, so two objectives of one type "
+            "cannot be told apart and none of their targets can be sent"))
+        self.assertIn(".objectives[", self.handler, "the report no longer resolves the picked objective")
+
+    def test_an_empty_picker_reports_nothing(self):
+        # Number('') is 0, so a quest with nothing left to report would
+        # otherwise report its first objective.
+        text = self.handler
+        self.assertIn("===''", text, "the Report handler never asks whether the picker was empty")
+        self.assertLess(text.index("===''"), text.index(".objectives["), "the empty picker is checked after it is read")
+        self.assertLess(text.index(".objectives["), text.index("run("), "the report posts before the objective is resolved")
 
 
 if __name__ == "__main__":  # pragma: no cover

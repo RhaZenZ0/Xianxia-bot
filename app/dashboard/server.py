@@ -90,6 +90,10 @@ def quest_journal(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 {
                     "id": str(o.get("id") or ""),
                     "type": str(o.get("type") or ""),
+                    # What the objective names, or None: the engine matches a
+                    # targeted objective only against a report that names the
+                    # same thing, so the card must send it back.
+                    "target": None if o.get("target") in (None, "") else str(o["target"]),
                     "label": str(o.get("label") or o.get("type") or ""),
                     "count": max(1, int(o.get("count") or 1)),
                     "progress": int(progress.get(str(o.get("id") or ""), 0) or 0),
