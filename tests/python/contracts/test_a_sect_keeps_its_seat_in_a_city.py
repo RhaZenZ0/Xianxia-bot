@@ -193,8 +193,12 @@ class ThePythonTwinAgreesWithTheContent(unittest.TestCase):
 
 class EverySurfaceNamesTheSeat(unittest.TestCase):
     def test_the_city_page_draws_the_seat_lines(self):
-        body = _body_without_docstring(_function(EXPLORATION, "city_look"))
-        self.assertIn("_seat_lines(city)", body)
+        # The rule, not its spelling (v1.0.8): City -> Look asks for the seat
+        # lines of *its* city, and hands over what the player knows of it.
+        looks = [c for c in ast.walk(_function(EXPLORATION, "city_look"))
+                 if isinstance(c, ast.Call) and isinstance(c.func, ast.Name) and c.func.id == "_seat_lines"]
+        self.assertEqual(len(looks), 1, "City -> Look no longer draws the seat lines")
+        self.assertEqual(ast.unparse(looks[0].args[0]), "city")
         seat = _body_without_docstring(_function(EXPLORATION, "_seat_lines"))
         self.assertIn("WORLD.seated_sect(city)", seat)
         self.assertIn("DB.get_territory(city)", seat)
@@ -208,11 +212,18 @@ class EverySurfaceNamesTheSeat(unittest.TestCase):
                 self.assertIn("/world → City → Enter", body, f"{name} no longer says how a gate is entered")
 
     def test_the_engine_keeps_a_private_part_off_the_map(self):
+        # One list of a city's parts in plain sight (v1.33.0): the map and the
+        # road in both read `cityPartsInPlainSight`, and that function is where
+        # `.Private` is asked - so a private gate is kept off the street in
+        # both, and the two cannot part company.
         source = EXPLORATION_GO.read_text(encoding="utf-8")
         start = source.index("func knownLocationsTx(")
         body = source[start: source.index("\n}\n", start)]
-        self.assertIn("cityPartsOf(catalog, city)", body)
-        self.assertIn(".Private", body, "knownLocationsTx marks a private gate known from the street")
+        self.assertIn("cityPartsInPlainSight(catalog, city)", body)
+        self.assertNotIn("cityPartsOf(", body, "knownLocationsTx marks a private gate known from the street")
+        helper = source.index("func cityPartsInPlainSight(")
+        self.assertIn(".Private", source[helper: source.index("\n}\n", helper)], "the plain-sight list no longer leaves out a private gate")
+        self.assertRegex(source, r'"city_parts":\s+cityPartsInPlainSight\(', "the road in names every part of the city, a private gate too")
 
 
 if __name__ == "__main__":

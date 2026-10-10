@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Collection
 from types import SimpleNamespace
 from typing import Any, Mapping
 
@@ -38,7 +38,7 @@ from ..discovery import (
 )
 from ..formatting import human_duration, roll_line
 from ..hubs import register_hub_option_hint, HubDynamicOption, panel_timeout, register_hub_option_provider
-from ..locations import _known_locations, access_realm_index, destination_groups, destinations_of_kind, door_allows, npcs_present
+from ..locations import _city_parts, _known_locations, _known_private_parts, access_realm_index, destination_groups, destinations_of_kind, door_allows, npcs_present
 from ..registry import ACTIONS, VIEW_RESTORERS, registered_group_command, registered_root_command
 from ..runtime import (
     DB,
@@ -1579,15 +1579,6 @@ def _city_of(location: str) -> str:
     return location
 
 
-def _city_parts(city: str) -> list[str]:
-    """A city's gates and districts in plain sight - never a private part. A
-    demonic sect's gate is a `private` district of its seat (v1.19.0), which a
-    sponsor reveals and the street does not show, the engine's
-    `knownLocationsTx` rule."""
-    return sorted(name for name, data in WORLD.locations.items()
-                  if data.get("district") and str(data.get("outside_location")) == city and not data.get("private"))
-
-
 def _sect_at_gate(gate: str) -> str:
     """The sect whose entrance trial is sat at `gate`, or "" - the content's
     `recruitment.location`, which is `sectGate`'s one statement."""
@@ -1597,7 +1588,7 @@ def _sect_at_gate(gate: str) -> str:
     return ""
 
 
-def _places_to_enter(here: str) -> list[tuple[str, str, str]]:
+def _places_to_enter(here: str, known: Collection[str] = ()) -> list[tuple[str, str, str]]:
     """Where "Enter" can take you from ``here`` (v1.12.1): the city's streets,
     then its districts, then its gates, as (name, emoji, what it is).
 
@@ -1606,14 +1597,21 @@ def _places_to_enter(here: str) -> list[tuple[str, str, str]]:
     places, walked by the same engine action, so nothing is decided here: a
     place is offered only where `door_allows` says the engine will open it
     (from inside a shop that is the street alone), never the place you are
-    standing in, and a road site or a city with no walls offers nothing."""
+    standing in, and a road site or a city with no walls offers nothing.
+
+    ``known`` is the private parts of this city the cultivator's own map holds
+    (`_known_private_parts`): a sponsor-revealed gate is offered to them, and
+    to nobody else. A private *room* (an abode, a household) is not a
+    catalogue location, so it still offers nothing; the early return that read
+    the flag off a gate was written when these gates were wilderness places,
+    and since they became districts (v1.19.0) it hid the way back out."""
     here_data = WORLD.locations.get(here) or {}
-    if here_data.get("road_site") or here_data.get("private"):
+    if here_data.get("road_site"):
         return []
     city = _city_of(here)
     if city not in WORLD.locations:
         return []
-    parts = _city_parts(city)
+    parts = _city_parts(city, known)
     rows: list[tuple[str, str, str]] = [(city, "🏙️", "the streets of the city")]
     rows += [(p, "🏘️", "a district") for p in parts if not WORLD.locations[p].get("gate") and WORLD.locations[p].get("district") != "sect_gate"]
     # A sect's gate (v1.19.0) is a district of its seat, entered like one.
@@ -1680,7 +1678,7 @@ def _prosperity_line(data: dict[str, Any]) -> str:
     return f"The city is **{mood}** — prosperity {prosperity}/100, security {int(data.get('security') or 0)}/100."
 
 
-async def _seat_lines(city: str) -> list[str]:
+async def _seat_lines(city: str, known: Collection[str] = ()) -> list[str]:
     """What a city's politics are (v1.19.0): the sect seated here, whose banner
     hangs over the city, and where that sect stands with the others - allies,
     rivals, the wars it is fighting. Read, never decided: the seat is the
@@ -1688,7 +1686,11 @@ async def _seat_lines(city: str) -> list[str]:
     `sect_relations` and `territory_wars`, all written by the engine's
     politics tick. It never raises, because it is drawn beside everything
     else on the city page and one failed read must not cost the page
-    (v1.0.10)."""
+    (v1.0.10).
+
+    The sect is named on its seat whatever its gate is (the header says so
+    too); the gate is named only where `_city_parts` shows it, so a demonic
+    sect's private gate is not told to a street that was never told it."""
     lines: list[str] = []
     try:
         seated = WORLD.seated_sect(city)
@@ -1696,6 +1698,8 @@ async def _seat_lines(city: str) -> list[str]:
         banner = str((territory or {}).get("controller_key") or "") if str((territory or {}).get("controller_type") or "") == "sect" else ""
         if seated:
             gate = str((WORLD.sects[seated].get("recruitment") or {}).get("location") or "")
+            if gate not in _city_parts(city, known):
+                gate = ""
             lines.append(f"**Seat:** the **{seated}** keeps its gate here" + (f", at **{gate}**" if gate else "") + ".")
         if banner and banner != seated:
             lines.append(f"**Banner:** the **{banner}** holds this city.")
@@ -1732,7 +1736,8 @@ async def city_look(interaction: discord.Interaction) -> None:
         return
     here = str(c.get("location") or "")
     city = _city_of(here)
-    parts = _city_parts(city)
+    known = await _known_private_parts(interaction.user.id, c, city)
+    parts = _city_parts(city, known)
     here_data = WORLD.locations.get(here) or {}
     if here_data.get("road_site"):
         leg = [str(x) for x in list(here_data.get("road_leg") or [])]
@@ -1753,7 +1758,7 @@ async def city_look(interaction: discord.Interaction) -> None:
         lines.append("**Gates:** " + "; ".join(f"{g} → {', '.join(faces.get(str(WORLD.locations[g].get('gate')), []))}" for g in gates))
     if districts:
         lines.append("**Districts:** " + ", ".join(districts))
-    lines.extend(await _seat_lines(city))
+    lines.extend(await _seat_lines(city, known))
     people = await npcs_present(here)
     if people:
         lines.append(f"**Here:** {', '.join(people[:12])}" + (" …" if len(people) > 12 else ""))
@@ -1766,7 +1771,7 @@ async def city_look(interaction: discord.Interaction) -> None:
     if mood:
         lines.append(mood)
     lines.append(f"{WORLD.locations.get(here, {}).get('description', '')}")
-    places = _places_to_enter(here)
+    places = _places_to_enter(here, known)
     walk = ("Press a place below to walk there, or **/world → City → Enter**" if places
             else "Walk to any gate or district with **/travel**")
     lines.append(f"{walk}; walk the streets with **/world → Act → Explore** to find the shops. **/world → City → Board** for work, **Inn** for company, **Rumours** for news.")
@@ -1781,8 +1786,10 @@ async def city_enter_autocomplete(interaction: discord.Interaction, current: str
     if not c:
         return []
     needle = str(current or "").casefold().strip()
+    here = str(c.get("location") or "")
+    known = await _known_private_parts(interaction.user.id, c, _city_of(here))
     return [app_commands.Choice(name=f"{name} — {what}"[:100], value=name[:100])
-            for name, _emoji, what in _places_to_enter(str(c.get("location") or ""))
+            for name, _emoji, what in _places_to_enter(here, known)
             if not needle or needle in name.casefold()][:25]
 
 
@@ -1791,8 +1798,10 @@ async def city_enter_hub_options(interaction: discord.Interaction, current: str)
     if not c:
         return []
     needle = str(current or "").casefold().strip()
+    here = str(c.get("location") or "")
+    known = await _known_private_parts(interaction.user.id, c, _city_of(here))
     return [HubDynamicOption(label=name[:100], value=name[:100], description=what[:100], emoji=emoji)
-            for name, emoji, what in _places_to_enter(str(c.get("location") or ""))
+            for name, emoji, what in _places_to_enter(here, known)
             if not needle or needle in name.casefold()][:25]
 
 

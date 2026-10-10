@@ -81,8 +81,16 @@ class TheEngineOwnsTheWalk(unittest.TestCase):
 
 class TheSurface(unittest.TestCase):
     def test_the_picker_offers_the_parts_of_the_city_you_are_in(self):
-        known = _body(LOCATIONS, "_known_locations")
-        self.assertIn('data.get("district") and str(data.get("outside_location")) == city', known)
+        # The parts come from the one list every door of the city page reads
+        # (`_city_parts`, v1.33.0), asked for plain sight alone: the map is
+        # what is discovered plus the street, and what is discovered is added
+        # above it. It is the rule that is held, not where the loop is written.
+        tree = ast.parse(LOCATIONS)
+        known = next(n for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef) and n.name == "_known_locations")
+        asks = [c for c in ast.walk(known) if isinstance(c, ast.Call) and isinstance(c.func, ast.Name) and c.func.id == "_city_parts"]
+        self.assertEqual(len(asks), 1, "_known_locations no longer asks _city_parts for the parts of the city you stand in")
+        self.assertEqual([ast.unparse(a) for a in asks[0].args], ["city"])
+        self.assertEqual(asks[0].keywords, [], "the map's own parts are plain sight; it must not be handed its own contents")
 
     def test_the_travel_reply_names_the_gate(self):
         self.assertIn('arrived_at=str(result.get("arrived_at") or "")', EXPLORATION)
