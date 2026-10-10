@@ -189,22 +189,31 @@ func warPeaceActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID, war
 		return nil, fmt.Errorf("a war %d day(s) old is not ready for terms; peace may be sued for in %d more day(s)",
 			max64(0, (gm-created)/warMinutesPerDay), (ready-gm+warMinutesPerDay-1)/warMinutesPerDay)
 	}
-	if held := i64(mem["contribution_points"]); held < rules.PeaceCostPoints {
-		return nil, fmt.Errorf("suing for peace costs %d sect contribution; you hold %d", rules.PeaceCostPoints, held)
+	territory := fmt.Sprint(war["territory_key"])
+	// A war over a part of a city has no terms to make: the table sets it
+	// aside (`WarVerdict`) and takes nothing for it.
+	cost := rules.PeaceCostPoints
+	if _, part := TerritoryGround(catalog, territory); part {
+		cost = 0
+	}
+	if held := i64(mem["contribution_points"]); held < cost {
+		return nil, fmt.Errorf("suing for peace costs %d sect contribution; you hold %d", cost, held)
 	}
 	// The balance only: spending never costs a rank (v1.8.0).
-	if _, err = conn.Execute(`UPDATE sect_membership SET contribution_points=contribution_points-? WHERE user_id=?`, []any{rules.PeaceCostPoints, userID}); err != nil {
-		return nil, err
+	if cost > 0 {
+		if _, err = conn.Execute(`UPDATE sect_membership SET contribution_points=contribution_points-? WHERE user_id=?`, []any{cost, userID}); err != nil {
+			return nil, err
+		}
 	}
 	siege := i64(war["siege_progress"])
 	winner, resolution := PeaceTerms(catalog, attacker, defender, siege)
+	winner, resolution = WarVerdict(catalog, territory, winner, resolution)
 	if _, _, err = ResolveWarTx(conn, catalog, warID, winner, resolution, gm, nowSeconds()); err != nil {
 		return nil, err
 	}
-	territory := fmt.Sprint(war["territory_key"])
 	return map[string]any{"war_id": warID, "status": "resolved", "resolution": resolution, "winner_key": winner,
 		"attacker_key": attacker, "defender_key": defender, "territory_key": territory, "territory_name": territoryName(conn, territory),
-		"siege_progress": siege, "cost": rules.PeaceCostPoints, "sued_by": sect}, nil
+		"siege_progress": siege, "cost": cost, "sued_by": sect}, nil
 }
 
 func minFloat(a, b float64) float64 {

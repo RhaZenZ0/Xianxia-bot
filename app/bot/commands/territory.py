@@ -11,6 +11,7 @@ import discord
 from discord import app_commands
 
 from ...ops.game_engine import GameEngineError
+from ...rules.realm_hubs import city_of_place
 from ..hubs import HubDynamicOption, register_hub_option_hint, register_hub_option_provider
 from ..locations import location_autocomplete
 from ..registry import registered_group_command
@@ -34,7 +35,9 @@ party_group = app_commands.Group(name="party", description="Create voluntary cul
 async def territory_status(interaction: discord.Interaction) -> None:
     c=await require_character(interaction)
     if not c:return
-    rows=await DB.get_territories(str(c.get('location')))
+    # A banner sits on the whole place, so a gate, a district or a shop answers
+    # the city's row (the engine's TerritoryGround).
+    rows=await DB.get_territories(city_of_place(c.get('location'),WORLD.locations))
     if not rows:
         await interaction.response.send_message("No persistent territory node exists here.",ephemeral=False);return
     t=rows[0]
@@ -47,7 +50,9 @@ async def territory_status(interaction: discord.Interaction) -> None:
 async def territory_claim(interaction: discord.Interaction) -> None:
     c=await require_character(interaction)
     if not c:return
-    rows=await DB.get_territories(str(c.get('location')))
+    # ...and so does a claim: standing anywhere in the city claims the city,
+    # as the engine would redirect it, so the reply names the ground it took.
+    rows=await DB.get_territories(city_of_place(c.get('location'),WORLD.locations))
     if not rows:
         await interaction.response.send_message("No claimable territory node exists here.",ephemeral=False);return
     t=rows[0]
@@ -97,7 +102,8 @@ async def war_status(interaction: discord.Interaction) -> None:
         if front: tag=f" • **you fight for {front.get('fights_for')}**"+(" as an ally" if front.get('ally') else "")
         until=int(op.get('occupation_until_game_minute') or 0)
         occupation=f" • occupied {_days_left(until,wt.total_minutes)} more day(s)" if until>wt.total_minutes and op.get('resolution')=='attacker_occupation' else ""
-        lines.append(f"\n`#{w['war_id']}` **{w['attacker_key']}** vs **{w['defender_key']}** for **{ground}** • **{w['status']}**{tag}\nSiege **{op.get('siege_progress',0)}%** • walls **{int(w.get('territory_defense') or 0)}** • morale A/D **{op.get('attacker_morale',100)}/{op.get('defender_morale',100)}** • forces A/D **{op.get('attacker_force',0)}/{op.get('defender_force',0)}**{occupation}"+(f" • winner **{op.get('winner_key')}**" if op.get('winner_key') else ""))
+        verdict=f" • winner **{op.get('winner_key')}**" if op.get('winner_key') else (" • set aside, no victor" if op.get('resolution')=='set_aside' else "")
+        lines.append(f"\n`#{w['war_id']}` **{w['attacker_key']}** vs **{w['defender_key']}** for **{ground}** • **{w['status']}**{tag}\nSiege **{op.get('siege_progress',0)}%** • walls **{int(w.get('territory_defense') or 0)}** • morale A/D **{op.get('attacker_morale',100)}/{op.get('defender_morale',100)}** • forces A/D **{op.get('attacker_force',0)}/{op.get('defender_force',0)}**{occupation}{verdict}")
         for ally in (w.get('allies') or []):
             beside=w['attacker_key'] if ally.get('side')=='attacker' else w['defender_key']
             lines.append(f"   🤝 **{ally.get('sect_name')}** fights beside {beside}")
@@ -170,7 +176,9 @@ def war_act_text(war_id: int, tactic: str, r: dict[str, Any]) -> str:
         lines.append(f"🤝 Your sect has joined this war beside **{r.get('fights_for')}**; the other side will remember it.")
     points=int(r.get('points') or 0)
     lines.append(f"🏯 +**{points}** sect contribution." if points else "🏯 You have earned all the contribution this war pays for fighting; a win still pays.")
-    if r.get('status') and r.get('status')!='active':
+    if r.get('status') and r.get('status')!='active' and op.get('resolution')=='set_aside':
+        lines.append("🏁 War set aside: that ground is part of a city, and a sect holds a place, not one of its streets. Nobody wins it.")
+    elif r.get('status') and r.get('status')!='active':
         winner=op.get('winner_key','unknown')
         lines.append(f"🏁 War resolved: **{winner}** {'takes the ground' if op.get('resolution')=='attacker_occupation' else 'holds'}.")
         if int(r.get('victory_points') or 0):
@@ -210,6 +218,10 @@ async def war_peace(interaction: discord.Interaction, war_id: int) -> None:
 def war_peace_text(r: dict[str, Any]) -> str:
     """The terms the engine made, in its own numbers (v1.24.0)."""
     ground=r.get('territory_name') or r.get('territory_key') or 'the ground'
+    if r.get('resolution')=='set_aside':
+        return (f"🕊️ **War #{int(r.get('war_id') or 0)} is set aside**: **{ground}** is part of a city, and a sect holds a place, "
+                "not one of its streets, so there are no terms to make and nobody holds it.\n"
+                f"🏯 It cost you **{int(r.get('cost') or 0)}** sect contribution.")
     if r.get('resolution')=='ceded':
         terms=f"**{r.get('defender_key')}** cedes **{ground}** to **{r.get('attacker_key')}**, and may not move on it again for a while"
     else:

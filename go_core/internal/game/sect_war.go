@@ -39,6 +39,11 @@ package game
 //     `end_relation_drop`.
 //   - **The world hears both ends.** A declaration and a resolution are each
 //     a public `world_history_events` row.
+//   - **A war is over a whole place.** A sect holds a city, not one of its
+//     streets (`TerritoryGround`): a declaration over a part is refused, a war
+//     found over one is set aside with no victor, and nothing the war would
+//     have moved - a banner, the walls, the standing, a truce, an occupation -
+//     moves.
 
 import (
 	"errors"
@@ -242,6 +247,16 @@ func DeclareWarTx(conn *storage.Conn, catalog worlddata.Catalog, attacker, defen
 	if attacker == "" || defender == "" || attacker == defender {
 		return 0, errors.New("a war needs two sects")
 	}
+	// A war is fought over a whole place: its banner, its walls and its
+	// occupation are all the city's row, and a part of a city has none the
+	// rest of the game reads. The world's own war step skips parts so this
+	// refusal never ends its tick (one system's error ends the tick).
+	if whole, part := TerritoryGround(catalog, territory); part {
+		if whole == "" {
+			return 0, fmt.Errorf("%s is no ground a sect can hold; a war is fought over a whole place", territory)
+		}
+		return 0, fmt.Errorf("%s is part of %s; a war is fought over a whole place", territory, whole)
+	}
 	if until := WarTruceUntilTx(conn, catalog, attacker, territory, gm); until > 0 {
 		days := (until - gm + warMinutesPerDay - 1) / warMinutesPerDay
 		return 0, fmt.Errorf("%w: %s was thrown back from %s and may not move on it again for %d more day(s)", errWarTruce, attacker, territoryName(conn, territory), days)
@@ -289,10 +304,33 @@ type WarSpoil struct {
 	Promoted string `json:"promoted,omitempty"`
 }
 
+// WarSetAside is the verdict on a war fought over a part of a city.
+const WarSetAside = "set_aside"
+
+// WarVerdict is how a war over this territory may end. A war over a part of a
+// city (`TerritoryGround`) is set aside with no victor whatever was won on its
+// walls: a banner on a street is not the city's, and the city is what every
+// reader of a banner looks at. Anything else ends as it was decided, and a war
+// with no verdict yet has none to set aside. It is idempotent, so a caller
+// that wants to report the verdict may ask it before `ResolveWarTx` asks it
+// again as the guard.
+func WarVerdict(catalog worlddata.Catalog, territory, winner, resolution string) (string, string) {
+	if resolution == "" {
+		return winner, resolution
+	}
+	if _, part := TerritoryGround(catalog, territory); part {
+		return "", WarSetAside
+	}
+	return winner, resolution
+}
+
 // ResolveWarTx ends an active war in winner's favour. It is idempotent: a war
 // that is no longer active is left alone and answers (nil, false). It writes
 // the operation row's verdict, the territory's new banner, unrest and walls,
 // the standing between the two sects, the history row, and the victors' pay.
+// A war over a part of a city ends with no victor and moves none of that
+// (`WarVerdict`), so no resolver - the tick, `war.act`, `war.peace` - can hand
+// a street to a sect.
 func ResolveWarTx(conn *storage.Conn, catalog worlddata.Catalog, warID int64, winner, resolution string, gm int64, now float64) ([]WarSpoil, bool, error) {
 	r, err := conn.Execute(`SELECT * FROM territory_wars WHERE war_id=?`, []any{warID})
 	if err != nil {
@@ -312,7 +350,9 @@ func ResolveWarTx(conn *storage.Conn, catalog worlddata.Catalog, warID int64, wi
 	rules := warRules(catalog)
 	attacker, defender := fmt.Sprint(war["attacker_key"]), fmt.Sprint(war["defender_key"])
 	territory := fmt.Sprint(war["territory_key"])
-	negotiated := resolution == "peace" || resolution == "ceded"
+	winner, resolution = WarVerdict(catalog, territory, winner, resolution)
+	setAside := resolution == WarSetAside
+	negotiated := resolution == "peace" || resolution == "ceded" || setAside
 	occupation := int64(0)
 	if winner == attacker && !negotiated {
 		occupation = gm + rules.OccupationDays*warMinutesPerDay
@@ -324,6 +364,8 @@ func ResolveWarTx(conn *storage.Conn, catalog worlddata.Catalog, warID int64, wi
 		}
 	}
 	switch {
+	case setAside:
+		// A part of a city is no sect's ground: nothing on it moves.
 	case resolution == "peace":
 		// The holder keeps the ground and nobody's walls move.
 		_, err = conn.Execute(`UPDATE territory_state SET unrest=MAX(0,unrest-5),updated_game_minute=?,updated_at=? WHERE territory_key=?`,
@@ -351,12 +393,16 @@ func ResolveWarTx(conn *storage.Conn, catalog worlddata.Catalog, warID int64, wi
 	if err != nil {
 		return nil, false, err
 	}
-	standing := -rules.EndRelationDrop
-	if negotiated {
-		standing = rules.PeaceRelationGain
-	}
-	if err = warSectRelationTx(conn, attacker, defender, standing, now); err != nil {
-		return nil, false, err
+	// A war set aside was never a war over anything: the declaration's drop
+	// stands and nothing warms or cools it again.
+	if !setAside {
+		standing := -rules.EndRelationDrop
+		if negotiated {
+			standing = rules.PeaceRelationGain
+		}
+		if err = warSectRelationTx(conn, attacker, defender, standing, now); err != nil {
+			return nil, false, err
+		}
 	}
 	loser := defender
 	if winner == defender {
@@ -374,7 +420,19 @@ func ResolveWarTx(conn *storage.Conn, catalog worlddata.Catalog, warID int64, wi
 	name := territoryName(conn, territory)
 	title := winner + " takes " + name
 	summary := fmt.Sprintf("%s has taken %s from %s. It is occupied for now; the old banner may yet come back for it.", winner, name, loser)
+	// Who the row is about: the winner and the loser, or - with no winner -
+	// the two sects the war was between. It stays public and, set aside,
+	// under the Quest Forge's floor: nobody won anything worth a quest.
+	faction, actor, target, significance := winner, winner, loser, int64(80)
 	switch {
+	case setAside:
+		faction, actor, target, significance = "", attacker, defender, 50
+		title = "The war over " + name + " is set aside"
+		if whole, _ := TerritoryGround(catalog, territory); whole != "" {
+			summary = fmt.Sprintf("%s is part of %s, and a sect holds a place, not one of its streets. The war between %s and %s over it ends with no victor.", name, whole, attacker, defender)
+		} else {
+			summary = fmt.Sprintf("%s is no ground a sect can hold. The war between %s and %s over it ends with no victor.", name, attacker, defender)
+		}
 	case resolution == "peace":
 		title = attacker + " and " + defender + " make peace"
 		summary = fmt.Sprintf("%s and %s have made peace over %s. %s keeps it, and %s may not move on it again for a while.", attacker, defender, name, defender, attacker)
@@ -385,8 +443,8 @@ func ResolveWarTx(conn *storage.Conn, catalog worlddata.Catalog, warID int64, wi
 		title = winner + " holds " + name
 		summary = fmt.Sprintf("%s has thrown %s back from %s. The walls stand higher for it.", winner, loser, name)
 	}
-	if err = recordWorldHistoryTx(conn, fmt.Sprintf("sect_war_end:%d", warID), "territory_war_resolved", title, summary, 80, "public",
-		territory, winner, "faction", winner, winner, "faction", loser, loser, nil, "",
+	if err = recordWorldHistoryTx(conn, fmt.Sprintf("sect_war_end:%d", warID), "territory_war_resolved", title, summary, significance, "public",
+		territory, faction, "faction", actor, actor, "faction", target, target, nil, "",
 		[]string{"territory", "war", territory}, gm, map[string]any{"war_id": warID, "resolution": resolution}, now); err != nil {
 		return nil, false, err
 	}
@@ -610,4 +668,102 @@ func warPoliticsOutcomeTx(conn *storage.Conn, winner, loser string, now float64)
 	_, err := conn.Execute(`UPDATE sect_politics_state SET influence=MAX(0,influence-?),resources=MAX(0,resources-?),updated_at=? WHERE sect_name=?`,
 		[]any{warPoliticsLoserLoss, warPoliticsLoserLoss, now, loser})
 	return err
+}
+
+// SetAsidePartialHoldingsTx is the repair for a world that holds banners over
+// parts of cities. A sect holds a city, not one of its streets
+// (`TerritoryGround`), but three writers once took any row - `territory.claim`,
+// both banner branches of `ResolveWarTx` and the war step's targets - and
+// migration 74 left an active war over each gate it neutralised, so a world
+// that has run for a while can hold a banner on a street or fight over one.
+// The writers hold the rule now; this puts right what they left. It runs every
+// maintenance pass, outside the automation flags and ahead of the siege tick,
+// and is idempotent: a clean world is a pair of reads.
+//
+//   - Every active war over a part is set aside (`ResolveWarTx` ends it with no
+//     victor), so the tick never fights it and no resolver hands a street over.
+//   - Where exactly one sect holds parts of a city and nobody holds the city or
+//     fights for it, the sect is folded into the city - the claim it would
+//     have made from that street today. Where two sects hold parts there, or
+//     another holds the city, nobody is given anything.
+//   - Every held part is released, so what it paid in tribute and what it
+//     offered as a war target stops. Releasing a banner is the one thing a
+//     migration could not do: it needs the catalogue to know which keys are
+//     parts, and a migration must not read the content a later release changes.
+//
+// It returns how many wars it set aside and banners it released.
+func SetAsidePartialHoldingsTx(conn *storage.Conn, catalog worlddata.Catalog, gm int64, now float64) (int64, error) {
+	if !tableExistsTx(conn, "territory_state") || !tableExistsTx(conn, "territory_wars") {
+		return 0, nil
+	}
+	changed := int64(0)
+	r, err := conn.Execute(`SELECT war_id,territory_key FROM territory_wars WHERE status='active' ORDER BY war_id`, nil)
+	if err != nil {
+		return 0, err
+	}
+	for _, row := range r.Rows {
+		if _, part := TerritoryGround(catalog, fmt.Sprint(row[1])); !part {
+			continue
+		}
+		_, ended, err := ResolveWarTx(conn, catalog, storage.ParseInt(row[0]), "", WarSetAside, gm, now)
+		if err != nil {
+			return changed, err
+		}
+		if ended {
+			changed++
+		}
+	}
+	r, err = conn.Execute(`SELECT territory_key,controller_key FROM territory_state WHERE controller_type='sect' AND controller_key<>'' ORDER BY territory_key`, nil)
+	if err != nil {
+		return changed, err
+	}
+	parts := []string{}
+	holders := map[string]map[string]bool{}
+	for _, row := range r.Rows {
+		key, sect := fmt.Sprint(row[0]), fmt.Sprint(row[1])
+		whole, part := TerritoryGround(catalog, key)
+		if !part {
+			continue
+		}
+		parts = append(parts, key)
+		if whole == "" {
+			continue
+		}
+		if holders[whole] == nil {
+			holders[whole] = map[string]bool{}
+		}
+		holders[whole][sect] = true
+	}
+	wholes := make([]string, 0, len(holders))
+	for whole := range holders {
+		wholes = append(wholes, whole)
+	}
+	sort.Strings(wholes)
+	for _, whole := range wholes {
+		if len(holders[whole]) != 1 {
+			continue
+		}
+		sect := ""
+		for s := range holders[whole] {
+			sect = s
+		}
+		up, err := conn.Execute(`UPDATE territory_state SET controller_type='sect',controller_key=?,updated_game_minute=?,updated_at=?
+            WHERE territory_key=? AND (controller_type='neutral' OR controller_key='')
+              AND NOT EXISTS (SELECT 1 FROM territory_wars w WHERE w.territory_key=territory_state.territory_key AND w.status='active')`,
+			[]any{sect, gm, now, whole})
+		if err != nil {
+			return changed, err
+		}
+		if up.RowsAffected == 1 {
+			RecordTerritoryClaimedTx(conn, catalog, sect, whole, gm, now)
+		}
+	}
+	for _, key := range parts {
+		if _, err := conn.Execute(`UPDATE territory_state SET controller_type='neutral',controller_key='',updated_game_minute=?,updated_at=? WHERE territory_key=?`,
+			[]any{gm, now, key}); err != nil {
+			return changed, err
+		}
+		changed++
+	}
+	return changed, nil
 }
