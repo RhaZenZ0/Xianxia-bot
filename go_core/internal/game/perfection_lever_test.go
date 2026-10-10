@@ -437,3 +437,24 @@ func TestAFillRowFromTheFillReleasesIsUndoneAndRedone(t *testing.T) {
 		t.Fatalf("the redo of a full bar should leave the trial open: %v", err)
 	}
 }
+
+// The redo is the fill's own upsert, and a fill on a perfected realm already
+// keeps its path closed; the redo keeps it closed too, or the trial's reward
+// could be taken twice by undoing and redoing a lever.
+func TestARedoNeverReopensAPerfectedRealm(t *testing.T) {
+	path := setupBatch4AuthorityDB(t)
+	world := batch4WorldPath(t)
+	batch4Exec(t, path, perfectionAuditDDL)
+	batch4Apply(t, path, world, "perfection.start", 1, map[string]any{"game_minute": 100})
+	applyAdmin(t, path, "admin.player.set_realm_perfection", map[string]any{"user_id": 42, "track": "cultivation", "realm_index": 0, "progress": 100, "reason": "story"})
+	passThePerfectionTrial(t, path, world, "perfection.trial", 2)
+	undoLast(t, path)
+	undoLast(t, path) // the redo
+	batch4Exec(t, path, "DELETE FROM cooldowns WHERE user_id=42")
+	if _, err := batch4ApplyErr(path, world, "perfection.quest", 42, 3, map[string]any{"mode": "prepare"}); err == nil || !strings.Contains(err.Error(), "not active") {
+		t.Fatalf("after undo and redo a perfected realm's quests took a step (%v); the redo opened the path for a second reward", err)
+	}
+	if got := storage.ParseInt(perfectionColumn(t, path, "realm_perfection", "completed")); got != 1 {
+		t.Fatalf("completed=%d after undo and redo", got)
+	}
+}

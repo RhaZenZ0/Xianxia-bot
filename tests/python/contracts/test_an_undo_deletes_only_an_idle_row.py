@@ -85,22 +85,24 @@ class AnIdleRowIsWhatTheSchemaSays(unittest.TestCase):
             }
         db.close()
         cls.lists = row_default_lists()
+        # The reader is asserted before it is trusted: against an empty parse
+        # every check below would pass by finding nothing to disagree with, so
+        # it fails the whole class here, ahead of any of them.
+        if set(cls.lists) != set(LIST_TABLES):
+            raise AssertionError(
+                "the reader found no rowDefault list, or a list this gate does not know; "
+                f"found {sorted(cls.lists)}; the gate is broken, not the tree"
+            )
+        if "completed" not in cls.lists["perfectionRowDefaults"]:
+            raise AssertionError(
+                "perfectionRowDefaults no longer names `completed`: a perfected realm would be idle and deleted"
+            )
 
     @classmethod
     def tearDownClass(cls):
         cls._dir.cleanup()
 
-    def test_the_reader_found_what_it_reads(self):
-        # Guards every check below: against an empty parse they would all pass
-        # by finding nothing to disagree with.
-        self.assertEqual(
-            set(self.lists), set(LIST_TABLES),
-            "the reader found no rowDefault list, or a list this gate does not know; the gate is broken, not the tree",
-        )
-        self.assertIn(
-            "completed", self.lists["perfectionRowDefaults"],
-            "perfectionRowDefaults no longer names `completed`: a perfected realm would be idle and deleted",
-        )
+    def test_the_schema_actually_bootstrapped(self):
         for table, columns in self.state.items():
             self.assertGreaterEqual(len(columns), 2, f"the bootstrapped schema holds too few state columns for {table}")
 

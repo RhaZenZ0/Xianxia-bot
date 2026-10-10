@@ -74,6 +74,16 @@ func parseNPCTarget(target string) (string, error) {
 // dual-table shape grant_currency uses), so restoring that snapshot is a
 // faithful, total reversal - not because the action is "safe" in some looser
 // sense.
+//
+// "Total" means of what the action wrote. A snapshot is taken whole whether or
+// not the action touched every column in it, so a reversal that restores the
+// whole snapshot writes over whatever play has changed since in a column the
+// lever never wrote - and a reversal that deletes the row a lever made deletes
+// whatever play has put on it. An entry restores the columns its action wrote
+// (the audit row says which: a key `after` carries, a value that differs
+// between the two sides), as an UPDATE onto the same row, and removes a row the
+// lever made only through deleteIfIdle; admin_undo_rows.go states the rule and
+// TestAReversalDeletesARowOnlyThroughDeleteIfIdle holds it.
 var reversibleAdminActions = map[string]reverseFunc{
 	// The Player Editor's three progress levers (v1.23.0); admin_player_progress.go.
 	"admin.player.set_profession":        reverseSetProfession,
