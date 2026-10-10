@@ -2818,6 +2818,11 @@ async def run(url: str, token: str, db_path: str) -> Report:
     # Last, because it ends the character. The trades this life practised go
     # into its record before the wipe, and a fresh rebirth remembers nothing
     # of them yet: awakened memory is 0, so the echo is 0 by construction.
+    # The character row survives a rebirth and is rewritten in place, so a
+    # column the install does not name rides into the next life: the sword
+    # intent a Sword Cultivator banked was one. Read it on both sides.
+    dying = dict(await db.get_character(PLAYER) or {})
+    banked = present(dying.get("path_resource"), 0)
     await step(report, "lifecycle.true_death", act("lifecycle.true_death", PLAYER, {"reason": "playtest", "max_wait_seconds": 1}))
     cycle = await step(report, "lifecycle.samsara_status", query("lifecycle.samsara_status", PLAYER, {}))
     if cycle is not None:
@@ -2827,6 +2832,11 @@ async def run(url: str, token: str, db_path: str) -> Report:
     if reborn is not None:
         trades = dict(reborn.get("past_life_trades") or {})
         report.add("PASS" if int(trades.get("Forging", 0)) == 1 else "FAIL", "the past life's Apprentice Forging is recorded", f"{trades}")
+    reborn_body = dict(await db.get_character(PLAYER) or {})
+    carried = present(reborn_body.get("path_resource"), -1)
+    report.add("PASS" if carried == 0 else "FAIL", "a new body starts with no sword intent banked",
+               f"banked {banked} at death, {carried} after the rebirth"
+               + ("" if banked else "; nothing was banked, so this proved only the zero - the carry is held in samsara_wipes_the_life_test.go"))
     legacy = await step(report, "the soul record", db.get_soul_legacy(PLAYER))
     if legacy is not None:
         past = list(legacy.get("past_lives") or [])

@@ -41,6 +41,25 @@ func TestAMemberAtTheAlliedGateIsTakenInAsAnOuterDisciple(t *testing.T) {
 	}
 }
 
+// A master among the old sect's people stays with the old sect (v1.33.0). The
+// bond is a row of its own, not a sect_lineage row, so the delete of the old
+// disciple bond never reached it and the Azure Cloud Elder went on paying a
+// disciple of the Jade Meridian Sect.
+func TestTheWayUpLeavesTheMasterBelow(t *testing.T) {
+	catalog := crossingCatalog(t)
+	gate := sectGate(catalog, "Jade Meridian Sect")
+	path := ascentDB(t, "Azure Cloud Sect", gate, catalog.Locations[gate].MinRealmIndex)
+	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS npc_mentorships(disciple_user_id INTEGER PRIMARY KEY,master_npc_name TEXT NOT NULL,sect_name TEXT NOT NULL,accepted_game_minute INTEGER NOT NULL DEFAULT 0,attention INTEGER NOT NULL DEFAULT 0,created_at REAL NOT NULL,FOREIGN KEY(disciple_user_id) REFERENCES characters(user_id) ON DELETE CASCADE)`)
+	batch4Exec(t, path, `INSERT INTO npc_mentorships(disciple_user_id,master_npc_name,sect_name,created_at) VALUES(42,'Elder Test Qiu','Azure Cloud Sect',0),(43,'Elder Test Qiu','Azure Cloud Sect',0)`)
+	batch4Result(t, batch4Apply(t, path, batch4WorldPath(t), "sect.ascend", 1, map[string]any{}))
+	if n := i64(actionScalar(t, path, `SELECT COUNT(*) FROM npc_mentorships WHERE disciple_user_id=42`)); n != 0 {
+		t.Errorf("a member who climbed to the Jade Meridian Sect still has a master among the Azure Cloud Sect's people (%d row)", n)
+	}
+	if n := i64(actionScalar(t, path, `SELECT COUNT(*) FROM npc_mentorships WHERE disciple_user_id=43`)); n != 1 {
+		t.Errorf("somebody who stayed holds %d bond(s) after another's ascent, want 1", n)
+	}
+}
+
 func TestTheWayUpIsRefusedAwayFromTheGateBelowTheFloorAndToNobody(t *testing.T) {
 	catalog := crossingCatalog(t)
 	gate := sectGate(catalog, "Jade Meridian Sect")
