@@ -3,6 +3,9 @@ package game
 import (
 	"encoding/json"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"strings"
 	"testing"
 
@@ -541,6 +544,72 @@ func TestAPassCompletesOnlyItsOwnExaminationQuest(t *testing.T) {
 	report(stripped, "exam_forging_apprentice")
 	if got := completed(stripped); len(got) != 12 {
 		t.Fatalf("untargeted, one pass completed %d of 12 quests; the reader cannot see the fault it exists for", len(got))
+	}
+}
+
+// calleesIn is every function a named function calls by bare name, read off
+// the file's syntax rather than its spelling.
+func calleesIn(t *testing.T, file, function string) map[string]bool {
+	t.Helper()
+	parsed, err := parser.ParseFile(token.NewFileSet(), file, nil, 0)
+	if err != nil {
+		t.Fatalf("cannot parse %s: %v", file, err)
+	}
+	callees := map[string]bool{}
+	found := false
+	for _, decl := range parsed.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Name.Name != function || fn.Body == nil {
+			continue
+		}
+		found = true
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			if call, ok := n.(*ast.CallExpr); ok {
+				if ident, ok := call.Fun.(*ast.Ident); ok {
+					callees[ident.Name] = true
+				}
+			}
+			return true
+		})
+	}
+	if !found || len(callees) == 0 {
+		t.Fatalf("%s carries no %s, or one that calls nothing; the reader is broken, not the tree", file, function)
+	}
+	return callees
+}
+
+// The hall that sits an examination and the craft that offers one answer one
+// question, so what is offered and what can be sat cannot disagree: that
+// disagreement is the whole of what a stranded crafter was.
+func TestTheHallAndTheCraftAskOneRule(t *testing.T) {
+	hall := calleesIn(t, "profession_exam.go", "professionExamAction")
+	offer := calleesIn(t, "profession_exam.go", "offerProfessionExamsTx")
+	craft := calleesIn(t, "crafting_actions.go", "craftOneUnitTx")
+	if !hall["professionExamsOpenTx"] {
+		t.Fatal("the hall no longer asks professionExamsOpenTx which examination to sit")
+	}
+	if !offer["professionExamsOpenTx"] {
+		t.Fatal("the offer no longer asks professionExamsOpenTx which examinations are open, so what is offered and what can be sat can disagree")
+	}
+	if !hall["offerProfessionExamsTx"] {
+		t.Fatal("the counter hands nothing over, so a rank that came by another road is never caught up")
+	}
+	if !craft["offerProfessionExamsTx"] {
+		t.Fatal("the craft that raises a rank offers no examination")
+	}
+	// The single-rank forms are gone: a second way to ask is a second rule.
+	for _, name := range []string{"professionExamFor", "offerProfessionExamTx"} {
+		for _, file := range []string{"profession_exam.go", "crafting_actions.go"} {
+			parsed, err := parser.ParseFile(token.NewFileSet(), file, nil, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, decl := range parsed.Decls {
+				if fn, ok := decl.(*ast.FuncDecl); ok && fn.Name.Name == name {
+					t.Fatalf("%s is back in %s: the examination of the rank held now is the rule that stranded three of them", name, file)
+				}
+			}
+		}
 	}
 }
 

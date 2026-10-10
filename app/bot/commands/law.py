@@ -14,7 +14,12 @@ from discord import app_commands
 
 from ...rules.effects import normalize_effect_payload
 from ...ops.game_engine import GameEngineError
-from ...rules.progression_systems import condition_definition, profession_rank, profession_xp_needed
+from ...rules.progression_systems import (
+    condition_definition,
+    examination_below_held_line,
+    profession_rank,
+    profession_xp_needed,
+)
 from ..cards import Card, card_view
 from ..character_state import record_quest_progress, announce_quest_progress, current_effect_modifiers
 from ..formatting import roll_line
@@ -583,12 +588,24 @@ async def profession_exam(interaction: discord.Interaction, profession: app_comm
     else:
         hours = max(1, int(result.get("retry_game_minutes", 1440)) // 60)
         lines.append(f"\n❌ **Not this time.** The hall will look at you again in about **{hours} hours**.")
+    # The hall sits the lowest rank this life has reached and not passed, which
+    # is below the rank held for a crafter who climbed past it (v1.33.0); the
+    # engine says which, and how many are still owed.
+    below_held = examination_below_held_line(
+        str(result.get("profession") or ""), int(result.get("rank") or 0),
+        int(result.get("rank_held") or 0), int(result.get("exams_remaining") or 0),
+        bool(result.get("passed")))
+    if below_held:
+        lines.append("\n" + below_held)
     # The quest's objective is the pass: recorded before the reply, told after
-    # (v1.0.5).
+    # (v1.0.5). It is reported under the examination's own quest key, because a
+    # crafter can hold all three of a trade's at once and an untargeted report
+    # would complete every one of them on the first pass.
     progressed: list[dict] = []
     if result.get("passed"):
         progressed = await record_quest_progress(
-            interaction.user.id, "profession_exam", game_minute=wt.total_minutes)
+            interaction.user.id, "profession_exam", target=result.get("quest_key"),
+            game_minute=wt.total_minutes)
     await reply_long(interaction, "\n".join(lines), ephemeral=False)
     await announce_quest_progress(interaction, progressed)
 

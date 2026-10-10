@@ -24,7 +24,7 @@ from ...rules.commissions import realm_band_allows
 from ...rules.item_effects import craft_readiness
 from ...rules.item_grades import grade_cap_note
 from ...ops.game_engine import GameEngineError
-from ...rules.progression_systems import profession_rank, profession_xp_needed
+from ...rules.progression_systems import examinations_offered_line, profession_rank, profession_xp_needed
 from ...rules.realm_hubs import REALM_HUBS, realm_hub, realm_hub_by_location
 from ...rules.sect_manor import manor_craft_bonus
 from ...rules.sect_recruitment import recruitment_definition
@@ -1125,11 +1125,12 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str, craft_all
     ]
     # A rank reached is a hall opening its roll (v1.0.0-rc.45). Said here
     # because the quest is handed over silently otherwise, and a crafter who is
-    # not told has no reason to look in /quests.
-    exam_line = ""
-    if resolved.get("exam_offered"):
-        exam_line = (f"\n🎓 The {profession} halls will examine you at this rank: "
-                     f"**/craft → Profession → Exam**, at a hall of the trade. See **/quests**.")
+    # not told has no reason to look in /quests. A Craft All can cross several
+    # ranks, and the engine names every examination it handed over - not the
+    # rank held, which may be past all of them (v1.33.0).
+    exam_line = examinations_offered_line(profession, list(resolved.get("exams_offered") or []))
+    if exam_line:
+        exam_line = "\n" + exam_line
     # Only a craft that produced something counts. A failed refinement spends
     # the ingredients and is a real part of the trade, but "craft a Recovery
     # Pill" is not satisfied by not crafting one.
