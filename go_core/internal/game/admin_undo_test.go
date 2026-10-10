@@ -2,6 +2,13 @@ package game
 
 import (
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -417,5 +424,276 @@ func TestAdminUndoLastSetMissingRestoresAlive(t *testing.T) {
 	undoLast(t, path)
 	if got := fmt.Sprint(scalar(t, path, "SELECT status||':'||missing_since_game_minute FROM npc_civilization_state WHERE npc_name='Herbalist Mo'")); got != "alive:0" {
 		t.Fatalf("row=%q, want alive:0 restored", got)
+	}
+}
+
+// --- an undo writes back what its lever wrote (admin_undo_rows.go) ---
+
+// A redo is the forward action's own upsert: the root an undo deleted comes back.
+func TestARedoOfARootBringsBackTheRowItsUndoDeleted(t *testing.T) {
+	path := setupAdminDB(t)
+	applyAdmin(t, path, "admin.player.set_spiritual_root", map[string]any{"user_id": 42, "grade": "Heaven", "purity": 80, "mutation": "", "reason": "reward"})
+	undoLast(t, path)
+	redo := undoLast(t, path).(map[string]any)
+	if got := fmt.Sprint(scalar(t, path, "SELECT grade||':'||purity FROM character_spiritual_roots WHERE user_id=42")); got != "Heaven:80" {
+		t.Fatalf("root is %q after the redo (rows_affected %v); a redo of a root its undo removed must put the root back", got, redo["rows_affected"])
+	}
+	undoLast(t, path) // undo again
+	if got := scalar(t, path, "SELECT grade FROM character_spiritual_roots WHERE user_id=42"); got != nil {
+		t.Fatalf("root is %v after undo, redo, undo; the lever made it and the undo takes it", got)
+	}
+}
+
+// A clear leaves the count of attempts alone, so its audit row names none, and
+// neither direction may write one: i64(nil) is a 0, and a 0 is not "absent".
+func TestARedoOfAClearKeepsTheAttemptsItNeverWrote(t *testing.T) {
+	path := setupAdminDB(t)
+	if _, err := storageExec(path, `INSERT INTO tribulation_state(user_id,gate_realm_index,preparation,attempts,cleared,last_result,updated_game_minute,updated_at) VALUES(42,7,2,3,0,'failed',0,0)`); err != nil {
+		t.Fatal(err)
+	}
+	read := func() string {
+		return fmt.Sprint(scalar(t, path, "SELECT preparation||':'||attempts||':'||cleared||':'||last_result FROM tribulation_state WHERE user_id=42 AND gate_realm_index=7"))
+	}
+	applyAdmin(t, path, "admin.player.set_tribulation", map[string]any{"user_id": 42, "gate_realm_index": 7, "mode": "clear", "reason": "unstick"})
+	if got := read(); got != "0:3:1:cleared" {
+		t.Fatalf("after the clear the gate is %s, want 0:3:1:cleared", got)
+	}
+	undoLast(t, path)
+	if got := read(); got != "2:3:0:failed" {
+		t.Fatalf("after the undo the gate is %s, want the 2:3:0:failed it replaced", got)
+	}
+	undoLast(t, path)
+	if got := read(); got != "0:3:1:cleared" {
+		t.Fatalf("after the redo the gate is %s, want 0:3:1:cleared: the clear never wrote the attempts and the redo zeroed them", got)
+	}
+}
+
+// A reset does write the count, so its undo puts it back.
+func TestAnUndoOfAResetPutsTheAttemptsBack(t *testing.T) {
+	path := setupAdminDB(t)
+	if _, err := storageExec(path, `INSERT INTO tribulation_state(user_id,gate_realm_index,preparation,attempts,cleared,last_result,updated_game_minute,updated_at) VALUES(42,7,2,3,0,'failed',0,0)`); err != nil {
+		t.Fatal(err)
+	}
+	applyAdmin(t, path, "admin.player.set_tribulation", map[string]any{"user_id": 42, "gate_realm_index": 7, "mode": "reset", "reason": "oops"})
+	undoLast(t, path)
+	if got := fmt.Sprint(scalar(t, path, "SELECT preparation||':'||attempts||':'||cleared||':'||last_result FROM tribulation_state WHERE user_id=42 AND gate_realm_index=7")); got != "2:3:0:failed" {
+		t.Fatalf("after undoing a reset the gate is %s, want 2:3:0:failed", got)
+	}
+}
+
+// The identity is written back only when the call wrote it. `before` carries
+// the physique_id whether or not the GM gave one, so a samsara between the lever
+// and the undo - which makes a new physique - must not be undone by it.
+func TestAnUndoOfThreeNumbersLeavesTheIdentityAlone(t *testing.T) {
+	path := setupAdminDB(t)
+	if _, err := storageExec(path, `INSERT INTO character_physiques(user_id,physique_id,name,state,evolution_stage,progress,stability,updated_at) VALUES(42,'ordinary_mortal_body','Ordinary Mortal Body','ordinary',0,10,100,0)`); err != nil {
+		t.Fatal(err)
+	}
+	applyAdmin(t, path, "admin.player.set_physique", map[string]any{"user_id": 42, "evolution_stage": 2, "progress": 60, "stability": 40, "reason": "reward"})
+	// A new life: the identity is somebody else's now.
+	if _, err := storageExec(path, `UPDATE character_physiques SET physique_id='nine_yang_solar_body',name='Nine-Yang Solar Body' WHERE user_id=42`); err != nil {
+		t.Fatal(err)
+	}
+	undoLast(t, path)
+	if got := fmt.Sprint(scalar(t, path, "SELECT physique_id||':'||evolution_stage||':'||progress||':'||stability FROM character_physiques WHERE user_id=42")); got != "nine_yang_solar_body:0:10:100" {
+		t.Fatalf("physique is %s after the undo, want the new life's identity kept and the three numbers back: the old life's identity was written over it", got)
+	}
+}
+
+// A call that wrote the identity has it put back, and so does its redo; and a
+// snapshot with no identity anywhere (before v1.0.11) restores three numbers.
+func TestTheReversalOfAPhysiqueWritesTheIdentityOnlyWhenTheCallDid(t *testing.T) {
+	reverse := reversibleAdminActions["admin.player.set_physique"]
+	const target = "user:42"
+	stmt := func(before, after map[string]any, redo bool) string {
+		t.Helper()
+		stmts, err := reverse(before, after, target, redo)
+		if err != nil || len(stmts) != 1 {
+			t.Fatalf("reverse: %v (%d statement(s))", err, len(stmts))
+		}
+		return stmts[0].sql
+	}
+	numbers := func(m map[string]any) map[string]any {
+		m["evolution_stage"], m["progress"], m["stability"] = int64(1), int64(2), int64(3)
+		return m
+	}
+	withIdentity := stmt(numbers(map[string]any{"physique_id": "ordinary_mortal_body", "name": "Ordinary Mortal Body"}), numbers(map[string]any{"physique_id": "nine_yang_solar_body", "name": "Nine-Yang"}), false)
+	if !strings.Contains(withIdentity, "physique_id=?") {
+		t.Fatalf("a call that wrote the identity did not restore it: %s", withIdentity)
+	}
+	if redo := stmt(numbers(map[string]any{"physique_id": "ordinary_mortal_body", "name": "Ordinary Mortal Body"}), numbers(map[string]any{"physique_id": "nine_yang_solar_body", "name": "Nine-Yang"}), true); !strings.Contains(redo, "physique_id=?") {
+		t.Fatalf("the redo of a call that wrote the identity did not write it: %s", redo)
+	}
+	// v1.0.11 to this release: before carries the identity, after does not.
+	if numbersOnly := stmt(numbers(map[string]any{"physique_id": "ordinary_mortal_body", "name": "Ordinary Mortal Body"}), numbers(map[string]any{}), false); strings.Contains(numbersOnly, "physique_id") {
+		t.Fatalf("a call that wrote three numbers restored an identity it never wrote: %s", numbersOnly)
+	}
+	// Before v1.0.11: neither carries one.
+	if old := stmt(numbers(map[string]any{}), numbers(map[string]any{}), false); strings.Contains(old, "physique_id") {
+		t.Fatalf("an old snapshot with no identity wrote one: %s", old)
+	}
+}
+
+// The columns an undo of a perfection fill writes are the columns the idle row
+// names, so a default is never missing at the moment it is needed.
+func TestEveryColumnAPerfectionUndoWritesHasADefault(t *testing.T) {
+	for _, col := range append([]string{"progress"}, perfectionQuestColumns...) {
+		if _, err := rowDefaultValue(perfectionRowDefaults, col); err != nil {
+			t.Fatalf("%v", err)
+		}
+	}
+	if _, err := rowDefaultValue(perfectionRowDefaults, "not_a_column"); err == nil {
+		t.Fatal("a column the list does not name was given a default; the undo would write one over a player's row")
+	}
+}
+
+// deleteIfIdle names every column of its list and removes nothing a player has
+// put a value on.
+func TestDeleteIfIdleNamesEveryColumnOfTheList(t *testing.T) {
+	stmt := deleteIfIdle("law_progress", "user_id=? AND law_id=?", []any{int64(42), "fire"}, lawRowDefaults)
+	for _, want := range []string{"DELETE FROM law_progress WHERE user_id=? AND law_id=?", "comprehension=?", "insights=?"} {
+		if !strings.Contains(stmt.sql, want) {
+			t.Fatalf("%q does not hold %q", stmt.sql, want)
+		}
+	}
+	if len(stmt.args) != 4 {
+		t.Fatalf("%d argument(s) for two keys and two defaults", len(stmt.args))
+	}
+}
+
+// Every statement in a reversal that removes a row goes through deleteIfIdle,
+// except the two whose row carries nothing a player writes. The walk starts at
+// the map of reversible actions itself and closes over the package functions
+// each entry calls, so a reversal added next week is read without anybody
+// adding it to a list - and a list of files is exactly what would miss it.
+func TestAReversalDeletesARowOnlyThroughDeleteIfIdle(t *testing.T) {
+	allowed := map[string]string{
+		"deleteIfIdle":                    "the door itself",
+		"admin.player.adjust_item":        "an inventory row carries only the quantity the snapshot holds, so a delete is exact",
+		"admin.player.set_spiritual_root": "every character carries a root row from creation, samsara and the boot backfill, so a made row exists only in fixtures",
+	}
+	deleteFrom := regexp.MustCompile(`(?i)\bdelete\s+from\b`)
+
+	files, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fset := token.NewFileSet()
+	funcs := map[string]*ast.FuncDecl{}
+	var table *ast.CompositeLit
+	for _, file := range files {
+		if strings.HasSuffix(file, "_test.go") {
+			continue
+		}
+		parsed, err := parser.ParseFile(fset, file, nil, 0)
+		if err != nil {
+			t.Fatalf("%s: %v", file, err)
+		}
+		for _, decl := range parsed.Decls {
+			switch d := decl.(type) {
+			case *ast.FuncDecl:
+				if d.Recv == nil {
+					funcs[d.Name.Name] = d
+				}
+			case *ast.GenDecl:
+				for _, spec := range d.Specs {
+					if vs, ok := spec.(*ast.ValueSpec); ok && len(vs.Names) == 1 && vs.Names[0].Name == "reversibleAdminActions" && len(vs.Values) == 1 {
+						table, _ = vs.Values[0].(*ast.CompositeLit)
+					}
+				}
+			}
+		}
+	}
+	if table == nil {
+		t.Fatal("the walk found no reversibleAdminActions map; the gate is broken, not the tree")
+	}
+	if len(table.Elts) < 15 {
+		t.Fatalf("the walk found %d reversible action(s), and the shipped map holds more than that; the gate is broken, not the tree", len(table.Elts))
+	}
+
+	type root struct {
+		owner string
+		node  ast.Node
+	}
+	var roots []root
+	entries := 0
+	for _, elt := range table.Elts {
+		kv, ok := elt.(*ast.KeyValueExpr)
+		if !ok {
+			t.Fatalf("an entry of reversibleAdminActions is not key: value")
+		}
+		key, err := strconv.Unquote(kv.Key.(*ast.BasicLit).Value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entries++
+		switch v := kv.Value.(type) {
+		case *ast.FuncLit:
+			roots = append(roots, root{key, v})
+		case *ast.Ident:
+			fn, ok := funcs[v.Name]
+			if !ok {
+				t.Fatalf("%s names %s, which is not a function in this package", key, v.Name)
+			}
+			roots = append(roots, root{v.Name, fn})
+		default:
+			t.Fatalf("%s is neither a function literal nor a named function (%T); the gate cannot read it", key, kv.Value)
+		}
+	}
+	if len(roots) != entries {
+		t.Fatalf("%d of %d entries resolved to a body; the gate is broken, not the tree", len(roots), entries)
+	}
+
+	// Close over the package functions each entry calls.
+	seen := map[string]bool{}
+	var queue []root
+	queue = append(queue, roots...)
+	found := map[string][]string{}
+	for len(queue) > 0 {
+		r := queue[0]
+		queue = queue[1:]
+		ast.Inspect(r.node, func(n ast.Node) bool {
+			switch x := n.(type) {
+			case *ast.BasicLit:
+				if x.Kind == token.STRING {
+					if s, err := strconv.Unquote(x.Value); err == nil && deleteFrom.MatchString(s) {
+						found[r.owner] = append(found[r.owner], fset.Position(x.Pos()).String())
+					}
+				}
+			case *ast.CallExpr:
+				if id, ok := x.Fun.(*ast.Ident); ok {
+					if fn, ok := funcs[id.Name]; ok && !seen[id.Name] {
+						seen[id.Name] = true
+						queue = append(queue, root{id.Name, fn})
+					}
+				}
+			}
+			return true
+		})
+	}
+
+	if len(found["deleteIfIdle"]) == 0 {
+		t.Fatal("the walk found no DELETE in deleteIfIdle; the gate is broken, not the tree")
+	}
+	for _, name := range []string{"reverseSetRealmPerfection", "reverseSetProfession", "reverseSetLaw"} {
+		fn, ok := funcs[name]
+		if !ok || !callsAny(fn, "deleteIfIdle") {
+			t.Errorf("%s no longer removes a row it made through deleteIfIdle", name)
+		}
+	}
+	owners := make([]string, 0, len(found))
+	for owner := range found {
+		owners = append(owners, owner)
+	}
+	sort.Strings(owners)
+	for _, owner := range owners {
+		if _, ok := allowed[owner]; !ok {
+			t.Errorf("%s removes a row with a DELETE of its own (%s); a row the lever made is deleted only through deleteIfIdle, because a bare DELETE takes whatever play put on it since", owner, strings.Join(found[owner], ", "))
+		}
+	}
+	for owner, why := range allowed {
+		if len(found[owner]) == 0 {
+			t.Errorf("%s is allowed a DELETE (%s) and has none; drop the entry", owner, why)
+		}
 	}
 }
