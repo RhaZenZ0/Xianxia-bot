@@ -18,7 +18,10 @@ holds:
   for;
 - the Discord playtest skips the jump select when it answers a leaf's input
   steps, because the panel itself is often the message a leaf's result lands
-  on, and picking the jump would change page mid-sweep.
+  on, and picking the jump would change page mid-sweep;
+- a More actions offset lives only while the page pages: when the grid grows
+  back (a result cleared, fewer next steps, a door closing) the page draws
+  every action from the top rather than the tail it was left on.
 """
 from __future__ import annotations
 
@@ -309,6 +312,65 @@ class ThePageIsCompact(unittest.TestCase):
             asyncio.run(more.callback(interaction))
             self.assertLessEqual(_count(view), hubs._LAYOUT_COMPONENT_CAP)
         self.assertEqual(sorted(seen), sorted(a.path for a in actions), "More actions skipped or repeated a lever")
+
+    def _drawn(self, view):
+        return ([s.accessory.action.path for s in _of(view, "Section")]
+                + [b.action.path for b in _of(view, "HubLayoutGridButton")])
+
+    def test_refresh_after_more_actions_draws_every_action_again(self):
+        surface, hubs, _ = _modules()
+        definition = surface._ADMIN_HUB_DEFINITION
+        page = next(p for p in definition.pages if p.key == "player")
+        steps = hubs.suggested_actions("**/world → City → Look** **/world → Explore** **/world → Hunt**")
+        interaction = SimpleNamespace(response=SimpleNamespace(edit_message=AsyncMock(), defer=AsyncMock()))
+        for count in range(4):
+            with self.subTest(next_steps=count):
+                view = self._draw(hubs, definition, page)
+                view.last_result = "Done."
+                view.result_pages = hubs._result_pages(view.last_result)
+                view.result_actions = steps[:count]
+                view.rebuild()
+                more = _of(view, "HubLayoutActionPageButton")
+                self.assertTrue(more, "the walk is vacuous: a result on the long page no longer pages it")
+                asyncio.run(more[0].callback(interaction))
+                self.assertGreater(view.action_offset, 0, "More actions did not move the page on")
+                with patch.object(view, "refresh_status", AsyncMock()):
+                    asyncio.run(_of(view, "HubLayoutRefreshButton")[0].callback(interaction))
+                actions = [a.path for a in view.page_actions(page)]
+                drawn = self._drawn(view)
+                self.assertEqual(_of(view, "HubLayoutActionPageButton"), [],
+                                 "the page fits again and still offers More actions")
+                self.assertEqual(len(drawn), len(actions),
+                                 f"after Refresh the page drew {len(drawn)} of {len(actions)} actions, "
+                                 "with no More actions to reach the rest: the offset outlived the paging")
+                self.assertEqual(drawn, actions)
+
+    def test_a_page_that_offers_no_more_actions_draws_every_action(self):
+        """Refresh is one door to the stranded page and not the only one: a new
+        press's result with fewer next steps, a door closing and the page
+        falling back to the first each shrink the paging the same way. Most of
+        these offsets cannot be reached today - the point is that none can
+        strand a page, so this stays when it looks dead."""
+        surface, hubs, _ = _modules()
+        failures: list[str] = []
+        checked = 0
+        for definition in [*hubs.REGISTERED_HUBS, surface._ADMIN_HUB_DEFINITION]:
+            for page in definition.pages:
+                for result in (False, True):
+                    view = self._draw(hubs, definition, page, result=result)
+                    actions = view.page_actions(page)
+                    rest = actions[hubs._LAYOUT_FEATURED:]
+                    if len(rest) < 2 or _of(view, "HubLayoutActionPageButton"):
+                        continue
+                    checked += 1
+                    view.action_offset = len(rest) - 1
+                    view.rebuild()
+                    drawn = self._drawn(view)
+                    if drawn != [a.path for a in actions]:
+                        failures.append(f"/{definition.name} -> {page.label}"
+                                        f"{' (under a result)' if result else ''}: {len(drawn)} of {len(actions)}")
+        self.assertGreater(checked, 0, "no page was checked; the walk is vacuous")
+        self.assertEqual(failures, [], "a page that offers no More actions left its offset on a tail")
 
 
 class ThePlaytestNeverAnswersTheJump(unittest.TestCase):
