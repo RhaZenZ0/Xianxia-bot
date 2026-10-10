@@ -93,6 +93,49 @@ def profession_rank(level: int, trade: str = "") -> str:
     return f"Tier {tier} {word} {title}" if word else f"Tier {tier} {title}"
 
 
+def examinations_offered_line(profession: str, offered: list[dict[str, Any]]) -> str:
+    """What a craft says when it handed over examinations, or "" when it did not.
+
+    The engine names each examination it handed over (`exams_offered`: quest
+    key, rank, rank name, hall), lowest rank first, and the hall sits them in
+    that order - so the line says how many are owed, names them in the engine's
+    own words, and says "lowest first" when there are several. Where the hall
+    is comes from the one table every quest label reads, never restated here.
+    """
+    names = [str(dict(exam).get("rank_name") or "").strip() for exam in list(offered or []) if isinstance(exam, dict)]
+    names = [name for name in names if name]
+    if not names:
+        return ""
+    from .quests import OBJECTIVE_PATHS
+
+    door = OBJECTIVE_PATHS.get("profession_exam", "")
+    if len(names) == 1:
+        return (f"🎓 The {profession} halls will examine you for the **{names[0]}** rank: {door}, "
+                f"at a hall of the trade. See **/quests**.")
+    listed = ", ".join(f"**{name}**" for name in names[:-1]) + f" and **{names[-1]}**"
+    return (f"🎓 The {profession} halls owe you {len(names)} examinations, {listed}. A hall sits them lowest "
+            f"first: {door}, at a hall of the trade. See **/quests**.")
+
+
+def examination_below_held_line(profession: str, rank: int, held: int, remaining: int, passed: bool) -> str:
+    """One line when the examination sat is for a rank below the one held.
+
+    The hall sits the lowest rank this life has reached and not passed, so a
+    crafter who climbed past a rank is examined for it first. Said only then,
+    because a candidate sitting the rank they hold has nothing to be told.
+    """
+    if int(rank) >= int(held):
+        return ""
+    held_name = profession_rank(int(held), profession)
+    if passed and int(remaining) > 0:
+        owed = "one more examination is" if int(remaining) == 1 else f"{int(remaining)} more examinations are"
+        return f"🎓 You hold **{held_name}**, so {owed} still owed. The hall sits the lowest first; ask again."
+    if passed:
+        return f"🎓 You hold **{held_name}**, and every rank up to it is certified now."
+    return (f"🎓 You hold **{held_name}**, but the hall sits the lowest rank you have not passed first; "
+            f"the higher ones wait behind it.")
+
+
 ASCENSION_GATES: dict[int, dict[str, Any]] = {
     7: {"from_world": "Mortal World", "to_world": "Spiritual World", "name": "Mortal Ascension Tribulation"},
     15: {"from_world": "Spiritual World", "to_world": "Immortal World", "name": "Transcendence Tribulation"},

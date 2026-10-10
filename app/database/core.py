@@ -27,7 +27,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 79
+SCHEMA_VERSION = 80
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -3302,6 +3302,38 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                 FOREIGN KEY(disciple_user_id) REFERENCES characters(user_id) ON DELETE CASCADE
             )""",
             "CREATE INDEX IF NOT EXISTS idx_npc_mentorships_master ON npc_mentorships(master_npc_name)",
+        ),
+    ),
+    (
+        80,
+        "an_examination_names_its_quest",
+        (
+            # v1.33.0: a pass is reported under the quest key of the examination
+            # that was sat, and each examination's objective now names its own
+            # key as its target - an untargeted objective takes any pass, so a
+            # crafter holding all three of a trade's (one Craft All crosses
+            # them) completed and was paid every one on the first. The seeding
+            # is insert-only, so a running world still holds the untargeted
+            # objectives, in the definition and in the terms a player already
+            # pinned; both are given their target here. Only an examination's
+            # own first objective, and only where no target is set: a GM who
+            # edited one in the workbench is obeyed (migration 55's rule), and
+            # `realm_road_21`, whose objective merely asks for a pass, is not an
+            # examination and stays untargeted. A completed quest is kept as it
+            # was paid. This is the first migration to read JSON in SQL; the
+            # engine already does (`json_extract` in its own queries).
+            """UPDATE quest_definitions
+                  SET objectives_json=json_set(objectives_json,'$[0].target',quest_key)
+                WHERE source_key LIKE 'profession_exam:%'
+                  AND json_valid(objectives_json)
+                  AND json_extract(objectives_json,'$[0].type')='profession_exam'
+                  AND json_type(objectives_json,'$[0].target') IS NULL""",
+            """UPDATE character_quests
+                  SET terms_json=json_set(terms_json,'$.objectives[0].target',quest_key)
+                WHERE quest_key IN (SELECT quest_key FROM quest_definitions WHERE source_key LIKE 'profession_exam:%')
+                  AND status='active' AND terms_json<>'' AND json_valid(terms_json)
+                  AND json_extract(terms_json,'$.objectives[0].type')='profession_exam'
+                  AND json_type(terms_json,'$.objectives[0].target') IS NULL""",
         ),
     ),
 )

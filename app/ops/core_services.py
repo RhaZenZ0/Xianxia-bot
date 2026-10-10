@@ -211,7 +211,7 @@ HANDED_OVER_BY_A_ROSTER = frozenset({
     "beginner_path",     # granted at creation, then stage by stage as each completes
     "household_errand",  # `family.errand`, at home, one at a time
     "world_crossing",    # handed over by a cleared world-crossing tribulation
-    "profession_exam",   # offered by the craft that reached the rank
+    "profession_exam",   # offered by the craft that reached the rank, and at the hall's counter
     "sect_recruitment",  # `beginner_lesson`'s follow_on, where the trial's odds are worth taking
     "realm_road",        # handed over by the crossing into its realm, and by the stage before it
 })

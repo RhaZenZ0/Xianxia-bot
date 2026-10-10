@@ -228,9 +228,12 @@ def profession_exam_seed_rows(world: Any) -> list[dict[str, Any]]:
 
     `profession_exams` is keyed by trade, each entry one rank: the hall kind
     that examines it, the target number, the fee, and the prose the keeper's
-    counter is described with. The engine finds the one to hand over from the
-    rank a craft just reached, and every one of them is an ordinary giver-less
-    quest - the hall offers an examination, it does not commission work.
+    counter is described with. The engine hands over every one the rank held
+    has reached and this life has not passed - from the craft that raised the
+    rank and from the hall's counter - and every one of them is an ordinary
+    giver-less quest: the hall offers an examination, it does not commission
+    work. Each one's objective names its own quest key as its target, so a pass
+    completes that examination's quest and no other.
     """
     rows: list[dict[str, Any]] = []
     exams = dict((getattr(world, "data", {}) or {}).get("profession_exams") or {})
@@ -382,11 +385,16 @@ OBJECTIVE_TYPES: dict[str, dict[str, Any]] = {
     # location a draft could name in advance and be right about.
     "ascension_gate": {"target": None, "label": "", "untargeted": "Anchor a crossing where you survived your tribulation"},
     "world_cross": {"target": None, "label": "", "untargeted": "Cross into the world above"},
-    # Reported by `/craft -> Profession -> Exam` only on a pass (v1.0.0-rc.45).
-    # Untargeted: the examiner is whichever hall's keeper the candidate walked
-    # in on, one of a hundred and twenty, so there is no name a draft could
-    # fix in advance and be right about.
-    "profession_exam": {"target": None, "label": "", "untargeted": "Pass a hall's examination in your trade"},
+    # Reported by `/craft -> Profession -> Exam` only on a pass (v1.0.0-rc.45),
+    # under the quest key of the examination that was sat (v1.33.0). The
+    # examiner is whichever hall's keeper the candidate walked in on, so there
+    # is no name to target - but an examination is a rank of a trade, and a
+    # crafter can hold all three of a trade's at once (one Craft All crosses
+    # them), so objectives that took any pass completed every one of them on
+    # the first. Each examination's own objective names its own key; an
+    # untargeted objective still accepts any pass, which is what a quest that
+    # merely asks for one wants.
+    "profession_exam": {"target": "profession_exam", "label": "Sit the {target}", "untargeted": "Pass a hall's examination in your trade"},
     # The road through the upper worlds (v1.18.0). A Law is read under the
     # Spiritual World's archive and wielded from Law Manifestation on, and
     # until now no quest could ask for either; a personal world is the last
@@ -663,6 +671,23 @@ def validate_quest_definition(draft: dict[str, Any], world: Any, budget: dict[st
                     errors.append(f"objective {index + 1}: unknown Law technique {target_text!r}")
                     continue
                 target_label = str(dict(techniques[target] or {}).get("name") or target)
+            elif spec["target"] == "profession_exam":
+                # `profession_exams` is keyed by trade, one entry per rank, and
+                # a pass is reported under the examination's own quest key (the
+                # engine's `quest_key` on the result), so that key is the
+                # target. The label names the rank in the engine's own words.
+                exams: dict[str, tuple[str, str, str]] = {}
+                for trade, ladder in dict(getattr(world, "data", {}).get("profession_exams") or {}).items():
+                    for exam in list(ladder or []):
+                        exam_key = str(dict(exam).get("quest_key") or "").strip()
+                        if exam_key:
+                            exams[exam_key.lower()] = (exam_key, str(trade), str(dict(exam).get("rank_name") or ""))
+                found = exams.get(target_text.lower())
+                if found is None:
+                    errors.append(f"objective {index + 1}: unknown examination {target_text!r}")
+                    continue
+                target = found[0]
+                target_label = f"{found[2]} examination in {found[1]}"
         objective_id = re.sub(r"[^a-z0-9_]+", "_", str(raw.get("id") or f"{kind}_{index + 1}").lower()).strip("_") or f"{kind}_{index + 1}"
         if objective_id in seen_ids:
             objective_id = f"{objective_id}_{index + 1}"

@@ -363,6 +363,15 @@ class _QuestWorld:
         # A `craft` objective names a recipe (v1.2.1); without this every one
         # the editor saved or reported was "an unknown recipe".
         self.recipes = dict(data.get("recipes") or {})
+        # The target kinds added since v1.16.0 read the rest of the content pack
+        # (a realm's name, a flame, a Law, a secret realm, an examination's
+        # quest key), and a hand edit goes through the same validator. Without
+        # these every one of those kinds was "unknown" here, so the workbench
+        # refused to save any realm-road stage - and, from v1.33.0, any
+        # examination, which an untargeted objective used to let through.
+        self.data = data
+        self.realms = list(data.get("realms") or [])
+        self.secret_realms = dict(data.get("secret_realms") or {})
 
 
 def json_safe_numbers(value: Any) -> Any:
@@ -2199,6 +2208,13 @@ class ReadOnlyDashboardStore:
             str(name) for name, loc in world.locations.items() if not (loc or {}).get("private")
         }
         location_lookup = {name.lower(): name for name in location_names}
+        # A `profession_exam` objective names an examination by its quest key
+        # (v1.33.0), so a key the content does not carry strands the quest.
+        exam_keys = {
+            str(dict(exam).get("quest_key") or "").strip().lower()
+            for ladder in dict(getattr(world, "data", {}).get("profession_exams") or {}).values()
+            for exam in list(ladder or [])
+        }
         for row in approved:
             bands[str(row.get("realm_band") or "any")] = bands.get(str(row.get("realm_band") or "any"), 0) + 1
             for objective in _json_list(row.get("objectives_json")):
@@ -2223,6 +2239,9 @@ class ReadOnlyDashboardStore:
                 elif expects == "item" and target.lower().replace(" ", "_") not in item_ids:
                     unknown_targets.append({"quest_key": str(row.get("quest_key")), "type": kind, "target": target,
                                             "expects": "item"})
+                elif expects == "profession_exam" and target.lower() not in exam_keys:
+                    unknown_targets.append({"quest_key": str(row.get("quest_key")), "type": kind, "target": target,
+                                            "expects": "profession_exam"})
         return {
             "realm_bands": sorted(({"band": band, "count": count} for band, count in bands.items()),
                                   key=lambda item: item["band"]),
