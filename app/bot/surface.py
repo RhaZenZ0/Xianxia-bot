@@ -913,7 +913,9 @@ class MenuNextButton(MenuDailyButton):
     and left the player to walk it, which is the "I forget where to go"
     report. This is that path as a button: the same leaf a reply's next-step
     button resolves (`suggested_actions`), opened and pressed the way a Daily
-    button is."""
+    button is. A leaf whose first step is a form (Boss Raids → Claim, Personal
+    World → Create) cannot open it on a press that has already opened the hub,
+    so it is handed a Continue button instead."""
 
     def __init__(self, hub: str, action: HubAction) -> None:
         super().__init__(str(getattr(action.command, "name", "next")), hub, action.path)
