@@ -20,6 +20,7 @@ definition order is the order these had in main.py.
 """
 from __future__ import annotations
 
+from collections.abc import Collection
 from typing import Any, Sequence
 
 import discord
@@ -258,6 +259,24 @@ def _world_is_unlocked(character: dict[str, Any], world_name: str) -> bool:
     return access_realm_index(character) >= _world_min_realm_index(str(world_name))
 
 
+def _city_parts(city: str, known: Collection[str] = ()) -> list[str]:
+    """A city's gates and districts as a cultivator sees them - the twin of the
+    engine's `cityPartsInPlainSight`, and the one list every door of the city
+    page reads (the header, City -> Look, City -> Enter, the seat line, the
+    travel picker's map).
+
+    A part is shown unless it is `private`: a demonic sect's gate is a district
+    of its seat (v1.19.0) which the street does not show, so the arrival line,
+    the header and Look name it to nobody. What lifts that is the engine's
+    other half of the rule - a sponsor's word is a discovery row, and standing
+    in the gate is knowing it - so a private part is shown to somebody whose own
+    map (`known`, `_known_private_parts`) holds it. With no `known` this is
+    plain sight alone."""
+    return sorted(name for name, data in WORLD.locations.items()
+                  if data.get("district") and str(data.get("outside_location")) == city
+                  and (not data.get("private") or name in known))
+
+
 async def _known_locations(user_id: int, character: dict[str, Any]) -> set[str]:
     rows = await DB.get_discovered_locations(int(user_id))
     known = {str(row.get("location")) for row in rows if row.get("location")}
@@ -280,12 +299,11 @@ async def _known_locations(user_id: int, character: dict[str, Any]) -> set[str]:
             city = str(current_data["outside_location"])
             known.add(city)
             current_data = WORLD.locations.get(city) or {}
-        for name, data in WORLD.locations.items():
-            # A private part - a sect's hidden gate - is a sponsor's to reveal,
-            # not the street's (`knownLocationsTx` skips it too, v1.19.0); the
-            # picker offered it and the engine refused it until v1.26.0.
-            if data.get("district") and str(data.get("outside_location")) == city and not data.get("private"):
-                known.add(name)
+        # A private part - a sect's hidden gate - is a sponsor's to reveal,
+        # not the street's (`knownLocationsTx` skips it too, v1.19.0); the
+        # picker offered it and the engine refused it until v1.26.0. No `known`
+        # is passed: this is plain sight, and what is discovered is above.
+        known.update(_city_parts(city))
         # At a road-side site (v0.39.0) the road runs both ways: both ends
         # of its leg are known, and every other site on that leg.
         leg = [str(x) for x in list(current_data.get("road_leg") or [])] if current_data.get("road_site") else []
@@ -310,6 +328,25 @@ async def _known_locations(user_id: int, character: dict[str, Any]) -> set[str]:
         if _world_is_unlocked(character, world_name):
             known.add(str(hub["location"]))
     return known
+
+
+async def _known_private_parts(user_id: int, character: dict[str, Any], city: str) -> frozenset[str]:
+    """The private parts of ``city`` this cultivator's own map holds - a gate a
+    sponsor named, or the one they are standing in - for `_city_parts` to lift.
+
+    Nearly every city has none, so it answers at once without a read; the two
+    seats of a private gate pay for one. It never raises: it is drawn beside
+    everything else on a city page, and a failed read leaves the street's
+    answer (plain sight), which under-offers rather than leaks."""
+    private = {name for name, data in WORLD.locations.items()
+               if data.get("private") and data.get("district") and str(data.get("outside_location")) == city}
+    if not private:
+        return frozenset()
+    try:
+        return frozenset(private & await _known_locations(int(user_id), character))
+    except Exception:  # noqa: BLE001 - one unavailable read must not cost the city page
+        log.exception("Could not read what %s knows of %s", user_id, city)
+        return frozenset()
 
 
 async def _location_is_visible(user_id: int, character: dict[str, Any], location: str) -> bool:
@@ -545,7 +582,10 @@ def here_summary(location: str, limit: int = 180, *, present: Sequence[str] | No
     elif data.get("district"):
         what = f"the {str(data['district']).replace('_', ' ')} of {city}" if data["district"] != "inn" else f"the inn of {city}"
     else:
-        parts = sorted(n for n, d in WORLD.locations.items() if d.get("district") and str(d.get("outside_location")) == name)
+        # Counted from plain sight (v1.33.0): this header has no viewer, and a
+        # private gate counted here made it say three districts over a Look
+        # that lists two.
+        parts = _city_parts(name)
         gates = [p for p in parts if WORLD.locations[p].get("gate")]
         districts = [p for p in parts if not WORLD.locations[p].get("gate")]
         roads = [str(r) for r in list(data.get("roads") or [])]

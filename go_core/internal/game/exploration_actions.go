@@ -796,6 +796,23 @@ func cityPartsOf(catalog worlddata.Catalog, city string) []string {
 	return parts
 }
 
+// cityPartsInPlainSight is what anybody standing in a city, or walking in
+// along a road to it, can see of it: its gates and districts less the ones
+// that are not in plain sight (a demonic sect's gate, v1.19.0, which only a
+// sponsor reveals). knownLocationsTx draws the map from it and the travel
+// result names the parts of the city it arrives at from it, so the two cannot
+// disagree about what a street shows; cityPartsOf stays for the rules that
+// walk the whole city (the envoys' hall, the road-site sweep).
+func cityPartsInPlainSight(catalog worlddata.Catalog, city string) []string {
+	parts := []string{}
+	for _, part := range cityPartsOf(catalog, city) {
+		if !catalog.Locations[part].Private {
+			parts = append(parts, part)
+		}
+	}
+	return parts
+}
+
 // gateFacing is the gate of city that faces neighbour - the one a road
 // from neighbour arrives at and the one a road to neighbour leaves by.
 func gateFacing(catalog worlddata.Catalog, city, neighbour string) (string, string, bool) {
@@ -855,12 +872,10 @@ func knownLocationsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 				known[neighbor] = true
 			}
 		}
-		for _, part := range cityPartsOf(catalog, city) {
-			// A private district (a demonic sect's gate, v1.19.0) is not in
-			// plain sight: a sponsor reveals it, as a sponsor always has.
-			if !catalog.Locations[part].Private {
-				known[part] = true
-			}
+		// A private district (a demonic sect's gate, v1.19.0) is not in plain
+		// sight: a sponsor reveals it, as a sponsor always has.
+		for _, part := range cityPartsInPlainSight(catalog, city) {
+			known[part] = true
 		}
 		// At a road-side site (v0.39.0) the road runs both ways: both ends
 		// of the leg are known, and so is every other site on it.
@@ -1768,7 +1783,7 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 		"arrived_at":                    arrivedAt,
 		"arrival_gate":                  arrivalGate,
 		"left_by_gate":                  leftBy,
-		"city_parts":                    cityPartsOf(catalog, p.Destination),
+		"city_parts":                    cityPartsInPlainSight(catalog, p.Destination),
 		"road_sites_found":              sitesFound,
 		"site_kind":                     dest.RoadSite,
 		"site_leg":                      append([]string{}, dest.RoadLeg...),
