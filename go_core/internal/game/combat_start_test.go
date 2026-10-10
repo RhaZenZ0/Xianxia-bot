@@ -2,6 +2,7 @@ package game
 
 import (
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -24,23 +25,35 @@ CREATE TABLE characters(
 	body_realm_index INTEGER, body_phase INTEGER, cultivation INTEGER, body_cultivation INTEGER,
 	life_status TEXT, vitality INTEGER, vitality_max INTEGER, updated_at REAL
 );
-CREATE TABLE battles(
-	battle_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, npc_name TEXT,
-	npc_realm_index INTEGER, npc_stage INTEGER, player_hp INTEGER, player_hp_max INTEGER,
-	npc_hp INTEGER, npc_hp_max INTEGER, status TEXT, location TEXT, source TEXT,
-	target_key TEXT, npc_suppressed_turns INTEGER DEFAULT 0, version INTEGER DEFAULT 0,
-	created_at REAL, updated_at REAL
-);
 INSERT INTO characters(user_id,name,gender,path,spiritual_root,location,attributes_json,realm_index,phase,body_realm_index,body_phase,cultivation,body_cultivation,life_status,vitality,vitality_max,updated_at)
 	VALUES(101,'Tester 101','','Sword Cultivator','Fire','Greenriver Town','{}',3,4,0,1,0,0,'alive',12,20,0);
 INSERT INTO characters(user_id,name,gender,path,spiritual_root,location,attributes_json,realm_index,phase,body_realm_index,body_phase,cultivation,body_cultivation,life_status,vitality,vitality_max,updated_at)
 	VALUES(202,'Tester 202','','Sword Cultivator','Fire','Greenriver Town','{}',1,2,0,1,0,0,'alive',20,20,0);
 INSERT INTO characters(user_id,name,gender,path,spiritual_root,location,attributes_json,realm_index,phase,body_realm_index,body_phase,cultivation,body_cultivation,life_status,vitality,vitality_max,updated_at)
 	VALUES(303,'Tester 303','','Sword Cultivator','Fire','Greenriver Town','{}',1,2,0,1,0,0,'dead',0,20,0);
-`); err != nil {
+` + challengeWorldDDL + `
+` + challengeSeeds("Greenriver Town",
+		challengeSeed{"Iron Bandit", 5, 7}, challengeSeed{"Named Opponent", 1, 2},
+		challengeSeed{"First Foe", 1, 1}, challengeSeed{"Second Foe", 1, 1})); err != nil {
 		t.Fatal(err)
 	}
 	return path
+}
+
+// challengeSeed is somebody the simulation has standing at a place, written as
+// the SQL a fixture script runs. A challenge reads whom it fights from this row
+// and from nothing the payload says.
+type challengeSeed struct {
+	name         string
+	realm, phase int
+}
+
+func challengeSeeds(location string, people ...challengeSeed) string {
+	var b strings.Builder
+	for _, p := range people {
+		fmt.Fprintf(&b, "INSERT INTO npc_civilization_state(npc_name,home_location,current_location,world_name,profession,influence,realm_index,phase,updated_at) VALUES('%s','%s','%s','Mortal World','Test',10,%d,%d,0);\n", p.name, location, location, p.realm, p.phase)
+	}
+	return b.String()
 }
 
 func callCombatStart(t *testing.T, path string, userID int64, payload map[string]any) (authoritativeMutation, error) {
@@ -78,15 +91,17 @@ func callCombatStart(t *testing.T, path string, userID int64, payload map[string
 
 func TestCombatStartChallengeComputesServerSideHPFromCanonicalCharacter(t *testing.T) {
 	path := setupCombatStartDB(t)
+	// The payload says realm 0, stage 1. The curve below is Iron Bandit's own
+	// 5/7 from the row the simulation holds: what a challenge fights is the
+	// world's to say, and this test used to pin the opposite (the defect).
 	mut, err := callCombatStart(t, path, 101, map[string]any{
-		"kind": "challenge", "npc_name": "Iron Bandit", "npc_realm_index": 5, "npc_stage": 7,
-		"source": "challenge:npc:iron-bandit", "target_key": "challenge:npc:iron-bandit", "game_minute": 100,
+		"kind": "challenge", "npc_name": "Iron Bandit", "npc_realm_index": 0, "npc_stage": 1, "game_minute": 100,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	out := mut.Result.(map[string]any)
-	// npc_hp = max(10, 12 + realm*4 + stage*2) = 12 + 20 + 14 = 46
+	// npc_hp = max(10, 12 + realm*4 + stage*2) = 12 + 20 + 14 = 46, from the row
 	if storage.ParseInt(out["npc_hp"]) != 46 || storage.ParseInt(out["npc_hp_max"]) != 46 {
 		t.Fatalf("npc_hp=%v", out["npc_hp"])
 	}
@@ -134,14 +149,12 @@ func TestCombatStartEventKindDerivesOpponentFromCallersOwnCharacterNotPayload(t 
 func TestCombatStartRejectsDuplicateActiveTargetKeyFromAnotherUser(t *testing.T) {
 	path := setupCombatStartDB(t)
 	if _, err := callCombatStart(t, path, 101, map[string]any{
-		"kind": "challenge", "npc_name": "Named Opponent", "npc_realm_index": 1, "npc_stage": 2,
-		"source": "challenge:npc:named", "target_key": "challenge:npc:named", "game_minute": 100,
+		"kind": "challenge", "npc_name": "Named Opponent", "game_minute": 100,
 	}); err != nil {
 		t.Fatalf("first start: %v", err)
 	}
 	_, err := callCombatStart(t, path, 202, map[string]any{
-		"kind": "challenge", "npc_name": "Named Opponent", "npc_realm_index": 1, "npc_stage": 2,
-		"source": "challenge:npc:named", "target_key": "challenge:npc:named", "game_minute": 100,
+		"kind": "challenge", "npc_name": "Named Opponent", "game_minute": 100,
 	})
 	if err == nil || !strings.Contains(err.Error(), "already locked") {
 		t.Fatalf("expected already-locked error, got %v", err)
@@ -162,16 +175,14 @@ func TestCombatStartRejectsDeceasedActor(t *testing.T) {
 func TestCombatStartAbandonsAnyPriorActiveBattleForSameUser(t *testing.T) {
 	path := setupCombatStartDB(t)
 	first, err := callCombatStart(t, path, 101, map[string]any{
-		"kind": "challenge", "npc_name": "First Foe", "npc_realm_index": 1, "npc_stage": 1,
-		"source": "challenge:npc:first", "target_key": "challenge:npc:first", "game_minute": 100,
+		"kind": "challenge", "npc_name": "First Foe", "game_minute": 100,
 	})
 	if err != nil {
 		t.Fatalf("first start: %v", err)
 	}
 	firstID := storage.ParseInt(first.Result.(map[string]any)["battle_id"])
 	second, err := callCombatStart(t, path, 101, map[string]any{
-		"kind": "challenge", "npc_name": "Second Foe", "npc_realm_index": 1, "npc_stage": 1,
-		"source": "challenge:npc:second", "target_key": "challenge:npc:second", "game_minute": 100,
+		"kind": "challenge", "npc_name": "Second Foe", "game_minute": 100,
 	})
 	if err != nil {
 		t.Fatalf("second start: %v", err)
