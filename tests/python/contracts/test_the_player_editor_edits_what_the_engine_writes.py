@@ -16,7 +16,10 @@ engine cannot sit unreachable from the editor the way five did until v1.23.0.
 
 from __future__ import annotations
 
+import json
 import re
+import shutil
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -186,9 +189,36 @@ class TheQuestReportNamesItsObjective(unittest.TestCase):
         self.assertNotIn("Number(uid", self.payload)
 
     def test_the_picker_offers_objectives_not_types(self):
-        self.assertNotIn("new Set(", self.fill, (
+        # Driven, not grepped: a picker that collapsed by type under another
+        # spelling than the old `new Set(` would pass a substring check (v1.0.8,
+        # a gate holds the rule). fillObjectives' own body is run under node
+        # against the Go fixture's four objectives - two of them `talk`s to
+        # different people - and must draw one option per objective still
+        # short, each carrying its own target.
+        node = shutil.which("node")
+        if node is None:
+            self.skipTest("node is not installed, so the picker cannot be driven")
+        script = (
+            "const drawn=[];"
+            "const el=()=>({set innerHTML(v){drawn.push(v)}});"
+            "const opt=(v,l)=>`<option value=\"${v}\">${l}</option>`;"
+            "const chosenQuest=()=>({objectives:["
+            "{id:'gate',label:'Cross the gate',type:'breakthrough',target:'Qi Refining',progress:0,count:1},"
+            "{id:'sit',label:'Sit once',type:'cultivate',progress:1,count:1},"
+            "{id:'pine',label:'Speak with Elder Pine',type:'talk',target:'Elder Pine',progress:0,count:1},"
+            "{id:'qiao',label:'Speak with Steward Qiao',type:'talk',target:'Steward Qiao',progress:0,count:1}]});"
+            f"(()=>{self.fill})();"
+            "process.stdout.write(JSON.stringify(drawn));"
+        )
+        run = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=30)
+        self.assertEqual(run.returncode, 0, f"fillObjectives did not run under node: {run.stderr}")
+        drawn = json.loads(run.stdout)
+        self.assertEqual(len(drawn), 1, "fillObjectives drew the picker more or less than once")
+        values = re.findall(r'<option value="(\d+)">', drawn[0])
+        self.assertEqual(values, ["0", "2", "3"], (
             "the picker collapses objectives by type again, so two objectives of one type "
             "cannot be told apart and none of their targets can be sent"))
+        self.assertIn("Steward Qiao", drawn[0], "the second talk objective lost its own target")
         self.assertIn(".objectives[", self.handler, "the report no longer resolves the picked objective")
 
     def test_an_empty_picker_reports_nothing(self):

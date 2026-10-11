@@ -7577,7 +7577,7 @@ held-rank sit fails *"a candidate holding rank 3 with nothing passed is examined
 rank=3 held=3 passed=True remaining=2"* and *"profession.exam then sits rank 2 - no examination is
 held in Alchemy at this rank"*.
 
-**Its own gates caught three things on the way.** (1) The plan's test 3 prototype drove the offer
+**Its own gates caught three things on the way.** (1) The first prototype of the offer test drove the offer
 at a single rank and so could not have seen `exam.Rank != held` filtering the batch's earlier ranks
 out; `TestReachingARankOffersEveryOpenExamination` hands over from Tier 2 with nothing passed and
 holds the pair. (2) The first draft of the "only its own quest completes" test would have been green
@@ -7588,9 +7588,9 @@ third Alchemy examination teaches nothing (its makings are on no Mortal shelf), 
 at rank 3 would print an empty list for a wrong teacher and look green.
 
 **Deliberately not done.** No clawback of payouts a stranded crafter already collected through the
-old untargeted report (owner decision 6) - the three fees and three payouts a stranded crafter now
+old untargeted report, on the owner's call - the three fees and three payouts a stranded crafter now
 collects close together are the same total as an on-time crafter's. No Craft All stop at an exam
-rank (owner decision 4). `world_cross` and `ascension_gate` are untargeted in the same way and fire
+rank, on the owner's call: a batch is N crafts and nothing else (v1.21.0). `world_cross` and `ascension_gate` are untargeted in the same way and fire
 on any world change, a descent included (`abode.py`, `cultivation.py`): a separate finding.
 
 ### The heartbeat that could not be sent (v1.33.0)
