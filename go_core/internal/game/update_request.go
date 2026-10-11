@@ -25,7 +25,8 @@ package game
 //     object out of the answer by hand.
 //   - admin.server.cancel_update   - the GM's way to close a request that will
 //     never finish (v1.12.3), audited. Without it an open request refused every
-//     later one for ever, and only an edit of the database could clear it.
+//     later one for ever, and only an edit of the database could clear it. What
+//     it may close is one statement, updateInstallUnderway, below.
 //
 // The watcher reaches these the way `update.sh` already reaches
 // `/v1/db/backups`: `docker compose exec` into the engine container, the token
@@ -47,9 +48,23 @@ const (
 	updateHeartbeatKey = "update_watcher_heartbeat"
 	// A watcher whose heartbeat is older than this is "not running" - the
 	// dashboard's card says so at the same age (UPDATE_WATCHER_STALE_SECONDS in
-	// app/dashboard/server.py, held equal by a test), and it is the only point
-	// past which a request the watcher has already picked up may be cancelled.
+	// app/dashboard/server.py, held equal by a test). It is one half of the
+	// cancel rule and not the whole of it: the watcher's silence says nothing
+	// about an install, which is the one time it cannot be heard.
 	updateWatcherStaleSeconds = 15 * 60
+	// An install the watcher has picked up is its own for this long after the
+	// request's last report. The watcher reports `fetching` and then nothing
+	// until the updater exits, and the updater stops the whole stack - this
+	// engine and the dashboard with it - and rebuilds it, so no heartbeat can
+	// reach the engine for most of an install and the heartbeat's age tells a
+	// GM nothing about whether one is running. The request's own `updated_at`
+	// does: `fetching` writes it just before the updater starts, and it
+	// survives a rollback because the database copy a rollback restores is
+	// taken after it. Two hours is longer than a cold image build plus the
+	// rollback restart. It is also the exit for a watcher that died
+	// mid-install, where fifteen minutes used to be (held equal to the card's
+	// by a test).
+	updateInstallLeaseSeconds = 2 * 60 * 60
 	// The watcher's reports are bounded here rather than trusted: a detail is
 	// the tail of a log, and the log stays on the host.
 	updateDetailLimit = 300
@@ -91,6 +106,23 @@ func updateWatcherRunning(heartbeat map[string]any, now float64) bool {
 		return false
 	}
 	return now-at < updateWatcherStaleSeconds
+}
+
+// updateInstallUnderway is the one statement of when an open request is the
+// updater's and a GM may not close it: past `requested` (before that nothing
+// has picked it up), and either the watcher is heard from or the request has
+// reported within the lease. The card's twin (install_underway in
+// app/dashboard/server.py) asks the same question; the engine decides again.
+//
+// An absent `updated_at` decodes to 0, an age of fifty years, and is not
+// protected - a value nobody wrote is not a report. Every writer sets it, so
+// only a damaged row reads that way, and the way out is the right direction
+// for one.
+func updateInstallUnderway(request updateRequestState, heartbeat map[string]any, now float64) bool {
+	if !request.open() || request.Status == "requested" {
+		return false
+	}
+	return updateWatcherRunning(heartbeat, now) || now-request.UpdatedAt < updateInstallLeaseSeconds
 }
 
 // readUpdateStateTx reads one of the three rows. An absent or unreadable blob
@@ -282,12 +314,19 @@ func adminServerUpdateStatus(conn *storage.Conn, raw json.RawMessage) (any, erro
 //
 //   - still `requested`: the watcher has not picked it up, so there is nothing
 //     to stop; or
-//   - in any later state, once the watcher has not been heard from for
-//     updateWatcherStaleSeconds - the same "not running" the card shows.
+//   - in any later state, once updateInstallUnderway is false: the watcher has
+//     not been heard from for updateWatcherStaleSeconds - the same "not
+//     running" the card shows - AND the request has not reported for
+//     updateInstallLeaseSeconds.
 //
-// An install in progress (a live watcher, a later state) is refused: the
-// world is closed, update.sh is replacing the code, and a request cancelled
-// under it would leave the watcher's closing report with nothing to land on.
+// An install in progress is refused: the world is closed, update.sh is
+// replacing the code, and a request cancelled under it would leave the
+// watcher's closing report with nothing to land on - the engine refuses a
+// report against a closed request, so `update_result` would never be written
+// and a second request could run the updater again over the first. The
+// watcher's heartbeat is no evidence either way during an install (it is not
+// sent while the updater runs, and the stack that would receive it is down),
+// which is why the request's own last report counts.
 func adminServerCancelUpdate(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
 	p, err := decodeMap(raw)
 	if err != nil {
@@ -313,14 +352,20 @@ func adminServerCancelUpdate(conn *storage.Conn, adminUserID int64, raw json.Raw
 		return nil, errors.New("there is no open update request to cancel")
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
-	if before.Status != "requested" {
-		heartbeat, err := readUpdateStateTx(conn, updateHeartbeatKey)
-		if err != nil {
-			return nil, err
-		}
+	heartbeat, err := readUpdateStateTx(conn, updateHeartbeatKey)
+	if err != nil {
+		return nil, err
+	}
+	if updateInstallUnderway(before, heartbeat, now) {
 		if updateWatcherRunning(heartbeat, now) {
 			return nil, fmt.Errorf("the update is already %s and the watcher is running; an install in progress cannot be cancelled", before.Status)
 		}
+		// The watcher cannot be heard while the updater has the stack down, so
+		// the advice to restart it waits for the updater to be over: a restarted
+		// watcher reports the request failed whether or not the updater is
+		// still at work.
+		return nil, fmt.Errorf("the update is already %s and was last reported %d minute(s) ago; the updater stops the whole stack while it installs, so the watcher cannot be heard until it finishes, and the request can be cancelled after %d minutes with no report. If update_watch.sh has stopped, check update_watch.log on the NAS; once update.sh has finished, starting update_watch.sh again closes the request",
+			before.Status, int(max(0, now-before.UpdatedAt)/60), updateInstallLeaseSeconds/60)
 	}
 	next := before
 	next.Status = "cancelled"

@@ -262,9 +262,11 @@ func TestABreakthroughIsHeardSoonerOnTheAltar(t *testing.T) {
 	}
 }
 
-// A raid's reward is paid in the money of the world the raider stands in.
+// A raid's reward is paid in the money of the world the raid was fought in.
 // The claim paid the Mortal stone in every world, which was right only while
-// every raid was the Mortal World's.
+// every raid was the Mortal World's. This one claims at the lair, so it holds
+// the stone out of the Spiritual World and nothing about where else a claim
+// may be made: TestARaidIsPaidInItsLairsCoinWhereverItIsClaimed does that.
 func TestARaidIsPaidInTheMoneyOfItsWorld(t *testing.T) {
 	path := setupSoloRaidDB(t)
 	catalog := crossingCatalog(t)

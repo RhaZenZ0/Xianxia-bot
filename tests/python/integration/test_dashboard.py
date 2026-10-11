@@ -202,12 +202,36 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
                 "VALUES('stuck_lesson','The Last Lesson','[{\"id\":\"x\",\"type\":\"family_lesson\",\"count\":1,\"label\":\"Take the lesson\"}]','{}','approved',0,0)")
             await db.execute(
                 "INSERT INTO character_quests(user_id,quest_key,status,progress_json,created_at,updated_at) VALUES(11,'stuck_lesson','active','{}',0,0)")
+            # A targeted objective is met only by a report naming the same
+            # thing (v1.33.0), so the journal must carry the target back to the
+            # card - from the terms the player accepted, and, for a row with no
+            # pinned terms, from the definition.
+            await db.execute(
+                "INSERT OR REPLACE INTO quest_definitions(quest_key,title,objectives_json,rewards_json,status,created_at,updated_at) "
+                "VALUES('road_stage','A Road Stage','[{\"id\":\"cross\",\"type\":\"breakthrough\",\"target\":\"Qi Refining\",\"count\":1,\"label\":\"Cross\"},"
+                "{\"id\":\"sit\",\"type\":\"cultivate\",\"count\":2}]','{}','approved',0,0)")
+            await db.execute(
+                "INSERT INTO character_quests(user_id,quest_key,status,progress_json,created_at,updated_at,terms_json) "
+                "VALUES(11,'road_stage','active','{}',0,0,"
+                "'{\"objectives\":[{\"id\":\"cross\",\"type\":\"breakthrough\",\"target\":\"Foundation Establishment\",\"count\":1}]}')")
+            await db.execute(
+                "INSERT OR REPLACE INTO quest_definitions(quest_key,title,objectives_json,rewards_json,status,created_at,updated_at) "
+                "VALUES('unpinned_stage','An Unpinned Stage','[{\"id\":\"talk\",\"type\":\"talk\",\"target\":\"Elder Pine\",\"count\":1}]','{}','approved',0,0)")
+            await db.execute(
+                "INSERT INTO character_quests(user_id,quest_key,status,progress_json,created_at,updated_at) VALUES(11,'unpinned_stage','active','{}',0,0)")
             await db.commit()
         journal = {q["quest_key"]: q for q in (await self.store.player_detail(11))["quests"]}
         self.assertEqual(journal["stuck_lesson"]["title"], "The Last Lesson")
         self.assertEqual(journal["stuck_lesson"]["status"], "active")
         self.assertEqual(journal["stuck_lesson"]["objectives"],
-                         [{"id": "x", "type": "family_lesson", "label": "Take the lesson", "count": 1, "progress": 0}])
+                         [{"id": "x", "type": "family_lesson", "target": None, "label": "Take the lesson", "count": 1, "progress": 0}],
+                         "the journal must carry every objective's target - None for an untargeted one - for the card to report it")
+        self.assertEqual([(o["type"], o["target"]) for o in journal["road_stage"]["objectives"]],
+                         [("breakthrough", "Foundation Establishment")],
+                         "the pinned terms are what the player accepted, so their target is the one to report")
+        self.assertEqual([(o["type"], o["target"]) for o in journal["unpinned_stage"]["objectives"]],
+                         [("talk", "Elder Pine")],
+                         "a row with no pinned terms reads its target off the definition")
 
     async def test_new_dashboard_api_routes_return_json(self):
         settings = DashboardSettings(self.path, "127.0.0.1", 0, "gm", "a-very-long-private-dashboard-token", admin_writes=False)
@@ -567,6 +591,21 @@ class QuestsWorkbenchTests(unittest.IsolatedAsyncioTestCase):
         await self.db.set_quest_definition_status("dead_end", "approved")
         coverage = (await self.store.quests())["coverage"]
         self.assertEqual([t["target"] for t in coverage["unknown_targets"]], ["Atlantis"])
+
+    async def test_coverage_reports_an_examination_quest_that_names_no_examination(self):
+        # An examination is named by its quest key (v1.33.0); a key the content
+        # does not carry strands the quest, and one it does carry does not.
+        for key, target in (("dead_exam", "exam_nobody_at_all"), ("live_exam", "exam_alchemy_apprentice")):
+            await self.db.save_quest_definition(
+                {"quest_key": key, "title": "Sit The Examination",
+                 "description": "It asks for an examination by its key.",
+                 "objectives": [{"id": "sit", "type": "profession_exam", "target": target, "count": 1}],
+                 "rewards": {}},
+                status="draft", origin="gm_prompt", created_by=1)
+            await self.db.set_quest_definition_status(key, "approved")
+        coverage = (await self.store.quests())["coverage"]
+        self.assertEqual([(t["quest_key"], t["expects"]) for t in coverage["unknown_targets"]],
+                         [("dead_exam", "profession_exam")])
 
     async def test_held_rows_say_whether_the_terms_are_pinned(self):
         self.assertTrue(await seed_character(

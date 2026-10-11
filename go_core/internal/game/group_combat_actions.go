@@ -163,8 +163,8 @@ var bossTemplatesGo = map[string]bossTemplateGo{
 	"nine_echo_sword_wraith":  {"Nine-Echo Sword Wraith", "Sword Grave of Nine Echoes", 7, 420, 420, "nine_echo_sword_tablet", 1, []bossPhaseGo{{"First Three Echoes", .70, 14, 7, 6}, {"Sixfold Sword Domain", .35, 19, 6, 10}, {"Ninth Echo: Severing", 0, 25, 4, 15}}},
 	// Each upper world's raid (v1.17.0), in the wilds of one of its cities; the
 	// three above were all the Mortal World's, so no raid waited past realm 7.
-	// The reward currency is paid in the money of the world the raider stands
-	// in (characterWalletDeltaTx), so these numbers are that world's coin.
+	// The reward currency is paid in the money of the world the lair stands
+	// in (raidRewardCurrency), so these numbers are that world's coin.
 	"hundred_horn_ancestor_stag": {"Hundred-Horn Ancestor Stag", "Thousand Beast Steppe", 11, 640, 300, "spirit_crystal_ore", 4, []bossPhaseGo{{"The Herd Turns", .70, 16, 8, 6}, {"Hundred-Horn Charge", .35, 21, 7, 10}, {"The Old Line", 0, 27, 5, 15}}},
 	"starfall_iron_colossus":     {"Starfall Iron Colossus", "Starfall Crater", 19, 900, 400, "immortal_gold_ore", 3, []bossPhaseGo{{"The Rim Walk", .70, 20, 11, 7}, {"Molten Core", .35, 26, 9, 11}, {"Star-Iron Collapse", 0, 33, 6, 16}}},
 	"unmoored_star_leviathan":    {"Unmoored Star Leviathan", "Shattered Firmament", 27, 1200, 500, "starsteel_ore", 3, []bossPhaseGo{{"The Constellation Stirs", .70, 24, 13, 8}, {"Starfall Coils", .35, 31, 11, 12}, {"The Last Star Goes Out", 0, 39, 7, 18}}},
@@ -557,6 +557,43 @@ func bossLair(catalog worlddata.Catalog, t bossTemplateGo) (location, realmID st
 		}
 	}
 	return t.Location, ""
+}
+
+// raidCoinOf is the tier-1 coin of the world a place stands in, and whether
+// the catalogue says so. worldBaseCurrency answers the Mortal stone for a
+// world it cannot find, which is right for a price nobody chose and wrong for
+// a reward: a place the catalogue does not carry, or a world with no tier-1
+// coin of its own, has no answer here, and a caller told so must not invent
+// one.
+func raidCoinOf(catalog worlddata.Catalog, place string) (string, bool) {
+	loc, ok := catalog.Locations[place]
+	if !ok || loc.World == "" {
+		return "", false
+	}
+	coin := worldBaseCurrency(catalog, loc.World)
+	if def, ok := catalog.Currencies[coin]; !ok || def.World != loc.World {
+		return "", false
+	}
+	return coin, true
+}
+
+// raidRewardCurrency is the one statement of which coin a raid pays: the money
+// of the world the raid was fought in, whoever claims it and wherever they
+// stand when they do (a claim is not tied to a place or a time). The lair
+// stored on the encounter is the first answer, because it is where this
+// fight happened; the template's current lair is the second, for an encounter
+// whose stored place has since left the catalogue. Neither resolving answers
+// false, and the claim is refused with its reward kept rather than paid in the
+// Mortal stone - a fallback that looks like a value is not a sentinel.
+func raidRewardCurrency(catalog worlddata.Catalog, lair, templateKey string) (string, bool) {
+	if coin, ok := raidCoinOf(catalog, lair); ok {
+		return coin, true
+	}
+	if t, ok := bossTemplatesGo[templateKey]; ok {
+		place, _ := bossLair(catalog, t)
+		return raidCoinOf(catalog, place)
+	}
+	return "", false
 }
 
 // bossSoloHPScale is what a boss's health is scaled by for a party of one
@@ -1029,14 +1066,27 @@ func bossClaimActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	}
 	now := nowSeconds()
 	amt := i64(row["currency_amount"])
-	// Paid in the money of the world the raider stands in (v1.17.0, rc.44's
-	// rule): the claim paid the Mortal stone in every world, which was right
-	// only while every raid was the Mortal World's.
-	currency, e := characterBaseCurrencyTx(conn, catalog, userID)
+	// The encounter the claim is for. The claim cascades from it, so a missing
+	// row cannot happen; it is refused rather than paid blind if it ever does.
+	enc, e := conn.Execute(`SELECT boss_name,location,template_key FROM boss_encounters WHERE encounter_id=?`, []any{p.ID})
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
+	encounter := firstRowMap(enc)
+	if encounter == nil {
+		return authoritativeMutation{}, errors.New("raid encounter not found")
+	}
+	// Paid in the money of the world the raid was fought in, not the one the
+	// raider happens to be standing in when they claim. v1.17.0 read the
+	// raider's location, and a claim is not tied to a place or a time, so a
+	// Mortal raid claimed on the steppe paid a hundred times too much and the
+	// reverse a hundredth. walletDeltaTx, not characterWalletDeltaTx: the coin
+	// is named here, and the purse mirrors the sheet only where it is local.
+	currency, resolved := raidRewardCurrency(catalog, nullableText(encounter["location"]), nullableText(encounter["template_key"]))
 	if amt != 0 {
+		if !resolved {
+			return authoritativeMutation{}, errors.New("this raid's lair is not a place the world carries, so there is no coin to pay it in; the reward stays claimable")
+		}
 		if _, e = walletDeltaTx(conn, catalog, userID, currency, amt, now); e != nil {
 			return authoritativeMutation{}, e
 		}
@@ -1056,10 +1106,7 @@ func bossClaimActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	// The boss the claim is for (v1.16.0), read off the encounter rather than
 	// the template so a renamed template still names the boss that was
 	// fought; the realm road's `raid_win` objective is keyed on it.
-	bossName := ""
-	if named, nerr := conn.Execute(`SELECT boss_name FROM boss_encounters WHERE encounter_id=?`, []any{p.ID}); nerr == nil && len(named.Rows) > 0 {
-		bossName = fmt.Sprint(named.Rows[0][0])
-	}
+	bossName := nullableText(encounter["boss_name"])
 	result := map[string]any{"encounter_id": p.ID, "currency_amount": amt, "currency": currency, "item_id": item, "item_quantity": qty, "boss_name": bossName}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "boss", EventType: "boss.claim", EntityType: "boss_encounter", EntityID: fmt.Sprint(p.ID), Payload: result}}, nil
 }

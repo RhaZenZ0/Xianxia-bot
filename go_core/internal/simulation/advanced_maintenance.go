@@ -215,6 +215,15 @@ func (r *Runner) advancedMaintenance(conn *storage.Conn, gm int64, automation ma
 	if err != nil {
 		return Run{}, false, err
 	}
+	// Banners and wars over parts of cities (a sect holds a city, not one of
+	// its streets) are put right before the siege tick looks at a war, so
+	// the tick never fights over a street. Outside the automation flags, like
+	// the realm-site fill above: whether the world's sects fight is the flag's
+	// to say, whether a street can be held is not.
+	counts["partial_holdings"], err = game.SetAsidePartialHoldingsTx(conn, r.World, gm, nowFloat())
+	if err != nil {
+		return Run{}, false, err
+	}
 	counts["wars"], err = r.advanceWars(conn, gm)
 	if err != nil {
 		return Run{}, false, err
@@ -273,7 +282,7 @@ func (r *Runner) advancedMaintenance(conn *storage.Conn, gm int64, automation ma
 	if !changed {
 		return Run{}, false, nil
 	}
-	summary := fmt.Sprintf("auctions=%d merchants=%d merchant_bids=%d secret_realms=%d hunters_spawned=%d hunters_updated=%d wars=%d occupations=%d caravans_sent=%d caravans=%d seclusions=%d commissions_expired=%d moderations_expired=%d era_changed=%t", counts["auctions"], counts["merchants"], counts["merchant_bids"], counts["secret_realms"], counts["hunters_spawned"], counts["hunters_updated"], counts["wars"], counts["occupations"], counts["caravans_sent"], counts["caravans"], counts["seclusions"], counts["commissions_expired"], counts["moderations_expired"], eraChanged)
+	summary := fmt.Sprintf("auctions=%d merchants=%d merchant_bids=%d secret_realms=%d hunters_spawned=%d hunters_updated=%d partial_holdings=%d wars=%d occupations=%d caravans_sent=%d caravans=%d seclusions=%d commissions_expired=%d moderations_expired=%d era_changed=%t", counts["auctions"], counts["merchants"], counts["merchant_bids"], counts["secret_realms"], counts["hunters_spawned"], counts["hunters_updated"], counts["partial_holdings"], counts["wars"], counts["occupations"], counts["caravans_sent"], counts["caravans"], counts["seclusions"], counts["commissions_expired"], counts["moderations_expired"], eraChanged)
 	return Run{System: "advanced_world", DueSteps: 1, AppliedSteps: 1, Summary: summary, Events: spawned}, true, nil
 }
 

@@ -22,6 +22,7 @@ from tests.support import PROJECT_ROOT, install_aiosqlite_shim
 install_aiosqlite_shim()
 
 from app.dashboard.server import (  # noqa: E402
+    UPDATE_INSTALL_LEASE_SECONDS,
     UPDATE_TERMINAL_STATUSES,
     UPDATE_WATCHER_STALE_SECONDS,
     AdminDashboardController,
@@ -138,10 +139,61 @@ class AnOpenRequestCanBeClosed(unittest.TestCase):
             self.assertFalse(update_card_state(rows, RELEASE_OK, NOW)["can_cancel"], status)
 
     def test_an_install_whose_watcher_has_gone_quiet_can_be_cancelled(self):
+        # Quiet is not enough (an install is the one time the watcher cannot be
+        # heard): the request's own last report must also be past the lease.
         stale = {"at": NOW - UPDATE_WATCHER_STALE_SECONDS - 1}
+        old_report = NOW - UPDATE_INSTALL_LEASE_SECONDS - 1
         for heartbeat in (stale, None):
-            rows = {"update_request": {"status": "fetching", "nonce": "n"}, "update_watcher_heartbeat": heartbeat}
+            rows = {"update_request": {"status": "fetching", "nonce": "n", "updated_at": old_report},
+                    "update_watcher_heartbeat": heartbeat}
             self.assertTrue(update_card_state(rows, RELEASE_OK, NOW)["can_cancel"], heartbeat)
+
+    def test_an_install_the_watcher_cannot_be_heard_from_is_not_cancellable(self):
+        """The updater stops the stack, so an hour into an install the
+        watcher's heartbeat is an hour old. The card used to read that as "not
+        running" and offer Cancel under an install in progress."""
+        rows = {"update_request": {"status": "fetching", "nonce": "n", "updated_at": NOW - 3600},
+                "update_watcher_heartbeat": {"at": NOW - UPDATE_WATCHER_STALE_SECONDS - 60}}
+        state = update_card_state(rows, RELEASE_OK, NOW)
+        self.assertFalse(state["watcher_running"])
+        self.assertTrue(state["install_underway"])
+        self.assertEqual(state["install_reported_seconds_ago"], 3600)
+        self.assertEqual(state["install_lease_seconds"], UPDATE_INSTALL_LEASE_SECONDS)
+        self.assertFalse(state["can_cancel"], "the card offered Cancel for an install that reported an hour ago")
+        # A damaged row with no timestamp is not a report, and reads as the
+        # engine reads it: nothing protects it, and the card says unknown.
+        undated = {"update_request": {"status": "fetching", "nonce": "n"}}
+        state = update_card_state(undated, RELEASE_OK, NOW)
+        self.assertTrue(state["can_cancel"], "an undated install must read as the engine reads it")
+        self.assertIsNone(state["install_reported_seconds_ago"], "an absent timestamp must not read as an age")
+
+    def test_the_lease_ends_where_the_engine_ends_it(self):
+        """Inside the lease the install is under way, at it the lease is over:
+        the engine's `now-updated_at < lease`, the same boundary in both."""
+        stale = {"at": NOW - UPDATE_WATCHER_STALE_SECONDS - 60}
+        for age, underway in ((UPDATE_INSTALL_LEASE_SECONDS - 1, True),
+                              (UPDATE_INSTALL_LEASE_SECONDS, False),
+                              (UPDATE_INSTALL_LEASE_SECONDS + 1, False)):
+            rows = {"update_request": {"status": "installing", "nonce": "n", "updated_at": NOW - age},
+                    "update_watcher_heartbeat": stale}
+            state = update_card_state(rows, RELEASE_OK, NOW)
+            self.assertEqual(state["install_underway"], underway, age)
+            self.assertEqual(state["can_cancel"], not underway, age)
+
+    def test_a_request_still_asked_for_is_never_an_install(self):
+        """Nothing has picked it up, however recently it was written."""
+        rows = {"update_request": {"status": "requested", "nonce": "n", "updated_at": NOW - 5}}
+        state = update_card_state(rows, RELEASE_OK, NOW)
+        self.assertFalse(state["install_underway"])
+        self.assertIsNone(state["install_reported_seconds_ago"])
+        self.assertTrue(state["can_cancel"])
+
+    def test_a_live_watcher_with_an_old_request_is_still_an_install(self):
+        rows = {"update_request": {"status": "fetching", "nonce": "n", "updated_at": NOW - 3 * UPDATE_INSTALL_LEASE_SECONDS},
+                "update_watcher_heartbeat": {"at": NOW - 30}}
+        state = update_card_state(rows, RELEASE_OK, NOW)
+        self.assertTrue(state["install_underway"])
+        self.assertFalse(state["can_cancel"])
 
     def test_nothing_open_is_nothing_to_cancel(self):
         self.assertFalse(update_card_state({}, RELEASE_OK, NOW)["can_cancel"])
@@ -154,6 +206,29 @@ class AnOpenRequestCanBeClosed(unittest.TestCase):
         self.assertIn("server.cancel_update", js)
         self.assertIn("upd.in_progress&&upd.can_cancel", js, "the button must be drawn only where the card says it can work")
 
+    def test_the_card_says_installing_and_the_confirm_stops_promising_nothing_is_installed(self):
+        """The watcher cannot be heard during an install, so "watcher not
+        running - restart it" was wrong advice then, and "Nothing is installed"
+        was a false promise past `requested`."""
+        js = (PROJECT_ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
+        start = js.index("const updReported=")
+        card = js[start:js.index("const updStatus=", start)]
+        # assertTrue over a search: assertIn would print the whole card.
+        self.assertTrue("upd.install_underway&&!upd.watcher_running" in card,
+                        "the card does not say an install is under way when the watcher cannot be heard")
+        self.assertTrue("pill('installing'" in card, "an install under way is not called one")
+        self.assertTrue("upd.install_lease_seconds" in card, "the card spells the lease itself instead of reading it")
+        self.assertIsNone(re.search(r"\d+\s*min with no report", card), "the card spells a lease length of its own")
+        confirm = js[js.index("const cancelBtn="):]
+        confirm = confirm[:confirm.index("\n")]
+        # assertTrue over a search: assertIn would print the whole line.
+        self.assertTrue("updReq&&updReq.status==='requested'" in confirm,
+                        "the confirm does not tell a request nobody picked up from an install")
+        requested, install = confirm.split("updReq.status==='requested'", 1)[1].split(":`", 1)
+        self.assertFalse("Nothing is installed" in confirm, "the confirm still promises that nothing is installed")
+        self.assertTrue("nothing has been installed" in requested, "the unclaimed request no longer says why it is safe")
+        self.assertTrue("update_watch.log" in install, "the confirm does not point a GM at the log before cancelling")
+
     def test_the_card_and_the_engine_agree_on_the_window_and_on_what_closes_a_request(self):
         """One rule, two readers that cannot call each other: the watcher is
         "not running" after the same fifteen minutes in the card and in the
@@ -162,6 +237,17 @@ class AnOpenRequestCanBeClosed(unittest.TestCase):
         match = re.search(r"updateWatcherStaleSeconds\s*=\s*(\d+)\s*\*\s*(\d+)", go)
         self.assertIsNotNone(match, "the engine's stale window could not be read; this gate is broken, not the tree")
         self.assertEqual(int(match.group(1)) * int(match.group(2)), UPDATE_WATCHER_STALE_SECONDS)
+        # The install lease: a product of any number of factors, read whole.
+        lease = re.search(r"updateInstallLeaseSeconds\s*=\s*(\d+(?:\s*\*\s*\d+)*)", go)
+        self.assertIsNotNone(lease, "the engine's install lease could not be read; this gate is broken, not the tree")
+        product = 1
+        for factor in lease.group(1).split("*"):
+            product *= int(factor)
+        self.assertEqual(product, UPDATE_INSTALL_LEASE_SECONDS)
+        # The card twins one engine statement, so the statement has to exist
+        # for the twin to mean anything; what it answers is held by the Go
+        # table (TestTheCancelRuleIsOneStatement) and by the cases above.
+        self.assertIn("func updateInstallUnderway(", go, "the engine's cancel rule is gone; the card's twin has nothing to agree with")
         open_body = re.search(r"func \(s updateRequestState\) open\(\) bool \{(.*?)\n\}", go, re.S)
         self.assertIsNotNone(open_body)
         for status in UPDATE_TERMINAL_STATUSES:

@@ -25,6 +25,7 @@ import asyncio
 import importlib
 import json
 import os
+import re
 import sqlite3
 import tempfile
 import unittest
@@ -193,8 +194,12 @@ class ThePythonTwinAgreesWithTheContent(unittest.TestCase):
 
 class EverySurfaceNamesTheSeat(unittest.TestCase):
     def test_the_city_page_draws_the_seat_lines(self):
-        body = _body_without_docstring(_function(EXPLORATION, "city_look"))
-        self.assertIn("_seat_lines(city)", body)
+        # The rule, not its spelling (v1.0.8): City -> Look asks for the seat
+        # lines of *its* city, and hands over what the player knows of it.
+        looks = [c for c in ast.walk(_function(EXPLORATION, "city_look"))
+                 if isinstance(c, ast.Call) and isinstance(c.func, ast.Name) and c.func.id == "_seat_lines"]
+        self.assertEqual(len(looks), 1, "City -> Look no longer draws the seat lines")
+        self.assertEqual(ast.unparse(looks[0].args[0]), "city")
         seat = _body_without_docstring(_function(EXPLORATION, "_seat_lines"))
         self.assertIn("WORLD.seated_sect(city)", seat)
         self.assertIn("DB.get_territory(city)", seat)
@@ -208,11 +213,22 @@ class EverySurfaceNamesTheSeat(unittest.TestCase):
                 self.assertIn("/world → City → Enter", body, f"{name} no longer says how a gate is entered")
 
     def test_the_engine_keeps_a_private_part_off_the_map(self):
+        # One list of a city's parts in plain sight (v1.33.0): the map and the
+        # road in both read `cityPartsInPlainSight`, and that function is where
+        # `.Private` is asked - so a private gate is kept off the street in
+        # both, and the two cannot part company.
         source = EXPLORATION_GO.read_text(encoding="utf-8")
         start = source.index("func knownLocationsTx(")
         body = source[start: source.index("\n}\n", start)]
-        self.assertIn("cityPartsOf(catalog, city)", body)
-        self.assertIn(".Private", body, "knownLocationsTx marks a private gate known from the street")
+        # assertTrue over a search, never assertIn: a failure of the latter
+        # prints its whole haystack, a function body or a 2,000-line file.
+        self.assertTrue("cityPartsInPlainSight(catalog, city)" in body and "cityPartsOf(" not in body,
+                        "knownLocationsTx marks a private gate known from the street")
+        helper = source.index("func cityPartsInPlainSight(")
+        self.assertTrue(".Private" in source[helper: source.index("\n}\n", helper)],
+                        "the plain-sight list no longer leaves out a private gate")
+        self.assertTrue(re.search(r'"city_parts":\s+cityPartsInPlainSight\(', source),
+                        "the road in names every part of the city, a private gate too")
 
 
 if __name__ == "__main__":
@@ -269,3 +285,38 @@ class ARunningWorldIsCarriedOntoTheSeats(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rows[moved_gate], ("neutral", ""), "the gate is a district of its seat now, and no sect claims a street")
         self.assertEqual(rows[held_seat], ("sect", "Frozen Moon Palace"), "a seat another sect holds is not taken by a migration")
         self.assertEqual(rows[held_gate], ("sect", "Crimson Furnace Sect"), "a gate beside a contested seat is left as it is")
+
+    async def test_a_war_over_the_gate_is_left_active_over_a_neutral_district(self):
+        """The state the engine's repair is written for (`SetAsidePartialHoldingsTx`).
+
+        Migration 74 neutralises a gate once its seat carries the sect's banner
+        and reads no `territory_wars` row, so a war that was on over the gate is
+        still on over a district nobody holds. The migration is frozen - it
+        needs no catalogue and takes no side - and the engine puts the war right
+        on the first tick after the upgrade, because a war over a part of a city
+        is set aside with no victor. This pins the Go fixture
+        (`TestAWarOverAGateIsSetAside`) to what production's DDL and this
+        migration actually leave, foreign key included: a fixture that wrote a
+        different bad state would prove the repair against a world that never
+        existed.
+        """
+        gate, seat = "Azure Cloud Mountain Gate", "Cloudblade City"
+        path, Database = await self._world_at(73)
+        with sqlite3.connect(path) as conn:
+            self._territory(conn, gate, "sect", "Azure Cloud Sect")
+            self._territory(conn, seat)
+            conn.execute(
+                "INSERT INTO territory_wars(attacker_key,defender_key,territory_key,status,created_at,updated_at) "
+                "VALUES('Crimson Furnace Sect','Azure Cloud Sect',?,'active',0,0)", (gate,))
+            conn.execute("INSERT INTO territory_war_operations(war_id,updated_at) SELECT war_id,0 FROM territory_wars")
+            conn.commit()
+        await Database(path).init()
+        with sqlite3.connect(path) as conn:
+            rows = {k: (t, c) for k, t, c in conn.execute("SELECT territory_key,controller_type,controller_key FROM territory_state")}
+            wars = conn.execute("SELECT territory_key,status FROM territory_wars").fetchall()
+            keys = [(r[2], r[3]) for r in conn.execute("PRAGMA foreign_key_list(territory_wars)")]
+        self.assertEqual(rows[seat], ("sect", "Azure Cloud Sect"), "the migration did not seat the claim; the reader is broken, not the tree")
+        self.assertEqual(rows[gate], ("neutral", ""))
+        self.assertEqual(wars, [(gate, "active")], "the war over the gate did not survive the migration as the engine's repair expects it")
+        self.assertIn(("territory_state", "territory_key"), keys,
+                      "territory_wars lost its key on territory_state: the Go fixture models a key production no longer declares")

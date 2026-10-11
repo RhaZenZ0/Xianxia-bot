@@ -74,6 +74,16 @@ func parseNPCTarget(target string) (string, error) {
 // dual-table shape grant_currency uses), so restoring that snapshot is a
 // faithful, total reversal - not because the action is "safe" in some looser
 // sense.
+//
+// "Total" means of what the action wrote. A snapshot is taken whole whether or
+// not the action touched every column in it, so a reversal that restores the
+// whole snapshot writes over whatever play has changed since in a column the
+// lever never wrote - and a reversal that deletes the row a lever made deletes
+// whatever play has put on it. An entry restores the columns its action wrote
+// (the audit row says which: a key `after` carries, a value that differs
+// between the two sides), as an UPDATE onto the same row, and removes a row the
+// lever made only through deleteIfIdle; admin_undo_rows.go states the rule and
+// TestAReversalDeletesARowOnlyThroughDeleteIfIdle holds it.
 var reversibleAdminActions = map[string]reverseFunc{
 	// The Player Editor's three progress levers (v1.23.0); admin_player_progress.go.
 	"admin.player.set_profession":        reverseSetProfession,
@@ -128,38 +138,9 @@ var reversibleAdminActions = map[string]reverseFunc{
 		}
 		return stmts, nil
 	},
-	"admin.player.set_realm_perfection": func(before, after map[string]any, target string, redo bool) ([]sqlStmt, error) {
-		uid, err := parseTargetUserID(target)
-		if err != nil {
-			return nil, err
-		}
-		snap := pickSnapshot(before, after, redo)
-		var table string
-		switch fmt.Sprint(snap["track"]) {
-		case "cultivation":
-			table = "realm_perfection"
-		case "body":
-			table = "body_realm_perfection"
-		default:
-			return nil, fmt.Errorf("cannot undo: unrecognized track %q", fmt.Sprint(snap["track"]))
-		}
-		realm := i64(snap["realm_index"])
-		// Since v1.23.1 a snapshot says whether the row existed and carries the
-		// quest state, because 100% fills the quests too. A row the forward
-		// action made is deleted; one from before this release carries no
-		// "existed" and is undone on its progress alone, as it was written.
-		existed, known := snap["existed"].(bool)
-		if known && !existed {
-			return []sqlStmt{{`DELETE FROM ` + table + ` WHERE user_id=? AND realm_index=?`, []any{uid, realm}}}, nil
-		}
-		if _, hasQuests := snap["completed_quests"]; !known || !hasQuests {
-			return []sqlStmt{{`UPDATE ` + table + ` SET progress=? WHERE user_id=? AND realm_index=?`, []any{i64(snap["progress"]), uid, realm}}}, nil
-		}
-		// An upsert, so a redo puts back a row its own undo deleted.
-		return []sqlStmt{{`INSERT INTO ` + table + `(user_id,realm_index,progress,active,quest_index,quest_preparation,completed_quests,discovered_json,updated_at) VALUES(?,?,?,?,?,?,?,?,?)
-			ON CONFLICT(user_id,realm_index) DO UPDATE SET progress=excluded.progress,active=excluded.active,quest_index=excluded.quest_index,quest_preparation=excluded.quest_preparation,completed_quests=excluded.completed_quests,discovered_json=excluded.discovered_json,updated_at=excluded.updated_at`,
-			[]any{uid, realm, i64(snap["progress"]), i64(snap["active"]), i64(snap["quest_index"]), i64(snap["quest_preparation"]), i64(snap["completed_quests"]), fmt.Sprint(snap["discovered_json"]), float64(time.Now().UnixNano()) / 1e9}}}, nil
-	},
+	// The reversal reads the audit row for what the lever wrote and restores that
+	// and nothing else; admin_undo_rows.go.
+	"admin.player.set_realm_perfection": reverseSetRealmPerfection,
 	"admin.player.set_spiritual_root": func(before, after map[string]any, target string, redo bool) ([]sqlStmt, error) {
 		uid, err := parseTargetUserID(target)
 		if err != nil {
@@ -172,6 +153,13 @@ var reversibleAdminActions = map[string]reverseFunc{
 		mutation := fmt.Sprint(snap["mutation"])
 		if mutation == "<nil>" {
 			mutation = ""
+		}
+		// A redo is the forward action's own upsert, so it lands even on a row
+		// its undo deleted; an undo only ever moves a row that is there.
+		if redo {
+			return []sqlStmt{{`INSERT INTO character_spiritual_roots(user_id,grade,purity,mutation,updated_at) VALUES(?,?,?,?,?)
+				ON CONFLICT(user_id) DO UPDATE SET grade=excluded.grade,purity=excluded.purity,mutation=excluded.mutation,updated_at=excluded.updated_at`,
+				[]any{uid, fmt.Sprint(snap["grade"]), i64(snap["purity"]), mutation, float64(time.Now().UnixNano()) / 1e9}}}, nil
 		}
 		return []sqlStmt{{`UPDATE character_spiritual_roots SET grade=?,purity=?,mutation=? WHERE user_id=?`, []any{fmt.Sprint(snap["grade"]), i64(snap["purity"]), mutation, uid}}}, nil
 	},
@@ -194,16 +182,19 @@ var reversibleAdminActions = map[string]reverseFunc{
 			return nil, err
 		}
 		snap := pickSnapshot(before, after, redo)
-		// The identity too, since v1.0.11 gave the lever one to write. An undo
-		// that restored only the three numbers would have left a granted
-		// physique standing and called itself an undo - and the snapshot is the
-		// only record of what it replaced.
+		// The identity too, since v1.0.11 gave the lever one to write - but only
+		// when this call wrote it. The snapshot carries the identity whether or
+		// not the call changed it, so `before` alone cannot say: `after` carries
+		// `physique_id` only when the GM gave one. Writing it back otherwise
+		// would put the old life's identity over whatever a samsara has made
+		// since, for a lever that only ever edited three numbers.
 		//
-		// A snapshot from before that release carries no `physique_id`, so the
-		// three-number statement is kept for it rather than writing an empty id
-		// over a real physique: an old audit row must stay undoable on exactly
-		// the terms it was written.
-		if id := strings.TrimSpace(fmt.Sprint(snap["physique_id"])); id != "" && id != "<nil>" {
+		// A snapshot from before that release carries no `physique_id` at all,
+		// so the three-number statement is kept for it rather than writing an
+		// empty id over a real physique: an old audit row must stay undoable on
+		// exactly the terms it was written.
+		_, wroteIdentity := after["physique_id"]
+		if id := strings.TrimSpace(fmt.Sprint(snap["physique_id"])); wroteIdentity && id != "" && id != "<nil>" {
 			return []sqlStmt{{`UPDATE character_physiques SET physique_id=?,name=?,evolution_stage=?,progress=?,stability=? WHERE user_id=?`,
 				[]any{id, fmt.Sprint(snap["name"]), i64(snap["evolution_stage"]), i64(snap["progress"]), i64(snap["stability"]), uid}}}, nil
 		}
@@ -220,8 +211,27 @@ var reversibleAdminActions = map[string]reverseFunc{
 			return nil, err
 		}
 		snap := pickSnapshot(before, after, redo)
-		return []sqlStmt{{`UPDATE tribulation_state SET preparation=?,attempts=?,cleared=?,last_result=? WHERE user_id=? AND gate_realm_index=?`,
-			[]any{i64(snap["preparation"]), i64(snap["attempts"]), i64(snap["cleared"]), fmt.Sprint(snap["last_result"]), uid, gateRealmIndex}}}, nil
+		// Only the columns the forward action wrote, which `after` names in both
+		// directions. A clear leaves `attempts` alone, so its `after` carries
+		// none and `i64(nil)` would be a 0 written over the count of real
+		// attempts - a redo of a clear zeroed them.
+		sets, args := []string{}, []any{}
+		for _, col := range []string{"preparation", "attempts", "cleared", "last_result"} {
+			if _, wrote := after[col]; !wrote {
+				continue
+			}
+			sets = append(sets, col+"=?")
+			if col == "last_result" {
+				args = append(args, fmt.Sprint(snap[col]))
+			} else {
+				args = append(args, i64(snap[col]))
+			}
+		}
+		if len(sets) == 0 {
+			return nil, errors.New("this action cannot be safely undone")
+		}
+		args = append(args, uid, gateRealmIndex)
+		return []sqlStmt{{`UPDATE tribulation_state SET ` + strings.Join(sets, ",") + ` WHERE user_id=? AND gate_realm_index=?`, args}}, nil
 	},
 	"admin.player.adjust_item": func(before, after map[string]any, target string, redo bool) ([]sqlStmt, error) {
 		uid, err := parseTargetUserID(target)

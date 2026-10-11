@@ -37,6 +37,17 @@ package game
 // is: a pass is refused again only in the life that earned it, so samsara -
 // which wipes `profession_progress` and `character_recipes` - lets a new life
 // sit the same examination without deleting any history. No schema.
+//
+// **An examination is open from the rank it certifies upward, not only at it.**
+// A rank rises on crafting alone and a Craft All is up to fifty crafts in one
+// press, so one press can carry a crafter across all three ranks the content
+// examines. The hall used to sit the rank held *now*, and the others were lost
+// for the life: their quests handed over and unfinishable, their methods never
+// taught, the trade never certified. `professionExamsOpenTx` is the one rule -
+// every rank the content examines at or below the rank held that this life has
+// not passed - and the craft that offers an examination and the hall that sits
+// one both ask it, so what is offered and what can be sat cannot disagree.
+// The hall sits the lowest, strictly, and the roll uses the rank held.
 
 import (
 	"encoding/json"
@@ -67,37 +78,65 @@ const (
 	professionExamSuccessBonus int64 = 2
 )
 
-// professionExamFor is the examination the content authors for one rank of one
-// trade, or false when it authors none. Ranks are sorted so a trade carrying
-// two entries for one rank answers the same one on every run.
-func professionExamFor(catalog worlddata.Catalog, trade string, rank int64) (worlddata.ProfessionExam, bool) {
+// professionExamsOpenTx is every examination this life can sit in a trade at
+// the rank it holds: each rank the content examines that is at or below `held`
+// and that this life has not passed, lowest first. A rank held is a rank
+// reached, and an examination whose rank was passed over - a crafter who
+// crossed two ranks in one press never stood at the first - is still owed.
+//
+// The sort makes the answer the same on every run when a trade authors two
+// entries for one rank, and rank 0 never examines anybody (a trade nobody has
+// practised has nothing to certify).
+func professionExamsOpenTx(conn *storage.Conn, catalog worlddata.Catalog, userID, life int64, trade string, held int64) ([]worlddata.ProfessionExam, error) {
 	exams := append([]worlddata.ProfessionExam(nil), catalog.ProfessionExams[trade]...)
-	sort.Slice(exams, func(a, b int) bool { return exams[a].Rank < exams[b].Rank })
+	sort.SliceStable(exams, func(a, b int) bool { return exams[a].Rank < exams[b].Rank })
+	open := []worlddata.ProfessionExam{}
 	for _, exam := range exams {
-		if exam.Rank == rank {
-			return exam, true
+		if exam.Rank < 1 || exam.Rank > held {
+			continue
+		}
+		passed, _, err := professionExamRecordsTx(conn, userID, life, trade, exam.Rank)
+		if err != nil {
+			return nil, err
+		}
+		if !passed {
+			open = append(open, exam)
 		}
 	}
-	return worlddata.ProfessionExam{}, false
+	return open, nil
 }
 
-// offerProfessionExamTx hands over the examination for a rank just reached.
+// offerProfessionExamsTx hands over the quest of every examination that is
+// open at the rank held, and returns the ones it handed over now.
 //
-// Called from the one place a rank can rise. A trade with no authored
-// examination at that rank, a quest already held, or a definition not seeded
-// yet are all "no" rather than errors - the same three kinds of no
-// `grantOrdinaryQuestTx` already gives, for the same reason: a craft must
-// never fail because a quest could not be handed over.
-func offerProfessionExamTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, trade string, rank, gameMinute int64) (string, error) {
-	exam, authored := professionExamFor(catalog, trade, rank)
-	if !authored || strings.TrimSpace(exam.QuestKey) == "" {
-		return "", nil
+// Called from the two places that can know: the craft that raised the rank, and
+// the hall's counter, which is how a crafter whose rank came by another road (a
+// household's tutoring, `family.tutor`, a GM's lever) is caught up. A trade
+// with no authored examination, a quest already held and a definition not
+// seeded yet are all "no" rather than errors - the same three kinds of no
+// `grantOrdinaryQuestTx` already gives, for the same reason: a craft must never
+// fail because a quest could not be handed over. The row is the memory, so a
+// second call returns only what is new.
+func offerProfessionExamsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, trade string, held, gameMinute int64) ([]worlddata.ProfessionExam, error) {
+	open, err := professionExamsOpenTx(conn, catalog, userID, soulLifeTx(conn, userID), trade, held)
+	if err != nil {
+		return nil, err
 	}
-	granted, err := grantOrdinaryQuestTx(conn, userID, strings.TrimSpace(exam.QuestKey), gameMinute)
-	if err != nil || !granted {
-		return "", err
+	offered := []worlddata.ProfessionExam{}
+	for _, exam := range open {
+		key := strings.TrimSpace(exam.QuestKey)
+		if key == "" {
+			continue
+		}
+		granted, err := grantOrdinaryQuestTx(conn, userID, key, gameMinute)
+		if err != nil {
+			return nil, err
+		}
+		if granted {
+			offered = append(offered, exam)
+		}
 	}
-	return exam.QuestKey, nil
+	return offered, nil
 }
 
 // professionExamRecord is one attempt, as it sits in `event_log`.
@@ -305,9 +344,9 @@ func professionExamAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 	if c.LifeStatus != "alive" {
 		return authoritativeMutation{}, errors.New("a deceased incarnation cannot sit an examination")
 	}
-	// The rank being sat for is the one they have reached, so an examination
-	// is always for what the candidate already is. A trade nobody has practised
-	// has no rank to certify.
+	// What they have reached bounds what they may sit, and the hall sits the
+	// lowest examination of it that this life has not passed. A trade nobody
+	// has practised has no rank to certify.
 	level, err := professionLevelTx(conn, userID, trade)
 	if err != nil {
 		return authoritativeMutation{}, err
@@ -315,23 +354,34 @@ func professionExamAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 	if level <= 0 {
 		return authoritativeMutation{}, fmt.Errorf("no hall examines a %s who has not reached the first rank", strings.ToLower(trade))
 	}
-	exam, authored := professionExamFor(catalog, trade, level)
-	if !authored {
+	life := soulLifeTx(conn, userID)
+	open, err := professionExamsOpenTx(conn, catalog, userID, life, trade, level)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	if len(open) == 0 {
+		// Nothing owed is two different facts. A trade that examines at or
+		// below the rank held and has every one passed has nothing left to
+		// give; a trade that examines nowhere yet, or only above it, is held
+		// to no examination at this rank.
+		if first, ok := firstProfessionExam(catalog, trade); ok && first.Rank <= level {
+			return authoritativeMutation{}, fmt.Errorf("you already hold every certificate the %s halls give up to your rank", trade)
+		}
 		return authoritativeMutation{}, fmt.Errorf("no examination is held in %s at this rank", trade)
 	}
+	// Strictly the lowest: a candidate does not pick a rank, because the
+	// payload carries none and a later rank sat first would leave the earlier
+	// one to be explained.
+	exam := open[0]
 	// The hall is the examiner. A candidate standing anywhere else is told
 	// which counter to stand at rather than merely refused.
 	_, shop, inside := shopAt(catalog, c.Location)
 	if !inside || shop.Kind != exam.HallKind {
 		return authoritativeMutation{}, fmt.Errorf("the %s examination is sat at a %s; you are at %s", strings.ToLower(exam.RankName), exam.Hall, c.Location)
 	}
-	life := soulLifeTx(conn, userID)
-	passed, lastFail, err := professionExamRecordsTx(conn, userID, life, trade, level)
+	_, lastFail, err := professionExamRecordsTx(conn, userID, life, trade, exam.Rank)
 	if err != nil {
 		return authoritativeMutation{}, err
-	}
-	if passed {
-		return authoritativeMutation{}, fmt.Errorf("you already hold this hall's %s certificate in %s", exam.RankName, trade)
 	}
 	if lastFail != nil {
 		if waited := p.GameMinute - lastFail.GameMinute; waited < professionExamRetryGameMinutes {
@@ -356,6 +406,16 @@ func professionExamAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 	} else if balance, err = walletBalanceTx(conn, userID, currency); err != nil {
 		return authoritativeMutation{}, err
 	}
+	// The counter hands over what the craft could not (v1.33.0). A rank that
+	// came by another road - the household's tutoring, `family.tutor`, a GM's
+	// lever - raised nothing in a craft, so no examination was ever offered;
+	// asking at the counter catches that crafter up, and a quest already held
+	// is not handed over twice. It sits after every refusal, so a refused
+	// sitting hands over nothing, and before the roll, so the pass the report
+	// carries has a quest to land on.
+	if _, err = offerProfessionExamsTx(conn, catalog, userID, trade, level, p.GameMinute); err != nil {
+		return authoritativeMutation{}, err
+	}
 
 	attribute := tradeAttribute[trade]
 	if attribute == "" {
@@ -376,6 +436,9 @@ func professionExamAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 	if tn <= 0 {
 		tn = 12
 	}
+	// The roll is the rank held, so the formula is what it always was: a
+	// candidate who has climbed past a rank is no worse at its examination for
+	// having climbed.
 	roll, err := rollCheck(score+level+steadiness, tn)
 	if err != nil {
 		return authoritativeMutation{}, err
@@ -383,12 +446,19 @@ func professionExamAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 	success, _ := roll["success"].(bool)
 	now := nowSeconds()
 	if err = recordProfessionExamTx(conn, userID, professionExamRecord{
-		Trade: trade, Rank: level, Life: life, GameMinute: p.GameMinute, Passed: success}); err != nil {
+		Trade: trade, Rank: exam.Rank, Life: life, GameMinute: p.GameMinute, Passed: success}); err != nil {
 		return authoritativeMutation{}, err
 	}
 
+	// What this life still owes after this sitting, so the reply says the hall
+	// has more only when it has.
+	remaining := int64(len(open))
+	if success {
+		remaining--
+	}
 	out := map[string]any{
-		"profession": trade, "rank": level, "rank_name": exam.RankName, "title": exam.Title,
+		"profession": trade, "rank": exam.Rank, "rank_held": level, "exams_remaining": remaining,
+		"rank_name": exam.RankName, "title": exam.Title,
 		"hall": exam.Hall, "hall_kind": exam.HallKind, "location": c.Location, "shop": shop.Name,
 		"examiner": shop.Keeper, "attribute": attribute, "tn": tn, "roll": roll,
 		"fee": fee, "listed_fee": exam.Fee, "currency": currency, "balance": balance, "passed": success,
@@ -400,7 +470,7 @@ func professionExamAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 			Domain: "profession", EventType: professionExamEvent, EntityType: "character",
 			EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: out}}, nil
 	}
-	taught, withheld, err := teachRankRecipesTx(conn, catalog, userID, trade, level, p.GameMinute, now, shop.World)
+	taught, withheld, err := teachRankRecipesTx(conn, catalog, userID, trade, exam.Rank, p.GameMinute, now, shop.World)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

@@ -91,6 +91,9 @@ def war_card(war: dict[str, Any], *, game_minute: int | None = None) -> Card:
             line = f"🕊️ Peace: **{defender}** keeps {ground}, and {attacker} may not move on it again for a while."
         elif verdict == "ceded":
             line = f"🕊️ Peace: **{defender}** ceded {ground} to **{attacker}** at the table."
+        elif verdict == "set_aside":
+            line = (f"🕊️ The war over {ground} is set aside: it is part of a city, and a sect holds a place, "
+                    "not one of its streets. Nobody wins it.")
         elif verdict == "defender_holds":
             line = f"🛡️ **{winner}** holds {ground}. {attacker} may not move on it again for a while."
         else:

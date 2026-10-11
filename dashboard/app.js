@@ -746,7 +746,13 @@ async function loadAdmin(){
    :upd.newest_on_channel===null||upd.newest_on_channel===undefined
    ?`Installed <b>v${esc(upd.installed_version||'?')}</b> · newest on the channel: <b>unknown</b> <span class="muted">(${esc(upd.release_error||'the bot has not answered')})</span>`
    :`Installed <b>v${esc(upd.installed_version||'?')}</b> · newest on ${esc(upd.channel||'stable')}: <b>v${esc(upd.newest_on_channel)}</b> ${upd.update_available?pill('update available','warn'):pill('up to date','good')}${upd.checked_seconds_ago===null||upd.checked_seconds_ago===undefined?'':` <span class="muted">checked ${esc(Math.round(upd.checked_seconds_ago/60))} min ago</span>`}`;
- const updWatcher=upd.watcher_seen_seconds_ago===null||upd.watcher_seen_seconds_ago===undefined
+ // An install the watcher picked up cannot be heard from: update.sh stops the whole stack while
+ // it rebuilds, so a quiet watcher is the normal state of one and "restart it" would be the wrong
+ // advice. The engine decides this (install_underway); the card only says it.
+ const updReported=upd.install_reported_seconds_ago;
+ const updWatcher=upd.install_underway&&!upd.watcher_running
+   ?`${pill('installing','warn')} <span class="muted">update.sh stops the whole stack while it rebuilds, so the watcher is not heard until it finishes — ${updReported===null||updReported===undefined?'last report time unknown':`last report ${esc(Math.round(updReported/60))} min ago`}; Cancel is offered after ${esc(Math.round((upd.install_lease_seconds||0)/60))} min with no report</span>`
+   :upd.watcher_seen_seconds_ago===null||upd.watcher_seen_seconds_ago===undefined
    ?`${pill('watcher not running','bad')} <span class="muted">start <code>update_watch.sh</code> on the NAS — see docs/CONFIGURATION.md, "Updating from the dashboard"</span>`
    :(upd.watcher_running?`${pill('watcher running','good')} <span class="muted">last seen ${esc(upd.watcher_seen_seconds_ago)}s ago</span>`
    :`${pill('watcher not running','bad')} <span class="muted">last seen ${esc(Math.round(upd.watcher_seen_seconds_ago/60))} min ago — restart <code>update_watch.sh</code> on the NAS</span>`);
@@ -754,7 +760,8 @@ async function loadAdmin(){
  const updLast=updRes?`<div><b>Last outcome:</b> ${updRes.status==='done'?'✅ updated to v'+esc(updRes.installed_version||'?'):'❌ failed'}${updRes.detail?` — ${esc(updRes.detail)}`:''} <span class="muted">(${new Date(Number(updRes.finished_at)*1000).toLocaleString()})</span></div>`:'';
  const updCancelled=updReq&&updReq.status==='cancelled'?`<div><b>Last request:</b> ⛔ cancelled${updReq.detail?` — ${esc(updReq.detail)}`:''}</div>`:'';
  const updCanAsk=!upd.in_progress&&upd.watcher_running;
- // An open request a GM may close: not yet picked up, or the watcher has gone quiet.
+ // An open request a GM may close: not yet picked up, or nothing is acting on it any more (the
+ // engine's install lease has run out and the watcher is not heard from).
  const updCancel=upd.in_progress&&upd.can_cancel?`<button class="btn" id="cancelUpdate">Cancel request</button>`:'';
  const pOpts=optionRows(players), locations=(d.locations||[]).map(x=>`<option>${esc(x)}</option>`).join(''), currencies=(d.currencies||[]).map(x=>`<option>${esc(x)}</option>`).join('');
  const npcOpts=(d.npcs||[]).map(x=>`<option>${esc(x)}</option>`).join(''), eventOpts=(d.active_events||[]).map(x=>`<option value="${esc(x.event_key)}">${esc(x.title)} (${esc(x.event_key)})</option>`).join('');
@@ -798,7 +805,7 @@ async function loadAdmin(){
  document.getElementById('lockdownOn').onclick=()=>{if(confirm('Close the world? Every player is refused until you open it again.'))run('server.maintenance_mode',{enabled:true,reason:lockReason()})};
  document.getElementById('lockdownOff').onclick=()=>run('server.maintenance_mode',{enabled:false,reason:lockReason()});
  document.getElementById('requestUpdate').onclick=()=>run('server.request_update',{channel:upd.channel||'stable',reason:document.getElementById('updateReason').value.trim()},`Request an update${upd.newest_on_channel?` to v${upd.newest_on_channel}`:''}? The world closes to players while it installs and reopens when it is done or rolled back.`);
- const cancelBtn=document.getElementById('cancelUpdate');if(cancelBtn)cancelBtn.onclick=()=>run('server.cancel_update',{reason:'GM cancelled the update request from the dashboard'},'Cancel the open update request? Nothing is installed, and you can request again afterwards.');
+ const cancelBtn=document.getElementById('cancelUpdate');if(cancelBtn)cancelBtn.onclick=()=>run('server.cancel_update',{reason:'GM cancelled the update request from the dashboard'},updReq&&updReq.status==='requested'?'Cancel the open update request? The watcher has not picked it up, so nothing has been installed, and you can request again afterwards.':`Cancel an update the watcher picked up${updReported===null||updReported===undefined?'':` and has not reported on for ${Math.round(updReported/60)} minutes`}? Cancelling does not stop update.sh if it is still running, and anything it installed stays installed — check update_watch.log on the NAS first.`);
 }
 
 // The Player Editor (v1.0.0-rc.37). One character at a time: the sheet as the
@@ -981,8 +988,10 @@ async function loadPlayerEditor(){
  on('adjustFate',()=>run('player.fate',{user_id:uid,delta:Number(val('fateDelta')),reason:reason('karmaReason')}));
  on('grantQuest',()=>run('player.quest_grant',{user_id:uid,quest_key:val('grantQuestKey'),reason:reason('grantQuestReason')},`Hand ${(grantable.find(q=>q.quest_key===val('grantQuestKey'))||{}).title||val('grantQuestKey')} to this player?`));
  const questSel=el('questKey');
- if(questSel){const fillObjectives=()=>{const q=activeQuests.find(x=>x.quest_key===questSel.value)||{objectives:[]};const pending=q.objectives.filter(o=>o.progress<o.count);const types=[...new Set(pending.map(o=>o.type))];el('questObjective').innerHTML=types.map(t=>opt(t,`${t} · ${pending.filter(o=>o.type===t).map(o=>o.label).join(' / ')}`,false)).join('')};questSel.onchange=fillObjectives;fillObjectives();
-  on('reportQuest',()=>run('player.quest_progress',{user_id:uid,quest_key:questSel.value,objective_type:val('questObjective'),amount:Number(val('questAmount')),reason:reason('questReason')}));
+ if(questSel){const chosenQuest=()=>activeQuests.find(x=>x.quest_key===questSel.value)||{objectives:[]};
+  // One option per objective still short, valued by its place in the quest: a report names the objective's own type and target, because the engine counts a targeted objective only against a report naming the same thing.
+  const fillObjectives=()=>{el('questObjective').innerHTML=chosenQuest().objectives.map((o,i)=>o.progress<o.count?opt(String(i),`${o.label} · ${o.type}${o.target?` → ${o.target}`:''} (${o.progress}/${o.count})`,false):'').join('')};questSel.onchange=fillObjectives;fillObjectives();
+  on('reportQuest',()=>{const pick=val('questObjective');const o=pick===''?undefined:chosenQuest().objectives[Number(pick)];if(!o){out.innerHTML=resultBox('This quest has no objective left to report.',false);return}run('player.quest_progress',{user_id:uid,quest_key:questSel.value,objective_type:o.type,target:o.target||'',amount:Number(val('questAmount')),reason:reason('questReason')})});
   on('completeQuest',()=>run('player.quest_complete',{user_id:uid,quest_key:questSel.value,reason:reason('questReason')},'Complete this quest, pay its reward and hand over its next stage? This cannot be undone.'))}
  const untilText=(until)=>until>0?(until*1000<=Date.now()?' (lapsed, clears on the next tick)':` until ${new Date(until*1000).toLocaleString()}`):' until lifted';
  const held=[Number(r.is_banned)?'banned':'',Number(r.is_frozen)?'frozen'+untilText(Number(r.frozen_until||0)):'',Number(r.is_muted)?'muted'+untilText(Number(r.muted_until||0)):''].filter(Boolean);

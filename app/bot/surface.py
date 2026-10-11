@@ -22,6 +22,7 @@ from ..database import SCHEMA_VERSION
 from ..rules import feature_unlocks as unlocks
 from ..rules.advanced_runtime import BOSS_TEMPLATES, boss_lair
 from ..rules.progression_systems import ASCENSION_GATES
+from ..rules.realm_hubs import access_realm_index
 from .admin.core import (
     admin_family_group,
     admin_npc_group,
@@ -913,7 +914,9 @@ class MenuNextButton(MenuDailyButton):
     and left the player to walk it, which is the "I forget where to go"
     report. This is that path as a button: the same leaf a reply's next-step
     button resolves (`suggested_actions`), opened and pressed the way a Daily
-    button is."""
+    button is. A leaf whose first step is a form (Boss Raids → Claim, Personal
+    World → Create) cannot open it on a press that has already opened the hub,
+    so it is handed a Continue button instead."""
 
     def __init__(self, hub: str, action: HubAction) -> None:
         super().__init__(str(getattr(action.command, "name", "next")), hub, action.path)
@@ -1333,12 +1336,14 @@ PROGRESSION_GATES["war_peace_rank"] = ("war peace",)
 PROGRESSION_GATES.update({f"sect_rank:{op}": leaves for op, (_what, leaves) in RANK_FLOOR_LEAVES.items()})
 
 
-def _sect_ascent_refusal(sect: str, here: str, realm: int) -> str:
+def _sect_ascent_refusal(sect: str, here: str, access: int) -> str:
     """Why `sect.ascend` would refuse a member of `sect` standing at `here`,
     or "" when it would not - the twin of `sectAscendActionGo`'s four
     refusals, in the engine's order: the sect names nothing above it, the
     sect above keeps no gate, you are not at that gate, you stand below the
-    gate's world's floor."""
+    gate's world's floor. The floor is a place's, so `access` is the higher of
+    the two ladders (`access_realm_index`) and the refusal names the stage it
+    was measured at, as the engine does."""
     above = str((WORLD.sects.get(sect) or {}).get("ascends_to") or "").strip()
     if not above:
         return f"{sect or 'your sect'} names no sect above it"
@@ -1350,8 +1355,8 @@ def _sect_ascent_refusal(sect: str, here: str, realm: int) -> str:
     if here != gate:
         return f"the way up into {above} is taken at {gate}; you stand at {here or 'nowhere'}"
     floor = int(WORLD.locations[gate].get("min_realm_index") or 0)
-    if realm < floor:
-        return f"the way up into {above} asks for {WORLD.realm_name(floor)}; you stand at {WORLD.realm_name(realm)}"
+    if access < floor:
+        return f"the way up into {above} asks for {WORLD.realm_name(floor)}; you stand at {WORLD.realm_name(access)}"
     return ""
 
 
@@ -1359,10 +1364,17 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
     uid = interaction.user.id
     realm = int(c.get("realm_index") or 0)
     phase = int(c.get("phase") or 1)
+    body_realm = int(c.get("body_realm_index") or 0)
+    # A place is measured on the higher ladder (`accessRealmIndex`); a Law, a
+    # personal world and the rest of what is read off `realm` below are a
+    # cultivator's strength and stay on the qi ladder.
+    access = access_realm_index(c)
     shut: dict[str, str] = {}
     if realm < LAW_MIN_REALM_INDEX:
         shut["law"] = f"a Law needs {WORLD.realm_name(LAW_MIN_REALM_INDEX)}; you stand at {WORLD.realm_name(realm)}"
-    if realm not in ASCENSION_GATES:
+    # `eligibleTribulation` takes either ladder's gate stage (v1.33.0), so a
+    # body cultivator at a gate realm is not told the tribulation is shut.
+    if realm not in ASCENSION_GATES and body_realm not in ASCENSION_GATES:
         shut["tribulation"] = "only at a world-crossing gate (realms " + ", ".join(str(r) for r in sorted(ASCENSION_GATES)) + ")"
     here = str(c.get("location") or "")
     standing_in = str((WORLD.locations.get(here) or {}).get("world") or "")
@@ -1378,7 +1390,6 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
             if departing else "no world-crossing tribulation leads out of this world")
     # Either ladder at stage 9 opens the door (v1.11.1): `/perfect start`
     # takes a path, and the body path's stage is its own column.
-    body_realm = int(c.get("body_realm_index") or 0)
     body_phase = int(c.get("body_phase") or 1)
     if phase != 9 and body_phase != 9:
         shut["perfection"] = "Perfection begins at stage 9 of the realm or the body"
@@ -1394,7 +1405,7 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
         shut["sect_ascent"] = "the way up is a member's — join a sect first"
     else:
         shut["sect_outsider"] = "you already belong to a sect"
-        ascent = _sect_ascent_refusal(str(membership.get("sect_name") or ""), here, realm)
+        ascent = _sect_ascent_refusal(str(membership.get("sect_name") or ""), here, access)
         if ascent:
             shut["sect_ascent"] = ascent
     # The standing each door asks (v1.17.1), named the way the engine refuses.
@@ -1453,7 +1464,6 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
     if stall is None:
         # `stall.open` asks `accessRealmIndex()` - the higher of the two
         # ladders - so a body cultivator ahead of their qi stage is let in.
-        access = max(realm, body_realm)
         if access < STALL_MIN_REALM_INDEX:
             shut["stall_open"] = f"a stall asks for {WORLD.realm_name(STALL_MIN_REALM_INDEX)}; you stand at {WORLD.realm_name(access)}"
         shut["stall_keeper"] = "you keep no stall yet — open one in a city's street with **/economy → Market Stalls → Open**"

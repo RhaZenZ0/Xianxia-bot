@@ -80,9 +80,13 @@ func sectAscendActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	}
 	// The gate stands in the world above and carries that world's floor; a
 	// GM's teleport can put somebody there below it, and the sect reads the
-	// floor as its own.
-	if floor := catalog.Locations[gate].MinRealmIndex; c.RealmIndex < floor {
-		return authoritativeMutation{}, fmt.Errorf("the way up into %s asks for %s; you stand at %s", to, realmNameGo(catalog, floor), realmNameGo(catalog, c.RealmIndex))
+	// floor as its own. It is a place floor, so it is measured on the ladder
+	// that carried the cultivator there (accessRealmIndex): a body cultivator
+	// at the allied gate was walked in by the same rule that refused them
+	// here, and a refusal that names the qi stage at the access index says the
+	// stage the way in was measured at, as the stall does.
+	if floor := catalog.Locations[gate].MinRealmIndex; c.accessRealmIndex() < floor {
+		return authoritativeMutation{}, fmt.Errorf("the way up into %s asks for %s; you stand at %s", to, realmNameGo(catalog, floor), realmNameGo(catalog, c.accessRealmIndex()))
 	}
 	now := nowSeconds()
 	rankName, rankLevel := "Outer Disciple", int64(10)
@@ -107,6 +111,13 @@ func sectAscendActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		if _, err = conn.Execute(`DELETE FROM sect_lineage WHERE disciple_user_id=? OR master_user_id=?`, []any{userID, userID}); err != nil {
 			return authoritativeMutation{}, err
 		}
+	}
+	// A master among the old sect's people is the old sect's too: the bond is a
+	// row of its own (v1.25.0), not a sect_lineage row, so the delete above
+	// never reached it and the Azure Cloud Elder went on paying a disciple of
+	// the Jade Meridian Sect.
+	if _, err = severNPCMasterTx(conn, userID); err != nil {
+		return authoritativeMutation{}, err
 	}
 	if _, err = conn.Execute(`INSERT OR IGNORE INTO character_sect_discoveries(user_id,sect_name,discovery_kind,source_key,discovered_game_minute,created_at) VALUES(?,?,?,?,?,?)`,
 		[]any{userID, to, sectAscentAttempt, "sect:" + from, p.GameMinute, now}); err != nil {

@@ -652,18 +652,18 @@ func teleportArrayActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID
 		d = worlddata.TeleportArray{Name: raised.Name, From: raised.Location, To: raised.Destination,
 			Currency: raised.Currency, Cost: raised.Cost, MinRealmIndex: raised.MinRealmIndex}
 	}
-	r, e := conn.Execute(`SELECT location,realm_index FROM characters WHERE user_id=?`, []any{userID})
+	ch, e := loadMechanicsCharacter(conn, catalog, userID)
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	ch := firstRowMap(r)
-	if ch == nil {
-		return authoritativeMutation{}, errors.New("character not found")
-	}
-	if fmt.Sprint(ch["location"]) != d.From {
+	if ch.Location != d.From {
 		return authoritativeMutation{}, errors.New("that array is not available here")
 	}
-	if i64(ch["realm_index"]) < d.MinRealmIndex {
+	// The floor is a place's, so it is the ladder that carried the cultivator
+	// that answers: a raised gate stores the realm its opener cleared the storm
+	// at (accessRealmIndex), and the body path's opener could not step through
+	// the gate they tore while the qi path's could.
+	if ch.accessRealmIndex() < d.MinRealmIndex {
 		return authoritativeMutation{}, errors.New("your realm cannot withstand this transit")
 	}
 	balance, e := walletDeltaTx(conn, catalog, userID, d.Currency, -d.Cost, nowSeconds())

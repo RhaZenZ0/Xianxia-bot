@@ -99,7 +99,7 @@ func adminQuestLever(conn *storage.Conn, catalog worlddata.Catalog, adminUserID 
 		return nil, fmt.Errorf("that player does not hold %s active", questKey)
 	}
 	if touched, _ := transition["touched"].(bool); !touched {
-		return nil, fmt.Errorf("%s has no objective of type %q left to advance", questKey, report.ObjectiveType)
+		return nil, questReportMissTx(conn, uid, questKey, report)
 	}
 	if note, err := questNextStageNoteTx(conn, uid, questKey, transition); err != nil {
 		return nil, err
@@ -116,6 +116,11 @@ func adminQuestLever(conn *storage.Conn, catalog worlddata.Catalog, adminUserID 
 		after = map[string]any{"status": "resolved"}
 	}
 	after["objective_type"] = report.ObjectiveType
+	if report.Target != nil {
+		// A quest may ask for two things of one type (two talks, two
+		// travels), so the type alone does not say which objective moved.
+		after["target"] = *report.Target
+	}
 	for _, key := range []string{"rewards_granted", "follow_on", "caught_up", "commission", "next_stage"} {
 		if v, ok := transition[key]; ok {
 			after[key] = v
@@ -130,6 +135,65 @@ func adminQuestLever(conn *storage.Conn, catalog worlddata.Catalog, adminUserID 
 	}
 	transition["user_id"] = uid
 	return transition, nil
+}
+
+// questReportMissTx says why a GM's report advanced nothing. An objective that
+// names a target is met only by a report naming the same thing (progressQuest),
+// so "no objective of that type" is the wrong reason to give a report that
+// reached a targeted objective without it: the objective is there, and the GM
+// is told it is not. When the quest's objectives of that type name targets, the
+// refusal lists them and says what the report named; when none does, the
+// report really was of a type the quest does not ask for, and the old sentence
+// stands. It reads only - the lever's transaction is rolled back behind the
+// error either way.
+func questReportMissTx(conn *storage.Conn, userID int64, questKey string, report questPayload) error {
+	noObjective := fmt.Errorf("%s has no objective of type %q left to advance", questKey, report.ObjectiveType)
+	gameMinute, err := canonicalWorldGameMinute(conn)
+	if err != nil {
+		return err
+	}
+	active, found, err := activeQuestTermsTx(conn, userID, questKey, gameMinute)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return noObjective
+	}
+	var named []string
+	targeted := 0
+	for _, objective := range active.terms.Objectives {
+		if fmt.Sprint(objective["type"]) != report.ObjectiveType || objective["target"] == nil {
+			continue
+		}
+		target := strings.TrimSpace(fmt.Sprint(objective["target"]))
+		if target == "" {
+			continue
+		}
+		targeted++
+		listed := false
+		for _, have := range named {
+			listed = listed || strings.EqualFold(have, target)
+		}
+		if !listed {
+			named = append(named, target)
+		}
+	}
+	if targeted == 0 {
+		return noObjective
+	}
+	quoted := make([]string, len(named))
+	for i, target := range named {
+		quoted[i] = fmt.Sprintf("%q", target)
+	}
+	asked := "no target"
+	if report.Target != nil {
+		asked = fmt.Sprintf("%q", *report.Target)
+	}
+	noun := "objective names"
+	if targeted > 1 {
+		noun = "objectives name"
+	}
+	return fmt.Errorf("%s's %q %s %s, and a report naming %s meets none of them: report the objective by what it names", questKey, report.ObjectiveType, noun, strings.Join(quoted, ", "), asked)
 }
 
 // questNextStageNoteTx says, when the GM finished an ordinary quest and no next

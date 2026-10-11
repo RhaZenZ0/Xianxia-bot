@@ -1335,18 +1335,18 @@ async def run(url: str, token: str, db_path: str) -> Report:
         await step(report, "recipe.learn from the slip", act("recipe.learn", PLAYER, {"item_id": slip}))
     else:
         report.add("FAIL", "recipe.learn", "the catalogue carries no item that teaches a method")
-    # -- the hall that examines the trade (v1.0.0-rc.45). The rank is set with
-    # the lever rather than crafted up to, and the hall is a Mortal World
-    # weaponsmith, because the fee is charged in the money of the world the
-    # candidate is standing in. The demonstration is a roll, so the leg reports
-    # it and asserts only what is certain either way: passing teaches exactly
-    # that rank's methods, failing teaches none and names the wait.
+    # -- the hall that examines the trade (v1.0.0-rc.45). The first rank is
+    # crafted up to, and the hall is a Mortal World weaponsmith, because the fee
+    # is charged in the money of the world the candidate is standing in. The
+    # demonstration is a roll, so the leg reports it and asserts only what is
+    # certain either way: passing teaches exactly that rank's methods, failing
+    # teaches none and names the wait.
     forge_hall = next((shop for shop in world["shops"].values()
                        if shop.get("kind") == "weaponsmith" and shop.get("world") == "Mortal World"), {})
-    # There is no GM lever for a trade's rank - `profession_progress` is written
-    # only by working at it - so the rank is crafted up to on a bounded loop.
-    # That is the better shape anyway: crossing the rank is what hands the
-    # examination over, so this drives the offer as well as the sitting.
+    # The first rank is crafted up to on a bounded loop although a GM lever sets
+    # a trade's rank (`admin.player.set_profession`, used below): crossing the
+    # rank is what hands the examination over, so this drives the offer as well
+    # as the sitting.
     offered = ""
     for _ in range(14):
         row = dict(await db.get_profession_progress(PLAYER, "Forging") or {})
@@ -1383,6 +1383,36 @@ async def run(url: str, token: str, db_path: str) -> Report:
         # says which: already certified, or come back tomorrow.
         await step(report, "a second sitting the same day is refused", act("profession.exam", PLAYER, {"profession": "Forging"}),
                    expect_error="already hold" if sat.get("passed") else "look at you again")
+    # A rank that climbed past its examinations (v1.33.0): a Craft All is up to
+    # fifty crafts and carries a trade across every rank the content examines,
+    # so the hall sits the lowest rank this life has reached and not passed, not
+    # the rank held. A crafted climb is dice, so the lever stands the trade at
+    # rank 3 with nothing passed - the state a Craft All leaves - and the leg
+    # holds what is certain either way: the first sitting is rank 1 whatever
+    # the dice say, the second is rank 2 after a pass and the wait after a fail.
+    apothecary = next((shop for shop in world["shops"].values()
+                       if shop.get("kind") == "apothecary" and shop.get("world") == "Mortal World"), {})
+    await step(report, f"walk into {apothecary.get('name', 'an apothecary')}",
+               gm("admin.player.teleport", {"user_id": PLAYER, "location": str(apothecary.get("location") or town), "reason": "playtest"}))
+    await step(report, "fees need money", gm("admin.player.grant_currency", {"user_id": PLAYER, "currency_id": "low_spirit_stone", "amount": 500, "reason": "playtest"}))
+    await audited("admin.player.set_profession", {"user_id": PLAYER, "profession": "Alchemy", "level": 3, "xp": 0,
+                                                   "reason": "playtest: three ranks reached, none sat"})
+    lowest = await step(report, "profession.exam sits the lowest rank not passed, not the rank held",
+                        act("profession.exam", PLAYER, {"profession": "Alchemy"}))
+    if lowest is not None:
+        report.add("PASS" if int(lowest.get("rank") or 0) == 1 and int(lowest.get("rank_held") or 0) == 3 else "FAIL",
+                   "a candidate holding rank 3 with nothing passed is examined for rank 1",
+                   f"rank={lowest.get('rank')} held={lowest.get('rank_held')} passed={lowest.get('passed')} "
+                   f"remaining={lowest.get('exams_remaining')}")
+        if lowest.get("passed"):
+            nxt = await step(report, "profession.exam then sits rank 2", act("profession.exam", PLAYER, {"profession": "Alchemy"}))
+            if nxt is not None:
+                report.add("PASS" if int(nxt.get("rank") or 0) == 2 else "FAIL",
+                           "the hall moves up one rank at a time, lowest first", f"rank={nxt.get('rank')} passed={nxt.get('passed')}")
+        else:
+            await step(report, "the higher ranks wait behind the failed one", act("profession.exam", PLAYER, {"profession": "Alchemy"}),
+                       expect_error="look at you again")
+    await audited("admin.audit.undo_last", {"reason": "playtest: undo the trade rank"})
     await step(report, "back to the town", gm("admin.player.teleport", {"user_id": PLAYER, "location": town, "reason": "playtest"}))
 
     await step(report, "the hills", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Cloudspine Foothills", "reason": "playtest"}))
@@ -1443,12 +1473,23 @@ async def run(url: str, token: str, db_path: str) -> Report:
     await step(report, "an overwhelming cultivator", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 7, "phase": 9, "reason": "playtest"}))
     targets = await step(report, "combat.targets in the town", query("combat.targets", PLAYER, {"location": town}))
     candidates = [r for r in list((targets or {}).get("targets") or (targets or {}).get("rows") or []) if isinstance(r, dict) and r.get("name")]
-    npcs = [r for r in candidates if str(r.get("kind") or r.get("type") or "npc") == "npc"] or candidates
-    opponent = str(min(npcs, key=lambda r: int(r.get("realm_index") or 0)).get("name")) if npcs else ""
+    # `target_type` is the column the engine's rows carry; the `kind`/`type` this
+    # used to read are keys no row has, so the default kept every row.
+    npcs = [r for r in candidates if str(r.get("target_type") or "npc") == "npc"] or candidates
+    opponent_row = min(npcs, key=lambda r: int(r.get("realm_index") or 0)) if npcs else {}
+    opponent = str(opponent_row.get("name") or "")
     if not opponent:
         report.add("FAIL", "combat.start", f"nobody to challenge in {town}: {str(targets)[:200]}")
     else:
-        battle = await step(report, f"combat.start against {opponent}", act("combat.start", PLAYER, {"kind": "challenge", "npc_name": opponent, "source": "playtest"}))
+        # A challenge names whom it means and nothing else: the engine finds
+        # them among those standing here and fights them at their own realm.
+        battle = await step(report, f"combat.start against {opponent}", act("combat.start", PLAYER, {"kind": "challenge", "npc_name": opponent}))
+        if battle is not None:
+            report.add("PASS" if present(battle.get("npc_realm_index")) == present(opponent_row.get("realm_index"), 0)
+                       and present(battle.get("npc_stage")) == present(opponent_row.get("phase"), 1) else "FAIL",
+                       "a challenge fights the opponent at the world's realm and stage, not one a caller states",
+                       f"battle {battle.get('npc_realm_index')}/{battle.get('npc_stage')} source={battle.get('source')} "
+                       f"row {opponent_row.get('realm_index')}/{opponent_row.get('phase')}")
         battle_id = int((battle or {}).get("battle_id") or 0)
         if battle_id:
             await step(report, "combat.recovery_item", act("combat.recovery_item", PLAYER, {"battle_id": battle_id, "item_id": "recovery_pill"}))
@@ -1475,7 +1516,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
             if spared is not None and won:
                 report.add("PASS" if int(spared.get("sword_intent") or 0) >= 1 else "FAIL",
                            "a Sword Cultivator's win banks sword intent", f"sword_intent={spared.get('sword_intent')}")
-        second = await step(report, "combat.start again for the GM's lever", act("combat.start", PLAYER, {"kind": "challenge", "npc_name": opponent, "source": "playtest"}))
+        second = await step(report, "combat.start again for the GM's lever", act("combat.start", PLAYER, {"kind": "challenge", "npc_name": opponent}))
         if second is not None:
             second_id = int(second.get("battle_id") or 0)
             if second_id and won:
@@ -2413,7 +2454,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         report.add("SKIP", "combat.technique with a qualified Law", f"nobody to challenge in {town}")
     else:
         foe = str(min(rows, key=lambda r: int(r.get("realm_index") or 0)).get("name"))
-        duel = await step(report, f"combat.start against {foe} for the Law", act("combat.start", PLAYER, {"kind": "challenge", "npc_name": foe, "source": "playtest"}))
+        duel = await step(report, f"combat.start against {foe} for the Law", act("combat.start", PLAYER, {"kind": "challenge", "npc_name": foe}))
         duel_id = int((duel or {}).get("battle_id") or 0)
         if duel_id:
             crushed = await step(report, "combat.technique spatial_strangulation",
@@ -2530,11 +2571,11 @@ async def run(url: str, token: str, db_path: str) -> Report:
         report.add("PASS" if studied.get("forbidden") else "FAIL", "the scripture is forbidden, and the first study costs a point of karma", f"first_study={studied.get('first_study')} karma={studied.get('karma_score')}")
     targets = await step(report, "combat.targets for a witnessed fight", query("combat.targets", PLAYER, {"location": town}))
     candidates = [r for r in list((targets or {}).get("targets") or (targets or {}).get("rows") or []) if isinstance(r, dict) and r.get("name")]
-    marks = [r for r in candidates if str(r.get("kind") or r.get("type") or "npc") == "npc"] or candidates
+    marks = [r for r in candidates if str(r.get("target_type") or "npc") == "npc"] or candidates
     mark = str(min(marks, key=lambda r: int(r.get("realm_index") or 0)).get("name")) if marks else ""
     pursuit: dict[str, Any] = {}
     if mark:
-        fight = await step(report, f"combat.start against {mark}", act("combat.start", PLAYER, {"kind": "challenge", "npc_name": mark, "source": "playtest"}))
+        fight = await step(report, f"combat.start against {mark}", act("combat.start", PLAYER, {"kind": "challenge", "npc_name": mark}))
         palm = await step(report, "manual.technique Blood Sea Palm, in the open", act("manual.technique", PLAYER, {"technique_id": "blood_sea_palm"})) if fight is not None else None
         if palm is not None:
             report.add("PASS" if palm.get("witnessed") and palm.get("forbidden") else "FAIL", "unconcealed, the palm is witnessed with certainty", f"witnessed={palm.get('witnessed')} exposure={palm.get('exposure')} crime={str(palm.get('crime'))[:80]}")
@@ -2691,6 +2732,12 @@ async def run(url: str, token: str, db_path: str) -> Report:
     for status in ("acked", "fetching", "installing"):
         await audited("admin.server.update_status", {"nonce": nonce, "status": status, "detail": "playtest"},
                       name=f"the watcher reports {status}")
+    # The updater stops the stack this engine runs in, so while an install is
+    # under way the watcher cannot be heard; the request's own last report is
+    # what shows it is not abandoned. A cancel here would refuse the closing
+    # report below, and `done` is the step that fails if it were accepted.
+    await step(report, "an install that has just reported is not cancelled under the updater",
+               gm("admin.server.cancel_update", {"reason": "playtest"}), expect_error="the update is already")
     await audited("admin.server.update_status",
                   {"nonce": nonce, "status": "done", "detail": "playtest", "installed_version": "0.0.0-playtest"},
                   name="the watcher reports done")
@@ -2818,6 +2865,11 @@ async def run(url: str, token: str, db_path: str) -> Report:
     # Last, because it ends the character. The trades this life practised go
     # into its record before the wipe, and a fresh rebirth remembers nothing
     # of them yet: awakened memory is 0, so the echo is 0 by construction.
+    # The character row survives a rebirth and is rewritten in place, so a
+    # column the install does not name rides into the next life: the sword
+    # intent a Sword Cultivator banked was one. Read it on both sides.
+    dying = dict(await db.get_character(PLAYER) or {})
+    banked = present(dying.get("path_resource"), 0)
     await step(report, "lifecycle.true_death", act("lifecycle.true_death", PLAYER, {"reason": "playtest", "max_wait_seconds": 1}))
     cycle = await step(report, "lifecycle.samsara_status", query("lifecycle.samsara_status", PLAYER, {}))
     if cycle is not None:
@@ -2827,6 +2879,11 @@ async def run(url: str, token: str, db_path: str) -> Report:
     if reborn is not None:
         trades = dict(reborn.get("past_life_trades") or {})
         report.add("PASS" if int(trades.get("Forging", 0)) == 1 else "FAIL", "the past life's Apprentice Forging is recorded", f"{trades}")
+    reborn_body = dict(await db.get_character(PLAYER) or {})
+    carried = present(reborn_body.get("path_resource"), -1)
+    report.add("PASS" if carried == 0 else "FAIL", "a new body starts with no sword intent banked",
+               f"banked {banked} at death, {carried} after the rebirth"
+               + ("" if banked else "; nothing was banked, so this proved only the zero - the carry is held in samsara_wipes_the_life_test.go"))
     legacy = await step(report, "the soul record", db.get_soul_legacy(PLAYER))
     if legacy is not None:
         past = list(legacy.get("past_lives") or [])

@@ -93,7 +93,12 @@ class BothDoorsWalkThroughTravel(unittest.TestCase):
 
     def test_look_sends_the_buttons_when_there_is_somewhere_to_go(self):
         body = ast.unparse(_function("city_look"))
-        self.assertIn("_places_to_enter(here)", body)
+        # The places for *this* spot (the first argument), and what the player
+        # knows of the city - not the spelling of the call (v1.0.8).
+        offers = [c for c in ast.walk(_function("city_look"))
+                  if isinstance(c, ast.Call) and isinstance(c.func, ast.Name) and c.func.id == "_places_to_enter"]
+        self.assertEqual(len(offers), 1, "City → Look no longer asks _places_to_enter")
+        self.assertEqual(ast.unparse(offers[0].args[0]), "here")
         self.assertIn("CityLookView(", body, "City → Look lost its buttons")
 
     def test_enter_is_hidden_in_a_private_room(self):

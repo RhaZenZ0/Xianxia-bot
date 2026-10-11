@@ -52,7 +52,7 @@ DASHBOARD_API_VERSION = 2
 # stalls; neither is a gameplay table.
 # Schema 79 (v1.25.0) adds `npc_mentorships`, a player's master among the
 # sect's own people: read-only on Members & Lineage beside the player lineage.
-DASHBOARD_REVIEWED_SCHEMA_VERSION = 79
+DASHBOARD_REVIEWED_SCHEMA_VERSION = 80
 
 DASHBOARD_GET_API_PATHS = frozenset({
     "/api/overview", "/api/capabilities", "/api/timeline", "/api/npcs", "/api/npc",

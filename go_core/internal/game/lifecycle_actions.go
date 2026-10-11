@@ -868,6 +868,29 @@ var incarnationScopedTables = []string{"inventory", "active_effects", "character
 // over a table a later schema owns.
 var incarnationScopedLaterTables = []string{"character_flames", "character_spirit_sense"}
 
+// incarnationColumn is a column of the `characters` row that belongs to the
+// life, and what a new life starts it at.
+type incarnationColumn struct{ Column, Reset string }
+
+// incarnationScopedLaterColumns are the per-life columns of `characters`
+// that a later schema added. The character row survives a rebirth - it is the
+// soul's, and the install below rewrites it in place - and that rewrite names
+// the columns that existed when it was written, so a column added after it
+// passed from one life into the next: the sword intent a Sword Cultivator had
+// banked (schema 72) and the anchor the body's mending counts from (schema 59).
+// They are reset here rather than in the install for the same reason the later
+// tables are skipped when absent (v1.1.0): in the compose stack the engine is
+// healthy before db-init migrates, and a rebirth must not be refused over a
+// column a later schema owns. A column that is the soul's and not the life's
+// (the karma the wheel reads, the declared Dao, the moderation flags) is named
+// in SAMSARA_KEEPS_COLUMNS in tests/python/contracts/test_engine_boundary.py
+// with its reason; that test holds every `characters` column to being one list
+// or the other.
+var incarnationScopedLaterColumns = []incarnationColumn{
+	{"vitality_recovered_game_minute", "NULL"},
+	{"path_resource", "0"},
+}
+
 // clearIncarnationStateTx is what a rebirth wipes before the new body is
 // installed.
 func clearIncarnationStateTx(conn *storage.Conn, userID int64) error {
@@ -883,6 +906,20 @@ func clearIncarnationStateTx(conn *storage.Conn, userID int64) error {
 		if _, err := conn.Execute(fmt.Sprintf(`DELETE FROM %s WHERE user_id=?`, t), []any{userID}); err != nil {
 			return err
 		}
+	}
+	for _, c := range incarnationScopedLaterColumns {
+		if ok, err := tableHasColumns(conn, "characters", c.Column); err != nil || !ok {
+			continue
+		}
+		if _, err := conn.Execute(fmt.Sprintf(`UPDATE characters SET %s=%s WHERE user_id=?`, c.Column, c.Reset), []any{userID}); err != nil {
+			return err
+		}
+	}
+	// The master among the sect's people is the old life's: the bond names the
+	// disciple by account and not by body, so it would otherwise go on paying
+	// its terms to a child who never knelt to anyone.
+	if _, err := severNPCMasterTx(conn, userID); err != nil {
+		return err
 	}
 	return nil
 }

@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import ast
 import importlib
+import json
 import os
 import unittest
 from pathlib import Path
@@ -27,6 +28,7 @@ import pytest
 pytestmark = pytest.mark.unit
 
 BOSS = Path(__file__).resolve().parents[3] / "app" / "bot" / "commands" / "boss.py"
+CONTENT = Path(__file__).resolve().parents[3] / "content" / "world.json"
 ENV = {"DISCORD_TOKEN": "test-token", "GUILD_ID": "123456789012345678",
        "ENGINE_AUTH_TOKEN": "test-engine-token-1234567890", "DATABASE_PATH": "data/test.sqlite3"}
 RAIDER, OTHER = 1456074443989188610, 1456074443989188611
@@ -132,7 +134,7 @@ class TheRaidHasACard(unittest.TestCase):
         self.assertNotIn("No formation", party, "a raider alone has nobody to stand in formation with")
 
     def test_the_reward_is_the_templates_and_a_won_raid_counts_the_claims(self):
-        # The coin is the lair's world's (v1.17.0): the boar is the Mortal World's.
+        # The coin is the lair's world's: the boar is the Mortal World's.
         self.assertIn("**120** Low-Grade Spirit Stone + **Low Beast Core ×2**", _fields(raid_card(_encounter()))["Reward, each raider"])
         won = _encounter(status="victory", boss_hp=0,
                          claims=[{"user_id": RAIDER, "claimed": 1}, {"user_id": OTHER, "claimed": 0}])
@@ -140,6 +142,39 @@ class TheRaidHasACard(unittest.TestCase):
         self.assertIn(f"<@{RAIDER}> • 🎁 claimed", fields["Raid Party (2)"])
         self.assertIn(f"<@{OTHER}> • 🎁 to claim", fields["Raid Party (2)"])
         self.assertIn("1/2 claimed", fields["Reward, each raider"])
+
+    def test_the_raid_card_names_each_lairs_coin(self):
+        # The engine pays a raid in the coin of the world it was fought in,
+        # whoever claims it (raidRewardCurrency): the encounter's stored lair
+        # first, the template's own second. The card names the same coin. The
+        # expectation is computed from the raw content, not from the code
+        # under test, so two wrong halves cannot agree with each other.
+        world = json.loads(CONTENT.read_text(encoding="utf-8"))
+        coin_of_world = {
+            str(entry["world"]): str(entry["name"])
+            for entry in world["currencies"].values() if int(entry["tier"]) == 1
+        }
+        realm_entrance = {str(r["name"]): str(r["location"]) for r in world["secret_realms"].values()}
+        templates = _boss().BOSS_TEMPLATES
+        coins_named = set()
+        for key, template in templates.items():
+            lair = realm_entrance.get(str(template["location"]), str(template["location"]))
+            expected = coin_of_world[world["locations"][lair]["world"]]
+            coins_named.add(expected)
+            reward = _fields(raid_card(_encounter(template_key=key, location=lair)))["Reward, each raider"]
+            self.assertIn(f"**{template['reward_currency']}** {expected}", reward, f"{key} is fought at {lair}")
+            # An encounter with no stored lair falls back to the template's.
+            bare = _fields(raid_card(_encounter(template_key=key, location="")))["Reward, each raider"]
+            self.assertIn(f"**{template['reward_currency']}** {expected}", bare, f"{key} with no stored lair")
+        self.assertEqual(len(coins_named), 4, "the raids should stand in four worlds; the sweep is broken, not the card")
+
+        # The stored lair wins over the template's: a Boar King fought on the
+        # steppe is paid in the steppe's coin, not the Mortal World's.
+        steppe = realm_entrance.get(str(templates["hundred_horn_ancestor_stag"]["location"]),
+                                    str(templates["hundred_horn_ancestor_stag"]["location"]))
+        boar = _fields(raid_card(_encounter(location=steppe)))["Reward, each raider"]
+        self.assertIn(f"**120** {coin_of_world['Spiritual World']}", boar)
+        self.assertNotIn(coin_of_world["Mortal World"], boar)
 
 
 def _buttons(status):

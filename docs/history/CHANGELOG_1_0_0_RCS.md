@@ -707,7 +707,7 @@ that inventory came from grepping the simulation's own test files. And the test 
 commit no further crimes skipped itself whenever no killing happened, which is the same fault wearing
 a quieter coat: most runs it proved nothing. Both are certain now. The measured class was eleven tests
 by assertion phrasing and twenty-two by the time the call graph had been asked; the difference is why
-the rule is no longer prose alone. See CLAUDE.md, "Testing conventions".
+the rule is no longer prose alone. See CLAUDE.md (Testing conventions).
 
 **1.0.0** (rc.41) closes the world while you update it.
 
@@ -720,7 +720,7 @@ its own four doors, because a read like `/sheet` never reaches the engine at all
 answer out of a half-migrated database. The scheduled world tick stands down too and resumes where
 it left off, since every system schedules off the game clock rather than wall-clock. The reason the
 operator types is shown to players verbatim. The flag fails open on every unreadable shape, because
-a world nobody can enter is also a world nobody can reach to unlock. See CLAUDE.md, "The world
+a world nobody can enter is also a world nobody can reach to unlock. See docs/FINDINGS.md, "The world
 closed for maintenance".
 
 **1.0.0** (rc.40) retires the catalogue mirrors: one table, one path.
@@ -735,7 +735,7 @@ it writes the territory map and the baseline era, which is what it did besides t
 name no longer claims a catalogue it does not touch. The GM's "Sync world catalog" says the same
 truth. The one path the mirrors existed to serve - pytest, which has no engine to fill the new tables
 - is a fixture now rather than a second set of tables, because the engine is the only thing that may
-write `content_*` in production. See CLAUDE.md, "The content file as tables".
+write `content_*` in production. See docs/ARCHITECTURE.md, "The content file as tables".
 
 **1.0.0** (rc.39) retires the last Python-side clock.
 
@@ -752,7 +752,7 @@ and the engine playtest all read through it. Four copies of the arithmetic in Go
 that no file under `app/` or `scripts/` so much as names `anchor_real_ts`. `WORLD_TIME_SCALE` is the
 engine's key now, passed through by compose, and it seeds a **new** world only - after that the
 stored scale is the last word, changed by the audited lever alone, which `/admin world advancetime`
-gained an optional `scale` for. `Settings.world_time_scale` is gone. See CLAUDE.md, "The last
+gained an optional `scale` for. `Settings.world_time_scale` is gone. See docs/FINDINGS.md, "The last
 Python-side clock".
 
 **1.0.0** (rc.38) drives what only the world makes, and empties the deferred set.
@@ -772,7 +772,7 @@ connection's implicit transaction was never committed before the switch path clo
 told the player they had found somebody while the row stayed missing, and a grave claim handed over
 a keepsake it never wrote. The handler commits, the switch path now commits a result returned over an
 open transaction and rolls back an error, and a test drives it through `Apply` the way the server
-does. See CLAUDE.md, "The playtest touches everything".
+does. See docs/FINDINGS.md, "The playtest touches everything".
 
 **1.0.0** (rc.37) drives progression through the engine playtest.
 
@@ -790,7 +790,7 @@ from the rows each lever writes (`/api/player` returns them beside the sheet), w
 keeps the levers that act on the world or the server; the write path, the action map and the audit
 row are unchanged. The Discord `/admin` panel does the same: its Players, Grants and Moderation
 heads are one **Player Edit** head, paged by "More actions", and it gains `/admin player setrealm`,
-the realm lever with the same optional body pair. See CLAUDE.md, "The playtest touches everything"
+the realm lever with the same optional body pair. See docs/FINDINGS.md, "The playtest touches everything"
 and "Dashboard".
 
 **1.0.0** (rc.36) drives the sect and the homestead through the engine playtest.
@@ -801,7 +801,7 @@ recommendation, a discipleship requested, accepted and left, a territory claimed
 a second sect's claim, and the homestead founded, shared, furnished, sat in and left - twenty-two
 operations and one GM lever, each on a state the GM levers build, with the rolls reported. The one
 door the engine never opens itself, the sect's residence row, is staged through the same repository
-call `/sect abode` uses. See CLAUDE.md, "The playtest touches everything".
+call `/sect abode` uses. See docs/FINDINGS.md, "The playtest touches everything".
 
 **1.0.0** (rc.35) makes the playtest touch everything, and holds it there.
 
@@ -820,7 +820,7 @@ three named follow-ups. The sweep's first run found four handlers no source read
 had ever left Discord (a `game_minute` the client refuses to send), the forage reply raised on
 every forage (the engine's roll was flattened without its degree), `/talk` at a grave called a
 switch operation through the authoritative client, and a GM's grant to a member with no
-character crashed instead of refusing. All four are fixed and held. See CLAUDE.md, "The playtest
+character crashed instead of refusing. All four are fixed and held. See docs/FINDINGS.md, "The playtest
 touches everything".
 
 **1.0.0** (rc.34) lets the head of the house teach and test the new cultivator.

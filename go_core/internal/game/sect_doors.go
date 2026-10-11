@@ -298,3 +298,26 @@ func TerritoryIsWholePlace(catalog worlddata.Catalog, location string) bool {
 	loc, ok := catalog.Locations[location]
 	return ok && !loc.Private && cityOf(catalog, location) == location
 }
+
+// TerritoryGround is the whole place a territory's banner belongs on, and
+// whether the key asked about was a part of one. A part of a city answers its
+// city; a whole place answers itself, and so does a key the catalogue does not
+// carry (a renamed location, a fixture's invented ground), which is left alone
+// rather than guessed at. A part whose city is itself no ground a sect can hold
+// answers ("", true).
+//
+// `TerritoryIsWholePlace` was a rule only the world's own claim step obeyed
+// (v1.12.0): a player's `territory.claim`, both banner branches of
+// `ResolveWarTx` and the war step's targets all took any row, so a sect could
+// hold a street while every reader of the banner - the event's sect, the
+// caravan toll, the city page - looked at the city's row. Every writer asks
+// this now, so the rule has one statement.
+func TerritoryGround(catalog worlddata.Catalog, key string) (whole string, part bool) {
+	if _, ok := catalog.Locations[key]; !ok || TerritoryIsWholePlace(catalog, key) {
+		return key, false
+	}
+	if city := cityOf(catalog, key); city != key && TerritoryIsWholePlace(catalog, city) {
+		return city, true
+	}
+	return "", true
+}

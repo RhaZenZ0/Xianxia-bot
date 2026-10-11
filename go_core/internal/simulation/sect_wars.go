@@ -94,6 +94,14 @@ func (r *Runner) npcSectWars(conn *storage.Conn, steps, gm int64) (int64, error)
 	open, retakes := [][]any{}, [][]any{}
 	for _, row := range targets.Rows {
 		key := fmt.Sprint(row[0])
+		// A sect moves on a whole place, never a street of one (v1.12.0's
+		// rule, which this step did not ask): the war door refuses a part, and
+		// one system's error ends the tick, so it is skipped here rather than
+		// refused there. A part can only be held in a world the repair has not
+		// yet reached.
+		if _, part := game.TerritoryGround(r.World, key); part {
+			continue
+		}
 		if game.WarTruceUntilTx(conn, r.World, attacker, key, gm) > 0 {
 			continue
 		}

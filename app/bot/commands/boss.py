@@ -179,11 +179,19 @@ def raid_card(encounter: dict[str, Any], *, events: list[str] | None = None, not
     # What each raider is owed on a win: the template the engine pays from
     # (bossTemplatesGo), held equal to this one by the boss-table parity gate.
     if template.get("reward_currency") or template.get("reward_item"):
-        # In the money of the world the lair stands in (v1.17.0), which is what
-        # the claim pays; the card used to say the Mortal stone for every raid.
-        lair, _ = boss_lair(template, WORLD.secret_realms)
-        lair_world = str((WORLD.locations.get(lair) or {}).get("world") or "Mortal World")
-        coin = WORLD.currency_name(WORLD.world_base_currency(lair_world))
+        # In the money of the world the raid was fought in, which is what the
+        # claim pays and in the claim's own order (the engine's
+        # raidRewardCurrency): the lair the encounter was stored at, else the
+        # template's. Never the world of whoever claims it. Only the name is
+        # drawn here; a raid whose lair neither names a world is one the
+        # engine refuses to pay, so the card names no coin rather than the
+        # Mortal stone.
+        lair_world = ""
+        for place in (str(encounter.get("location") or ""), boss_lair(template, WORLD.secret_realms)[0]):
+            lair_world = str((WORLD.locations.get(place) or {}).get("world") or "")
+            if lair_world:
+                break
+        coin = WORLD.currency_name(WORLD.world_base_currency(lair_world)) if lair_world else "coin"
         reward = [f"**{int(template.get('reward_currency') or 0)}** {coin}"]
         if template.get("reward_item") and int(template.get("reward_quantity") or 0) > 0:
             reward.append(f"**{WORLD.item_name(str(template['reward_item']))} ×{int(template['reward_quantity'])}**")
@@ -291,9 +299,9 @@ async def _raid_act(
 
 
 def _claim_line(result: dict[str, Any]) -> str:
-    # The coin is the engine's (v1.17.0): a raid is paid in the money of the
-    # world the raider stands in, so the line names what was paid rather than
-    # the Mortal stone it used to assume.
+    # The coin is the engine's: a raid is paid in the money of the world it was
+    # fought in, wherever the raider stands when they claim, so the line names
+    # what was paid rather than the Mortal stone it used to assume.
     coin = WORLD.currency_name(str(result.get("currency") or "low_spirit_stone"))
     return (
         f"🏆 Claimed **{result.get('currency_amount', 0)} {coin}** and "

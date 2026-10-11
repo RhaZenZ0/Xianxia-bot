@@ -69,6 +69,17 @@ func territoryClaimActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 		return authoritativeMutation{}, e
 	}
 	p.TerritoryKey = strings.TrimSpace(p.TerritoryKey)
+	// A sect holds a city, not one of its streets (v1.12.0's rule, which only
+	// the world's own claim step obeyed): a claim made from a gate, a district,
+	// a shop or an inn is a claim on the city it stands in, so an older bot
+	// that still names the part keeps working and nobody can raise a banner
+	// the rest of the game never reads.
+	if whole, part := TerritoryGround(catalog, p.TerritoryKey); part {
+		if whole == "" {
+			return authoritativeMutation{}, fmt.Errorf("%s is no ground a sect can hold", p.TerritoryKey)
+		}
+		p.TerritoryKey = whole
+	}
 	mem, e := sectMembershipRow(conn, userID)
 	if e != nil {
 		return authoritativeMutation{}, e
@@ -95,7 +106,9 @@ func territoryClaimActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	if region := strings.TrimSpace(fmt.Sprint(t["region"])); region != c.Location {
+	// The ground is the city's row, so standing anywhere in the city is
+	// standing on it: a gate is its city (v1.0.9).
+	if region := strings.TrimSpace(fmt.Sprint(t["region"])); cityOf(catalog, region) != cityOf(catalog, c.Location) {
 		return authoritativeMutation{}, fmt.Errorf("%s is claimed from %s; you are at %s", fmt.Sprint(t["name"]), region, c.Location)
 	}
 	controller := strings.TrimSpace(fmt.Sprint(t["controller_key"]))
@@ -285,6 +298,9 @@ func territoryWarActActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 		winner = fmt.Sprint(war["defender_key"])
 		resolution = "defender_holds"
 	}
+	// A war over a part of a city ends with no victor (`WarVerdict`); the
+	// reply says what the war door will write, not what the blow would have won.
+	winner, resolution = WarVerdict(catalog, territory, winner, resolution)
 	// A defender's fortify raises the walls for good, not only this siege's
 	// numbers (v1.24.0): `territory_state.defense` was written by nothing.
 	defense := territoryDefenseTx(conn, territory)
@@ -335,7 +351,7 @@ func territoryWarActActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	status := "active"
 	occupation := int64(0)
 	spoils := []WarSpoil{}
-	if winner != "" {
+	if resolution != "" {
 		var ended bool
 		if spoils, ended, e = ResolveWarTx(conn, catalog, p.WarID, winner, resolution, p.GameMinute, now); e != nil {
 			return authoritativeMutation{}, e
@@ -396,15 +412,11 @@ func caravanDispatchActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	if p.Escort < 0 || p.Escort > 20 {
 		return authoritativeMutation{}, errors.New("caravan escort must be between 0 and 20")
 	}
-	r, e := conn.Execute(`SELECT realm_index,location,attributes_json,life_status,path,phase FROM characters WHERE user_id=?`, []any{userID})
+	c, e := loadMechanicsCharacter(conn, catalog, userID)
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	c := firstRowMap(r)
-	if c == nil {
-		return authoritativeMutation{}, errors.New("character not found")
-	}
-	if !strings.EqualFold(strings.TrimSpace(fmt.Sprint(c["life_status"])), "alive") {
+	if !strings.EqualFold(strings.TrimSpace(c.LifeStatus), "alive") {
 		return authoritativeMutation{}, errors.New("only a living incarnation can dispatch a caravan")
 	}
 	// A caravan leaves from the city the cultivator is standing in (v1.1.0).
@@ -413,7 +425,7 @@ func caravanDispatchActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	// which is where a walk into a city ends - found no road and refused, at
 	// 429 of the catalogue's 477 places. The same fault v1.0.9 found in the
 	// household door, in a second place.
-	origin := cityOf(catalog, fmt.Sprint(c["location"]))
+	origin := cityOf(catalog, c.Location)
 	if p.Destination == "" || p.Destination == origin {
 		return authoritativeMutation{}, errors.New("choose a different destination")
 	}
@@ -437,7 +449,11 @@ func caravanDispatchActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	// `high_` at realm 7, which nothing has ever credited: dispatch was dead
 	// from realm 4 up. See worldBaseCurrency.
 	currency := worldBaseCurrency(catalog, catalog.Locations[origin].World)
-	plan, found := canonicalRoadRoute(catalog, origin, p.Destination, i64(c["realm_index"]))
+	// The road is a place's too: canonicalRoadRoute drops every place above the
+	// realm it is handed, the origin included, so the qi ladder alone refused a
+	// body cultivator at the capital of every world above the Mortal one with
+	// "no canonical road route" while travel walked them out of it.
+	plan, found := canonicalRoadRoute(catalog, origin, p.Destination, c.accessRealmIndex())
 	if !found {
 		return authoritativeMutation{}, errors.New("no canonical road route connects the caravan destination")
 	}
@@ -469,8 +485,7 @@ func caravanDispatchActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	}
 	payout := max64(1, int64(float64(base*p.Quantity)*mult))
 	risk := clamp(plan.MaxDanger+10, 5, 85)
-	attrs := rowAttributes(catalog, c)
-	conceal := max64(0, i64(attrs["agility"])/2)
+	conceal := max64(0, c.Attributes["agility"]/2)
 	cargo, _ := json.Marshal(map[string]any{
 		p.ItemID:          p.Quantity,
 		"_payout":         payout,

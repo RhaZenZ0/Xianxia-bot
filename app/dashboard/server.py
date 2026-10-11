@@ -90,6 +90,10 @@ def quest_journal(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 {
                     "id": str(o.get("id") or ""),
                     "type": str(o.get("type") or ""),
+                    # What the objective names, or None: the engine matches a
+                    # targeted objective only against a report that names the
+                    # same thing, so the card must send it back.
+                    "target": None if o.get("target") in (None, "") else str(o["target"]),
                     "label": str(o.get("label") or o.get("type") or ""),
                     "count": max(1, int(o.get("count") or 1)),
                     "progress": int(progress.get(str(o.get("id") or ""), 0) or 0),
@@ -359,6 +363,15 @@ class _QuestWorld:
         # A `craft` objective names a recipe (v1.2.1); without this every one
         # the editor saved or reported was "an unknown recipe".
         self.recipes = dict(data.get("recipes") or {})
+        # The target kinds added since v1.16.0 read the rest of the content pack
+        # (a realm's name, a flame, a Law, a secret realm, an examination's
+        # quest key), and a hand edit goes through the same validator. Without
+        # these every one of those kinds was "unknown" here, so the workbench
+        # refused to save any realm-road stage - and, from v1.33.0, any
+        # examination, which an untargeted objective used to let through.
+        self.data = data
+        self.realms = list(data.get("realms") or [])
+        self.secret_realms = dict(data.get("secret_realms") or {})
 
 
 def json_safe_numbers(value: Any) -> Any:
@@ -2195,6 +2208,13 @@ class ReadOnlyDashboardStore:
             str(name) for name, loc in world.locations.items() if not (loc or {}).get("private")
         }
         location_lookup = {name.lower(): name for name in location_names}
+        # A `profession_exam` objective names an examination by its quest key
+        # (v1.33.0), so a key the content does not carry strands the quest.
+        exam_keys = {
+            str(dict(exam).get("quest_key") or "").strip().lower()
+            for ladder in dict(getattr(world, "data", {}).get("profession_exams") or {}).values()
+            for exam in list(ladder or [])
+        }
         for row in approved:
             bands[str(row.get("realm_band") or "any")] = bands.get(str(row.get("realm_band") or "any"), 0) + 1
             for objective in _json_list(row.get("objectives_json")):
@@ -2219,6 +2239,9 @@ class ReadOnlyDashboardStore:
                 elif expects == "item" and target.lower().replace(" ", "_") not in item_ids:
                     unknown_targets.append({"quest_key": str(row.get("quest_key")), "type": kind, "target": target,
                                             "expects": "item"})
+                elif expects == "profession_exam" and target.lower() not in exam_keys:
+                    unknown_targets.append({"quest_key": str(row.get("quest_key")), "type": kind, "target": target,
+                                            "expects": "profession_exam"})
         return {
             "realm_bands": sorted(({"band": band, "count": count} for band, count in bands.items()),
                                   key=lambda item: item["band"]),
@@ -2570,6 +2593,12 @@ class ReadOnlyDashboardStore:
 # A watcher that has not written its heartbeat for this long is reported as
 # not running. It writes one every five minutes, so this is three missed.
 UPDATE_WATCHER_STALE_SECONDS = 15 * 60
+# An install the watcher has picked up stays the updater's this long after the
+# request's last report, because the updater stops the whole stack while it
+# rebuilds and no heartbeat can be heard meanwhile - the watcher's silence
+# says nothing about an install. Mirrors the engine's updateInstallLeaseSeconds
+# (held equal by a test); the exit for a watcher that died mid-install.
+UPDATE_INSTALL_LEASE_SECONDS = 2 * 60 * 60
 # The states that close an update request. Mirrors the engine's
 # updateRequestState.open (go_core/internal/game/update_request.go).
 UPDATE_TERMINAL_STATUSES = ("", "done", "failed", "cancelled")
@@ -2609,6 +2638,24 @@ def update_card_state(rows: dict[str, Any] | None, release: dict[str, Any] | Non
     # was not there.
     no_release = reachable and not release.get("newest")
     watcher_running = seen is not None and seen < UPDATE_WATCHER_STALE_SECONDS
+    # The engine's updateInstallUnderway: past `requested`, the watcher is heard
+    # from or the request has reported inside the lease. An absent updated_at
+    # is an age the engine reads as fifty years - a value nobody wrote is not a
+    # report - and here it is unknown, which protects nothing either (and is
+    # shown as unknown, never as a number of minutes). The engine decides again
+    # when the button is pressed.
+    status = str((request or {}).get("status") or "")
+    reported: float | None = None
+    if in_progress and status != "requested":
+        stamp = request.get("updated_at")
+        if stamp is not None:
+            try:
+                reported = max(0.0, float(now) - float(stamp))
+            except (TypeError, ValueError):
+                reported = None
+    install_underway = in_progress and status != "requested" and (
+        watcher_running or (reported is not None and reported < UPDATE_INSTALL_LEASE_SECONDS)
+    )
     return {
         "installed_version": INSTALLED_VERSION,
         "channel": str(release.get("channel") or "") or None,
@@ -2622,11 +2669,16 @@ def update_card_state(rows: dict[str, Any] | None, release: dict[str, Any] | Non
         "watcher_seen_seconds_ago": None if seen is None else int(seen),
         "watcher_running": watcher_running,
         "in_progress": in_progress,
+        # An install is under way while the watcher is heard from or its request
+        # has reported inside the lease; the card says "installing" then, not
+        # "watcher not running", and shows how long ago the last report was.
+        "install_underway": install_underway,
+        "install_reported_seconds_ago": None if reported is None else int(reported),
+        "install_lease_seconds": UPDATE_INSTALL_LEASE_SECONDS,
         # An open request a GM may close: still `requested` (nothing has picked
-        # it up), or any later state once the watcher is not running. An install
-        # in progress under a live watcher is not cancellable. The engine
+        # it up), or any later state once nothing is acting on it. The engine
         # decides again; this only decides whether the card offers the button.
-        "can_cancel": in_progress and (str((request or {}).get("status") or "") == "requested" or not watcher_running),
+        "can_cancel": in_progress and not install_underway,
     }
 
 
