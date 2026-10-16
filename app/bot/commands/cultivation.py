@@ -38,6 +38,47 @@ from ..runtime import (
 )
 from ..services import GUILD, NARRATOR, NARRATOR_CONTEXT, QUESTS
 
+
+def _full_stage_line(result: dict[str, Any]) -> str:
+    """What a session at a full stage says it did (v1.34.0).
+
+    The engine credits an open Perfection path on a full stage by design
+    (rc.37), so "gathered nothing, banked nothing" is only true of a session
+    that refined nothing either: one that did is told it refined the path, and
+    is not told to stop meditating. A path whose training is as deep as a
+    session takes it is told so, rather than that nothing happened. What is
+    said comes off the result - `perfection_gain` and `perfection_active` are
+    the engine's - and the reply decides nothing.
+    """
+    if int(result.get("perfection_gain", 0) or 0):
+        return "\n🪷 This stage is already full, so the session went into refining your Perfection path instead: no essence banked, nothing risked."
+    if result.get("perfection_active") is True:
+        return ("\n🪷 This stage is already full and your Perfection path is as deep as meditation takes it: the session gathered nothing, "
+                "banked nothing and risked nothing. Work the path under **/ascend → Perfection**.")
+    return "\n🪷 This stage is already full: the session gathered nothing, banked nothing and risked nothing. Break through before meditating again."
+
+
+def _ready_line(result: dict[str, Any], phase: int, *, body: bool) -> str:
+    """The line under a session that filled the stage (v1.34.0).
+
+    At stage 9 the choice is the Perfection path or the breakthrough, and which
+    verb the path takes depends on whether one is under way: **Start** for a
+    cultivator with none, **continue** for one already walking it (the old line
+    told a trainee to start the path they were on). The engine says which in
+    `perfection_active`; an engine that does not say is read as having none,
+    which is the line this reply always printed.
+    """
+    if not result.get("ready"):
+        return ""
+    breakthrough = "**/cultivation → Body → Breakthrough**" if body else "**/ascend → Main Progression → Breakthrough**"
+    if phase != 9:
+        return f"\n✨ Your body is ready for {breakthrough}." if body else f"\n✨ You are ready to attempt {breakthrough}."
+    full = "Body Stage 9 is full." if body else "Stage 9 is full."
+    if result.get("perfection_active") is True:
+        return f"\n✨ {full} Continue the path under **/ascend → Perfection**, or attempt {breakthrough}."
+    return f"\n✨ {full} Choose **/ascend → Perfection → Start** or {breakthrough}."
+
+
 @registered_root_command(name="cultivate", description="Meditate and gather cultivation essence", guild=GUILD)
 @serialized_user_action
 async def cultivate(interaction: discord.Interaction) -> None:
@@ -122,10 +163,8 @@ async def cultivate(interaction: discord.Interaction) -> None:
     if deviation:
         extra += f"\n⚠️ The forced qi ran wild: **{deviation.get('name') or 'Qi Deviation'}** (severity {int(deviation.get('severity', 1))}). Treat it under **/character → Afflictions**, or it drags every session down."
     if result.get("stage_full") and not gain:
-        extra += "\n🪷 This stage is already full: the session gathered nothing, banked nothing and risked nothing. Break through before meditating again."
-    ready = ""
-    if result.get("ready"):
-        ready = "\n✨ Stage 9 is full. Choose **/ascend → Perfection → Start** or **/ascend → Main Progression → Breakthrough**." if int(c.get("phase", 1)) == 9 else "\n✨ You are ready to attempt **/ascend → Main Progression → Breakthrough**."
+        extra += _full_stage_line(result)
+    ready = _ready_line(result, int(c.get("phase", 1)), body=False)
     try:
         progressed = await record_quest_progress(
             interaction.user.id, "cultivate", amount=1, game_minute=wt.total_minutes)
@@ -574,8 +613,7 @@ async def body_cultivate(interaction: discord.Interaction) -> None:
         extra += f"\n🌌 **{result.get('era_name') or 'World Era'}** modifies cultivation to **x{float(result['era_mult']):.2f}**."
     if int(result.get("perfection_gain", 0)):
         extra += f"\n★ Body refinement deepens by **+{int(result['perfection_gain'])}%**."
-    if result.get("ready"):
-        extra += "\n✨ Body Stage 9 is full. Choose **/ascend → Perfection → Start** or **/cultivation → Body → Breakthrough**." if int(c.get("body_phase", 1)) == 9 else "\n✨ Your body is ready for **/cultivation → Body → Breakthrough**."
+    extra += _ready_line(result, int(c.get("body_phase", 1)), body=True)
     await interaction.followup.send(f"💪 **{c['name']} tempers the body.**\nYou refine flesh, blood, bone, and meridians for **+{gain} body essence**.\nProgress: **{total}/{cost}**{extra}")
 
 

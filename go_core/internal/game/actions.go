@@ -1665,6 +1665,27 @@ func adminSetResourceCaps(conn *storage.Conn, adminUserID int64, raw json.RawMes
 		return nil, err
 	}
 	after := map[string]any{"vitality_max": newVitalityMax, "qi_max": newQiMax}
+	// The cap a GM sets is a permanent one, and the next settle rebuilds the pool
+	// from the body, so the difference between the cap now and the cap asked for
+	// goes into the bonus (it can be negative: a GM may lower a cap).
+	if hasQi {
+		hasBonus, e := qiMaxBonusColumn(conn)
+		if e != nil {
+			return nil, e
+		}
+		if hasBonus {
+			oldBonus, e := qiMaxBonusOf(conn, uid)
+			if e != nil {
+				return nil, e
+			}
+			delta := newQiMax - storage.ParseInt(row["qi_max"])
+			if err = addQiMaxBonusTx(conn, uid, delta); err != nil {
+				return nil, err
+			}
+			before["qi_max_bonus"] = oldBonus
+			after["qi_max_bonus"] = oldBonus + delta
+		}
+	}
 	if err := auditAdmin(conn, adminUserID, "admin.player.set_resource_caps", fmt.Sprintf("user:%d", uid), before, after, fmt.Sprint(p["reason"])); err != nil {
 		return nil, err
 	}

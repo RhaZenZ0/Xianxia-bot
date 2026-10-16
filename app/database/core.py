@@ -27,7 +27,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 80
+SCHEMA_VERSION = 81
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -3334,6 +3334,20 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                   AND status='active' AND terms_json<>'' AND json_valid(terms_json)
                   AND json_extract(terms_json,'$.objectives[0].type')='profession_exam'
                   AND json_type(terms_json,'$.objectives[0].target') IS NULL""",
+        ),
+    ),
+    (
+        81,
+        "qi_max_bonus_outlives_the_settle",
+        (
+            # v1.34.0: the qi a cultivator earns for good - a perfected realm's
+            # tenth, an inheritance's, a GM's cap - was written onto `qi_max`
+            # alone, and the engine rebuilds the pool from the body on every
+            # settle, so it lasted until the next read of the pool and was then
+            # gone. The bonus has a column now and the settle adds it. It starts
+            # at 0 for everyone: what a settle already took cannot be told from
+            # the body's own figure, so it is not recovered.
+            "ALTER TABLE characters ADD COLUMN qi_max_bonus INTEGER NOT NULL DEFAULT 0",
         ),
     ),
 )

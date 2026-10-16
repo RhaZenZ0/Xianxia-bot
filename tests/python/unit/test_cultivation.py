@@ -375,5 +375,78 @@ class PerfectionIsOnThePanelAtStageNine(unittest.TestCase):
         self.assertIn("'perfect trial'", ast.unparse(gates.value))
 
 
+# --- v1.34.0: the cultivate reply does not tell a Perfection trainee to stop ---
+
+
+def _cultivation_commands():
+    with patch.dict(os.environ, ENV):
+        return importlib.import_module("app.bot.commands.cultivation")
+
+
+GO_CULTIVATION = (GO / "game" / "cultivation_actions.go").read_text(encoding="utf-8")
+
+
+class TheCultivateReplyDoesNotTellATraineeToStop(unittest.TestCase):
+    """The engine credits an open Perfection path on a full stage by design
+    (rc.37), and the reply printed "gathered nothing ... Break through before
+    meditating again" over a session that had just refined the path, and at
+    stage 9 "Choose Perfection -> Start" to somebody already walking it. The
+    engine half (`perfection_active` on the result, whether or not the session
+    gained) is held in Go by `TestTheCultivateReplyKnowsWhetherAPerfectionPathIsOpen`."""
+
+    def setUp(self):
+        self.module = _cultivation_commands()
+
+    def test_a_session_that_refined_the_path_is_not_told_nothing_happened(self):
+        line = self.module._full_stage_line({"stage_full": True, "gain": 0, "perfection_gain": 2, "perfection_active": True})
+        self.assertIn("refining your Perfection path", line)
+        self.assertNotIn("Break through before meditating again", line,
+                         "the cultivate reply tells a Perfection trainee to stop meditating")
+        self.assertNotIn("gathered nothing", line)
+
+    def test_a_path_as_deep_as_meditation_takes_it_is_pointed_back_at_the_path(self):
+        line = self.module._full_stage_line({"stage_full": True, "perfection_gain": 0, "perfection_active": True})
+        self.assertIn("/ascend → Perfection", line)
+        self.assertNotIn("Break through before meditating again", line)
+
+    def test_a_full_stage_with_no_path_keeps_its_old_line(self):
+        for result in ({"stage_full": True}, {"stage_full": True, "perfection_gain": 0, "perfection_active": False}):
+            with self.subTest(result=result):
+                line = self.module._full_stage_line(result)
+                self.assertIn("This stage is already full", line)
+                self.assertIn("Break through before meditating again", line)
+
+    def test_stage_nine_says_start_to_nobody_walking_a_path_and_continue_to_somebody_who_is(self):
+        for body, full in ((False, "Stage 9 is full."), (True, "Body Stage 9 is full.")):
+            with self.subTest(body=body):
+                none = self.module._ready_line({"ready": True, "perfection_active": False}, 9, body=body)
+                self.assertIn(full, none)
+                self.assertIn("/ascend → Perfection → Start", none)
+                walking = self.module._ready_line({"ready": True, "perfection_active": True}, 9, body=body)
+                self.assertIn(full, walking)
+                self.assertIn("Continue the path under **/ascend → Perfection**", walking)
+                self.assertNotIn("Start", walking, "the reply tells somebody walking the path to start it")
+                # An engine that does not say is read as having none: the line this reply always printed.
+                self.assertEqual(self.module._ready_line({"ready": True}, 9, body=body), none)
+
+    def test_below_stage_nine_and_unready_the_lines_are_as_they_were(self):
+        self.assertEqual(self.module._ready_line({"ready": False, "perfection_active": True}, 9, body=False), "")
+        self.assertIn("You are ready to attempt **/ascend → Main Progression → Breakthrough**",
+                      self.module._ready_line({"ready": True}, 4, body=False))
+        self.assertIn("Your body is ready for **/cultivation → Body → Breakthrough**",
+                      self.module._ready_line({"ready": True}, 4, body=True))
+
+    def test_both_replies_draw_through_the_helpers_and_the_engine_sends_what_they_read(self):
+        source = (PROJECT_ROOT / "app" / "bot" / "commands" / "cultivation.py").read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        for command, helper in (("cultivate", "_full_stage_line"), ("cultivate", "_ready_line"), ("body_cultivate", "_ready_line")):
+            node = next((n for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef) and n.name == command), None)
+            self.assertIsNotNone(node, f"{command} is gone; the reader is broken, not the tree")
+            calls = {n.func.id for n in ast.walk(node) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
+            self.assertIn(helper, calls, f"{command} no longer draws its line through {helper}")
+        # The twin is held to the Go: the key the helpers read is one the engine sends.
+        self.assertIn('"perfection_active": perfectionActive', GO_CULTIVATION)
+
+
 if __name__ == "__main__":
     unittest.main()

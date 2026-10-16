@@ -176,6 +176,22 @@ class TheFirstHourIsNeverGated(unittest.TestCase):
             "the reason it exists.",
         )
 
+    def test_the_way_back_to_a_life_is_never_gated_for_the_dead(self):
+        """`reincarnate` and `afterlife` have no slash command, and the death
+        notice, `require_character` and the engine's reset refusal all send the
+        dead to `/character -> Samsara`, so the curriculum steps aside there
+        (v1.34.0). Held behaviourally in `test_the_dead_have_a_door_to_samsara.py`;
+        what is held here is that the provider every panel reads still asks."""
+        body = _code(SURFACE, "_curriculum_opened")
+        self.assertIn(
+            '"deceased"', body,
+            "the curriculum provider no longer asks whether the character is dead, so a cultivator "
+            "who died below realm 5 has no door to Samsara",
+        )
+        self.assertIn("_the_dead_need", body)
+        need = _code(SURFACE, "_the_dead_need")
+        self.assertIn("_hub_page_leaves", need, "the dead are shown a copied list of leaves, not the live Samsara page")
+
     def test_a_household_errand_can_always_be_walked(self):
         """Errands are handed over by a roster from the first hour and their
         last objective is always the door home (rc.32)."""

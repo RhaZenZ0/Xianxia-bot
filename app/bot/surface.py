@@ -781,27 +781,60 @@ def _hub_page_leaves() -> dict[str, dict[str, list[str]]]:
     return _HUB_PAGE_LEAVES
 
 
-async def _curriculum_opened(user_id: int) -> frozenset[str]:
-    """What this player's standing opens whatever their realm (v1.19.4).
+# The leaves of the `character` hub a soul between lives needs. The Samsara
+# page is `afterlife`, `reincarnate` and `reset`; the soul-cycle and what a past
+# life left the soul sit on Overview as `soul` and `inheritances`, and the
+# curriculum pages both at realm 5 (v1.34.0). The Samsara page itself is read
+# off the live hub, so a leaf moved onto it is carried by the move.
+_SAMSARA_PAGE = ("character", "Samsara")
+_THE_DEAD_ALSO_NEED = ("soul", "inheritances")
 
-    Asked for from play: *"if you in a sect if your not at the needed stage
-    open all the commands for it."* A sect is joined at the gate from realm 0,
-    and the curriculum held its pages to Qi Refining and its territory and war
-    to the Nascent Soul, so a new member saw the sect they had just joined as a
-    collapsed line. Membership is the introduction the curriculum stands in
-    for, so a member is shown every leaf on the sect hub. The engine's own
-    refusals are untouched (`PROGRESSION_GATES` still hides a manor below its
-    rank), and the panel, the menu and `/locked` all read this one answer.
 
-    A failed read opens nothing: the curriculum as it was is the safe side.
+def _the_dead_need() -> frozenset[str]:
+    """Every leaf a deceased cultivator is shown whatever their realm."""
+    hub, page = _SAMSARA_PAGE
+    return frozenset(_hub_page_leaves().get(hub, {}).get(page, ())) | frozenset(_THE_DEAD_ALSO_NEED)
+
+
+async def _curriculum_opened(user_id: int, character: Mapping[str, Any] | None = None) -> frozenset[str]:
+    """What this player's standing opens whatever their realm.
+
+    **A sect member (v1.19.4).** Asked for from play: *"if you in a sect if your
+    not at the needed stage open all the commands for it."* A sect is joined at
+    the gate from realm 0, and the curriculum held its pages to Qi Refining and
+    its territory and war to the Nascent Soul, so a new member saw the sect they
+    had just joined as a collapsed line. Membership is the introduction the
+    curriculum stands in for, so a member is shown every leaf on the sect hub.
+    The engine's own refusals are untouched (`PROGRESSION_GATES` still hides a
+    manor below its rank).
+
+    **The dead (v1.34.0).** A cultivator who died at realm 2 was told, by the
+    death notice, by `require_character` and by the engine's own refusal, to
+    use `/character -> Samsara -> Reincarnate` - and the curriculum had that
+    page and four of its leaves held to realm 5, with no slash command to fall
+    back on. The curriculum paces what the game has not introduced yet; death
+    is the introduction to Samsara, and the page is the only way back to a
+    life, so a deceased character is shown every leaf of it.
+
+    The panel, the menu and `/locked` all read this one answer; a caller that
+    already holds the character row passes it rather than asking again. Each
+    read fails on its own: a failed one opens nothing, the curriculum as it was being the
+    safe side, and does not take the other with it.
     """
+    opened: set[str] = set()
     try:
-        if not await DB.get_sect_membership(user_id):
-            return frozenset()
+        if await DB.get_sect_membership(user_id):
+            opened.update(leaf for leaves in _hub_page_leaves().get("sect", {}).values() for leaf in leaves)
     except Exception:
         log.exception("Sect membership unavailable for the curriculum")
-        return frozenset()
-    return frozenset(leaf for leaves in _hub_page_leaves().get("sect", {}).values() for leaf in leaves)
+    try:
+        if character is None:
+            character = await DB.get_character(user_id)
+        if character and character.get("life_status") == "deceased":
+            opened.update(_the_dead_need())
+    except Exception:
+        log.exception("Life status unavailable for the curriculum")
+    return frozenset(opened)
 
 
 async def _menu_shape(interaction: discord.Interaction) -> dict[str, Any]:
@@ -821,7 +854,7 @@ async def _menu_shape(interaction: discord.Interaction) -> dict[str, Any]:
     realm = int(c.get("realm_index") or 0)
     roster = WORLD.data.get("feature_unlocks") or {}
     hidden = unlocks.hidden_hubs(roster, realm, _hub_page_leaves(),
-                                 opened=await _curriculum_opened(interaction.user.id))
+                                 opened=await _curriculum_opened(interaction.user.id, c))
     tutorial = ""
     for row in await DB.list_character_quests(interaction.user.id, status="active"):
         definition = await QUESTS.definition(str(row.get("quest_key") or "")) or {}
@@ -1807,7 +1840,7 @@ async def _curriculum_unlocks(interaction: discord.Interaction) -> dict[str, int
         return {}
     roster = WORLD.data.get("feature_unlocks") or {}
     locked = unlocks.locked_leaves(roster, int(c.get("realm_index") or 0),
-                                   opened=await _curriculum_opened(interaction.user.id))
+                                   opened=await _curriculum_opened(interaction.user.id, c))
     return {"/" + path: realm for path, realm in locked.items()}
 
 
