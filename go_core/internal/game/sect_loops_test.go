@@ -45,8 +45,11 @@ func TestACraftedDonationCannotBeRedeemedForLess(t *testing.T) {
 	if err := recordProfessionExamTx(conn, 1, professionExamRecord{Trade: "Alchemy", Rank: 1, Life: 1, Passed: true}); err != nil {
 		t.Fatal(err)
 	}
-	if _, capped := sectDonationCap(catalog, "longevity_pill"); capped || itemTrade(catalog, "longevity_pill") != "Alchemy" {
-		t.Fatal("the Longevity Pill is no longer an uncapped Alchemy output; pick another item that shows the loop")
+	// No Mortal shelf sells it, so the only cap is the cheapest upper shelf
+	// carried down the ladder (v1.34.0): hundreds of stones a unit, far above
+	// the 180 points a donation of it earns here.
+	if limit, capped := sectDonationCap(catalog, "longevity_pill"); (capped && limit < 180) || itemTrade(catalog, "longevity_pill") != "Alchemy" {
+		t.Fatal("the Longevity Pill is no longer an effectively uncapped Alchemy output; pick another item that shows the loop")
 	}
 	startPoints, startEarned := int64(0), earnedOf(t, conn, 1)
 	setPoints(t, conn, 1, startPoints)

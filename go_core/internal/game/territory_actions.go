@@ -115,6 +115,13 @@ func territoryClaimActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	now := nowSeconds()
 	out := map[string]any{"territory_key": p.TerritoryKey, "sect_name": sect}
 	if controller == "" || fmt.Sprint(t["controller_type"]) == "neutral" {
+		// A neutral home belongs to its own sect alone, as the world's own
+		// claim step has always held (SectHomes). The claim of a seat that has
+		// lain neutral is its sect's to make; a rival's banner on it would be
+		// a war nobody declared.
+		if owner, isHome := SectHomes(catalog)[p.TerritoryKey]; isHome && owner != sect {
+			return authoritativeMutation{}, fmt.Errorf("%s is the seat of %s, and no other sect may claim it while it lies neutral", fmt.Sprint(t["name"]), owner)
+		}
 		_, e = conn.Execute(`UPDATE territory_state SET controller_type='sect',controller_key=?,unrest=MIN(100,unrest+10),updated_game_minute=?,updated_at=? WHERE territory_key=?`, []any{sect, p.GameMinute, now, p.TerritoryKey})
 		if e != nil {
 			return authoritativeMutation{}, e
@@ -401,6 +408,36 @@ func territoryWarPeaceActionGo(conn *storage.Conn, catalog worlddata.Catalog, us
 	}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "territory", EventType: "war.peace", EntityType: "territory_war", EntityID: fmt.Sprint(p.WarID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
+
+// caravanUnitPayout is what one unit of a cargo fetches at the far end, in the
+// coin of the world the caravan left: the item's worth with the trader's
+// margin on it (a fifth over, a third over smuggled), held to one coin under
+// the cheapest shelf anywhere (shelfReference). Without the ceiling a caravan
+// was a buyer of last resort that paid above every shop: a Void-Stride
+// Talisman is worth 70 stones as the content prices it and sells for 13 on its
+// cheapest shelf, so freighting it paid five times what buying it cost, and
+// the margin was the same for fifty of them (v1.34.0). An item no shop sells
+// has no shelf to be held under and keeps its worth. Payable is false when the
+// shelf is less than one coin of this world's: no whole-coin price is under it.
+func caravanUnitPayout(catalog worlddata.Catalog, item worlddata.Item, itemID, currency string, smuggle bool) (int64, bool) {
+	base := max64(5, item.BasePrice)
+	if base <= 5 {
+		base = max64(base, item.SectValue)
+	}
+	mult := 1.15
+	if smuggle {
+		mult = 1.35
+	}
+	unit := max64(1, int64(math.Round(float64(base)*mult)))
+	if shelf, ok := shelfReference(catalog, itemID, currency); ok {
+		if shelf < 1 {
+			return 0, false
+		}
+		unit = min64(unit, max64(1, shelf-1))
+	}
+	return unit, true
+}
+
 func caravanDispatchActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p caravanDispatchPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
@@ -449,6 +486,12 @@ func caravanDispatchActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	// `high_` at realm 7, which nothing has ever credited: dispatch was dead
 	// from realm 4 up. See worldBaseCurrency.
 	currency := worldBaseCurrency(catalog, catalog.Locations[origin].World)
+	// What the cargo will fetch is settled before the road is paid for, because
+	// a cargo that fetches nothing is refused (caravanUnitPayout).
+	unitPayout, payable := caravanUnitPayout(catalog, item, p.ItemID, currency, p.Smuggle)
+	if !payable {
+		return authoritativeMutation{}, fmt.Errorf("a caravan will not carry %s: the cheapest shelf in the world asks less than a single %s for it, and a caravan pays whole coins", itemDisplayName(catalog, p.ItemID), coinName(catalog, currency))
+	}
 	// The road is a place's too: canonicalRoadRoute drops every place above the
 	// realm it is handed, the origin included, so the qi ladder alone refused a
 	// body cultivator at the capital of every world above the Mortal one with
@@ -475,15 +518,7 @@ func caravanDispatchActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	base := max64(5, item.BasePrice)
-	if base <= 5 {
-		base = max64(base, item.SectValue)
-	}
-	mult := 1.15
-	if p.Smuggle {
-		mult = 1.35
-	}
-	payout := max64(1, int64(float64(base*p.Quantity)*mult))
+	payout := unitPayout * p.Quantity
 	risk := clamp(plan.MaxDanger+10, 5, 85)
 	conceal := max64(0, c.Attributes["agility"]/2)
 	cargo, _ := json.Marshal(map[string]any{

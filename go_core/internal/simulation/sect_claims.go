@@ -98,12 +98,7 @@ func (r *Runner) npcSectClaims(conn *storage.Conn, steps, gm int64) (int64, erro
 	}
 	// A neutral home - a seat city, or a wilderness gate - belongs to its
 	// own sect alone.
-	homeOf := map[string]string{}
-	for name := range r.World.Sects {
-		if home := game.SectHome(r.World, name); home != "" {
-			homeOf[home] = name
-		}
-	}
+	homeOf := game.SectHomes(r.World)
 	byWorld := r.eraModifiersOrNone(conn)
 	claimed := int64(0)
 	now := nowFloat()

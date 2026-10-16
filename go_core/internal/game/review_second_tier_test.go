@@ -51,11 +51,15 @@ func TestAMarketCounterStaysInsideTheShopsBand(t *testing.T) {
 					t.Fatalf("a market sells %s for %d and a keeper pays %d: buy at the market, sell to the counter", itemID, buy, floor)
 				}
 				sell := marketUnitPrice(catalog, itemID, currency, base, index, false)
-				if shelf, ok := cheapestShelfPrice(catalog, itemID, currency); ok && sell >= shelf {
+				shelf, shelved := cheapestShelfPrice(catalog, itemID, currency)
+				if shelved && sell >= shelf && shelf >= 2 {
 					t.Fatalf("a market pays %d for %s and a shelf sells it for %d: buy off the shelf, sell to the market", sell, itemID, shelf)
 				}
-				if sell < 1 || buy < 1 {
-					t.Fatalf("%s priced at buy=%d sell=%d", itemID, buy, sell)
+				// A counter pays nothing (0) for what the cheapest shelf in the
+				// world asks less than one coin for; everywhere else it pays a coin
+				// at least.
+				if sell < 0 || (sell == 0) != (shelved && shelf < 1) || buy < 1 {
+					t.Fatalf("%s priced at buy=%d sell=%d against a shelf of %d (%v)", itemID, buy, sell, shelf, shelved)
 				}
 				checked++
 			}

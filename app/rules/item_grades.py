@@ -17,11 +17,6 @@ from typing import Any, Mapping
 
 SEPARATOR = "@"
 
-# The first rung no keeper deals in: Low and Mid are shelf goods, the rest is
-# priced by players. The engine's keeperGradeCeiling is the same number.
-KEEPER_GRADE_CEILING = 2
-
-
 def split_item_grade(item_id: str) -> tuple[str, str]:
     """``"qi_pill@high"`` -> ``("qi_pill", "high")``; a bare id has grade ``""``."""
     text = str(item_id or "")

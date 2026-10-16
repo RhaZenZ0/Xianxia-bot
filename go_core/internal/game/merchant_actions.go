@@ -419,6 +419,12 @@ func AuctionStruckProsperityTx(conn *storage.Conn, catalog worlddata.Catalog, au
 // merchant's purse shrinks and its pack grows. It returns the merchant key
 // and true when a merchant bought; false leaves the lot to be returned to
 // the seller. The caller owns the transaction.
+//
+// The merchant pays no more here than it would bid (merchantValuation, the
+// check MerchantsBid makes): a starting bid is the seller's number, and a lot
+// listed at ten thousand stones for a herb is not worth ten thousand stones
+// to somebody who buys to resell. Without the check the last bidder was a
+// door out of the world's money, paid at the seller's own price (v1.34.0).
 func MerchantBuysUnsoldLot(conn *storage.Conn, catalog worlddata.Catalog, auction map[string]any, gm int64) (string, bool, error) {
 	ok, err := merchantTablesExist(conn)
 	if err != nil || !ok {
@@ -433,6 +439,9 @@ func MerchantBuysUnsoldLot(conn *storage.Conn, catalog worlddata.Catalog, auctio
 	key, state, err := pickMerchantForLot(conn, catalog, city, strings.TrimSpace(fmt.Sprint(auction["currency_id"])), price, "", gm, now)
 	if err != nil || key == "" {
 		return "", false, err
+	}
+	if price > merchantValuation(catalog, catalog.Merchants[key], fmt.Sprint(auction["item_id"]), i64(auction["quantity"])) {
+		return "", false, nil
 	}
 	if err := merchantTakesLotTx(conn, catalog, key, state, auction, price, false, gm, now); err != nil {
 		return "", false, err
