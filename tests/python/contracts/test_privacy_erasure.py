@@ -76,6 +76,9 @@ class TheRealSchemaIsFullyClassified(unittest.TestCase):
             raise AssertionError(f"could not bootstrap the schema: {result.stderr[-2000:]}")
         db = sqlite3.connect(path)
         cls.columns: list[tuple[str, str, bool]] = []
+        # Columns the schema itself clears when the character goes: a foreign
+        # key to `characters` that says ON DELETE SET NULL.
+        cls.set_null: set[str] = set()
         tables = db.execute(
             "SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
         ).fetchall()
@@ -84,6 +87,9 @@ class TheRealSchemaIsFullyClassified(unittest.TestCase):
                 continue
             for column in db.execute(f'PRAGMA table_info("{table}")'):
                 cls.columns.append((table, column[1], bool(column[3])))
+            for fk in db.execute(f'PRAGMA foreign_key_list("{table}")'):
+                if fk[2] == "characters" and fk[6] == "SET NULL":
+                    cls.set_null.add(f"{table}.{fk[3]}")
         cls.table_count = len(tables)
         db.close()
 
@@ -153,6 +159,22 @@ class TheRealSchemaIsFullyClassified(unittest.TestCase):
             "anonymise column would fail the whole erasure",
         )
 
+    def test_a_lot_does_not_go_with_its_high_bidder(self):
+        """`auctions.current_bidder_user_id` says ON DELETE SET NULL, and the
+        sweep deleted it (v1.34.0): a bidder's erasure or reset took the
+        *seller's* lot, and the item the seller had put in escrow, with it. A
+        column the schema clears for a leaving character is shared state with a
+        link in it - it is anonymised, never a reason to delete the row."""
+        self.assertIn(
+            "auctions.current_bidder_user_id", self.set_null,
+            "the schema no longer says the high bidder's link clears; the reader or this test needs rewriting",
+        )
+        self.assertIn(
+            "auctions.current_bidder_user_id", go_map_keys("erasureAnonymise"),
+            "auctions.current_bidder_user_id is classified a delete again: erasing or resetting a bidder "
+            "deletes the seller's lot with the item in escrow",
+        )
+
     def test_the_audit_trail_is_the_only_thing_kept(self):
         self.assertEqual(
             go_map_keys("erasureKeep"), {"admin_audit_log.admin_user_id"},
@@ -178,7 +200,7 @@ class ErasureIsReachableAndAudited(unittest.TestCase):
     def test_it_is_wired_into_the_action_dispatch(self):
         actions = (PROJECT_ROOT / "go_core" / "internal" / "game" / "actions.go").read_text(encoding="utf-8")
         self.assertIn('case "admin.player.erase":', actions)
-        self.assertIn("adminErasePlayer(conn, req.ActorID, req.Payload)", actions)
+        self.assertIn("adminErasePlayer(conn, catalog, req.ActorID, req.Payload)", actions)
 
     def test_it_writes_to_the_admin_audit_log(self):
         # The repo's rule for every Admin Console action (CLAUDE.md), and here

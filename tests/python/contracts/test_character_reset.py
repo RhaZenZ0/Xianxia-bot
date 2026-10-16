@@ -54,6 +54,17 @@ def subject_columns() -> set[str]:
     return set(re.findall(r'"([a-z_0-9]+)":\s*true', match.group(1)))
 
 
+def released_keys() -> set[str]:
+    """The "table.column" keys of characterResetReleased."""
+    match = re.search(r"var characterResetReleased = map\[string\]\[2\]string\{(.*?)\n\}", RESET_GO, re.S)
+    if not match:
+        raise AssertionError("characterResetReleased is not a map literal any more")
+    keys = set(re.findall(r'"([a-z_]+\.[a-z_]+)":', match.group(1)))
+    if not keys:
+        raise AssertionError("characterResetReleased parsed to nothing; the reader is broken, not the tree")
+    return keys
+
+
 class WhatBoundsAResetIsInTheRealSchema(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -109,6 +120,24 @@ class WhatBoundsAResetIsInTheRealSchema(unittest.TestCase):
                     f"{key} is kept from the reset, but {column!r} is not an erasure subject column, "
                     "so the sweep would never have deleted it and the keep is decoration",
                 )
+
+    def test_every_released_column_is_one_erasure_anonymises(self):
+        """A reset releases only what erasure anonymises. (The converse is not
+        a rule: an anonymise column nobody has released refuses a reset until
+        somebody decides, on purpose.) The high bidder's link joined both lists
+        in v1.34.0; a release for a column erasure does not anonymise would
+        unlink a row the sweep then deletes whole."""
+        anonymised = set(re.findall(
+            r'"([a-z_]+\.[a-z_]+)":',
+            re.search(r"var erasureAnonymise = map\[string\]string\{(.*?)\n\}", PRIVACY_GO, re.S).group(1),
+        ))
+        self.assertIn("auctions.current_bidder_user_id", anonymised)
+        self.assertIn("auctions.current_bidder_user_id", released_keys())
+        self.assertEqual(
+            sorted(released_keys() - anonymised), [],
+            "characterResetReleased names a column erasureAnonymise does not: the reset unlinks a row "
+            "that the sweep then deletes",
+        )
 
     def test_the_count_is_read_from_the_table_it_is_kept_in(self):
         """The count and the keep must name the same place.

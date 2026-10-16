@@ -176,6 +176,63 @@ async def _edit_card(guild: discord.Guild, record: dict[str, Any], lot: dict[str
     return True
 
 
+async def _delete_card_message(guild: discord.Guild, record: dict[str, Any]) -> None:
+    """Take the message down. A card already gone, or one the bot may no longer
+    touch, is a card that is not there - never a reason to raise."""
+    channel = await _resolve_text_channel(guild, record.get("channel_id"))
+    if channel is None:
+        return
+    try:
+        message = await channel.fetch_message(int(record["message_id"]))
+        await message.delete()
+    except discord.HTTPException:
+        pass
+
+
+async def player_lot_cards(guild: discord.Guild | None, user_id: int) -> list[dict[str, Any]]:
+    """The cards of the lots one person sells or leads, read *before* a reset
+    or an erasure sweeps the rows that name them (the order `take_down_card`
+    states for the stall: read the id before the engine call, act after).
+
+    Each record is the stored card plus ``role``: ``seller`` for a lot the
+    engine will close and delete with its seller, ``bidder`` for a lot that
+    stays and only loses the high bid. Never raises - a floor that cannot be
+    read is a card left standing, not a reset that fails."""
+    if guild is None:
+        return []
+    out: list[dict[str, Any]] = []
+    try:
+        for record in await DB.list_auction_lot_messages(guild.id):
+            lot = await DB.get_auction(int(record["auction_id"]))
+            if lot is None:
+                continue
+            if lot.get("seller_user_id") is not None and int(lot["seller_user_id"]) == int(user_id):
+                out.append({**record, "role": "seller"})
+            elif lot.get("current_bidder_user_id") is not None and int(lot["current_bidder_user_id"]) == int(user_id):
+                out.append({**record, "role": "bidder"})
+    except Exception:
+        log.exception("Could not read the auction cards of user %s", user_id)
+    return out
+
+
+async def settle_player_lot_cards(guild: discord.Guild | None, records: list[dict[str, Any]]) -> None:
+    """After the engine has committed: a lot the person was selling is gone, so
+    its card (which still reads ``Seller: <their name>``) comes down; a lot they
+    led is still on the floor, so its card is brought up to date and stops
+    naming them as the high bidder. Never raises."""
+    if guild is None:
+        return
+    for record in records:
+        try:
+            if record.get("role") == "seller":
+                await _delete_card_message(guild, record)
+                await DB.forget_auction_lot_message(int(record["auction_id"]))
+            else:
+                await refresh_lot(guild, int(record["auction_id"]))
+        except Exception:
+            log.exception("Could not settle the card of lot %s", record.get("auction_id"))
+
+
 async def refresh_lot(guild: discord.Guild | None, auction_id: int) -> None:
     """Bring the card up to date after a bid."""
     if guild is None:
@@ -208,6 +265,11 @@ async def sync_lots(guild: discord.Guild | None) -> int:
     for record in await DB.list_auction_lot_messages(guild.id):
         lot = await DB.get_auction(int(record["auction_id"]))
         if lot is None:
+            # The row is gone (its seller was erased or reset away, or a GM
+            # removed it): the card goes with it, not merely the record of it.
+            # Forgetting the message id alone left "Seller: <name>" standing
+            # on the floor for good (v1.34.0).
+            await _delete_card_message(guild, record)
             await DB.forget_auction_lot_message(int(record["auction_id"]))
             continue
         if int(lot.get("active") or 0):
