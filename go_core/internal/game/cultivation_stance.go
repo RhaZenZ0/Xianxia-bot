@@ -223,16 +223,28 @@ func insightGateCost(realmIndex int64) int64 {
 	return minI64(60, 5+5*maxI64(0, realmIndex))
 }
 
-func bankedInsight(conn *storage.Conn, userID int64) (bool, int64, error) {
+// bankedInsightAt says whether the insight a cultivator holds is one for the
+// gate out of this realm. A bank carries the realm it was bought at
+// (`realm_index`) and opens that gate alone: one from another realm - a GM's
+// set_realm, a stale row - is not a licence for this one, and a row that does
+// not say its realm opens nothing, because absent is not realm zero.
+func bankedInsightAt(conn *storage.Conn, userID, realm int64) (bool, error) {
 	state, err := readWorldStateMap(conn, cultivationInsightKey(userID))
 	if err != nil {
-		return false, 0, err
+		return false, err
 	}
 	if state == nil {
-		return false, 0, nil
+		return false, nil
 	}
 	banked, _ := state["banked"].(bool)
-	return banked, storage.ParseInt(state["realm_index"]), nil
+	if !banked {
+		return false, nil
+	}
+	stored, has := state["realm_index"]
+	if !has || stored == nil {
+		return false, nil
+	}
+	return storage.ParseInt(stored) == realm, nil
 }
 
 func readInsightXP(conn *storage.Conn, userID int64) (int64, error) {
@@ -256,7 +268,7 @@ func realmGateOpen(conn *storage.Conn, userID, realm int64) (open bool, viaInsig
 	if perfect {
 		return true, false, nil
 	}
-	banked, _, err := bankedInsight(conn, userID)
+	banked, err := bankedInsightAt(conn, userID, realm)
 	if err != nil {
 		return false, false, err
 	}
@@ -281,7 +293,7 @@ func cultivationInsightAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if c.RealmIndex+1 >= int64(len(catalog.Realms)) {
 		return authoritativeMutation{}, errors.New("there is no realm beyond this one to gain insight into")
 	}
-	banked, _, err := bankedInsight(conn, userID)
+	banked, err := bankedInsightAt(conn, userID, c.RealmIndex)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -436,7 +448,7 @@ func cultivationStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if err != nil {
 		return nil, err
 	}
-	banked, _, err := bankedInsight(conn, userID)
+	banked, err := bankedInsightAt(conn, userID, c.RealmIndex)
 	if err != nil {
 		return nil, err
 	}

@@ -536,7 +536,7 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 		case "character.create":
 			mutation, err = createCharacterAuthoritative(conn, worldPath, req.ActorID, req.Payload)
 		case "character.reset":
-			mutation, err = characterResetAction(conn, req.ActorID, req.Payload)
+			mutation, err = characterResetAction(conn, catalog, req.ActorID, req.Payload)
 		case "family.household.enter":
 			mutation, err = familyHouseholdEnterAction(conn, catalog, req.ActorID, req.Payload)
 		case "family.household.leave":

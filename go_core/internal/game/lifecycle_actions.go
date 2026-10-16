@@ -921,6 +921,12 @@ func clearIncarnationStateTx(conn *storage.Conn, userID int64) error {
 	if _, err := severNPCMasterTx(conn, userID); err != nil {
 		return err
 	}
+	// And the shelf of player-keyed world_state rows (v1.34.0): the insight
+	// the last body banked, the stance it held, the clock its lifespan counted
+	// from. None is a user_id column, so none of the lists above could name it.
+	if _, err := clearPlayerWorldStateTx(conn, userID); err != nil {
+		return err
+	}
 	return nil
 }
 

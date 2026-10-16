@@ -42,8 +42,10 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 // erasedUserSentinel replaces a Discord id on an anonymised column that cannot
@@ -90,6 +92,11 @@ var erasureAnonymise = map[string]string{
 	"stall_sales.buyer_user_id": "the seller's own ledger (v1.5.0) - the sale happened and the " +
 		"seller was paid for it; only who bought is personal, so that is the part that goes, and the " +
 		"row goes with the seller when the seller is erased",
+	"auctions.current_bidder_user_id": "another seller's lot - the lot is the seller's, and the " +
+		"schema's own ON DELETE says what becomes of the high bid when its bidder goes: the link " +
+		"clears. It was classified a delete, which took the whole lot, and the item its seller had " +
+		"put in escrow, with it. The bid itself is refunded first (resolveLeavingEscrowTx), so only " +
+		"the link is left to clear",
 	"npc_graves.claimed_by_user_id": "world canon - somebody was lost, died out there and was " +
 		"eventually found, and the grave goes on saying so. Only which cultivator reached it first " +
 		"is personal, so that is the part that goes; the grave stays emptied, because it was - " +
@@ -239,6 +246,17 @@ func applyErasureTargets(conn *storage.Conn, userID int64, targets []erasureTarg
 			sweep.RowsAnonymised += affected
 		}
 	}
+	// The world_state rows keyed on the person (v1.34.0) are in no column the
+	// schema walk above can see - the id is inside the key - so they are swept
+	// here, in the one function both levers share, and not in either lever.
+	shelf, err := clearPlayerWorldStateTx(conn, userID)
+	if err != nil {
+		return erasureSweep{}, fmt.Errorf("erasing world_state: %w", err)
+	}
+	if shelf > 0 {
+		sweep.Deleted["world_state.key"] = shelf
+		sweep.RowsDeleted += shelf
+	}
 	return sweep, nil
 }
 
@@ -251,7 +269,7 @@ type erasePlayerPayload struct {
 // touched. Idempotent by construction: a second run finds nothing and succeeds,
 // which matters because the operator answering a request has no way to know
 // whether the first attempt got halfway.
-func adminErasePlayer(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
+func adminErasePlayer(conn *storage.Conn, catalog worlddata.Catalog, adminUserID int64, raw json.RawMessage) (any, error) {
 	var p erasePlayerPayload
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return nil, err
@@ -300,6 +318,14 @@ func adminErasePlayer(conn *storage.Conn, adminUserID int64, raw json.RawMessage
 		if _, err := playerFamilyDepartTx(conn, p.UserID); err != nil {
 			return nil, err
 		}
+	}
+	// What the person had in escrow comes back before the sweep takes the rows
+	// it would come back from: the lots they were selling are closed and their
+	// high bidder refunded, a lot they were winning loses only the bid, and a
+	// caravan still on the road is lost with its owner. The resolver a death
+	// runs, and a reset.
+	if _, err := resolveLeavingEscrowTx(conn, catalog, p.UserID, float64(time.Now().UnixNano())/1e9); err != nil {
+		return nil, err
 	}
 	sweep, err := applyErasureTargets(conn, p.UserID, targets, nil)
 	if err != nil {
