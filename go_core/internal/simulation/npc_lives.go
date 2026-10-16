@@ -205,17 +205,37 @@ func (r *Runner) freeChildName(conn *storage.Conn, parent string) (string, error
 		if _, taken := r.World.NPCs[candidate]; taken {
 			continue
 		}
-		res, err := conn.Execute(`SELECT 1 FROM npc_descendants WHERE child_name=?
-            UNION ALL SELECT 1 FROM npc_civilization_state WHERE npc_name=? LIMIT 1`,
-			[]any{candidate, candidate})
+		taken, err := childNameTaken(conn, candidate)
 		if err != nil {
 			return "", err
 		}
-		if len(res.Rows) == 0 {
+		if !taken {
 			return candidate, nil
 		}
 	}
 	return "", nil
+}
+
+// childNameTaken is the one question both child-name walks ask: does anybody
+// already carry this name. The registry is part of the answer - a catalogue,
+// birth-family or sect-hall person is a row there before they are one anywhere
+// else - and `freeSectMemberName` has always asked it. These two did not, so a
+// newborn who drew a registry-held name was accepted, grew up, and was marked
+// `generated_as_npc` at maturation without ever becoming a person, because
+// `RegisterNPCTx` refused the name (v1.34.0).
+func childNameTaken(conn *storage.Conn, candidate string) (bool, error) {
+	query := `SELECT 1 FROM npc_descendants WHERE child_name=?
+        UNION ALL SELECT 1 FROM npc_civilization_state WHERE npc_name=?`
+	args := []any{candidate, candidate}
+	if simTableExists(conn, "npc_registry") {
+		query += ` UNION ALL SELECT 1 FROM npc_registry WHERE name=?`
+		args = append(args, candidate)
+	}
+	res, err := conn.Execute(query+` LIMIT 1`, args)
+	if err != nil {
+		return false, err
+	}
+	return len(res.Rows) > 0, nil
 }
 
 // npcCareers spends career_progress, which climbed to its ceiling and was read
@@ -317,7 +337,7 @@ func (r *Runner) npcBreakthroughs(conn *storage.Conn, gm int64) (int64, error) {
 	if reach <= 0 {
 		reach = defaultNPCCrossingRealmReach
 	}
-	res, err := conn.Execute(`SELECT c.npc_name,c.realm_index,c.wealth,c.current_location,c.ambition,l.health,c.profession
+	res, err := conn.Execute(`SELECT c.npc_name,c.realm_index,c.wealth,c.current_location,c.ambition,l.health,c.profession,c.world_name
         FROM npc_civilization_state c JOIN npc_life_state l ON l.npc_name=c.npc_name
         WHERE c.status='alive' AND c.phase>=? AND c.wealth>=? AND l.health>=60
         ORDER BY c.ambition DESC,c.npc_name LIMIT 60`, []any{breakthroughAt, breakthroughCost})
@@ -348,7 +368,7 @@ func (r *Runner) npcBreakthroughs(conn *storage.Conn, gm int64) (int64, error) {
 		// of the world cannot climb at all and the rest stop somewhere; wealth
 		// and health were the only two questions asked before, and both are
 		// things a porter can have.
-		if ceiling := r.npcTalentCeiling(name, fmt.Sprint(row[6])); realm >= ceiling {
+		if ceiling := r.npcTalentCeiling(name, fmt.Sprint(row[6]), fmt.Sprint(row[7])); realm >= ceiling {
 			if _, err := conn.Execute(
 				`UPDATE npc_civilization_state SET activity='Has gone as far as their talent allows',last_game_minute=?,updated_at=? WHERE npc_name=? AND activity<>'Has gone as far as their talent allows'`,
 				[]any{gm, now, name}); err != nil {
@@ -400,12 +420,12 @@ func (r *Runner) npcDiscipleBonds(conn *storage.Conn, gm int64) (int64, error) {
 	// End bonds whose master or disciple has died.
 	now := nowFloat()
 	if _, err := conn.Execute(`UPDATE npc_disciple_bonds SET status='ended',ended_game_minute=?,reason='the master is dead',updated_at=?
-        WHERE status='active' AND master_name IN (SELECT npc_name FROM npc_civilization_state WHERE status<>'alive')`,
+        WHERE status='active' AND master_name IN (SELECT npc_name FROM npc_civilization_state WHERE status='dead')`,
 		[]any{gm, now}); err != nil {
 		return 0, err
 	}
 	if _, err := conn.Execute(`UPDATE npc_disciple_bonds SET status='ended',ended_game_minute=?,reason='the disciple is dead',updated_at=?
-        WHERE status='active' AND disciple_name IN (SELECT npc_name FROM npc_civilization_state WHERE status<>'alive')`,
+        WHERE status='active' AND disciple_name IN (SELECT npc_name FROM npc_civilization_state WHERE status='dead')`,
 		[]any{gm, now}); err != nil {
 		return 0, err
 	}

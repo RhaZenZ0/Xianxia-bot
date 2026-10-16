@@ -83,9 +83,22 @@ func bootstrapElderAge(realmIndex, phase, natural int64, seed uint64) (int64, in
 // only anyone standing on the same tile - because the catalogue puts each NPC
 // at their work rather than at their home, and a married couple in a city are
 // two people at two different addresses in it.
+//
+// A world's past is written once. Bootstrap runs after every character
+// creation, reincarnation and start, and this read "the singles" each time, so
+// every call married a fresh share of whoever was still single and planted
+// children for them: over four calls a world's married people went from 188 to
+// 230 and its children from 111 to 133, retroactive births that skipped the
+// courtship, the mourning and the wedding cap. `householdsSeededKey` in
+// `world_state` is the marker, written in the same transaction as the seeding
+// (v1.34.0).
 func (r *Runner) seedHouseholds(conn *storage.Conn, gameMinute int64, out *BootstrapResult) error {
 	if !simTableExists(conn, "npc_life_state") || !simTableExists(conn, "npc_social_relations") {
 		return nil
+	}
+	seeded, err := r.householdsAlreadySeeded(conn)
+	if err != nil || seeded {
+		return err
 	}
 	now := nowFloat()
 	res, err := conn.Execute(`SELECT c.npc_name,c.current_location,c.world_name,c.realm_index,
@@ -140,7 +153,57 @@ func (r *Runner) seedHouseholds(conn *storage.Conn, gameMinute int64, out *Boots
 		}
 		out.NPCChildrenSeeded += born
 	}
+	// Marked only when there was a roster to read: a bootstrap that found no
+	// one yet has seeded nothing, and must not close the door on the call that
+	// does.
+	if len(res.Rows) > 0 {
+		return markHouseholdsSeeded(conn, gameMinute, now)
+	}
 	return nil
+}
+
+// householdsSeededKey is the `world_state` row that says a world's households
+// have been seeded.
+const householdsSeededKey = "households_seeded"
+
+// householdsAlreadySeeded answers whether this world has had its past written.
+// A world that predates the marker has had it written, perhaps several times,
+// so one that already holds a marriage or a child is marked here and left
+// alone rather than seeded once more on the first bootstrap after the upgrade.
+func (r *Runner) householdsAlreadySeeded(conn *storage.Conn) (bool, error) {
+	if !simTableExists(conn, "world_state") {
+		return false, nil
+	}
+	res, err := conn.Execute(`SELECT 1 FROM world_state WHERE key=?`, []any{householdsSeededKey})
+	if err != nil {
+		return false, err
+	}
+	if len(res.Rows) > 0 {
+		return true, nil
+	}
+	spoken, err := conn.Execute(`SELECT 1 FROM npc_life_state WHERE spouse_name<>'' LIMIT 1`, nil)
+	if err != nil {
+		return false, err
+	}
+	if len(spoken.Rows) == 0 && simTableExists(conn, "npc_descendants") {
+		if spoken, err = conn.Execute(`SELECT 1 FROM npc_descendants LIMIT 1`, nil); err != nil {
+			return false, err
+		}
+	}
+	if len(spoken.Rows) == 0 {
+		return false, nil
+	}
+	return true, markHouseholdsSeeded(conn, 0, nowFloat())
+}
+
+func markHouseholdsSeeded(conn *storage.Conn, gameMinute int64, now float64) error {
+	if !simTableExists(conn, "world_state") {
+		return nil
+	}
+	_, err := conn.Execute(`INSERT INTO world_state(key,value_json,updated_at) VALUES(?,?,?)
+        ON CONFLICT(key) DO NOTHING`,
+		[]any{householdsSeededKey, fmt.Sprintf(`{"game_minute":%d}`, gameMinute), now})
+	return err
 }
 
 // seedPartnerFor is the same compatibility the courtship uses, without the
@@ -248,13 +311,11 @@ func (r *Runner) seededChildName(conn *storage.Conn, parent string, nth int64) (
 		if _, taken := r.World.NPCs[candidate]; taken {
 			continue
 		}
-		res, err := conn.Execute(`SELECT 1 FROM npc_descendants WHERE child_name=?
-            UNION ALL SELECT 1 FROM npc_civilization_state WHERE npc_name=? LIMIT 1`,
-			[]any{candidate, candidate})
+		taken, err := childNameTaken(conn, candidate)
 		if err != nil {
 			return "", err
 		}
-		if len(res.Rows) == 0 {
+		if !taken {
 			return candidate, nil
 		}
 	}

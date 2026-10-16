@@ -1438,6 +1438,16 @@ func TestAdminSetMissingLosesAnNPCTheWayTheBatchDoes(t *testing.T) {
 	if got := storage.ParseInt(scalar(t, path, "SELECT significance FROM world_history_events WHERE event_type='npc_missing' AND visibility='public' AND location='Greenriver Town'")); got != NPCMissingSignificance {
 		t.Fatalf("history significance=%d, want %d", got, NPCMissingSignificance)
 	}
+	// The public row says where they were last seen, never where they are: the
+	// summary reaches the narrator's RAG and the Forge's quest story, and the
+	// death notice has always been held to this (v1.34.0).
+	summary := fmt.Sprint(scalar(t, path, "SELECT summary FROM world_history_events WHERE event_type='npc_missing'"))
+	if !strings.Contains(summary, "Greenriver Town") {
+		t.Fatalf("the disappearance does not name the home that was waiting: %q", summary)
+	}
+	if strings.Contains(summary, "Moonfen Marsh") {
+		t.Fatalf("the disappearance gives away where they are: %q", summary)
+	}
 	if got := auditCount(t, path); got != before+1 {
 		t.Fatalf("audit count=%d, want %d", got, before+1)
 	}
