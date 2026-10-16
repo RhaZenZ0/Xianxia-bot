@@ -24,6 +24,24 @@ async def auction_currency_autocomplete(interaction:discord.Interaction,current:
     return out[:25]
 
 
+async def auction_house_currency_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[str]]:
+    """The coin of the floor the seller stands on, and no other (v1.34.0).
+
+    `/auction sell` lists in the money of the house's own world and the engine
+    refuses any other, so a picker that offered the sixteen currencies offered
+    fifteen the sale would be refused with. Outside a house there is nothing to
+    pick: the command says so itself. `auction_currency_autocomplete` stays for
+    the GM's grant, which does take any coin."""
+    c=await DB.get_character(interaction.user.id)
+    found=WORLD.auction_house_at(str((c or {}).get("location","")))
+    if not found: return []
+    cid=str(found[1].get("default_currency") or "")
+    name=str(WORLD.currencies.get(cid,{}).get("name",cid))
+    needle=current.casefold().strip()
+    if not cid or (needle and needle not in name.casefold() and needle not in cid.casefold()): return []
+    return [app_commands.Choice(name=name[:100],value=cid[:100])]
+
+
 async def _market_item_matches(current:str)->list[app_commands.Choice[str]]:
     # Which items an ordinary market may stock is the engine's rule
     # (market.catalog, v0.30.0); WORLD supplies only the display names.
