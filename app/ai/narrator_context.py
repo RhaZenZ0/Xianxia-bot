@@ -8,7 +8,7 @@ from ..rules.advanced_runtime import describe_era
 from ..rules.birthfamily import family_tier_name, karma_label
 from ..rules.realm_hubs import realm_hub_by_location
 from ..rules.worldtime import from_game_minutes
-from ..rules.npc_memory import format_memories, public_mood_hint
+from ..rules.npc_memory import format_memories, is_hidden_master, public_aim, public_mood_hint
 from .rag import MemoryRAGRetriever, RetrievalProfile, resolve_retrieval_profile
 
 
@@ -503,7 +503,7 @@ class NarratorContextBuilder:
                     if mood:
                         continuity.append("mood " + _clip(mood, 70))
                     goal = mind.get("current_goal") or public.get("want")
-                    if goal and not public.get("hidden_master"):
+                    if goal and not is_hidden_master(public):
                         continuity.append("goal " + _clip(goal, 150))
                     memories = format_memories(note.get("memories") or [], limit=2).replace("\n", " ")
                     if memories and "No established" not in memories:
@@ -808,10 +808,7 @@ class NarratorContextBuilder:
                 # Hidden masters keep their private objective opaque in free-form
                 # scene context.  Their public personality and actual prior player
                 # exchanges are still useful for continuity.
-                if public.get("hidden_master"):
-                    goal = "Continue their established private affairs without exposing concealed identity or power."
-                else:
-                    goal = _clip(mind.get("current_goal") or public.get("want") or "Continue established affairs.", 180)
+                goal = _clip(public_aim(public, mind.get("current_goal") or public.get("want"), "Continue established affairs."), 180)
                 memory_text = format_memories(note.get("memories") or [], limit=2).replace("\n", " ")
                 life = dict(note.get("life") or {})
                 life_text = (

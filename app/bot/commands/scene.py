@@ -521,6 +521,17 @@ async def _resolve_scene_action(
     await interaction.followup.send(view=card_view(embed), ephemeral=False)
 
 
+@serialized_user_action
+async def _submit_scene_action(interaction: discord.Interaction, **kwargs: Any) -> None:
+    """The panel's modal is the door that resolves a guided action (v1.34.0).
+
+    It is metered and serialized like the slash commands it sits beside. The
+    meter is spent here and not inside `_resolve_scene_action`, because typed
+    play reaches that function already holding the token its picker spent.
+    """
+    await _resolve_scene_action(interaction, **kwargs)
+
+
 class SceneActionDetailModal(discord.ui.Modal):
     def __init__(self, *, action_key: str, target: str):
         profile = SCENE_ACTION_TYPES[action_key]
@@ -537,7 +548,7 @@ class SceneActionDetailModal(discord.ui.Modal):
         self.add_item(self.detail)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
-        await _resolve_scene_action(
+        await _submit_scene_action(
             interaction,
             action_key=self.action_key,
             target=self.target,

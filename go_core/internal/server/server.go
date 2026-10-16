@@ -269,11 +269,24 @@ func (s *Server) simulationRunDue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	runs, err := s.simulation.RunDue(input)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "simulation_failed", "message": err.Error()})
-		return
+	status, body := runDueAnswer(runs, err)
+	writeJSON(w, status, body)
+}
+
+// runDueAnswer is what the tick's caller is told. RunDue commits system by
+// system, so an error in a later system comes back beside the runs the earlier
+// ones already committed, and those runs carry the events the bot turns into
+// threads. Answering 400 threw them away and an active event had no scene until
+// it expired. A tick that committed something answers 200 with the runs and the
+// error; the 400 stays for a request or a tick that did nothing at all.
+func runDueAnswer(runs []simulation.Run, err error) (int, map[string]any) {
+	if err == nil {
+		return http.StatusOK, map[string]any{"runs": runs}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"runs": runs})
+	if len(runs) > 0 {
+		return http.StatusOK, map[string]any{"runs": runs, "error": err.Error()}
+	}
+	return http.StatusBadRequest, map[string]any{"error": "simulation_failed", "message": err.Error()}
 }
 
 func (s *Server) simulationForce(w http.ResponseWriter, r *http.Request) {

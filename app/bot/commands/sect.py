@@ -735,20 +735,34 @@ def _npc_choice(row: dict[str, Any], note: str = "") -> app_commands.Choice[str]
     return app_commands.Choice(name=(label + (f" · {note}" if note else ""))[:100], value=str(row["name"])[:100])
 
 
-async def sect_npc_master_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
-    c = await DB.get_character(interaction.user.id)
-    if not c:
-        return []
-    _membership, people = await _sect_people_here(interaction.user.id, c)
-    rule = WORLD.npc_master_rule()
-    power = int(c.get("realm_index") or 0) * 10 + int(c.get("phase") or 0)
-    needle = current.casefold().strip()
+def _masters_who_would_hear(people: list[dict[str, Any]], rule: dict[str, Any], power: int) -> list[dict[str, Any]]:
+    """The sect's people `discipleship.npc_request` would hear from someone of
+    this power: the engine's bars, in its order (rank, standing above the
+    asker, then a master who still has room). A roster row with no `disciples`
+    count is offered - the engine refuses a full one with its own words, and an
+    unreadable count is not a zero that excuses nobody."""
     out = []
     for row in people:
         if WORLD.sect_rank_level(str(row.get("sect_rank") or "")) < rule["min_rank_level"]:
             continue
         if int(row.get("realm_index") or 0) * 10 + int(row.get("phase") or 0) <= power:
             continue
+        kept = row.get("disciples")
+        if rule["max_disciples"] > 0 and kept is not None and int(kept) >= rule["max_disciples"]:
+            continue
+        out.append(row)
+    return out
+
+
+async def sect_npc_master_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    c = await DB.get_character(interaction.user.id)
+    if not c:
+        return []
+    _membership, people = await _sect_people_here(interaction.user.id, c)
+    power = int(c.get("realm_index") or 0) * 10 + int(c.get("phase") or 0)
+    needle = current.casefold().strip()
+    out = []
+    for row in _masters_who_would_hear(people, WORLD.npc_master_rule(), power):
         if needle and needle not in str(row["name"]).casefold():
             continue
         out.append(_npc_choice(row))

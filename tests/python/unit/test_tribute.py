@@ -259,5 +259,81 @@ class TheWeekendAnnouncesItselfOnce(unittest.TestCase):
         self.assertIn("return", worker.split("Could not announce the weekend gift")[1][:200])
 
 
+class TheButtonSaysClaimedOnlyWhenTheEngineHasPaid(unittest.IsolatedAsyncioTestCase):
+    """The card used to read Claimed before the engine answered (v1.34.0).
+
+    `claim` disabled the button, relabelled it and stopped the view, then called
+    the engine; a refusal (the cooldown another press had spent, a closed world)
+    left a spent card over a gift nobody was paid, with no button to try again.
+    """
+
+    def _interaction(self):
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock
+
+        return SimpleNamespace(
+            id=7, user=SimpleNamespace(id=42, display_name="Li Wei"),
+            response=SimpleNamespace(defer=AsyncMock(), send_message=AsyncMock(), edit_message=AsyncMock()),
+            followup=SimpleNamespace(send=AsyncMock()),
+            edit_original_response=AsyncMock(),
+        )
+
+    def _support(self):
+        with patch.dict(os.environ, ENV):
+            return importlib.import_module("app.bot.commands.support")
+
+    async def _press(self, engine_result):
+        from unittest.mock import AsyncMock
+
+        support = self._support()
+        view = support.TributeClaimView(owner_id=42)
+        interaction = self._interaction()
+        ENGINE = AsyncMock()
+        if isinstance(engine_result, Exception):
+            ENGINE.authoritative_action.side_effect = engine_result
+        else:
+            ENGINE.authoritative_action.return_value = engine_result
+        with patch.object(support, "ENGINE", ENGINE), patch.object(support, "budget_refusal_line", lambda *_: None):
+            await view.claim.callback(interaction)
+        return support, view, interaction
+
+    async def test_a_refused_claim_leaves_the_button_pressable(self):
+        support = self._support()
+        view_error = support.GameEngineError("You have already taken this tribute.")
+        _, view, interaction = await self._press(view_error)
+        self.assertFalse(view.claim.disabled, "the tribute button disabled itself before the engine answered")
+        self.assertNotEqual(view.claim.label, "Claimed")
+        self.assertFalse(view.is_finished(), "the view stopped before the engine paid it")
+        interaction.edit_original_response.assert_not_called()
+        interaction.followup.send.assert_awaited_once()
+        self.assertIn("already taken", interaction.followup.send.await_args.args[0])
+
+    async def test_a_paid_claim_spends_the_button_after_the_answer(self):
+        _, view, interaction = await self._press(
+            {"result": {"amount": 20, "currency": "low_spirit_stone", "balance": 20}})
+        self.assertTrue(view.claim.disabled)
+        self.assertEqual(view.claim.label, "Claimed")
+        self.assertTrue(view.is_finished())
+        interaction.edit_original_response.assert_awaited_once()
+        self.assertIn("20", interaction.followup.send.await_args.args[0])
+
+    async def test_a_refusal_can_be_followed_by_a_paid_press(self):
+        from unittest.mock import AsyncMock
+
+        support = self._support()
+        view = support.TributeClaimView(owner_id=42)
+        engine = AsyncMock()
+        engine.authoritative_action.side_effect = [
+            support.GameEngineError("not yet"),
+            {"result": {"amount": 20, "currency": "low_spirit_stone", "balance": 20}},
+        ]
+        with patch.object(support, "ENGINE", engine), patch.object(support, "budget_refusal_line", lambda *_: None):
+            await view.claim.callback(self._interaction())
+            paid = self._interaction()
+            await view.claim.callback(paid)
+        self.assertEqual(engine.authoritative_action.await_count, 2, "a refusal locked the button against the retry")
+        self.assertTrue(view.claim.disabled)
+
+
 if __name__ == "__main__":
     unittest.main()
