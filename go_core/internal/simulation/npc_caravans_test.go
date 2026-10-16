@@ -46,13 +46,17 @@ CREATE TABLE npc_civilization_state(
 -- Production shapes (app/database/core.py). currency_wallets deliberately has
 -- no updated_at: a fixture that invents one is how a broken INSERT passes its
 -- own test, which is the fault v1.0.0-rc.15 shipped and then had to hunt down.
-CREATE TABLE currency_wallets(
-    user_id INTEGER NOT NULL, currency_id TEXT NOT NULL, balance INTEGER NOT NULL DEFAULT 0,
-    PRIMARY KEY(user_id,currency_id));
+-- And it carries the foreign key production carries (v1.34.0): the fixture
+-- accepted a payout to a user with no character for as long as it had none,
+-- while production refuses it and the refusal ends the bundle's transaction.
 CREATE TABLE characters(
     location TEXT NOT NULL DEFAULT '',
     user_id INTEGER PRIMARY KEY, spirit_stones INTEGER NOT NULL DEFAULT 0,
     updated_at REAL NOT NULL DEFAULT 0);
+CREATE TABLE currency_wallets(
+    user_id INTEGER NOT NULL, currency_id TEXT NOT NULL, balance INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY(user_id,currency_id),
+    FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE);
 CREATE TABLE world_eras(
     era_id INTEGER PRIMARY KEY AUTOINCREMENT, world TEXT NOT NULL DEFAULT 'Mortal World', name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
     modifiers_json TEXT NOT NULL DEFAULT '{}', active INTEGER NOT NULL DEFAULT 1,
@@ -154,6 +158,7 @@ func TestAnArrivedNPCCaravanPaysTheMerchantThatSentIt(t *testing.T) {
 func TestAPlayersCaravanStillPaysIntoTheirWallet(t *testing.T) {
 	path := setupSimulationDB(t, npcCaravanSchema)
 	r := caravanRunner()
+	seedCaravanOwner(t, path, 42)
 	arrivedCaravan(t, path, "player", "42", 200)
 	if n := runCaravans(t, path, r, 10); n != 1 {
 		t.Fatalf("resolved %d caravans, want 1", n)
@@ -161,6 +166,66 @@ func TestAPlayersCaravanStillPaysIntoTheirWallet(t *testing.T) {
 	final := storage.ParseInt(simScalar(t, path, `SELECT payout_final FROM caravan_operations WHERE caravan_id=1`))
 	if got := storage.ParseInt(simScalar(t, path, `SELECT balance FROM currency_wallets WHERE user_id=42 AND currency_id='low_spirit_stone'`)); got != final {
 		t.Fatalf("wallet=%d, want the payout %d", got, final)
+	}
+}
+
+// seedCaravanOwner is the character a player's caravan pays: the wallet row is
+// foreign-keyed to it.
+func seedCaravanOwner(t *testing.T, path string, userID int64) {
+	t.Helper()
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if _, err := conn.Execute(`INSERT INTO characters(user_id) VALUES(?)`, []any{userID}); err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Commit(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// An owner who has been erased, or reset and not begun again, has no character,
+// and the wallet row a payout writes is foreign-keyed to one. That refusal used
+// to come back out of advanceCaravans, and the advanced-maintenance bundle
+// rolled back on it every tick - auctions, merchants, eras and seclusions with
+// it - for as long as the row stayed `traveling`, which after an erasure is
+// forever (v1.34.0). A batch never fails the tick over one row's data.
+func TestACaravanWhoseOwnerIsGoneIsLostNotFatal(t *testing.T) {
+	path := setupSimulationDB(t, npcCaravanSchema)
+	r := caravanRunner()
+	arrivedCaravan(t, path, "player", "4242", 200) // no character 4242
+	arrivedCaravan(t, path, "npc", "old_hu_the_peddler", 200)
+	seedMerchantPurse(t, path, "old_hu_the_peddler", 400, "Old Hu the Peddler", 20)
+
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	n, err := r.advanceCaravans(conn, 10)
+	if err != nil {
+		t.Fatalf("one caravan with no owner ended the tick: %v", err)
+	}
+	if err := conn.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Fatalf("resolved %d caravans, want both", n)
+	}
+	if got := simText(t, path, `SELECT status FROM caravans WHERE caravan_id=1`); got != "lost" {
+		t.Fatalf("the orphaned caravan is %q, want lost", got)
+	}
+	if got := storage.ParseInt(simScalar(t, path, `SELECT COUNT(*) FROM currency_wallets`)); got != 0 {
+		t.Fatalf("%d wallet rows written for an owner who does not exist", got)
+	}
+	if got := storage.ParseInt(simScalar(t, path, `SELECT COUNT(*) FROM caravan_events WHERE caravan_id=1 AND event_type='lost'`)); got != 1 {
+		t.Fatalf("the road kept %d lost-events for the orphan, want 1", got)
+	}
+	// The row after it was still settled.
+	if got := simText(t, path, `SELECT status FROM caravans WHERE caravan_id=2`); got != "arrived" {
+		t.Fatalf("the NPC caravan behind the orphan is %q, want arrived", got)
 	}
 }
 

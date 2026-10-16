@@ -178,6 +178,35 @@ class BothLeversReadBeforeTheyWipe(unittest.TestCase):
                 )
 
 
+class BothLeversTakeTheirLotCardsDown(unittest.TestCase):
+    """The auction floor holds a card per lot, and a card keeps "Seller: <name>"
+    until something takes it down (v1.34.0). Same ordering as the threads and
+    the stall card: the cards are read before the engine call, because the sweep
+    takes the rows that say which lots were theirs, and settled after it."""
+
+    def test_the_cards_are_read_before_the_engine_and_settled_after(self):
+        for operation, source, handler in LEVERS:
+            with self.subTest(operation=operation):
+                fn = _function(source, handler)
+                reads = _call_lines(fn, "player_lot_cards")
+                settles = _call_lines(fn, "settle_player_lot_cards")
+                self.assertTrue(reads, f"{handler} never reads the person's lot cards, so {operation} leaves them standing")
+                self.assertTrue(settles, f"{handler} reads the lot cards and never settles them")
+                engine = [
+                    node.lineno for node in ast.walk(fn)
+                    if isinstance(node, ast.Constant) and node.value == operation
+                ]
+                self.assertTrue(engine, f"{handler} no longer names {operation}")
+                self.assertLess(
+                    min(reads), min(engine),
+                    f"{handler} reads the lot cards after {operation} has deleted the rows that name them",
+                )
+                self.assertGreater(
+                    min(settles), min(engine),
+                    f"{handler} takes the lot cards down before {operation} has agreed to anything",
+                )
+
+
 class DeletingAThreadNeverCostsTheReset(unittest.TestCase):
     def test_the_helper_swallows_what_discord_does(self):
         """The character is gone either way: an exception here could only

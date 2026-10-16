@@ -33,12 +33,16 @@ def _feed():
 class FakeMessage:
     # Since v1.9.0 a card is a Components V2 view; the fake keeps the card the
     # view carries, which is what these tests read.
-    def __init__(self, message_id: int, embed):
+    def __init__(self, message_id: int, embed, channel=None):
         self.id = message_id
         self.embed = embed
+        self.channel = channel
 
     async def edit(self, *, view, content=None, embed=None):
         self.embed = view.card
+
+    async def delete(self):
+        self.channel.messages.pop(self.id, None)
 
 
 class FakeChannel:
@@ -47,7 +51,7 @@ class FakeChannel:
         self.messages: dict[int, FakeMessage] = {}
 
     async def send(self, *, view):
-        message = FakeMessage(1000 + len(self.messages), view.card)
+        message = FakeMessage(1000 + len(self.messages), view.card, self)
         self.messages[message.id] = message
         return message
 
@@ -135,6 +139,76 @@ class TheTickCardsWhatTheWorldListed(unittest.IsolatedAsyncioTestCase):
         closed = await self._sync(db)
         self.assertEqual(closed, 1)
         self.assertNotIn(7, db.cards)
+
+
+class ACardOutlivesNeitherItsLotNorItsSeller(unittest.IsolatedAsyncioTestCase):
+    """v1.34.0: the card of a lot whose row is gone came down as a record and
+    stayed up as a message - "Seller: <name>" on the public floor for good - and
+    an erasure or a reset never reached the cards of the lots its person sold."""
+
+    def setUp(self):
+        self.feed = _feed()
+        self.house = next(iter(sorted(self.feed.WORLD.auction_houses)))
+        self.channel = FakeChannel()
+
+    async def _run(self, db, call):
+        async def resolve(guild, channel_id):
+            return self.channel
+        with patch.object(self.feed, "DB", db), patch.object(self.feed, "_resolve_text_channel", resolve):
+            return await call()
+
+    async def _carded(self, lots, *, bound=True):
+        db = FakeDB(lots, {self.house} if bound else set())
+        await self._run(db, lambda: self.feed.sync_lots(FakeGuild()))
+        return db
+
+    async def test_a_lot_whose_row_is_gone_loses_its_message_too(self):
+        db = await self._carded([_lot(7, self.house, seller_user_id=88)])
+        message_id = db.cards[7]["message_id"]
+        self.assertIn(message_id, self.channel.messages)
+        db.lots.pop(7)
+        await self._run(db, lambda: self.feed.sync_lots(FakeGuild()))
+        self.assertNotIn(7, db.cards)
+        self.assertNotIn(
+            message_id, self.channel.messages,
+            "sync_lots forgot a vanished lot's message id and left the card standing on the floor, "
+            "still naming its seller",
+        )
+
+    async def test_the_cards_a_person_sold_or_led_are_read_by_role(self):
+        db = await self._carded([
+            _lot(1, self.house, seller_user_id=88),
+            _lot(2, self.house, seller_user_id=99, current_bidder_user_id=88, current_bid=20),
+            _lot(3, self.house, seller_user_id=99),
+        ])
+        records = await self._run(db, lambda: self.feed.player_lot_cards(FakeGuild(), 88))
+        self.assertEqual({int(r["auction_id"]): r["role"] for r in records}, {1: "seller", 2: "bidder"})
+
+    async def test_a_sellers_cards_come_down_and_a_bidders_card_is_brought_up_to_date(self):
+        db = await self._carded([
+            _lot(1, self.house, seller_user_id=88),
+            _lot(2, self.house, seller_user_id=99, current_bidder_user_id=88, current_bid=20),
+        ])
+        records = await self._run(db, lambda: self.feed.player_lot_cards(FakeGuild(), 88))
+        seller_card, bidder_card = db.cards[1]["message_id"], db.cards[2]["message_id"]
+        # What the engine did between the read and the settle: the seller's lot
+        # is deleted, the bidder's is left with no high bid.
+        db.lots.pop(1)
+        db.lots[2].update(current_bidder_user_id=None, current_bid=0)
+        await self._run(db, lambda: self.feed.settle_player_lot_cards(FakeGuild(), records))
+        self.assertNotIn(seller_card, self.channel.messages, "the erased seller's lot card is still on the floor")
+        self.assertNotIn(1, db.cards)
+        self.assertIn(bidder_card, self.channel.messages, "another seller's lot lost its card")
+        card = self.channel.messages[bidder_card].embed
+        high = next(value for name, value, _inline in card.fields if name == "High bidder")
+        self.assertEqual(high, "None", "the card still names the leaving high bidder")
+
+    async def test_a_floor_that_cannot_be_read_costs_the_cards_not_the_command(self):
+        class Broken(FakeDB):
+            async def list_auction_lot_messages(self, guild_id):
+                raise RuntimeError("engine down")
+        records = await self._run(Broken([], set()), lambda: self.feed.player_lot_cards(FakeGuild(), 88))
+        self.assertEqual(records, [])
 
 
 if __name__ == "__main__":

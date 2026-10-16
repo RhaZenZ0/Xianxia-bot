@@ -44,25 +44,12 @@ func resolveIncarnationEscrowTx(conn *storage.Conn, catalog worlddata.Catalog, u
 	// migration, or a narrow fixture. Dying must not fail because a feature's
 	// table is absent: a character who cannot die is a worse bug than one
 	// whose auction outlives them.
-	if tableExistsTx(conn, "auctions") {
-		cancelled, refunded, err := resolveDeadPlayersAuctionsTx(conn, catalog, userID, now)
-		if err != nil {
-			return nil, err
-		}
-		out["auctions_cancelled"] = cancelled
-		out["bids_refunded"] = refunded
+	left, err := resolveLeavingEscrowTx(conn, catalog, userID, now)
+	if err != nil {
+		return nil, err
 	}
-	if tableExistsTx(conn, "caravans") {
-		// 3. Caravans still on the road. Settlement pays owner_key, which is
-		//    this id; there is nobody left to pay, so the venture is lost with
-		//    its owner. `lost` is terminal - the sweep only settles `traveling`.
-		lost, err := conn.Execute(
-			`UPDATE caravans SET status='lost',updated_at=? WHERE owner_type='player' AND owner_key=? AND status='traveling'`,
-			[]any{now, fmt.Sprint(userID)})
-		if err != nil {
-			return nil, err
-		}
-		out["caravans_lost"] = lost.RowsAffected
+	for key, value := range left {
+		out[key] = value
 	}
 	if tableExistsTx(conn, "seclusion_sessions") {
 		// 4. Seclusion (review finding #4). A session is keyed by user_id with
@@ -82,6 +69,55 @@ func resolveIncarnationEscrowTx(conn *storage.Conn, catalog worlddata.Catalog, u
 		out["seclusions_ended"] = ended.RowsAffected
 	}
 	return out, nil
+}
+
+// resolveLeavingEscrowTx is the part of the escrow every way out of a body
+// shares: the auction house and the caravans on the road. A death reaches it
+// through resolveIncarnationEscrowTx, and so do `character.reset` and
+// `admin.player.erase`, which end a person's rows just as surely and used to
+// settle neither - a reset swept the lots a bidder was winning out from under
+// their sellers, and an erased owner's caravan stayed on the road for the tick
+// to pay into a wallet that no longer existed. One function, three callers.
+//
+// It runs before the sweep, never after: the sweep deletes the seller's lots
+// with their bids, and by then the high bidder's escrow has nothing to come
+// back from.
+func resolveLeavingEscrowTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, now float64) (map[string]any, error) {
+	out := map[string]any{
+		"auctions_cancelled": int64(0),
+		"bids_refunded":      int64(0),
+		"caravans_lost":      int64(0),
+	}
+	if tableExistsTx(conn, "auctions") {
+		cancelled, refunded, err := resolveDeadPlayersAuctionsTx(conn, catalog, userID, now)
+		if err != nil {
+			return nil, err
+		}
+		out["auctions_cancelled"] = cancelled
+		out["bids_refunded"] = refunded
+	}
+	if tableExistsTx(conn, "caravans") {
+		lost, err := markPlayersCaravansLostTx(conn, userID, now)
+		if err != nil {
+			return nil, err
+		}
+		out["caravans_lost"] = lost
+	}
+	return out, nil
+}
+
+// markPlayersCaravansLostTx ends the ventures a player still has on the road.
+// Settlement pays owner_key, which is this id; there is nobody left to pay, so
+// the venture is lost with its owner. `lost` is terminal - the sweep only
+// settles `traveling`.
+func markPlayersCaravansLostTx(conn *storage.Conn, userID int64, now float64) (int64, error) {
+	lost, err := conn.Execute(
+		`UPDATE caravans SET status='lost',updated_at=? WHERE owner_type='player' AND owner_key=? AND status='traveling'`,
+		[]any{now, fmt.Sprint(userID)})
+	if err != nil {
+		return 0, err
+	}
+	return lost.RowsAffected, nil
 }
 
 // resolveDeadPlayersAuctionsTx handles both sides of the auction house.

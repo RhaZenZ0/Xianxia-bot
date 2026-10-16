@@ -29,10 +29,11 @@ from ..hubs import HubDynamicOption, panel_timeout, register_hub_option_provider
 from ..pickers import auction_currency_autocomplete
 from .. import maintenance
 from ..registry import registered_group_command
-from ..runtime import DB, ENGINE, SETTINGS, WORLD, _explain_engine_error, _revoke_cultivator_role, current_world_time, log, reply_long
+from ..runtime import DB, ENGINE, SETTINGS, WORLD, _explain_engine_error, _revoke_cultivator_role, _revoke_realm_roles, current_world_time, log, reply_long
 from ..services import QUEST_FORGE, QUESTS, SIM
 from ...ai.quest_forge import store_draft
 from ...rules.quests import validate_quest_definition
+from ..auction_feed import player_lot_cards, settle_player_lot_cards
 from ..stall_feed import card_record as stall_card_record, take_down_card
 from ..threads import delete_player_threads, ensure_sect_abode_record, ensure_sect_abode_thread_for
 from ..bot import bot
@@ -932,6 +933,10 @@ async def admin_erase(
     # And their stall's card in the world's market channel (v1.7.0), by the
     # same ordering: the sweep takes the row that names the message.
     stall_card = await stall_card_record(interaction.guild, member.id)
+    # And their lots' cards on the auction floor (v1.34.0), same ordering: a
+    # card keeps "Seller: <name>" for as long as nothing takes it down, and the
+    # sweep takes the rows that would say which card was theirs.
+    lot_cards = await player_lot_cards(interaction.guild, member.id)
     try:
         result = dict(
             await ENGINE.action(
@@ -946,11 +951,16 @@ async def admin_erase(
         return
     threads = await delete_player_threads(interaction.guild, doomed_threads)
     await take_down_card(interaction.guild, stall_card)
+    await settle_player_lot_cards(interaction.guild, lot_cards)
     # And the role that said they had played (v1.0.11). This is the only place
     # it can come off: `_sync_cultivator_role` rides `require_character`, which
-    # never fires again for an account with no character.
+    # never fires again for an account with no character. The realm roles come
+    # off beside it (v1.34.0) - the access roles the character's realm unlocked
+    # and the presence role of the capital they stood in are generated for them
+    # by `require_character` too, and an erased account keeps every one of them.
     try:
         await _revoke_cultivator_role(interaction.guild, member.id)
+        await _revoke_realm_roles(interaction.guild, member.id)
     except Exception:
         log.exception("Could not revoke the cultivator role from user %s after an erasure", member.id)
     deleted = int(result.get("rows_deleted") or 0)
