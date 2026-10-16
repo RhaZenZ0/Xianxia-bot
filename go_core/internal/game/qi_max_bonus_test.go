@@ -127,3 +127,20 @@ func TestTheQiBonusDegradesWhereTheColumnIsNotThereYet(t *testing.T) {
 		t.Fatalf("capacity=%d without the column, want the body's own %d", capacity, base)
 	}
 }
+
+// The bonus is the old body's: a rebirth sets `qi_max` back to a new life's pool
+// and the next settle would add the old life's bonus on top of it.
+func TestARebirthLeavesTheQiBonusBehind(t *testing.T) {
+	path := setupIncarnationDB(t, true)
+	batch4Exec(t, path, qiMaxBonusColumnDDL)
+	batch4Exec(t, path, "UPDATE characters SET qi_max_bonus=60 WHERE user_id IN (42,43)")
+	if err := wipeFor(t, path, 42); err != nil {
+		t.Fatal(err)
+	}
+	if got := storage.ParseInt(actionScalar(t, path, "SELECT qi_max_bonus FROM characters WHERE user_id=42")); got != 0 {
+		t.Fatalf("qi_max_bonus=%d after a rebirth; the old life's qi rides into the new body", got)
+	}
+	if got := storage.ParseInt(actionScalar(t, path, "SELECT qi_max_bonus FROM characters WHERE user_id=43")); got != 60 {
+		t.Fatalf("somebody else holds qi_max_bonus=%d after the wipe, want 60: it is scoped to one soul", got)
+	}
+}
