@@ -118,6 +118,8 @@ func TestTheMostRecentLifeWithTheBestHandsIsNamed(t *testing.T) {
 
 func TestTheRecordCarriesOnlyTradesPractisedPastNovice(t *testing.T) {
 	path := craftEchoDB(t)
+	// 9 is another cultivator, a character like any other: the table keys on one.
+	batch4Exec(t, path, `INSERT INTO characters(user_id,name,path,spiritual_root,location,attributes_json) VALUES(9,'Other Hand','Rogue Cultivator','Single','Greenriver Town','{}')`)
 	batch4Exec(t, path, `INSERT INTO profession_progress(user_id,profession,level,xp,updated_at) VALUES(42,'Forging',3,10,0),(42,'Alchemy',0,45,0),(42,'Foraging',1,0,0),(9,'Forging',6,0,0)`)
 	conn, err := storage.Open(path)
 	if err != nil {

@@ -440,7 +440,7 @@ OBJECTIVE_PATHS: dict[str, str] = {
     "gather": "**/forage**",
     "breakthrough": "**/breakthrough**",
     "flame_capture": "**/craft → Flames → Capture**",
-    "raid_win": "**/combat → Boss Raids → Start**",
+    "raid_win": "**/combat → Boss Raids → Claim**",
     "black_market": "**/economy → Black Market → Buy**",
     "perfection_start": "**/ascend → Perfection → Start**",
     "realm_enter": "**/realm → Secret Realms → Enter**",

@@ -11,7 +11,10 @@ func shippedCatalog(t *testing.T) worlddata.Catalog {
 	t.Helper()
 	catalog, err := worlddata.Load("../../../content/world.json")
 	if err != nil {
-		t.Skipf("shipped content not readable from here: %v", err)
+		// The content file is in the repository and always beside this package, so
+		// a read that fails means the gates below cannot do their job: a skip here
+		// would turn every one of them green and silent.
+		t.Fatalf("shipped content not readable from here: %v", err)
 	}
 	return catalog
 }
