@@ -8383,6 +8383,7 @@ class Database:
             # under the hammer, or take the illegal ones to the night market.
             "npc_consignments": True,
             "merchants": True,
+            "secret_realms": True,
             # v0.31.0: the GM scene flag - model narration for explore and
             # hunt by default, instead of the procedural pool plus a button.
             "ai_routine_narration": False,

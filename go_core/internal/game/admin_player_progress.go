@@ -266,13 +266,13 @@ func reverseSetProfession(before, after map[string]any, target string, redo bool
 	if redo {
 		return []sqlStmt{{`INSERT INTO profession_progress(user_id,profession,level,xp,updated_at) VALUES(?,?,?,?,?)
 		ON CONFLICT(user_id,profession) DO UPDATE SET level=excluded.level,xp=excluded.xp,updated_at=excluded.updated_at`,
-			[]any{uid, profession, i64(snap["level"]), i64(snap["xp"]), now}}}, nil
+			[]any{uid, profession, i64(snap["level"]), i64(snap["xp"]), now}, nil}}, nil
 	}
 	// A trade the character never had comes back to the empty row, and goes only
 	// if nothing has been practised on it: the successes an examination reads
 	// are play's, not the lever's.
 	stmts := []sqlStmt{{`UPDATE profession_progress SET level=?,xp=?,updated_at=? WHERE user_id=? AND profession=?`,
-		[]any{i64(snap["level"]), i64(snap["xp"]), now, uid, profession}}}
+		[]any{i64(snap["level"]), i64(snap["xp"]), now, uid, profession}, nil}}
 	if snap["level"] == nil {
 		stmts = append(stmts, deleteIfIdle("profession_progress", "user_id=? AND profession=?", []any{uid, profession}, professionRowDefaults))
 	}
@@ -301,13 +301,13 @@ func reverseSetLaw(before, after map[string]any, target string, redo bool) ([]sq
 		}
 		return []sqlStmt{{`INSERT INTO law_progress(user_id,law_id,comprehension,insights,updated_at) VALUES(?,?,?,?,?)
 		ON CONFLICT(user_id,law_id) DO UPDATE SET ` + set + `,updated_at=excluded.updated_at`,
-			[]any{uid, lawID, i64(snap["comprehension"]), i64(snap["insights"]), now}}}, nil
+			[]any{uid, lawID, i64(snap["comprehension"]), i64(snap["insights"]), now}, nil}}, nil
 	}
 	set, args := "comprehension=?", []any{i64(snap["comprehension"])}
 	if insightsWritten {
 		set, args = set+",insights=?", append(args, i64(snap["insights"]))
 	}
-	stmts := []sqlStmt{{`UPDATE law_progress SET ` + set + `,updated_at=? WHERE user_id=? AND law_id=?`, append(args, now, uid, lawID)}}
+	stmts := []sqlStmt{{`UPDATE law_progress SET ` + set + `,updated_at=? WHERE user_id=? AND law_id=?`, append(args, now, uid, lawID), nil}}
 	if before["comprehension"] == nil {
 		stmts = append(stmts, deleteIfIdle("law_progress", "user_id=? AND law_id=?", []any{uid, lawID}, lawRowDefaults))
 	}
@@ -320,14 +320,14 @@ func reverseSetSectContribution(before, after map[string]any, target string, red
 		return nil, err
 	}
 	snap := pickSnapshot(before, after, redo)
-	stmts := []sqlStmt{{`UPDATE sect_membership SET contribution_points=? WHERE user_id=?`, []any{i64(snap["contribution_points"]), uid}}}
+	stmts := []sqlStmt{{`UPDATE sect_membership SET contribution_points=? WHERE user_id=?`, []any{i64(snap["contribution_points"]), uid}, nil}}
 	// The lifetime count rides both snapshots whenever the column exists; equal
 	// sides mean the GM left it blank and the lever left it alone. It is the
 	// count promotion reads, and points earned since are play's.
 	_, hasBefore := before["contribution_earned"]
 	_, hasAfter := after["contribution_earned"]
 	if hasBefore && hasAfter && i64(before["contribution_earned"]) != i64(after["contribution_earned"]) {
-		stmts = append(stmts, sqlStmt{`UPDATE sect_membership SET contribution_earned=? WHERE user_id=?`, []any{i64(snap["contribution_earned"]), uid}})
+		stmts = append(stmts, sqlStmt{`UPDATE sect_membership SET contribution_earned=? WHERE user_id=?`, []any{i64(snap["contribution_earned"]), uid}, nil})
 	}
 	return stmts, nil
 }
