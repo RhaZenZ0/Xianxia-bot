@@ -419,27 +419,27 @@ class TheCultivateReplyDoesNotTellATraineeToStop(unittest.TestCase):
     def test_stage_nine_says_start_to_nobody_walking_a_path_and_continue_to_somebody_who_is(self):
         for body, full in ((False, "Stage 9 is full."), (True, "Body Stage 9 is full.")):
             with self.subTest(body=body):
-                none = self.module._ready_line({"ready": True, "perfection_active": False}, 9, body=body)
+                none = self.module._breakthrough_ready_line({"ready": True, "perfection_active": False}, 9, body=body)
                 self.assertIn(full, none)
                 self.assertIn("/ascend → Perfection → Start", none)
-                walking = self.module._ready_line({"ready": True, "perfection_active": True}, 9, body=body)
+                walking = self.module._breakthrough_ready_line({"ready": True, "perfection_active": True}, 9, body=body)
                 self.assertIn(full, walking)
                 self.assertIn("Continue the path under **/ascend → Perfection**", walking)
                 self.assertNotIn("Start", walking, "the reply tells somebody walking the path to start it")
                 # An engine that does not say is read as having none: the line this reply always printed.
-                self.assertEqual(self.module._ready_line({"ready": True}, 9, body=body), none)
+                self.assertEqual(self.module._breakthrough_ready_line({"ready": True}, 9, body=body), none)
 
     def test_below_stage_nine_and_unready_the_lines_are_as_they_were(self):
-        self.assertEqual(self.module._ready_line({"ready": False, "perfection_active": True}, 9, body=False), "")
+        self.assertEqual(self.module._breakthrough_ready_line({"ready": False, "perfection_active": True}, 9, body=False), "")
         self.assertIn("You are ready to attempt **/ascend → Main Progression → Breakthrough**",
-                      self.module._ready_line({"ready": True}, 4, body=False))
+                      self.module._breakthrough_ready_line({"ready": True}, 4, body=False))
         self.assertIn("Your body is ready for **/cultivation → Body → Breakthrough**",
-                      self.module._ready_line({"ready": True}, 4, body=True))
+                      self.module._breakthrough_ready_line({"ready": True}, 4, body=True))
 
     def test_both_replies_draw_through_the_helpers_and_the_engine_sends_what_they_read(self):
         source = (PROJECT_ROOT / "app" / "bot" / "commands" / "cultivation.py").read_text(encoding="utf-8")
         tree = ast.parse(source)
-        for command, helper in (("cultivate", "_full_stage_line"), ("cultivate", "_ready_line"), ("body_cultivate", "_ready_line")):
+        for command, helper in (("cultivate", "_full_stage_line"), ("cultivate", "_breakthrough_ready_line"), ("body_cultivate", "_breakthrough_ready_line")):
             node = next((n for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef) and n.name == command), None)
             self.assertIsNotNone(node, f"{command} is gone; the reader is broken, not the tree")
             calls = {n.func.id for n in ast.walk(node) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}

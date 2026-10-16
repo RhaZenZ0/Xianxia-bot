@@ -58,7 +58,7 @@ def _full_stage_line(result: dict[str, Any]) -> str:
     return "\n🪷 This stage is already full: the session gathered nothing, banked nothing and risked nothing. Break through before meditating again."
 
 
-def _ready_line(result: dict[str, Any], phase: int, *, body: bool) -> str:
+def _breakthrough_ready_line(result: dict[str, Any], phase: int, *, body: bool) -> str:
     """The line under a session that filled the stage (v1.34.0).
 
     At stage 9 the choice is the Perfection path or the breakthrough, and which
@@ -164,7 +164,7 @@ async def cultivate(interaction: discord.Interaction) -> None:
         extra += f"\n⚠️ The forced qi ran wild: **{deviation.get('name') or 'Qi Deviation'}** (severity {int(deviation.get('severity', 1))}). Treat it under **/character → Afflictions**, or it drags every session down."
     if result.get("stage_full") and not gain:
         extra += _full_stage_line(result)
-    ready = _ready_line(result, int(c.get("phase", 1)), body=False)
+    ready = _breakthrough_ready_line(result, int(c.get("phase", 1)), body=False)
     try:
         progressed = await record_quest_progress(
             interaction.user.id, "cultivate", amount=1, game_minute=wt.total_minutes)
@@ -613,7 +613,7 @@ async def body_cultivate(interaction: discord.Interaction) -> None:
         extra += f"\n🌌 **{result.get('era_name') or 'World Era'}** modifies cultivation to **x{float(result['era_mult']):.2f}**."
     if int(result.get("perfection_gain", 0)):
         extra += f"\n★ Body refinement deepens by **+{int(result['perfection_gain'])}%**."
-    extra += _ready_line(result, int(c.get("body_phase", 1)), body=True)
+    extra += _breakthrough_ready_line(result, int(c.get("body_phase", 1)), body=True)
     await interaction.followup.send(f"💪 **{c['name']} tempers the body.**\nYou refine flesh, blood, bone, and meridians for **+{gain} body essence**.\nProgress: **{total}/{cost}**{extra}")
 
 
