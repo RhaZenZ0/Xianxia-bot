@@ -889,6 +889,10 @@ type incarnationColumn struct{ Column, Reset string }
 var incarnationScopedLaterColumns = []incarnationColumn{
 	{"vitality_recovered_game_minute", "NULL"},
 	{"path_resource", "0"},
+	// A perfected realm's qi, an inheritance's, a GM's cap: the old body's. The
+	// install above sets `qi_max` back to a new life's pool, so a bonus left on
+	// the row would be added on top of it by the next settle (schema 81).
+	{"qi_max_bonus", "0"},
 }
 
 // clearIncarnationStateTx is what a rebirth wipes before the new body is

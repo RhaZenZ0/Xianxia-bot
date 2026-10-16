@@ -208,6 +208,11 @@ func grantInheritanceTx(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	if _, err = conn.Execute(`UPDATE characters SET qi_max=qi_max+?,qi=qi+?,vitality_max=vitality_max+?,vitality=vitality+?,updated_at=? WHERE user_id=?`, []any{qi, qi, vit, vit, now, userID}); err != nil {
 		return nil, err
 	}
+	// The next settle rebuilds the pool from the body; the bonus is what keeps
+	// an inheritance's qi from being forgotten with it.
+	if err = addQiMaxBonusTx(conn, userID, qi); err != nil {
+		return nil, err
+	}
 	// Insight through its one door (v1.0.0-rc.58); the pools stay flat. The
 	// granted figure is deliberately not captured: this result echoes the
 	// inheritance's authored `bonuses`, not a receipt of what landed, unlike

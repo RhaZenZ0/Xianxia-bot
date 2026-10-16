@@ -309,9 +309,9 @@ func perfectionTrialAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 			return authoritativeMutation{}, err
 		}
 		if body {
-			_, err = conn.Execute(`UPDATE characters SET vitality_max=vitality_max+MAX(1,CAST(vitality_max*0.10 AS INTEGER)),vitality=vitality_max+MAX(1,CAST(vitality_max*0.10 AS INTEGER)),qi_max=qi_max+MAX(1,CAST(qi_max*0.05 AS INTEGER)),qi=qi_max+MAX(1,CAST(qi_max*0.05 AS INTEGER)),updated_at=? WHERE user_id=?`, []any{now, userID})
+			err = raiseQiMaxTx(conn, userID, `UPDATE characters SET vitality_max=vitality_max+MAX(1,CAST(vitality_max*0.10 AS INTEGER)),vitality=vitality_max+MAX(1,CAST(vitality_max*0.10 AS INTEGER)),qi_max=qi_max+MAX(1,CAST(qi_max*0.05 AS INTEGER)),qi=qi_max+MAX(1,CAST(qi_max*0.05 AS INTEGER)),updated_at=? WHERE user_id=?`, []any{now, userID})
 		} else {
-			_, err = conn.Execute(`UPDATE characters SET qi_max=qi_max+MAX(1,CAST(qi_max*0.10 AS INTEGER)),qi=qi_max+MAX(1,CAST(qi_max*0.10 AS INTEGER)),vitality_max=vitality_max+MAX(1,CAST(vitality_max*0.05 AS INTEGER)),vitality=vitality_max+MAX(1,CAST(vitality_max*0.05 AS INTEGER)),updated_at=? WHERE user_id=?`, []any{now, userID})
+			err = raiseQiMaxTx(conn, userID, `UPDATE characters SET qi_max=qi_max+MAX(1,CAST(qi_max*0.10 AS INTEGER)),qi=qi_max+MAX(1,CAST(qi_max*0.10 AS INTEGER)),vitality_max=vitality_max+MAX(1,CAST(vitality_max*0.05 AS INTEGER)),vitality=vitality_max+MAX(1,CAST(vitality_max*0.05 AS INTEGER)),updated_at=? WHERE user_id=?`, []any{now, userID})
 		}
 		if err != nil {
 			return authoritativeMutation{}, err
