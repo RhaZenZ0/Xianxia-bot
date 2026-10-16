@@ -93,13 +93,14 @@ class TributeClaimView(discord.ui.View):
     """One button: the tribute this cultivator is owed.
 
     The button belongs to the cultivator who ran the command, and it is spent
-    once — the engine refuses a second claim inside the cooldown anyway, but a
-    disabled button says so before the round trip does.
+    once the engine has paid it — the engine refuses a second claim inside the
+    cooldown anyway, so a refused press leaves the button as it was.
     """
 
     def __init__(self, *, owner_id: int) -> None:
         super().__init__(timeout=panel_timeout())
         self.owner_id = int(owner_id)
+        self._claiming = False
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if int(interaction.user.id) != self.owner_id:
@@ -117,10 +118,17 @@ class TributeClaimView(discord.ui.View):
         if refusal:
             await interaction.response.send_message(refusal, ephemeral=False, delete_after=20)
             return
-        button.disabled = True
-        button.label = "Claimed"
-        self.stop()
-        await interaction.response.edit_message(view=self)
+        # The button says "Claimed" only once the engine has said so (v1.34.0): it
+        # used to disable itself before the call, so a refused claim (the cooldown
+        # an earlier press already spent, a closed world) left a card that read
+        # Claimed over a gift nobody was paid. A second press while the first is in
+        # flight is swallowed rather than sent, since the engine would only refuse it.
+        if self._claiming:
+            await interaction.response.defer()
+            return
+        self._claiming = True
+        await interaction.response.defer()
+        paid = False
         try:
             envelope = await ENGINE.authoritative_action(
                 "support.vote_claim",
@@ -129,9 +137,20 @@ class TributeClaimView(discord.ui.View):
                 action_id=f"discord:{interaction.id}:support.vote_claim",
             )
             result = dict(envelope.get("result") or {})
+            paid = True
         except GameEngineError as exc:
             await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
             return
+        finally:
+            if not paid:
+                self._claiming = False
+        button.disabled = True
+        button.label = "Claimed"
+        self.stop()
+        try:
+            await interaction.edit_original_response(view=self)
+        except discord.HTTPException:
+            log.exception("Could not mark the tribute button as claimed")
         await interaction.followup.send(
             _gift_line(result, name=_addressed(interaction.user)), ephemeral=False
         )

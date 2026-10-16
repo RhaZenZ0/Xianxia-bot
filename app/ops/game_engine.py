@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
 import httpx
+
+log = logging.getLogger(__name__)
 
 
 class GameEngineError(RuntimeError):
@@ -106,6 +109,11 @@ class GameEngineClient:
             "/v1/simulation/run-due",
             {"automation": {str(k): bool(v) for k, v in automation.items()}},
         )
+        # A tick that committed some systems and then failed answers with both
+        # (v1.34.0): the runs are returned so their events still get a scene,
+        # and the error is logged here rather than raised over them.
+        if data.get("error"):
+            log.error("World simulation stopped after %d committed run(s): %s", len(data.get("runs") or []), data["error"])
         return [dict(row) for row in data.get("runs", [])]
 
     async def force_simulation(self, system: str, steps: int) -> dict[str, Any]:

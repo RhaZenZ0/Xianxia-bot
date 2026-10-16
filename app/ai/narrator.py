@@ -11,7 +11,7 @@ from ..rules.narration_pool import exploration_kind, narration_tier, procedural_
 from ..rules.attribute_growth import sheet_attributes
 from ..rules.game import World
 from ..rules.sect import TERMINOLOGY_PROMPT
-from ..rules.npc_memory import format_memories
+from ..rules.npc_memory import format_memories, is_hidden_master, public_aim
 
 
 log = logging.getLogger("xianxia.narrator")
@@ -731,7 +731,7 @@ Narrate a concise hunting clash consistent with the fixed result. On success, th
         realm = self.world.realm_name(character["realm_index"], character.get("gender"))
         recent = _recent_context(history, 8)
         style_memory = _style_memory(history, player_name=str(character.get("name") or ""), npc_name=npc_name)
-        if npc.get("hidden_master"):
+        if is_hidden_master(npc):
             secret_for_prompt = (
                 "REDACTED BY THE GAME ENGINE. Do not infer, confirm, deny, or reveal "
                 "whether this NPC is a real Hidden Master, a fake expert, or something else."
@@ -740,7 +740,8 @@ Narrate a concise hunting clash consistent with the fixed result. On success, th
             secret_for_prompt = str(npc.get("secret", "None established."))
         state = dict(npc_state or {})
         long_term_memory = format_memories(salient_memories or [], limit=6)
-        current_goal = str(state.get("current_goal") or npc.get("want") or "Continue their established affairs.")
+        current_goal = public_aim(npc, state.get("current_goal") or npc.get("want"), "Continue their established affairs.")
+        long_term_want = public_aim(npc, npc.get("want"), "To get through the day without trouble.")
         current_activity = str(state.get("activity") or "Following established routine")
         mood = str(state.get("mood") or "calm")
         recent_event = str(state.get("recent_event") or "No notable autonomous development since the last update.")
@@ -755,7 +756,7 @@ NPC ROLE: {npc.get('role') or 'A local of no stated standing.'}
 NPC REALM: {npc.get('realm') or 'Unstated'}
 NPC PERSONALITY: {npc.get('personality') or 'Reserved; gives little away.'}
 NPC SPEECH STYLE: {npc.get('speech') or 'Plain, unhurried speech.'}
-NPC LONG-TERM WANT: {npc.get('want') or 'To get through the day without trouble.'}
+NPC LONG-TERM WANT: {long_term_want}
 NPC FEAR: {npc.get('fear') or 'Trouble they cannot walk away from.'}
 NPC SECT TIES: {sect_ties}
 NPC SECRET / HIDDEN STATE: {secret_for_prompt}

@@ -319,6 +319,7 @@ async def conceal_command(interaction: discord.Interaction, active: bool) -> Non
 
 @registered_root_command(name="check", description="Make a transparent RP skill check with no automatic reward", guild=GUILD)
 @app_commands.choices(attribute=ATTRIBUTE_CHOICES, difficulty=DIFFICULTY_CHOICES)
+@serialized_user_action
 async def check(
     interaction: discord.Interaction,
     attribute: app_commands.Choice[str],

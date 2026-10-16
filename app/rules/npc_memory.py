@@ -74,6 +74,25 @@ def public_mood_hint(mood: str) -> str:
     return value if value in allowed else ""
 
 
+# A hidden master's aim is the one line that would give the disguise away (the fake
+# beggar's want is "to be believed"), so every prompt builder that names an NPC's aim
+# routes it through here instead of reading `want` / `current_goal` itself.
+HIDDEN_MASTER_AIM = "Continue their established private affairs without exposing concealed identity or power."
+
+
+def is_hidden_master(npc: Any) -> bool:
+    """True for a catalogue NPC that carries a hidden-master block (real or fake)."""
+    return isinstance(npc, dict) and isinstance(npc.get("hidden_master"), dict)
+
+
+def public_aim(npc: Any, aim: Any, default: str = "") -> str:
+    """The aim a prompt may name for this NPC: theirs, or the opaque line for a hidden master."""
+    if is_hidden_master(npc):
+        return HIDDEN_MASTER_AIM
+    text = str(aim or "").strip()
+    return text or default
+
+
 def scene_memory_summary(player_text: str, npc_name: str, narration: str) -> str:
     return (
         f"Player action/dialogue involving {_clip(npc_name, 80)}: {_clip(player_text, 250)} | "
