@@ -25,7 +25,8 @@ package simulation
 // than from where the tick has since carried them - without that the ceiling
 // would move up every time somebody crossed it, which is not a ceiling. Someone
 // the catalogue does not carry (a descendant who came of age, a registry NPC)
-// begins at zero, which is right: they were born mortal like everybody else.
+// begins at the floor of the world they were made in - zero in the Mortal World,
+// where they were born mortal like everybody else.
 
 import (
 	"strings"
@@ -85,10 +86,20 @@ func npcTalentBand(name, profession string) int64 {
 }
 
 // npcTalentCeiling is the highest realm this person will ever reach.
-func (r *Runner) npcTalentCeiling(name, profession string) int64 {
-	origin := int64(0)
+//
+// The origin is the higher of two things: where the catalogue put them, and
+// the first realm of the world they were made in. The second is for the people
+// the catalogue does not carry whom `sectPopulation` stands at a world's floor
+// plus an offset - a Spiritual World Outer Disciple begins at realm 8, not at
+// zero, and measured from zero their ceiling sat at or below realm 12 and an
+// Immortal or Celestial hall member (realm 16 and up) was above it the day they
+// were made, "gone as far as their talent allows" for good (v1.34.0). The floor
+// is read off the same table that placed them (`worldFloorRealm`), so the two
+// cannot disagree about where a world begins.
+func (r *Runner) npcTalentCeiling(name, profession, world string) int64 {
+	origin := r.worldFloorRealm(world)
 	if def, ok := r.World.NPCs[name]; ok {
-		origin = worldRealmIndexFromName(def.Realm, r.World.Realms)
+		origin = max64(origin, worldRealmIndexFromName(def.Realm, r.World.Realms))
 	}
 	if origin < 0 {
 		origin = 0

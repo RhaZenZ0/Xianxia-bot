@@ -549,7 +549,7 @@ func TestTalentIsTheCeilingMostLivesNeverLeave(t *testing.T) {
 	addLife(t, path, "Porter Li", map[string]any{"health": 100})
 	conn := livesConn(t, path)
 	mustExec(t, conn, `UPDATE npc_civilization_state SET phase=9,wealth=900,realm_index=0 WHERE npc_name='Porter Li'`)
-	if ceiling := r.npcTalentCeiling("Porter Li", "Porter"); ceiling != 0 {
+	if ceiling := r.npcTalentCeiling("Porter Li", "Porter", "Mortal World"); ceiling != 0 {
 		t.Fatalf("a porter with no talent has a ceiling of %d", ceiling)
 	}
 	for i := 0; i < 5; i++ {
