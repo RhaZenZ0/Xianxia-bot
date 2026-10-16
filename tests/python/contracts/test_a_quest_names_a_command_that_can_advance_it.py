@@ -204,6 +204,46 @@ class AQuestNamesACommandThatCanAdvanceIt(unittest.TestCase):
             "naming the wrong command is invisible to it - which is how a player hunted all day "
             "at 0/1:\n  " + "\n  ".join(offenders)))
 
+    def test_the_door_a_type_is_given_reports_that_type(self):
+        """`OBJECTIVE_PATHS` is the path appended to a label that names none, so
+        it is the one a player is sent down for every quest whose author wrote
+        a bare label - and the gate above reads only the labels authored with a
+        path of their own. `raid_win` named **Start** while the boss raid is
+        reported from **Claim**: the card Start opens has Claim on it, so the
+        quest still advanced, but the line pointed at the first step of a door
+        and not the one that records it.
+
+        A type's door that is a hub leaf must be a leaf whose handler reports
+        that very type; a root command (`/hunt`) has no leaf to resolve and is
+        the reporters gate's to hold.
+        """
+        from app.rules.quests import OBJECTIVE_PATHS
+
+        offenders, checked = [], 0
+        for objective_type, door in sorted(OBJECTIVE_PATHS.items()):
+            paths = LABEL_PATH.findall(door)
+            self.assertTrue(paths, f"{objective_type!r}: OBJECTIVE_PATHS names no **/command** in {door!r}")
+            for path in paths:
+                segments = tuple(seg.strip().lstrip("/").casefold()
+                                  for seg in path.split("→") if seg.strip())
+                if len(segments) < 2:
+                    continue  # a root command rather than a hub leaf
+                handlers = self.leaves.get(segments) or self.leaves.get((segments[0], segments[-1]))
+                checked += 1
+                if not handlers:
+                    offenders.append(f"{objective_type}: {path!r} is not a leaf of any hub")
+                elif not any(objective_type in self.reporters.get(h, set()) for h in handlers):
+                    offenders.append(
+                        f"{objective_type}: {path!r}, but "
+                        + "; ".join(f"{h}() reports {sorted(self.reporters.get(h, set())) or 'nothing'}"
+                                    for h in sorted(handlers)))
+        self.assertGreater(checked, 10,
+                           "no OBJECTIVE_PATHS entry resolved to a hub leaf; the gate is broken, not the tree")
+        self.assertFalse(offenders, (
+            "OBJECTIVE_PATHS sends a player to a door that is not the one that records the objective, so "
+            "the line a quest prints points at the first step of a flow and not at the step that "
+            "counts:\n  " + "\n  ".join(offenders)))
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
