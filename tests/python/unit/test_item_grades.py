@@ -447,5 +447,35 @@ class TheKeeperSaysWhyItPaidMore(unittest.TestCase):
             self.assertIn("_rank_lift", calls, f"{name} no longer says which rank raised the keeper's price")
 
 
+class TheGradeModuleStatesNoNumberNothingReads(unittest.TestCase):
+    """``KEEPER_GRADE_CEILING`` sat in ``item_grades.py`` for a release restating
+    the engine's ``keeperGradeCeiling`` with no reader and no test holding it to
+    the Go (v1.34.0). A number the engine owns and the bot does not read is a
+    second copy waiting to drift, so every constant this module states is read
+    by something in ``app/`` or ``scripts/``."""
+
+    def test_every_constant_is_read(self) -> None:
+        module = PROJECT_ROOT / "app" / "rules" / "item_grades.py"
+        tree = ast.parse(module.read_text(encoding="utf-8"))
+        constants = [
+            target.id
+            for node in tree.body
+            if isinstance(node, ast.Assign)
+            for target in node.targets
+            if isinstance(target, ast.Name) and target.id.isupper()
+        ]
+        self.assertIn("SEPARATOR", constants, "the constants could not be read; the reader is broken, not the tree")
+        sources = [p for root in ("app", "scripts") for p in (PROJECT_ROOT / root).rglob("*.py")]
+        for name in constants:
+            readers = 0
+            for path in sources:
+                for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+                    if isinstance(node, ast.Name) and node.id == name and isinstance(node.ctx, ast.Load):
+                        readers += 1
+                    elif isinstance(node, ast.Attribute) and node.attr == name and isinstance(node.ctx, ast.Load):
+                        readers += 1
+            self.assertGreater(readers, 0, f"{name} in app/rules/item_grades.py is read by nothing: delete it or hold it to the engine")
+
+
 if __name__ == "__main__":
     unittest.main()

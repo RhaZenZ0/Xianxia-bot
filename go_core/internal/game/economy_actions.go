@@ -226,6 +226,18 @@ func auctionLeaveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "economy", EventType: "auction.leave", EntityType: "auction_house", EntityID: houseID, GameMinute: p.GameMinute, Payload: out}}, nil
 }
 
+// auctionMinLotMinutes is the shortest a lot may run. The bot's duration
+// picker floors at the same number (`/auction sell`'s Range), and a test reads
+// both: a bound the client states and the engine does not is not a bound. A
+// lot shorter than a merchant's snipe guard (merchantBidMinimumSecondsLeft) is
+// a lot nobody can answer, and the engine took one-second lots. The slack is
+// the time a request spends on the road: the picker's end time is its own
+// clock plus the minutes, and arrives a moment short of them.
+const (
+	auctionMinLotMinutes          = 5
+	auctionLotArrivalSlackSeconds = 30.0
+)
+
 func auctionSellAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p auctionSellPayload
 	if err := json.Unmarshal(raw, &p); err != nil {
@@ -267,6 +279,14 @@ func auctionSellAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if _, ok := catalog.Currencies[p.CurrencyID]; !ok {
 		return authoritativeMutation{}, errors.New("unknown auction currency")
 	}
+	// A floor deals in the money of the world it stands in (v1.2.3 made the
+	// bot send it): the currency is the seller's to name only in the sense that
+	// the engine names it back. A lot asked in another world's coin is a lot
+	// whose starting bid is a hundred times or a hundredth of what its seller
+	// thinks, and the unsold-lot buyer paid it out of a purse in that coin.
+	if want := worldBaseCurrency(catalog, catalog.Locations[house.Location].World); p.CurrencyID != want {
+		return authoritativeMutation{}, fmt.Errorf("%s deals in %s; a lot listed there is priced in it", house.Name, coinName(catalog, want))
+	}
 	qty, err := inventoryQuantityTx(conn, userID, p.ItemID)
 	if err != nil {
 		return authoritativeMutation{}, err
@@ -276,6 +296,9 @@ func auctionSellAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	}
 	if p.EndsAt <= nowSeconds() {
 		return authoritativeMutation{}, errors.New("auction end time must be in the future")
+	}
+	if p.EndsAt < nowSeconds()+float64(auctionMinLotMinutes)*60-auctionLotArrivalSlackSeconds {
+		return authoritativeMutation{}, fmt.Errorf("a lot runs for at least %d minutes", auctionMinLotMinutes)
 	}
 	now := nowSeconds()
 	_, err = conn.Execute(`UPDATE inventory SET quantity=quantity-? WHERE user_id=? AND item_id=?`, []any{p.Quantity, userID, p.ItemID})
@@ -536,7 +559,9 @@ func blackMarketTradeAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 // trade, or the town at a stall, which is highestNPCPays (v1.12.3: floored on
 // the plain third alone it undercut the other two) - and never pays as much
 // as the cheapest shelf asks - the rank ceiling's rule (trade_rank_price.go),
-// stated once more for the counter it forgot.
+// stated once more for the counter it forgot. The shelf is the cheapest in any
+// world, carried into the counter's coin (v1.34.0), and a sale the counter
+// cannot price under it answers 0.
 func marketUnitPrice(catalog worlddata.Catalog, itemID, currency string, base int64, index float64, buy bool) int64 {
 	unit := max64(1, int64(math.Round(float64(base)*index)))
 	if buy {
@@ -546,8 +571,16 @@ func marketUnitPrice(catalog worlddata.Catalog, itemID, currency string, base in
 		return unit
 	}
 	unit = max64(1, int64(math.Round(float64(unit)*0.70)))
-	if shelf, ok := cheapestShelfPrice(catalog, itemID, currency); ok && unit >= shelf {
-		unit = max64(1, shelf-1)
+	if shelf, ok := cheapestShelfPrice(catalog, itemID, currency); ok {
+		// The cheapest shelf anywhere asks less than one coin of this world's
+		// (cheapestShelfPrice reads it across the ladder): no whole-coin price
+		// sits under it, so the counter pays nothing and the caller refuses.
+		if shelf < 1 {
+			return 0
+		}
+		if unit >= shelf {
+			unit = max64(1, shelf-1)
+		}
 	}
 	return unit
 }
@@ -559,7 +592,7 @@ func highestKeeperBuy(catalog worlddata.Catalog, itemID, currency string) (int64
 		if shop.Currency != currency {
 			continue
 		}
-		if price, ok := shop.Buys[itemID]; ok && price > 0 && (!found || price > best) {
+		if price, ok := keeperBuyBase(catalog, shop, itemID); ok && shop.Buys[itemID] > 0 && (!found || price > best) {
 			best, found = price, true
 		}
 	}
@@ -619,6 +652,9 @@ func marketTradeAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		}
 		if owned < p.Quantity {
 			return authoritativeMutation{}, errors.New("not enough carried item")
+		}
+		if unit < 1 {
+			return authoritativeMutation{}, fmt.Errorf("this market will not pay for %s: the cheapest shelf in the world asks less than a single %s for it", itemDisplayName(catalog, p.ItemID), coinName(catalog, currency))
 		}
 		total = unit * p.Quantity
 		_, err = conn.Execute(`UPDATE inventory SET quantity=quantity-? WHERE user_id=? AND item_id=?`, []any{p.Quantity, userID, p.ItemID})

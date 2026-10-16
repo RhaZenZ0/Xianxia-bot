@@ -113,24 +113,8 @@ func crossWorldsPurseTx(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	if err != nil {
 		return nil, err
 	}
-	steps := worldTierIndex(catalog, toWorld) - worldTierIndex(catalog, fromWorld)
-	lower := toWorld
-	if steps > 0 {
-		lower = fromWorld
-	}
-	rate := ladderFactor(worldLadderRung(catalog, lower), steps)
-	converted, spent := balance, balance
-	switch {
-	case steps > 0:
-		converted = balance / rate
-		spent = converted * rate
-	case steps < 0:
-		if rate > 0 && balance > math.MaxInt64/rate {
-			converted = math.MaxInt64
-		} else {
-			converted = balance * rate
-		}
-	}
+	steps, rate := ladderRate(catalog, fromWorld, toWorld)
+	converted, spent := ladderConvert(balance, steps, rate)
 	if spent > 0 {
 		if _, err = walletDeltaTx(conn, catalog, userID, from, -spent, now); err != nil {
 			return nil, err
@@ -145,6 +129,41 @@ func crossWorldsPurseTx(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		"spent": spent, "converted": converted, "remainder": balance - spent, "rate": rate,
 		"balance": arrived,
 	}, nil
+}
+
+// ladderRate is how many worlds apart two worlds' money stands (positive going
+// up) and what one unit of the lower world's money is worth in the higher
+// world's, raised to that distance. It is the whole of the exchange rate: the
+// purse that crosses with a cultivator (crossWorldsPurseTx) and every price
+// that must be read across the same rungs (cheapestShelfPrice) take it from
+// here, so the two cannot disagree about what a crystal is worth in stones.
+func ladderRate(catalog worlddata.Catalog, fromWorld, toWorld string) (steps, rate int64) {
+	steps = worldTierIndex(catalog, toWorld) - worldTierIndex(catalog, fromWorld)
+	lower := toWorld
+	if steps > 0 {
+		lower = fromWorld
+	}
+	return steps, ladderFactor(worldLadderRung(catalog, lower), steps)
+}
+
+// ladderConvert moves an amount across the rungs ladderRate describes. Going
+// up divides, rounding down, and `spent` is the part of the amount that
+// divided cleanly (the remainder stays where it was); going down multiplies,
+// takes the whole amount and saturates rather than wrapping.
+func ladderConvert(amount, steps, rate int64) (converted, spent int64) {
+	converted, spent = amount, amount
+	switch {
+	case steps > 0:
+		converted = amount / rate
+		spent = converted * rate
+	case steps < 0:
+		if rate > 0 && amount > math.MaxInt64/rate {
+			converted = math.MaxInt64
+		} else {
+			converted = amount * rate
+		}
+	}
+	return converted, spent
 }
 
 // ladderFactor is the rung raised to the number of worlds crossed, clamped

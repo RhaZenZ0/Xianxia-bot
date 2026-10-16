@@ -56,8 +56,8 @@ func TestNothingBoughtAtAMarketSellsToAnNPCForMore(t *testing.T) {
 			bought := marketUnitPrice(catalog, itemID, currency, base, lowIndex, true)
 			for _, key := range shopKeys {
 				shop := catalog.Shops[key]
-				pays, wanted := shop.Buys[itemID]
-				if shop.Currency != currency || !wanted || pays <= 0 {
+				pays, wanted := keeperBuyBase(catalog, shop, itemID)
+				if shop.Currency != currency || !wanted || shop.Buys[itemID] <= 0 {
 					continue
 				}
 				if itemTrade(catalog, itemID) != "" {
