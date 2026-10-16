@@ -342,7 +342,7 @@ func TestAQuietSectIsLeftAlone(t *testing.T) {
 func TestTheRealWorldIsWalkable(t *testing.T) {
 	catalog, err := worlddata.Load(filepath.Join("..", "..", "..", "content", "world.json"))
 	if err != nil {
-		t.Skipf("real world content not readable from here: %v", err)
+		t.Fatalf("real world content not readable from here: %v", err)
 	}
 	r := &Runner{World: catalog}
 	stranded, total := 0, 0
