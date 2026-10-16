@@ -54,6 +54,7 @@ var diceAllowed = map[string]string{
 	"TestStarterHouseholdsAreSharedStableAndCoLocatedPlayersCanMeet":  "counts the starter household offers, which are the content file's own list and are the same list twice by design",
 	"TestAWaystationKeepsAStallAndStandsOnTheMerchantsRoad":           "the stall's stock is ensureShopStockTx writing max64(1, line.Quantity) per authored ware, so an empty stall is a content fault and not a miss",
 	"TestEveryShippedObjectiveIsMetByItsOwnTarget":                    "the zero-check the gate reads is the content walk's own self-check (`len(quests[\"realm_road_1\"]) == 0 || len(quests) < 200`), a count of the quests content/world.json authors read off the file before any report, and `targeted` below it is the same count's other half; every quest is held at count 1000 so no report completes anything",
+	"TestAnUpperWorldCounterRefusesWhatItsBoardDoesNotList":          "the zero-check is `want`, a count of the keeper's authored buy lines that keeperBuyBase prices off the content ladder - catalogue arithmetic read before any action runs; the sale it then drives is refused before any roll",
 
 	// A floor in the production code makes the zero the test guards against
 	// unreachable, whatever the dice say.
