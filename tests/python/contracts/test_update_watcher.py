@@ -16,6 +16,12 @@ it. The conversation is held over several polls now - a report the engine
 refuses is retried on the next tick, a world a GM closed stays closed, a
 signal ends the process - and the whole file runs under `sh` (dash, where
 there is one) and under bash.
+
+v1.34.0: the operator's scripts. A second `update.sh` that was refused took the
+running one's lock with it; an `--upgrade` with nothing newer to fetch left
+through `set -e` as exit 3 instead of 0; and the watcher would have called an
+exit 0 that installed nothing "done". `reset_database.sh` is held here too: it
+can only be driven with a stubbed `docker`.
 """
 
 from __future__ import annotations
@@ -57,6 +63,8 @@ esac
 FAKE_UPDATERS = {
     "installed": "#!/bin/sh\necho 'Stopping Xianxia RP...'\nprintf '1.4.0\\n' > \"$XW_VERSION_FILE\"\nexit 0\n",
     "slow": "#!/bin/sh\necho 'Stopping Xianxia RP...'\nsleep 2\nprintf '1.4.0\\n' > \"$XW_VERSION_FILE\"\nexit 0\n",
+    # update.sh's own sentence for a fetch that found nothing newer, exit 0.
+    "current": "#!/bin/sh\necho 'Installed 1.3.5 is already the newest on the stable channel (1.3.5).'\nexit 0\n",
     "preflight": "#!/bin/sh\necho 'ERROR: The installed .env does not satisfy Xianxia RP 1.4.0 (see above).' >&2\nexit 1\n",
     "rolled_back": "#!/bin/sh\necho 'Stopping Xianxia RP...'\necho 'ERROR: New docker-compose.yml is invalid.' >&2\nexit 1\n",
     # A tab and an ESC in the quoted ERROR line: invalid inside a JSON string.
@@ -176,6 +184,18 @@ class TheWatcherRunsTheRequestAndReportsIt(unittest.TestCase):
         self.assertFalse(reopened["enabled"])
         self.assertFalse(Path(f"{self.state_file}.pending").exists(), "a delivered report was left on disk")
         self.assertFalse(Path(f"{self.state_file}.closed").exists())
+
+    def test_an_update_that_found_nothing_newer_is_not_reported_as_an_install(self):
+        """update.sh answers "already the newest" with exit 0 and installs
+        nothing. Reported `done`, the card reads "updated to v1.3.5" for an
+        update that never happened."""
+        calls = self._run("current", self.REQUEST)
+        self.assertNotIn("done", self._statuses(calls), "an update that installed nothing was reported done")
+        failed = [p for op, p in calls if op == "admin.server.update_status" and p["status"] == "failed"]
+        self.assertEqual(len(failed), 1, calls)
+        self.assertIn("nothing was changed", failed[0]["detail"])
+        self.assertIn("already the newest", failed[0]["detail"])
+        self.assertFalse(self._world(calls)[-1]["enabled"], "the world stayed shut after an update that did nothing")
 
     def test_a_refused_preflight_reports_the_env_migration_and_nothing_changed(self):
         calls = self._run("preflight", self.REQUEST)
@@ -459,3 +479,179 @@ class TheWatcherIsShippedAndHoldsNoPrivilege(unittest.TestCase):
     def test_it_is_in_the_release_manifest(self):
         manifest = (PROJECT_ROOT / "RELEASE_MANIFEST.sha256").read_text(encoding="utf-8")
         self.assertTrue(" update_watch.sh" in manifest, "update_watch.sh is not in RELEASE_MANIFEST.sha256; run scripts/release_manifest.py --write")
+
+
+# -- v1.34.0: update.sh and reset_database.sh, driven with a stubbed world -------
+
+UPDATE_SH_FOR_REAL = PROJECT_ROOT / "update.sh"
+RESET_SH = PROJECT_ROOT / "reset_database.sh"
+
+
+class TheUpdaterCleansUpOnlyWhatItMade(unittest.TestCase):
+    """update.sh run for real, in a scratch folder, with the release channel
+    a directory of files (`XIANXIA_UPDATE_API_BASE=file://...`) and `docker`
+    a stub. Nothing here touches a real stack."""
+
+    def setUp(self):
+        if shutil.which("curl") is None:
+            self.skipTest("no curl on this machine (wget cannot read file://)")
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.project = self.tmp / "xianxia"
+        self.project.mkdir()
+        (self.project / "VERSION").write_text("1.3.5\n", encoding="utf-8")
+        shutil.copy2(UPDATE_SH_FOR_REAL, self.project / "update.sh")
+        self.bin = self.tmp / "bin"
+        self.bin.mkdir()
+        _executable(self.bin / "docker", "#!/bin/sh\nexit 0\n")
+        self.api = self.tmp / "api"
+        self.latest = self.api / "repos" / "o" / "r" / "releases" / "latest"
+        self.latest.parent.mkdir(parents=True)
+        # The shape of GitHub's /releases/latest: a url, then assets_url, then
+        # the assets - the pair update.sh cuts on.
+        self.latest.write_text(json.dumps({
+            "url": "https://example.invalid/r", "assets_url": "https://example.invalid/a",
+            "tag_name": "v1.3.5", "html_url": "https://example.invalid/page",
+            "assets": [{"browser_download_url": f"file://{self.api}/xianxia_rp_v1.3.5.zip"}],
+        }), encoding="utf-8")
+
+    def _run(self, *args: str) -> subprocess.CompletedProcess:
+        env = {
+            **os.environ, "PATH": f"{self.bin}{os.pathsep}{os.environ['PATH']}",
+            "XIANXIA_UPDATE_REPOSITORY": "o/r", "XIANXIA_UPDATE_API_BASE": f"file://{self.api}",
+            "XIANXIA_PROJECT_DIR": str(self.project), "TMPDIR": str(self.tmp),
+        }
+        env.pop("XIANXIA_UPDATER_REEXEC", None)
+        return subprocess.run(["sh", str(self.project / "update.sh"), *args], env=env,
+                              capture_output=True, text=True, timeout=60)
+
+    def test_a_refused_second_updater_leaves_the_running_ones_lock(self):
+        """LOCK_DIR was named before `mkdir` and the EXIT trap removes it, so
+        the copy that was refused deleted the lock of the one that was running
+        and a third could walk in."""
+        lock = self.tmp / ".xianxia-update.lock"
+        lock.mkdir()
+        (lock / "pid").write_text("12345\n", encoding="utf-8")
+        proc = self._run("--install")
+        self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+        self.assertIn("Another Xianxia RP update appears to be running", proc.stderr)
+        self.assertTrue(lock.exists(), "the refused updater removed the running one's lock")
+        self.assertEqual((lock / "pid").read_text().strip(), "12345")
+
+    def test_an_updater_that_took_the_lock_releases_it(self):
+        """The other direction: the lock the updater made itself is still
+        removed on the way out, or no second update could ever start."""
+        proc = self._run("--install", "missing.zip")
+        self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+        self.assertIn("No local update package", proc.stderr)
+        self.assertFalse((self.tmp / ".xianxia-update.lock").exists(), "the updater left its own lock behind")
+
+    def test_an_upgrade_with_nothing_newer_exits_zero(self):
+        """`fetch_release; rc=$?` under `set -e` ended the script on the
+        function's `return 3` itself, so "already the newest" left as exit 3
+        and the watcher read a failure."""
+        for mode in ("--upgrade", "--fetch"):
+            with self.subTest(mode=mode):
+                proc = self._run(mode)
+                self.assertEqual(proc.returncode, 0, f"{mode} exited {proc.returncode}: {proc.stdout}{proc.stderr}")
+                self.assertIn("is already the newest on the stable channel", proc.stdout)
+                self.assertNotIn("Stopping Xianxia RP", proc.stdout)
+
+    def test_an_upgrade_that_cannot_reach_the_channel_still_fails(self):
+        """The `|| rc=$?` must not swallow a real failure into the exit 0."""
+        self.latest.unlink()
+        proc = self._run("--upgrade")
+        self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+
+
+# Records every call; the stack is "running"; the engine's backup answers
+# whatever $XW_BACKUP_ANSWER holds (empty = it fails).
+STUB_DOCKER = r'''#!/bin/sh
+printf '%s\n' "$*" >> "$XW_DOCKER_LOG"
+case "$1" in
+    info) exit 0 ;;
+    inspect) echo true; exit 0 ;;
+    compose)
+        case "$2" in
+            exec)
+                case "$*" in
+                    *xianxia-engine*) cat "$XW_BACKUP_ANSWER" ;;
+                    *xianxia-bot*) printf '{"threads_found": 3, "threads_deleted": 3}' ;;
+                esac
+                exit 0 ;;
+        esac ;;
+esac
+exit 0
+'''
+
+
+class TheResetTakesItsBackupBeforeItTouchesDiscord(unittest.TestCase):
+    """reset_database.sh run for real in a scratch folder with a stubbed
+    `docker`. It deleted the Discord threads and posted the "world reset"
+    announcement, and only then took the safety backup that can abort the
+    reset - so a failed backup left the world intact and its threads gone."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.project = self.tmp / "xianxia"
+        (self.project / "data" / "backups").mkdir(parents=True)
+        shutil.copy2(RESET_SH, self.project / "reset_database.sh")
+        self.db = self.project / "data" / "xianxia.sqlite3"
+        self.db.write_text("the world", encoding="utf-8")
+        (self.project / ".env").write_text("BOT_CONTROL_TOKEN=secret\n", encoding="utf-8")
+        self.bin = self.tmp / "bin"
+        self.bin.mkdir()
+        _executable(self.bin / "docker", STUB_DOCKER)
+        self.docker_log = self.tmp / "docker.log"
+        self.docker_log.write_text("", encoding="utf-8")
+        self.backup_answer = self.tmp / "backup.json"
+
+    def _run(self, backup_name: str | None) -> subprocess.CompletedProcess:
+        if backup_name is None:
+            self.backup_answer.write_text("", encoding="utf-8")
+        else:
+            self.backup_answer.write_text(json.dumps({"name": backup_name}), encoding="utf-8")
+            (self.project / "data" / "backups" / backup_name).write_text("backup", encoding="utf-8")
+        env = {
+            **os.environ, "PATH": f"{self.bin}{os.pathsep}{os.environ['PATH']}",
+            "XIANXIA_PROJECT_DIR": str(self.project), "XW_DOCKER_LOG": str(self.docker_log),
+            "XW_BACKUP_ANSWER": str(self.backup_answer),
+        }
+        return subprocess.run(["sh", str(self.project / "reset_database.sh"), "--yes", "--no-restart"],
+                              env=env, capture_output=True, text=True, timeout=60)
+
+    def _exec_calls(self) -> list[str]:
+        return [line for line in self.docker_log.read_text(encoding="utf-8").splitlines() if line.startswith("compose exec")]
+
+    def test_a_backup_that_fails_aborts_before_any_thread_is_deleted(self):
+        proc = self._run(None)
+        self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+        self.assertIn("Could not create a safe SQLite backup", proc.stderr)
+        bot_calls = [c for c in self._exec_calls() if "xianxia-bot" in c]
+        self.assertEqual(bot_calls, [], "the Discord threads were deleted before the backup that aborted the reset")
+        self.assertNotIn("Cleaning up Discord", proc.stdout)
+        self.assertTrue(self.db.exists(), "the database was deleted by a reset that aborted")
+
+    def test_the_backup_is_taken_then_discord_is_cleaned_then_the_database_goes(self):
+        proc = self._run("xianxia-20260101-000000.sqlite3")
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        calls = self._exec_calls()
+        engine = [i for i, c in enumerate(calls) if "xianxia-engine" in c]
+        bot = [i for i, c in enumerate(calls) if "xianxia-bot" in c]
+        self.assertEqual(len(engine), 1, calls)
+        self.assertEqual(len(bot), 1, calls)
+        self.assertLess(engine[0], bot[0], "the Discord cleanup ran before the safety backup")
+        out = proc.stdout
+        self.assertLess(out.index("Backup: "), out.index("Cleaning up Discord"))
+        self.assertLess(out.index("Cleaning up Discord"), out.index("Deleting database"))
+        self.assertFalse(self.db.exists())
+
+    def test_the_header_states_the_order_the_script_runs(self):
+        """The usage line said "clean Discord, backup" and the paragraph under
+        it said the backup comes first; one of them was wrong."""
+        header = RESET_SH.read_text(encoding="utf-8").split("\nSCRIPT_DIR=", 1)[0]
+        self.assertIn("confirm, backup, clean Discord, reset, restart", header)
+        self.assertNotIn("clean Discord, backup", header)
+        helped = subprocess.run(["sh", str(RESET_SH), "--help"], capture_output=True, text=True, timeout=10).stdout
+        self.assertIn("dashboard's Discord Setup tab", helped, "--help cuts the header short")
