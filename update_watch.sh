@@ -236,9 +236,9 @@ finish() {
 
 run_update() {
     # $1 nonce, $2 channel. update.sh's own exit code and log say what happened:
-    # 0 is installed; nonzero before it ever said "Stopping" means the .env
-    # preflight refused and nothing was changed; nonzero after means its own
-    # rollback already ran.
+    # 0 is installed, unless it said "already the newest" (nothing to install);
+    # nonzero before it ever said "Stopping" means the .env preflight refused
+    # and nothing was changed; nonzero after means its own rollback already ran.
     report "$1" acked "" || return 0
     # Only now is the request ours: a failed ack leaves it `requested`, and the
     # next tick tries again.
@@ -254,7 +254,15 @@ run_update() {
     run_status=0; installed=""
     sh "$UPDATE_SH" --upgrade --channel "$2" >"$run_log" 2>&1 || run_status=$?
     cat "$run_log" >> "$LOG_FILE"
-    if [ "$run_status" -eq 0 ]; then
+    if [ "$run_status" -eq 0 ] && grep -q 'is already the newest on the' "$run_log"; then
+        # update.sh answers "already the newest" with exit 0 and installs
+        # nothing. `done` is what the card prints as "updated to vX", so a
+        # request that changed nothing is reported as one, with the updater's
+        # own sentence. (Keyed on that sentence, not on a missing "Stopping"
+        # line: a tree without stop.sh installs without printing one.)
+        outcome=failed
+        detail="nothing was changed: $(grep 'is already the newest on the' "$run_log" | tail -n 1 | cut -c1-200)"
+    elif [ "$run_status" -eq 0 ]; then
         installed=$(tr -d '[:space:]' < "$PROJECT_DIR/VERSION" 2>/dev/null || true)
         outcome=done; detail="installed ${installed:-the new release}"
     elif ! grep -q 'Stopping Xianxia RP' "$run_log"; then

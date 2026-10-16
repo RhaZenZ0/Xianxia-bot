@@ -14,14 +14,15 @@ set -eu
 # afterward if you want the bot to reconcile stale bindings.
 #
 # Usage:
-#   ./reset_database.sh                    # interactive: confirm, clean Discord, backup, reset, restart
+#   ./reset_database.sh                    # interactive: confirm, backup, clean Discord, reset, restart
 #   ./reset_database.sh --yes              # skip the typed confirmation (still backs up, still cleans Discord)
 #   ./reset_database.sh --no-backup        # skip the safety backup (not recommended)
 #   ./reset_database.sh --no-discord-cleanup  # leave Discord threads/announcement alone
 #   ./reset_database.sh --no-restart       # reset but leave the stack stopped
 #   ./reset_database.sh -h | --help
 #
-# A safety backup is always taken first unless --no-backup is given: through
+# A safety backup is always taken first - before the Discord cleanup, before
+# the database is touched - unless --no-backup is given: through
 # the authoritative Go engine's SQLite backup API when the stack is running
 # (the same transaction-safe method the dashboard's "Create backup" button
 # and update.sh use - see README's "Backups and maintenance"), or a plain
@@ -31,9 +32,10 @@ set -eu
 # backup over data/xianxia.sqlite3 (removing any -wal/-shm alongside it),
 # start the stack again.
 #
-# Discord cleanup (thread deletion + announcement) requires the bot to be
-# live, since only discord.py can touch Discord - it's skipped automatically
-# when the stack is already stopped, or always with --no-discord-cleanup.
+# Discord cleanup (thread deletion + announcement) runs after the backup and
+# requires the bot to be live, since only discord.py can touch Discord - it's
+# skipped automatically when the stack is already stopped, or always with
+# --no-discord-cleanup.
 # The same cleanup is also available as the "Reset World" button on the GM
 # dashboard's Discord Setup tab, for triggering it without a database wipe.
 
@@ -53,7 +55,7 @@ for arg in "$@"; do
         --no-backup) SKIP_BACKUP=1 ;;
         --no-discord-cleanup) SKIP_DISCORD=1 ;;
         --no-restart) SKIP_RESTART=1 ;;
-        -h|--help) sed -n '3,38p' "$0"; exit 0 ;;
+        -h|--help) sed -n '3,40p' "$0"; exit 0 ;;
         *) echo "ERROR: Unknown option: $arg" >&2; exit 2 ;;
     esac
 done
@@ -105,36 +107,11 @@ if [ "$SKIP_CONFIRM" -ne 1 ]; then
     [ "$answer" = "RESET" ] || { echo "Aborted. Nothing was changed."; exit 1; }
 fi
 
-if [ "$SKIP_DISCORD" -ne 1 ]; then
-    if bot_running; then
-        echo "Cleaning up Discord threads through the running bot..."
-        CONTROL_TOKEN=$(env_value BOT_CONTROL_TOKEN)
-        [ -n "$CONTROL_TOKEN" ] || CONTROL_TOKEN=$(env_value DASHBOARD_TOKEN)
-        if [ -z "$CONTROL_TOKEN" ]; then
-            echo "WARNING: No BOT_CONTROL_TOKEN/DASHBOARD_TOKEN found in .env; skipping Discord cleanup." >&2
-        else
-            # The bot image (python:3.12-slim) ships neither wget nor curl, so
-            # this used to fail silently every time (v1.2.1); python3 is what
-            # the image is.
-            response=$(cd "$PROJECT_DIR" && docker compose exec -T \
-                -e XIANXIA_CONTROL_TOKEN="$CONTROL_TOKEN" -e XIANXIA_CONTROL_URL="http://127.0.0.1:${HEALTH_PORT:-8082}/control/discord" \
-                xianxia-bot python3 -c 'import json,os,urllib.request
-req=urllib.request.Request(os.environ["XIANXIA_CONTROL_URL"], data=json.dumps({"action":"reset_world","payload":{"confirm":"RESET","reason":"reset_database.sh"}}).encode(), headers={"X-Xianxia-Control": os.environ["XIANXIA_CONTROL_TOKEN"], "Content-Type": "application/json"}, method="POST")
-print(urllib.request.urlopen(req, timeout=120).read().decode())' 2>/dev/null || true)
-            deleted=$(printf '%s' "$response" | sed -n 's/.*"threads_deleted"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/p')
-            found=$(printf '%s' "$response" | sed -n 's/.*"threads_found"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/p')
-            if [ -n "$deleted" ]; then
-                echo "Discord cleanup: deleted $deleted of $found tracked thread(s); reset announcement posted."
-            else
-                echo "WARNING: Discord cleanup did not complete (bot control call failed or was rejected)." >&2
-                echo "         Continuing with the database reset anyway; clean up threads manually if needed." >&2
-            fi
-        fi
-    else
-        echo "Stack is not running; skipping Discord cleanup (the bot must be live to reach Discord)."
-    fi
-fi
-
+# The safety backup comes before anything that cannot be undone: it is the one
+# step here that can abort the reset, and the Discord cleanup below deletes
+# threads and posts the "world reset" announcement, neither of which comes back.
+# A reset that stops at "Could not create a safe SQLite backup" has changed
+# nothing, in Discord or in the database.
 BACKUP_PATH=""
 if [ "$SKIP_BACKUP" -ne 1 ]; then
     mkdir -p "$BACKUP_DIR"
@@ -165,6 +142,36 @@ if [ "$SKIP_BACKUP" -ne 1 ]; then
     echo "Backup: $BACKUP_PATH"
 else
     echo "Skipping safety backup (--no-backup)."
+fi
+
+if [ "$SKIP_DISCORD" -ne 1 ]; then
+    if bot_running; then
+        echo "Cleaning up Discord threads through the running bot..."
+        CONTROL_TOKEN=$(env_value BOT_CONTROL_TOKEN)
+        [ -n "$CONTROL_TOKEN" ] || CONTROL_TOKEN=$(env_value DASHBOARD_TOKEN)
+        if [ -z "$CONTROL_TOKEN" ]; then
+            echo "WARNING: No BOT_CONTROL_TOKEN/DASHBOARD_TOKEN found in .env; skipping Discord cleanup." >&2
+        else
+            # The bot image (python:3.12-slim) ships neither wget nor curl, so
+            # this used to fail silently every time (v1.2.1); python3 is what
+            # the image is.
+            response=$(cd "$PROJECT_DIR" && docker compose exec -T \
+                -e XIANXIA_CONTROL_TOKEN="$CONTROL_TOKEN" -e XIANXIA_CONTROL_URL="http://127.0.0.1:${HEALTH_PORT:-8082}/control/discord" \
+                xianxia-bot python3 -c 'import json,os,urllib.request
+req=urllib.request.Request(os.environ["XIANXIA_CONTROL_URL"], data=json.dumps({"action":"reset_world","payload":{"confirm":"RESET","reason":"reset_database.sh"}}).encode(), headers={"X-Xianxia-Control": os.environ["XIANXIA_CONTROL_TOKEN"], "Content-Type": "application/json"}, method="POST")
+print(urllib.request.urlopen(req, timeout=120).read().decode())' 2>/dev/null || true)
+            deleted=$(printf '%s' "$response" | sed -n 's/.*"threads_deleted"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/p')
+            found=$(printf '%s' "$response" | sed -n 's/.*"threads_found"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/p')
+            if [ -n "$deleted" ]; then
+                echo "Discord cleanup: deleted $deleted of $found tracked thread(s); reset announcement posted."
+            else
+                echo "WARNING: Discord cleanup did not complete (bot control call failed or was rejected)." >&2
+                echo "         Continuing with the database reset anyway; clean up threads manually if needed." >&2
+            fi
+        fi
+    else
+        echo "Stack is not running; skipping Discord cleanup (the bot must be live to reach Discord)."
+    fi
 fi
 
 if stack_running; then

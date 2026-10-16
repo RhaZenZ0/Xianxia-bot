@@ -373,7 +373,10 @@ fi
 
 if [ "$MODE" = fetch ] || [ "$MODE" = upgrade ]; then
     FETCHED_ARCHIVE=""
-    fetch_release; rc=$?
+    # `fetch_release; rc=$?` under set -e would end the script on the return 3
+    # itself, so "already the newest" left as exit 3 instead of the 0 below.
+    rc=0
+    fetch_release || rc=$?
     [ "$rc" -eq 3 ] && exit 0
     [ "$rc" -eq 0 ] || exit 1
     if [ "$MODE" = fetch ]; then
@@ -402,11 +405,15 @@ fi
 need_cmd docker
 docker compose version >/dev/null 2>&1 || { echo "ERROR: Docker Compose V2 is required." >&2; exit 1; }
 
-LOCK_DIR="$PARENT_DIR/.xianxia-update.lock"
-if ! mkdir "$LOCK_DIR" 2>/dev/null; then
-    echo "ERROR: Another Xianxia RP update appears to be running: $LOCK_DIR" >&2
+# LOCK_DIR is what the EXIT trap removes, so it is named only once mkdir has
+# made the directory: a refused second updater must not delete the lock of the
+# one that is running.
+LOCK_PATH="$PARENT_DIR/.xianxia-update.lock"
+if ! mkdir "$LOCK_PATH" 2>/dev/null; then
+    echo "ERROR: Another Xianxia RP update appears to be running: $LOCK_PATH" >&2
     exit 1
 fi
+LOCK_DIR=$LOCK_PATH
 printf '%s\n' "$$" > "$LOCK_DIR/pid" 2>/dev/null || true
 
 if [ -n "$REQUESTED_ARCHIVE" ]; then
