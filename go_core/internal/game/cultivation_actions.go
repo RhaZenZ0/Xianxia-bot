@@ -172,32 +172,37 @@ func qiStormBonus(conn *storage.Conn, location string, now float64) (int64, erro
 	return 0, nil
 }
 
-func perfectionTraining(conn *storage.Conn, table string, userID, realmIndex int64, phase int64, cap int, bonus int64) (int64, error) {
+// perfectionTraining is what a session does for an open Perfection path: a full
+// stage still refines it (rc.37), by design. It returns the gain and whether a
+// path is open at all, which the reply needs to tell "continue the path" from
+// "start one" - a path whose training is already as deep as a session takes it
+// gains nothing and is still open.
+func perfectionTraining(conn *storage.Conn, table string, userID, realmIndex int64, phase int64, cap int, bonus int64) (int64, bool, error) {
 	if phase != 9 || cap <= 0 {
-		return 0, nil
+		return 0, false, nil
 	}
 	q := fmt.Sprintf(`SELECT training_progress,active FROM %s WHERE user_id=? AND realm_index=?`, table)
 	res, err := conn.Execute(q, []any{userID, realmIndex})
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
 	if len(res.Rows) == 0 || storage.ParseInt(res.Rows[0][1]) == 0 {
-		return 0, nil
+		return 0, false, nil
 	}
 	old := storage.ParseInt(res.Rows[0][0])
 	r, err := gamerng.Intn(3)
 	if err != nil {
-		return 0, err
+		return 0, true, err
 	}
 	add := int64(1+r) + maxI64(0, bonus)
 	next := minI64(int64(cap), old+add)
 	delta := next - old
 	if delta <= 0 {
-		return 0, nil
+		return 0, true, nil
 	}
 	q = fmt.Sprintf(`UPDATE %s SET training_progress=?,progress=MIN(100,progress+?),updated_at=? WHERE user_id=? AND realm_index=?`, table)
 	_, err = conn.Execute(q, []any{next, delta, float64(time.Now().UnixNano()) / 1e9, userID, realmIndex})
-	return delta, err
+	return delta, true, err
 }
 
 func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage, body bool) (authoritativeMutation, error) {
@@ -382,7 +387,7 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	if stance.Key == stanceRefine {
 		refineBonus = 1
 	}
-	pg, err := perfectionTraining(conn, perfectionTable, userID, realm, phase, cap, refineBonus)
+	pg, perfectionActive, err := perfectionTraining(conn, perfectionTable, userID, realm, phase, cap, refineBonus)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -455,7 +460,7 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		return authoritativeMutation{}, err
 	}
 	total := current + gain
-	payload := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "gain": gain, "attempted_gain": attempted, "total": total, "cost": cost, "base_gain": base, "pace": pace, "sessions_per_stage": sessionsForStage(realm), "attribute": attr, "attribute_value": attrValue, "attribute_quality": round4(quality), "resonance_bonus": resonance, "period": tm.Period, "season": tm.Season, "time_mult": timeMult, "root_resonance": tm.RootResonance, "effect_mult": effectMult, "soul_mult": soulMult, "era_name": eraName, "era_mult": eraMult, "world_name": worldName, "world_mult": worldMult, "manor_name": manorName, "manor_mult": manorMult, "storm_bonus": storm, "perfection_gain": pg, "ready": total >= cost, "stance": stance.Key, "stance_label": stance.Label, "stance_mult": stance.GainMult, "insight_xp_gain": insightGain, "deviation": deviation, "place_name": placeName, "place_mult": placeMult, "place_quality": placeQuality(placeMult), "stage_full": room == 0, "manual_name": manualName, "manual_grade": manualGrade, "manual_mult": manualMult, "manual_chosen": manualChosen, "manual_own_path": manualOwnPath, "qi_type": firstNonempty(ghostBody.QiType, spiritQiType), "corruption": ghostBody.Corruption, "corruption_gain": corruptionGain, "ghost_form_name": ghostFormAt(catalog, ghostBody.GhostForm).Name, "form_risen": formRisen, "ghost_rupture": ghostRupture, "element": absorption.Element, "element_relation": absorption.Relation, "element_label": absorption.Label, "element_note": absorption.Note, "element_mult": elementMult, "element_clash": elementClash, "root_grade": bundle.Root.Grade, "root_mult": rootMult, "master_mult": masterMult, "master_name": masterNPC}
+	payload := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "gain": gain, "attempted_gain": attempted, "total": total, "cost": cost, "base_gain": base, "pace": pace, "sessions_per_stage": sessionsForStage(realm), "attribute": attr, "attribute_value": attrValue, "attribute_quality": round4(quality), "resonance_bonus": resonance, "period": tm.Period, "season": tm.Season, "time_mult": timeMult, "root_resonance": tm.RootResonance, "effect_mult": effectMult, "soul_mult": soulMult, "era_name": eraName, "era_mult": eraMult, "world_name": worldName, "world_mult": worldMult, "manor_name": manorName, "manor_mult": manorMult, "storm_bonus": storm, "perfection_gain": pg, "perfection_active": perfectionActive, "ready": total >= cost, "stance": stance.Key, "stance_label": stance.Label, "stance_mult": stance.GainMult, "insight_xp_gain": insightGain, "deviation": deviation, "place_name": placeName, "place_mult": placeMult, "place_quality": placeQuality(placeMult), "stage_full": room == 0, "manual_name": manualName, "manual_grade": manualGrade, "manual_mult": manualMult, "manual_chosen": manualChosen, "manual_own_path": manualOwnPath, "qi_type": firstNonempty(ghostBody.QiType, spiritQiType), "corruption": ghostBody.Corruption, "corruption_gain": corruptionGain, "ghost_form_name": ghostFormAt(catalog, ghostBody.GhostForm).Name, "form_risen": formRisen, "ghost_rupture": ghostRupture, "element": absorption.Element, "element_relation": absorption.Relation, "element_label": absorption.Label, "element_note": absorption.Note, "element_mult": elementMult, "element_clash": elementClash, "root_grade": bundle.Root.Grade, "root_mult": rootMult, "master_mult": masterMult, "master_name": masterNPC}
 	if gain > 0 {
 		// The method is practised by being cultivated by (v1.11.0). A session
 		// that gathered nothing practises nothing, for the insight rule's reason
