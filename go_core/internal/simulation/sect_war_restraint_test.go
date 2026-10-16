@@ -30,7 +30,7 @@ func restraintDB(t *testing.T, extra string) string {
 }
 
 func TestASectDoesNotBesiegeItsAlly(t *testing.T) {
-	path := restraintDB(t, `INSERT INTO sect_relations(sect_a,sect_b,relation_type,relation_score) VALUES('Azure Reed Sect','Quiet Fen Hall','marriage_pact',20);`)
+	path := restraintDB(t, `INSERT INTO sect_relations(sect_a,sect_b,relation_type,relation_score) VALUES('Azure Cloud Sect','Quiet Fen Hall','marriage_pact',20);`)
 	defer gamerng.UseRoller(func(int) int { return 0 })()
 	if declared := runWars(t, path, &Runner{}, 1, 10000); declared != 0 {
 		t.Fatalf("a sect declared %d war(s) on the sect it is married to", declared)
@@ -41,8 +41,8 @@ func TestASectDoesNotMarchIntoAnotherWorld(t *testing.T) {
 	path := restraintDB(t, "")
 	r := &Runner{World: worlddata.Catalog{
 		Sects: map[string]worlddata.SectDefinition{
-			"Azure Reed Sect": {Recruitment: worlddata.SectRecruitment{Location: "Reed Gate"}},
-			"Quiet Fen Hall":  {Recruitment: worlddata.SectRecruitment{Location: "Fen Gate"}},
+			"Azure Cloud Sect": {Recruitment: worlddata.SectRecruitment{Location: "Reed Gate"}},
+			"Quiet Fen Hall":   {Recruitment: worlddata.SectRecruitment{Location: "Fen Gate"}},
 		},
 		Locations: map[string]worlddata.LocationDefinition{
 			"Reed Gate":    {World: "Mortal World"},

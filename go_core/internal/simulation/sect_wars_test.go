@@ -56,7 +56,7 @@ func sectWarDB(t *testing.T) string {
 	}
 	defer conn.Close()
 	if err := conn.ExecScript(`
-INSERT INTO sect_politics_state(sect_name,influence,cohesion,resources) VALUES('Azure Reed Sect',80,60,70);
+INSERT INTO sect_politics_state(sect_name,influence,cohesion,resources) VALUES('Azure Cloud Sect',80,60,70);
 INSERT INTO sect_politics_state(sect_name,influence,cohesion,resources) VALUES('Quiet Fen Hall',20,60,20);
 INSERT INTO territory_state(territory_key,controller_type,controller_key,defense) VALUES('reed_marches','sect','Quiet Fen Hall',30);
 `); err != nil {
@@ -99,7 +99,7 @@ func TestAnAmbitiousSectMovesOnAWeakNeighbour(t *testing.T) {
 	if declared := runWars(t, path, r, 1, 10000); declared != 1 {
 		t.Fatalf("an ambitious sect beside a weakly-held border declared %d war(s)", declared)
 	}
-	if got := fmt.Sprint(simScalar(t, path, `SELECT attacker_key FROM territory_wars LIMIT 1`)); got != "Azure Reed Sect" {
+	if got := fmt.Sprint(simScalar(t, path, `SELECT attacker_key FROM territory_wars LIMIT 1`)); got != "Azure Cloud Sect" {
 		t.Fatalf("the weak sect declared instead: %q", got)
 	}
 	if got := fmt.Sprint(simScalar(t, path, `SELECT defender_key FROM territory_wars LIMIT 1`)); got != "Quiet Fen Hall" {

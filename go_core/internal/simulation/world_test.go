@@ -236,7 +236,7 @@ CREATE TABLE martial_clan_branches(branch_id INTEGER PRIMARY KEY AUTOINCREMENT,f
 CREATE TABLE martial_clan_retainers(retainer_id INTEGER PRIMARY KEY AUTOINCREMENT,family_id INTEGER,group_name TEXT,leader_name TEXT,role TEXT,members INTEGER,realm_index INTEGER,loyalty INTEGER,upkeep INTEGER,status TEXT,updated_at REAL);
 CREATE TABLE martial_clan_relations(relation_id INTEGER PRIMARY KEY AUTOINCREMENT,family_id INTEGER,partner_family_id INTEGER,partner_name TEXT,relation_type TEXT,relation_score INTEGER,active INTEGER,started_game_minute INTEGER,updated_at REAL);
 CREATE TABLE world_history_events(history_id INTEGER PRIMARY KEY AUTOINCREMENT,source_key TEXT NOT NULL UNIQUE,event_type TEXT NOT NULL,title TEXT NOT NULL,summary TEXT NOT NULL,significance INTEGER NOT NULL,visibility TEXT NOT NULL,location TEXT NOT NULL,world_name TEXT NOT NULL,faction TEXT NOT NULL,actor_type TEXT NOT NULL,actor_key TEXT NOT NULL,actor_name TEXT NOT NULL,target_type TEXT NOT NULL,target_key TEXT NOT NULL,target_name TEXT NOT NULL,related_user_id INTEGER,related_npc_name TEXT NOT NULL,tags TEXT NOT NULL,game_minute INTEGER NOT NULL,metadata_json TEXT NOT NULL,created_at REAL NOT NULL,updated_at REAL NOT NULL);
-INSERT INTO npc_civilization_state VALUES('Elder Test','Azure Reed Sect elder','Following established routine');
+INSERT INTO npc_civilization_state VALUES('Elder Test','Azure Cloud Sect elder','Following established routine');
 INSERT INTO npc_mind_state VALUES('Elder Test','Protect the sect','pending','','',0,0,0);
 INSERT INTO birth_families VALUES(1,'Han Family','Han',3,'Han Rui',2,3,10,'active');
 `)
