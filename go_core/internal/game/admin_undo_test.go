@@ -569,7 +569,7 @@ func TestDeleteIfIdleNamesEveryColumnOfTheList(t *testing.T) {
 func TestAReversalDeletesARowOnlyThroughDeleteIfIdle(t *testing.T) {
 	allowed := map[string]string{
 		"deleteIfIdle":                    "the door itself",
-		"admin.player.adjust_item":        "an inventory row carries only the quantity the snapshot holds, so a delete is exact",
+		"reverseAdjustItem":               "an inventory row carries only the quantity, so removing the one a reversal has brought to nothing loses nothing",
 		"admin.player.set_spiritual_root": "every character carries a root row from creation, samsara and the boot backfill, so a made row exists only in fixtures",
 	}
 	deleteFrom := regexp.MustCompile(`(?i)\bdelete\s+from\b`)

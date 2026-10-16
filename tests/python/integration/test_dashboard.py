@@ -702,6 +702,117 @@ class QuestSaveValidationTests(unittest.IsolatedAsyncioTestCase):
         saved, _ = await self.admin._validated_quest(self._draft(quest_key="k", hold_policy="migrate"))
         self.assertEqual(saved["hold_policy"], "migrate")
 
+    # ---- the Workbench's round trip (v1.34.0) ---------------------------------
+    #
+    # Opening a quest and pressing Save must change nothing about it. The editor
+    # draws a draft from the stored row (questDraftFrom), reads the form back into
+    # it (readQuestEditor) and posts it; the server holds it to the Forge's gate
+    # (_validated_quest) and the engine's `quest.save` writes every column from
+    # the result, so a field the draft dropped is a field wiped. This drives the
+    # real front-end functions under node and the real server function, from the
+    # rows the engine would store for the shipped commissions and the realm road.
+
+    @staticmethod
+    def _function_source(source: str, name: str) -> str:
+        start = source.index(f"function {name}(")
+        end = source.index("\n}\n", start) + 2
+        return source[start:end]
+
+    def _stored_rows(self):
+        """The shipped quests that pass the GM's reward budget, as the dashboard reads them back."""
+        world = json.loads((ROOT / "content" / "world.json").read_text(encoding="utf-8"))
+        rows = []
+        for source in ("commissions", "realm_road"):
+            for quest in world[source]:
+                rows.append({
+                    "quest_key": quest["quest_key"], "title": quest["title"], "description": quest.get("description", ""),
+                    "objectives_json": json.dumps(quest["objectives"]), "rewards_json": json.dumps(quest.get("rewards", {})),
+                    "variants_json": json.dumps(quest.get("variants", [])), "giver_npc": quest.get("giver_npc", ""),
+                    "realm_band": quest.get("realm_band", ""), "tier": quest.get("tier", 1),
+                    "deadline_game_minutes": quest.get("deadline_game_minutes", 0),
+                    "requires_sect": quest.get("requires_sect", ""), "reward_visibility": quest.get("reward_visibility", "shown"),
+                    "boast": quest.get("boast", ""), "owner_user_id": None, "status": "approved", "held_now": 0,
+                })
+        # A personal quest: the owner is a snowflake, which the page holds as a string.
+        personal = dict(rows[0], quest_key="personal_one", owner_user_id="123456789012345678")
+        return rows + [personal]
+
+    def _drafts_through_the_page(self, rows):
+        import shutil
+        import subprocess
+
+        node = shutil.which("node")
+        if node is None:
+            self.skipTest("node is not installed, so the editor cannot be driven")
+        js = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
+        qjson = next(line for line in js.splitlines() if line.startswith("const qJson="))
+        script = "\n".join([
+            "const fs=require('fs');",
+            qjson,
+            self._function_source(js, "questDraftFrom"),
+            "var QDRAFT=null;",
+            self._function_source(js, "readQuestEditor"),
+            "const rows=JSON.parse(fs.readFileSync(0,'utf8'));",
+            "const out=rows.map(row=>{",
+            " QDRAFT=questDraftFrom(row);const d=QDRAFT,r=d.rewards||{};",
+            " const vals={qeTitle:d.title,qeDesc:d.description,qeBand:d.realm_band,qeGiver:d.giver_npc,qeTier:d.tier,",
+            "  qeDeadline:d.deadline_game_minutes,qeSect:d.requires_sect,qeVisibility:d.reward_visibility,",
+            "  qeItems:Object.entries(r.items||{}).map(([k,v])=>k+'\\u00d7'+v).join(','),qeXp:r.insight_xp||0,qeStones:r.spirit_stones||0};",
+            " globalThis.document={getElementById:id=>id in vals?{value:vals[id]}:null};",
+            " return readQuestEditor();});",
+            "process.stdout.write(JSON.stringify(out));",
+        ])
+        run = subprocess.run([node, "-e", script], input=json.dumps(rows), capture_output=True, text=True, timeout=60)
+        self.assertEqual(run.returncode, 0, f"the editor's draft functions did not run under node: {run.stderr}")
+        return json.loads(run.stdout)
+
+    async def test_saving_an_unchanged_quest_changes_nothing(self):
+        rows = self._stored_rows()
+        drafts = self._drafts_through_the_page(rows)
+        self.assertEqual(len(drafts), len(rows))
+        # The GM's reward budget refuses 35 shipped quests whose rewards exceed it
+        # (an honest refusal, not a change). Lifted here, it is the round trip
+        # that is under test, and every quest takes part - including the realm
+        # road's, which carry the long labels.
+        budget = self.store.quest_budget()
+        self.store.quest_budget = lambda: {key: 10**6 for key in budget}
+        checked = with_variants = long_labels = personal = 0
+        for row, draft in zip(rows, drafts):
+            saved, _ = await self.admin._validated_quest({**draft, "reason": "round trip"})
+            checked += 1
+            key = row["quest_key"]
+            self.assertEqual(saved["variants"], json.loads(row["variants_json"]), f"{key}: saving wiped or changed its variants")
+            self.assertEqual(saved["objectives"], json.loads(row["objectives_json"]),
+                             f"{key}: saving changed its objectives (a label is cut, a field dropped)")
+            self.assertEqual(saved["rewards"], json.loads(row["rewards_json"]), f"{key}: saving changed its rewards")
+            self.assertEqual(saved.get("owner_user_id"), None if row["owner_user_id"] is None else int(row["owner_user_id"]),
+                             f"{key}: saving changed who owns it")
+            for column in ("giver_npc", "realm_band", "tier", "deadline_game_minutes", "requires_sect", "reward_visibility", "boast"):
+                self.assertEqual(saved[column], row[column], f"{key}: saving changed {column}")
+            with_variants += bool(json.loads(row["variants_json"]))
+            long_labels += any(len(o.get("label", "")) > 90 for o in json.loads(row["objectives_json"]))
+            personal += row["owner_user_id"] is not None
+        # A loop that skipped everything would pass; these say it checked something of each kind.
+        self.assertEqual(checked, len(rows))
+        self.assertGreater(with_variants, 20, "no quest with variants was round-tripped, so the variant check is vacuous")
+        self.assertGreater(long_labels, 5, "no quest with a label past 90 characters was round-tripped")
+        self.assertEqual(personal, 1, "the personal quest was refused or not built")
+
+    async def test_the_editor_keeps_a_reward_the_form_does_not_show(self):
+        rows = [dict(self._stored_rows()[0], rewards_json=json.dumps({"insight_xp": 3, "household_standing": 5}))]
+        draft = self._drafts_through_the_page(rows)[0]
+        self.assertEqual(draft["rewards"], {"insight_xp": 3, "household_standing": 5},
+                         "the form rebuilt the rewards from its three fields and dropped the one it does not show")
+
+    async def test_the_label_cap_holds_every_shipped_label(self):
+        from app.rules.quests import MAX_OBJECTIVE_LABEL
+
+        world = json.loads((ROOT / "content" / "world.json").read_text(encoding="utf-8"))
+        labels = [o["label"] for source in ("commissions", "realm_road") for q in world[source] for o in q["objectives"] if o.get("label")]
+        self.assertGreater(len(labels), 100, "the reader found no labels")
+        self.assertLessEqual(max(len(label) for label in labels), MAX_OBJECTIVE_LABEL,
+                             "a shipped objective label is longer than the cap validate_quest_definition cuts to")
+
 
 class NavigationGroupingTests(unittest.TestCase):
     """The sidebar (v0.25.0).
