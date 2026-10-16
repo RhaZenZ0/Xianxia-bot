@@ -406,7 +406,7 @@ func TestAWorldIsLeftByOneDoor(t *testing.T) {
 	// The one write outside `moveCharacterTx`, with the reason it may.
 	allowed := map[string]string{
 		"world_crossing.go": "moveCharacterTx itself - the door every other path goes through",
-		"admin_undo.go":     "restoring a location snapshot is not a journey: the money was never converted, so putting somebody back must not convert it either",
+		"admin_undo.go":     "the reversal of a teleport audit row written before it carried a scene snapshot; a newer row goes home through moveCharacterTx",
 	}
 	entries, err := os.ReadDir(".")
 	if err != nil {

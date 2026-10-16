@@ -2893,7 +2893,14 @@ class AdminDashboardController:
                     locations = []
             simulations = await self.store._fetchall(db, "SELECT system,last_game_minute,interval_game_minutes,runs FROM world_simulation_state ORDER BY system")
             audit = await self.store._fetchall(db, "SELECT * FROM admin_audit_log ORDER BY audit_id DESC LIMIT 40")
+            # Every system the engine's adminAutomationSet accepts, at its default;
+            # tests/python/contracts/test_automation_toggles_agree.py holds the Go
+            # table, core.py, the Discord choices and this list equal.
             automation = {
+                "event_expiry": True,
+                "auction_settlement": True,
+                "unexpected_events": True,
+                "maintenance_cleanup": True,
                 "npc_civilization": True,
                 "npc_life": True,
                 "sect_politics": True,
@@ -2905,6 +2912,7 @@ class AdminDashboardController:
                 "npc_consignments": True,
                 "merchants": True,
                 "secret_realms": True,
+                "ai_routine_narration": False,
             }
             row = await self.store._fetchone(db, "SELECT value_json FROM world_state WHERE key='automation_settings'")
             if row:

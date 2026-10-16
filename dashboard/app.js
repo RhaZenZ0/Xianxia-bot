@@ -772,7 +772,7 @@ async function loadAdmin(){
   <section class="card control"><h3>👤 Player Editor</h3><p>Everything that edits one character - realm and body ladder, caps, sect, perfection, root, bloodline, physique, tribulation gates, teleport, currency, karma, fate, inventory, recovery, cooldowns, conditions, moderation, beasts, equipment and abode access - is on the Player Editor, pre-filled from the character's own rows.</p><label>Player<select id="editPlayer">${pOpts}</select></label><button class="btn primary" id="openEditor">Open the Player Editor</button></section>
   <section class="card control"><h3>⏳ World Time</h3><p>Advance or rewind canonical game time. Current scale: ${esc((d.clock||{}).scale ?? '?')}x game-minutes per real minute.</p><label>Minutes<input id="timeMinutes" type="number" value="1440"></label><label>New time scale (optional, blank = unchanged)<input id="timeScale" type="number" min="0" placeholder="e.g. 4"></label><label>Reason<input id="timeReason" value="GM world adjustment"></label><button class="btn primary" id="advanceTime">Apply time change</button></section>
   <section class="card control"><h3>🛤️ Travel Time</h3><p>How long a road journey actually waits, as a percentage of the road's length. 0 = arrive at once, 100 = the full road. Journeys already under way keep their arrival time.</p><div class="muted">Currently: <b>${d.travel_pace===null||d.travel_pace===undefined?'the .env baseline (TRAVEL_TIME_PERCENT)':esc(d.travel_pace)+'%'}</b></div><label>Wait (% of road length)<input id="travelPace" type="number" min="0" max="100" value="${esc(d.travel_pace??0)}"></label><label>Reason<input id="travelPaceReason" value="GM dashboard travel time"></label><button class="btn" id="setTravelPace">Set travel time</button></section>
-  <section class="card control"><h3>⚙️ Simulation</h3><p>Force a native Go batch or change its interval.</p><label>System<select id="simSystem">${sims.map(x=>`<option>${esc(x.system)}</option>`).join('')}</select></label><div class="fieldrow"><label>Steps<input id="simSteps" type="number" min="1" max="120" value="1"></label><label>Interval days<input id="simDays" type="number" min="1" max="365" value="1"></label></div><div class="buttonrow"><button class="btn" id="forceSim">Force batch</button><button class="btn" id="setInterval">Set interval</button></div></section>
+  <section class="card control"><h3>⚙️ Simulation</h3><p>Force a native Go batch or change its interval.</p><label>System<select id="simSystem">${sims.map(x=>`<option>${esc(x.system)}</option>`).join('')}</select></label><div class="fieldrow"><label>Steps<input id="simSteps" type="number" min="1" max="120" value="1"></label><label>Interval days<input id="simDays" type="number" min="1" max="365" value="1"></label></div><div class="buttonrow"><button class="btn" id="forceSim">Force batch</button><button class="btn" id="setSimInterval">Set interval</button></div></section>
   <section class="card control"><h3>🗺️ Relocate NPC</h3><p>Force-move an NPC's current location (does not affect players). Lose stages a disappearance exactly as the world's own tick does - they stay where they stand, the town learns they never came home, and the Quest Forge can draft the search; Bring back returns somebody the world lost, off-screen.</p><label>NPC<select id="npcSelect">${npcOpts}</select></label><label>New location<select id="npcLocation">${locations}</select></label><label>Reason<input id="npcReason" value="GM story move"></label><div class="buttonrow"><button class="btn" id="relocateNpc">Relocate</button><button class="btn danger" id="loseNpc">Lose</button><button class="btn" id="returnNpc">Bring back</button></div></section>
   <section class="card control"><h3>🌪️ End World Event</h3><p>End an active world event early.</p><label>Event<select id="eventSelect">${eventOpts}</select></label><label>Reason<input id="eventReason" value="GM ended early"></label><button class="btn" id="endWorldEvent">End event</button></section>
   <section class="card control${lockdown.enabled?' warnbox':''}"><h3>🔧 Maintenance mode</h3><p>Close the world while you update the server. Players are refused at every door — slash commands, hub panels and typed lines — and the scheduled world tick stands down. Administrators are unaffected, so you can always open it again.</p><div class="muted">Currently: <b>${lockdown.enabled?'CLOSED':'open'}</b>${lockdown.enabled&&lockdown.reason?` — ${esc(lockdown.reason)}`:''}</div><label>Reason players see<input id="lockdownReason" maxlength="300" placeholder="Updating to the new release, back in ten minutes" value="${esc(lockdown.reason||'')}"></label><button class="btn danger" id="lockdownOn">Close the world</button><button class="btn" id="lockdownOff">Open the world</button></section>
@@ -788,7 +788,7 @@ async function loadAdmin(){
  advanceTime.onclick=()=>{const payload={minutes:Number(timeMinutes.value),reason:timeReason.value};if(timeScale.value!=='')payload.scale=Number(timeScale.value);run('world.advance_time',payload,`Change canonical world time by ${timeMinutes.value} minutes${timeScale.value!==''?` and set scale to ${timeScale.value}x`:''}?`)};
  setTravelPace.onclick=()=>run('world.travel_pace',{percent:Number(travelPace.value),reason:travelPaceReason.value},`Set road travel time to ${travelPace.value}% of each road's length?`);
  forceSim.onclick=()=>run('simulation.force',{system:simSystem.value,steps:Number(simSteps.value),reason:'GM dashboard forced simulation'},`Force ${simSystem.value} for ${simSteps.value} step(s)?`);
- setInterval.onclick=()=>run('simulation.interval',{system:simSystem.value,days:Number(simDays.value),reason:'GM dashboard interval change'});
+ setSimInterval.onclick=()=>run('simulation.interval',{system:simSystem.value,days:Number(simDays.value),reason:'GM dashboard interval change'});
  relocateNpc.onclick=()=>run('npc.relocate',{npc_name:npcSelect.value,location:npcLocation.value,reason:npcReason.value});
  loseNpc.onclick=()=>run('npc.set_missing',{npc_name:npcSelect.value,missing:true,reason:npcReason.value},`Lose ${npcSelect.value} where they stand? The town learns they never came home and the Forge may draft the search.`);
  returnNpc.onclick=()=>run('npc.set_missing',{npc_name:npcSelect.value,missing:false,reason:npcReason.value},`Bring ${npcSelect.value} home off-screen?`);
@@ -1146,8 +1146,14 @@ function questByKey(key){return (QD.definitions||[]).find(r=>String(r.quest_key)
 
 function questDraftFrom(row){
  if(!row)return {quest_key:'',title:'',description:'',objectives:[],rewards:{},giver_npc:'',realm_band:'',tier:1,deadline_game_minutes:0,requires_sect:'',reward_visibility:'shown',boast:'',hold_policy:'keep',held_now:0,status:'new'};
+ // variants and owner_user_id ride along untouched: the save writes both columns
+ // from the draft, so a draft that lacked them wiped a commission's terms and
+ // turned a personal quest into one for the whole pool. The owner is null, never 0
+ // or '', when the quest has none, and a string because it is a snowflake.
  return {quest_key:row.quest_key,title:row.title||'',description:row.description||'',
    objectives:(qJson(row.objectives_json,[])||[]).map(o=>({...o})),rewards:qJson(row.rewards_json,{})||{},
+   variants:(qJson(row.variants_json,[])||[]).map(v=>({...v})),
+   owner_user_id:row.owner_user_id===undefined||row.owner_user_id===null||row.owner_user_id===''?null:String(row.owner_user_id),
    giver_npc:row.giver_npc||'',realm_band:row.realm_band||'',tier:Number(row.tier||1),
    deadline_game_minutes:Number(row.deadline_game_minutes||0),requires_sect:row.requires_sect||'',
    reward_visibility:row.reward_visibility||'shown',boast:row.boast||'',hold_policy:'keep',
@@ -1239,7 +1245,10 @@ function readQuestEditor(){
  d.reward_visibility=document.getElementById('qeVisibility').value;
  const items={};document.getElementById('qeItems').value.split(',').map(x=>x.trim()).filter(Boolean).forEach(part=>{
    const m=part.split(/[×x*]/);const id=(m[0]||'').trim();const qty=Math.max(1,Number((m[1]||'1').trim())||1);if(id)items[id]=qty});
- d.rewards={};
+ // Only the three reward keys the form shows are rebuilt from it; any other
+ // (an errand's household_standing) is the quest's own and is kept.
+ const kept={};Object.keys(d.rewards||{}).forEach(k=>{if(!['insight_xp','spirit_stones','items'].includes(k))kept[k]=d.rewards[k]});
+ d.rewards=kept;
  const xp=Number(document.getElementById('qeXp').value||0);if(xp>0)d.rewards.insight_xp=xp;
  const stones=Number(document.getElementById('qeStones').value||0);if(stones>0)d.rewards.spirit_stones=stones;
  if(Object.keys(items).length)d.rewards.items=items;

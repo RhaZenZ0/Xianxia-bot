@@ -195,7 +195,7 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 	case "admin.player.set_moderation":
 		result, err = adminSetModeration(conn, req.ActorID, req.Payload)
 	case "admin.audit.undo_last":
-		result, err = adminUndoLastAction(conn, req.ActorID, req.Payload)
+		result, err = adminUndoLastAction(conn, catalog, req.ActorID, req.Payload)
 	default:
 		err = fmt.Errorf("unsupported authoritative operation: %s", req.Operation)
 	}
@@ -1057,7 +1057,7 @@ func adminGrantCurrency(conn *storage.Conn, catalog worlddata.Catalog, adminUser
 			return nil, err
 		}
 	}
-	if err := auditAdmin(conn, adminUserID, "admin.player.grant_currency", fmt.Sprintf("user:%d", uid), map[string]any{"currency": currency, "balance": before}, map[string]any{"currency": currency, "amount": amount, "balance": after}, fmt.Sprint(p["reason"])); err != nil {
+	if err := auditAdmin(conn, adminUserID, "admin.player.grant_currency", fmt.Sprintf("user:%d", uid), map[string]any{"currency": currency, "balance": before}, map[string]any{"currency": currency, "amount": amount, "balance": after, "moved": amount}, fmt.Sprint(p["reason"])); err != nil {
 		return nil, err
 	}
 	if err := conn.Commit(); err != nil {
@@ -1236,12 +1236,23 @@ func adminTeleport(conn *storage.Conn, catalog worlddata.Catalog, adminUserID in
 		return nil, errors.New("character not found")
 	}
 	before := fmt.Sprint(row["location"])
+	// The scene row the move is about to overwrite, so the undo can put it back
+	// (a nil here is a player with no scene row, which the UPDATE below leaves
+	// alone too).
+	sceneBefore, err := sceneSnapshot(conn, uid)
+	if err != nil {
+		return nil, err
+	}
 	now := float64(time.Now().UnixNano()) / 1e9
 	if _, err = moveCharacterTx(conn, catalog, uid, loc, now); err != nil {
 		return nil, err
 	}
 	_, _ = conn.Execute(`UPDATE player_scene_state SET physical_location=?,scene_type='world',scene_key='',scene_label=?,channel_id=NULL,metadata_json='{}',updated_at=? WHERE user_id=?`, []any{loc, loc, now, uid})
-	if err := auditAdmin(conn, adminUserID, "admin.player.teleport", fmt.Sprintf("user:%d", uid), map[string]any{"location": before}, map[string]any{"location": loc}, fmt.Sprint(p["reason"])); err != nil {
+	var sceneAfter map[string]any
+	if sceneBefore != nil {
+		sceneAfter = map[string]any{"physical_location": loc, "scene_type": "world", "scene_key": "", "scene_label": loc, "channel_id": nil, "metadata_json": "{}"}
+	}
+	if err := auditAdmin(conn, adminUserID, "admin.player.teleport", fmt.Sprintf("user:%d", uid), map[string]any{"location": before, "scene": sceneBefore}, map[string]any{"location": loc, "scene": sceneAfter}, fmt.Sprint(p["reason"])); err != nil {
 		return nil, err
 	}
 	if err := conn.Commit(); err != nil {
@@ -1376,6 +1387,8 @@ func adminAutomationSet(conn *storage.Conn, adminUserID int64, raw json.RawMessa
 		"black_markets":           true,
 		"autonomous_world_events": true,
 		"merchants":               true,
+		"npc_consignments":        true,
+		"secret_realms":           true,
 		// v0.31.0: when on, exploration openings and hunt results are
 		// narrated by the model without being asked; off, they read from
 		// the procedural pool and offer a Narrate-it button.
@@ -1769,7 +1782,7 @@ func adminAdjustItem(conn *storage.Conn, adminUserID int64, raw json.RawMessage)
 	} else if _, err = conn.Execute(`INSERT INTO inventory(user_id,item_id,quantity) VALUES(?,?,?) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=excluded.quantity`, []any{uid, item, after}); err != nil {
 		return nil, err
 	}
-	if err := auditAdmin(conn, adminUserID, "admin.player.adjust_item", fmt.Sprintf("user:%d", uid), map[string]any{"item_id": item, "quantity": before}, map[string]any{"item_id": item, "quantity": after, "delta": delta}, fmt.Sprint(p["reason"])); err != nil {
+	if err := auditAdmin(conn, adminUserID, "admin.player.adjust_item", fmt.Sprintf("user:%d", uid), map[string]any{"item_id": item, "quantity": before}, map[string]any{"item_id": item, "quantity": after, "delta": delta, "moved": after - before}, fmt.Sprint(p["reason"])); err != nil {
 		return nil, err
 	}
 	if err := conn.Commit(); err != nil {

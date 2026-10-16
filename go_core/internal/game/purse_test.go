@@ -35,7 +35,7 @@ var purseWritersAllowed = map[string]string{
 	"migration_helpers.go": "walletDeltaTx itself - the one door, which writes the purse and sets the mirror from the new balance",
 	"lifecycle_actions.go": "character creation and samsara write the whole row from scratch, purse and mirror together, before any door exists to go through",
 	"authoritative.go":     "the twenty-five stones a new character starts with, inserted beside the creation row above",
-	"admin_undo.go":        "an undo restores the exact snapshot the audit row captured, which is an absolute write by definition and must not be re-derived",
+	"admin_undo_levers.go": "an undo of the GM's grant takes back the amount it gave, clamped at zero rather than refused when play has spent below it, and sets the mirror the way the grant did; walletDeltaTx would refuse the overdraft and leave the lever un-undoable",
 	"actions.go":           "the GM's grant and bulk grant clamp the mirror at zero rather than refusing an overdraft, which is the lever's designed behaviour and not a player's",
 }
 
