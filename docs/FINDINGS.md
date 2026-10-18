@@ -8403,3 +8403,35 @@ refuses `create_thread` and asks that the message was deleted, beside a thread t
 works: it is registered and its intro stays) and an intro that cannot be posted (nothing registered).
 **Drill** (the delete removed): `the intro of an event whose thread failed to open is still posted:
 the sweep that retries events without a scene every few minutes will post it again on every retry`.
+
+### The one counter the loop gate did not walk (v1.34.0)
+
+The release held a keeper, the market counter, the town at a stall, a caravan and a sect's donation
+points under the cheapest shelf anywhere, in every coin, and `TestNoWorldCrossingTurnsAShopIntoAMint`
+walked them all. The review that read the release asked which NPC buy price was missing from
+`arbitrageCeilings`, and it was `merchantValuation`: the ceiling a merchant's bid and its purchase of
+an unsold lot are both held to, computed as the item's sect value on the world's factor and never
+read against a shelf. The Nine-Echo Spatial Token sells for 340 stones at the Stoneback Array
+Workshop and carries a sect value of 900; Madam Wen's route passes the Highland Auction Lodge, so a
+lot listed at 900 was bid or bought at 900, five hundred and sixty up on one token without leaving
+the Mortal World. Across the ladder it was the whole fault of this release again, through the one
+door nobody had listed: Sister Qiu valued an 11-stone sword at 29 crystals. The gate was green
+because it held the spelling of the merchant's rule ("not above its valuation",
+`TestAMerchantDoesNotBuyAnUnsoldLotAboveItsValuation`) and not the rule every other counter obeys.
+`merchantValuation` now reads `cheapestShelfPrice` in the merchant's coin and keeps the unit one coin
+under it, answering 0 for an item no whole coin of the merchant's currency buys, which every bid and
+price is above; `arbitrageCeilings` walks every merchant beside the keepers, and
+`TestAMerchantPaysNoMoreThanTheCheapestShelfForALot` states the row. **Drill** (the shelf read taken
+out): `Madam Wen values one Nine-Echo Spatial Token at 900 stones while the cheapest shelf sells it
+for 340: list it at that and the merchant buys it, which prints money`, and the loop gate prints
+`3450 (shelf, ceiling) pairs print money; e.g. azure_flying_sword sells at the Azure Crown Forge for
+260 Low-Grade Spirit Stone and the merchant sister_qiu_of_the_frost_road pays 29 Low Spirit Crystal
+(2900 stones) for it`.
+
+The same review found a bound this release extended rather than made: the three combat death doors
+carry `base_samsara_years`, `minutes_per_year` and `max_wait_seconds` in the caller's payload, none of
+them in `callerOwnedNothing`, and the engine's own 320-year default is unreachable behind
+`maxI64(1, ...)`, so a caller that omits them gives a death a one-year wait. The production bot sends
+the setting on every door, so play is unaffected; moving the number into the engine is an engine
+`.env` key with its compose passthrough and the bot ceasing to send it, which is deferred to
+`docs/TODO.md` rather than done at the end of a release.

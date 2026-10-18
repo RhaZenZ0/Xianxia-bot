@@ -108,7 +108,45 @@ func arbitrageCeilings(t *testing.T, catalog worlddata.Catalog, itemID string, v
 	if cap, ok := sectDonationCap(catalog, itemID); ok {
 		add("a sect's donation points", "low_spirit_stone", cap)
 	}
+	// The merchants on the auction floors (v1.34.0): a merchant's bid and
+	// its purchase of an unsold lot are both held to merchantValuation, so
+	// that is the ceiling, per unit, in the merchant's own coin.
+	merchants := make([]string, 0, len(catalog.Merchants))
+	for key := range catalog.Merchants {
+		merchants = append(merchants, key)
+	}
+	sort.Strings(merchants)
+	for _, key := range merchants {
+		m := catalog.Merchants[key]
+		add("the merchant "+key, merchantCurrency(m), merchantValuation(catalog, m, itemID, 1))
+	}
 	return out
+}
+
+// The row the review found, stated: Madam Wen values the Nine-Echo Spatial
+// Token at its sect value of 900 while the Stoneback Array Workshop sells it
+// for 340, so a lot listed at 900 was bought at 900. Drill: take the shelf
+// read out of merchantValuation and this prints the 900.
+func TestAMerchantPaysNoMoreThanTheCheapestShelfForALot(t *testing.T) {
+	catalog := shippedCatalog(t)
+	m, ok := catalog.Merchants["madam_wen_of_the_silk_road"]
+	if !ok {
+		t.Fatal("madam_wen_of_the_silk_road is no longer in the catalogue; pick another merchant for this row")
+	}
+	shelf, ok := cheapestShelfPrice(catalog, "nine_echo_spatial_token", merchantCurrency(m))
+	if !ok || shelf < 2 {
+		t.Fatalf("the Nine-Echo Spatial Token has no shelf in %s (%d, %v); the row cannot be stated", merchantCurrency(m), shelf, ok)
+	}
+	if value := itemSectValue(catalog, "nine_echo_spatial_token"); value <= shelf {
+		t.Fatalf("the token's sect value (%d) no longer sits above its cheapest shelf (%d); the row no longer tests the cap", value, shelf)
+	}
+	got := merchantValuation(catalog, m, "nine_echo_spatial_token", 1)
+	if got >= shelf || got < 1 {
+		t.Fatalf("Madam Wen values one Nine-Echo Spatial Token at %d stones while the cheapest shelf sells it for %d: list it at that and the merchant buys it, which prints money", got, shelf)
+	}
+	if got3 := merchantValuation(catalog, m, "nine_echo_spatial_token", 3); got3 != got*3 {
+		t.Fatalf("a lot of three is valued at %d, not three times the unit %d", got3, got)
+	}
 }
 
 // No world crossing turns a shop into a mint. Drill: read cheapestShelfPrice

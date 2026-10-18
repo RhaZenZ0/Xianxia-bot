@@ -494,16 +494,45 @@ func merchantWorldFactor(world string) float64 {
 // base value of the goods (their sect value on the world's ladder), or
 // sixty percent of its own shelf price for something it stocks as a ware -
 // a merchant buys to resell, so it never pays what it would ask.
+//
+// Whichever it is, the unit stays one coin under the cheapest shelf anywhere
+// that sells the item, read in the merchant's own coin across the ladder
+// (cheapestShelfPrice), as every other NPC buy price is (v1.34.0): a sect
+// value of 900 against a shelf of 340 made listing a token at its valuation a
+// way to print money through the auction floor, the one counter the loop gate
+// did not walk. An item whose cheapest shelf is under a whole coin of the
+// merchant's currency is not something it buys at all, and the answer is 0,
+// which every bid and every price is above.
 func merchantValuation(catalog worlddata.Catalog, m worlddata.Merchant, itemID string, quantity int64) int64 {
 	quantity = max64(1, quantity)
+	var unit int64
 	if ware, ok := merchantWare(m, itemID); ok {
-		return max64(1, ware.Price*60/100) * quantity
+		unit = max64(1, ware.Price*60/100)
+	} else {
+		base := itemSectValue(catalog, itemID)
+		if base < 1 {
+			base = 5
+		}
+		unit = max64(1, int64(math.Ceil(float64(base)*merchantWorldFactor(m.World))))
 	}
-	base := itemSectValue(catalog, itemID)
-	if base < 1 {
-		base = 5
+	if shelf, ok := cheapestShelfPrice(catalog, itemID, merchantCurrency(m)); ok {
+		if shelf < 1 {
+			return 0
+		}
+		if unit >= shelf {
+			unit = max64(1, shelf-1)
+		}
 	}
-	return max64(1, int64(math.Ceil(float64(base)*merchantWorldFactor(m.World)))) * quantity
+	return unit * quantity
+}
+
+// merchantCurrency is the coin a merchant trades in; a merchant authored
+// without one trades in stones, as the caravan planner already reads it.
+func merchantCurrency(m worlddata.Merchant) string {
+	if m.Currency == "" {
+		return "low_spirit_stone"
+	}
+	return m.Currency
 }
 
 // merchantBidMinimumSecondsLeft keeps a merchant from sniping: it bids only

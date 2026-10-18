@@ -18,6 +18,7 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
 
 ## Open
 
+- **deferred** — *The length of a combat death's Samsara wait is the caller's number.* `combatItemPayload` carries `base_samsara_years`, `minutes_per_year` and `max_wait_seconds` into `recordTrueDeathAuthoritative` on all three combat death doors, none of them in `callerOwnedNothing`, and `samsaraScale`'s 320-year default sits behind `maxI64(1, ...)` where an absent or zero value cannot reach it: a caller that omits them gives a true death a one-year wait and a thirty-second cap. The production bot sends `REINCARNATION_BASE_SAMSARA_YEARS` on every door, so play reads the setting today; the old-age sweep already uses an engine constant, the right shape. The fix is an engine `.env` key (Go table, `.env.example`, compose passthrough, `docs/CONFIGURATION.md`), the three keys added to `callerOwnedNothing`, and the bot ceasing to send them - a configuration move that reaches every running world, which waits for a release that is not closing (v1.34.0).
 - **deferred (design)** — *Upper-world keepers have thin boards.* 790 of the 1,154 keeper buy lines pay
   nothing now: a Mortal-made good is worth under a whole coin up there once the ladder is read, so the
   cheap half of an upper economy has no NPC buyer. That is the ceiling doing its job, and it is also a
