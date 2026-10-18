@@ -8435,3 +8435,24 @@ them in `callerOwnedNothing`, and the engine's own 320-year default is unreachab
 the setting on every door, so play is unaffected; moving the number into the engine is an engine
 `.env` key with its compose passthrough and the bot ceasing to send it, which is deferred to
 `docs/TODO.md` rather than done at the end of a release.
+
+### The engine image ran a gate on a file it did not carry (v1.34.0)
+
+The `containers` job builds `go_core/Dockerfile`, which runs `go test ./...` inside the build on a
+context of `go_core` and `content` and nothing else: the content readers climb three directories
+out of their own package to `content/world.json`, and the Dockerfile keeps the `go_core` layout and
+copies `content` beside it for exactly that reason. The fixture gate this release added reads
+production's DDL out of `app/database/core.py` by the same climb, and, as the testing conventions
+ask, it fails rather than skips when the read fails. So the suite was green on every machine that
+had the repository and red inside the image, where the file was not there. The one file now comes
+along (`COPY app/database/core.py`), and
+`tests/python/contracts/test_engine_image_carries_what_its_tests_read.py` holds the shape: every
+repository path a Go test reaches through `../../../`, in either spelling the suite uses, is the
+source of a `COPY` in the build stage or sits under one, after asserting the reader found both the
+world file and the DDL. The server's path-traversal test sends `../../../etc/passwd` in a request
+body, which the reader does not count because it is text inside a string and not an argument.
+Reproduced here by building the image's context in a scratch directory: the gate prints
+`production DDL: open .../app/database/core.py: no such file or directory` without the file and
+passes with it, and the whole suite passes in that context. **Drill** (the COPY line removed): `a Go
+test reads app/database/core.py from outside go_core and go_core/Dockerfile does not COPY it into the
+build, so `go test ./...` inside the image fails on a file that is not there`.
