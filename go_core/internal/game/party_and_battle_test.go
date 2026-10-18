@@ -61,9 +61,6 @@ func withBattles(t *testing.T, path string) {
 	batch4Exec(t, path, battlesDDL)
 }
 
-func highDiceP7(n int) int { return n - 1 }
-func lowDiceP7(int) int    { return 0 }
-
 // --- the raid: who may join, who may be put out, who is waited for --------
 
 // raidParty makes a party by hand - 42 leads, 43 follows - and starts the Boar
@@ -448,7 +445,7 @@ func TestAPillDrunkInBattleLeavesItsToxicity(t *testing.T) {
 // opponent let a pill pass unanswered".
 func TestAPillDrunkInBattleCostsTheTurn(t *testing.T) {
 	// The dice lent high: the counter-attack lands.
-	defer gamerng.UseRoller(highDiceP7)()
+	defer gamerng.UseRoller(highDice)()
 	path := pillWorldDB(t)
 	battle := startBattle(t, path, 10, 10, 0, "npc:bandit", 1)
 	out, err := drinkInBattle(t, path, battle, recoveryCatalog(12, 0))
@@ -477,7 +474,7 @@ func TestAPillDrunkInBattleCostsTheTurn(t *testing.T) {
 // A held opponent spends the suppressed turn rather than answering, and the
 // pill still costs the turn.
 func TestAHeldOpponentSpendsItsSuppressedTurnOnAPill(t *testing.T) {
-	defer gamerng.UseRoller(highDiceP7)()
+	defer gamerng.UseRoller(highDice)()
 	path := pillWorldDB(t)
 	battle := startBattle(t, path, 10, 10, 1, "npc:bandit", 1)
 	out, err := drinkInBattle(t, path, battle, recoveryCatalog(12, 0))
@@ -497,7 +494,7 @@ func TestAHeldOpponentSpendsItsSuppressedTurnOnAPill(t *testing.T) {
 // Drill: end the pill's turn without the defeat branch and this prints "the
 // pill's turn left the battle active at zero hp".
 func TestAPillTurnCanLoseTheFight(t *testing.T) {
-	defer gamerng.UseRoller(highDiceP7)()
+	defer gamerng.UseRoller(highDice)()
 	path := pillWorldDB(t)
 	batch4Exec(t, path, `UPDATE characters SET vitality=1 WHERE user_id=42`)
 	battle := startBattle(t, path, 1, 10, 0, "npc:bandit", 6)

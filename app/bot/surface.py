@@ -375,7 +375,7 @@ _HUB_DEFINITIONS = (
         pages=(
             _hub_page("battle", "Active Battle", "Current battle, challenges and battle actions."),
             _hub_page("duel", "Duels", "Consent-gated nonlethal PvP duels."),
-            _hub_page("party", "Party", "Create, join, inspect or leave cultivation parties."),
+            _hub_page("party", "Party", "Create, join, inspect or leave cultivation parties; a leader may put a member out."),
             _hub_page("formation", "Formations", "Assign party positions and formation stances."),
             _hub_page("boss", "Boss Raids", "Persistent multi-phase party boss encounters."),
             _hub_page("hunter", "Bounty Hunter", "Respond to autonomous bounty-hunter pursuits."),
