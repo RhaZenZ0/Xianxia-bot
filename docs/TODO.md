@@ -18,6 +18,79 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
 
 ## Open
 
+- **deferred (design)** — *Upper-world keepers have thin boards.* 790 of the 1,154 keeper buy lines pay
+  nothing now: a Mortal-made good is worth under a whole coin up there once the ladder is read, so the
+  cheap half of an upper economy has no NPC buyer. That is the ceiling doing its job, and it is also a
+  content gap: a pass authoring upper-world demand for upper-world goods, or shelves priced on the
+  ladder, is the owner's call.
+- **deferred (design)** — *The market quote disagrees with the counter.* `market.rows` and
+  `market.quote` price a sale at 70 percent of the buy price with no floor, shelf ceiling or refusal
+  (`withMarketPrices`), while `market.trade` prices through `marketUnitPrice`; the quote can promise
+  more than the trade pays, or a sale the trade refuses. The quote needs the catalogue and the same
+  function.
+- **deferred (design)** — *Pickers that offer what the economy now refuses.* `/caravan dispatch`'s cargo
+  picker is the whole bag, and `/shop sell`'s picker reads the bag rather than the board the engine
+  trims, so a thing the counter will not pay for is still offered and then refused. Both want an engine
+  question ("what will this pay here").
+- **deferred (design)** — *Black-market and fence prices are not read against the ladder.*
+  `black_market.trade` sells and fences at its own prices in the post's coin; the arbitrage gate does
+  not walk it.
+- **deferred (design)** — *Other columns the schema clears on a character's leaving are still
+  deleted.* `territory_war_actions.user_id`, `sect_manor_projects.user_id` and
+  `deployed_location_arrays.owner_user_id` say `ON DELETE SET NULL` and the sweep still deletes their
+  rows. Each is a shared record whose row outlives the person; what a reset does with each is a design
+  call per table, and a gate ("every SET NULL column is anonymised or named here") waits on it.
+- **deferred (privacy, low)** — *An erased owner's Discord id stays in `caravans.owner_key`.* The row is
+  marked lost but keeps the TEXT key, which no subject column covers; anonymising it means a sentinel
+  the settlement and the dashboard's caravan list already treat as "no owner".
+- **deferred (privacy, low)** — *`docs/PRIVACY.md` does not name the player-keyed `world_state` rows
+  the erasure now deletes.*
+- **deferred (design)** — *Permanent qi that a settle already took.* Every `qi_max_bonus` starts at 0:
+  the qi a settle rebuilt over before v1.34.0 is in no column and cannot be told from the body's own
+  figure. The honest repair is a GM `set_resource_caps` per player, or a one-off replay of completed
+  `realm_perfection` / `body_realm_perfection` and `inheritances` rows into a bonus, which is an
+  estimate because the percentage compounded on the then-current pool.
+- **deferred (design)** — *A session on a capped Perfection path gains nothing.* The reply says so and
+  points at the path; refusing the session or turning a full stage into a different action is a pacing
+  call.
+- **deferred (design)** — *An old audit row's undo is still the absolute snapshot.* Grant, adjust-item
+  and teleport rows written before v1.34.0 carry no `moved` / `scene` and are undone as they always
+  were; they age out of the audit log's useful window, and a migration that rewrites them is not worth
+  a schema change.
+- **deferred (design)** — *Saving a shipped quest whose reward is above the GM budget is refused.* 35
+  shipped commissions and realm-road quests pay more than the default authoring budget, so they cannot
+  be opened and saved without lowering the reward first; the refusal names the budget. Whether an
+  unchanged reward should pass is a decision.
+- **deferred (design)** — *The update card has no "nothing to update" outcome.* An up-to-date
+  `--upgrade` is reported as `failed` with "nothing was changed: already the newest", because the
+  engine's terminal statuses are `done` and `failed` and the card prints `done` as "updated to vX". A
+  third status needs the engine's `updateStatuses`, the card and the watcher together.
+- **deferred (design)** — *The other capped walks over the roster.* `npcCrimes` (cap 5),
+  `npcBeastHunts` (cap 5) and `npcChildbirth` (cap 6) read their people in name order to a cap; the
+  first two rarely bind and childbirth consumes the state it walks. If a content change makes one bind,
+  call `rosterTurn` on its rows.
+- **deferred (design)** — *Households for people the catalogue adds later.* Seeding runs once per
+  world, so an NPC a content update adds afterwards is never offered a seeded marriage; the courtship
+  tick is how they marry. A per-NPC marker would be the shape if that matters.
+- **deferred (design)** — *A scene sweep for events other than the tick's.* The sweep covers the two
+  key shapes the tick mints (`auto:`, `secret_realm_rotation:`); a player's or a GM's event gets its
+  scene from the command that made it, and telling "no thread yet" from "never had one" for those keys
+  needs a marker in the payload.
+- **deferred (design)** — *The batch-5 fixture still lacks production's foreign keys.*
+  `setupBatch5AuthorityDB` (and `setupShopDB` on top of it) declares `equipment_instances`,
+  `character_item_appraisals`, `spirit_beasts`, `wild_beast_encounters`, `event_log`, `event_claims`
+  and the exploration-event tables without their `REFERENCES`; extend `fixtureKeyedTables` and that
+  DDL the same way and seed what the tests then miss.
+- **deferred (design)** — *A raid with an absent raider settles only on the next press.* The absence
+  gate is asked after every raid action and at a kick; no clock rings it, so a raid whose every
+  present raider has acted stays at "to act" until somebody presses. A raid ticker in the simulation
+  would settle it with nobody present.
+- **deferred (design)** — *The raid card does not mark an absent raider.* It still reads "to act" for
+  a raider the round will skip; an "away" tag wants the card to read the absence from the engine
+  rather than restating it.
+- **deferred (design)** — *Event manifestations have no per-day reward cap.* A `combat.finalize`
+  against an `event:` battle has no `target_key`, so insight and tempering are not limited per day;
+  the site's finite beasts bound it.
 - **deferred (design)** — *Quest rewards follow the player's feet, not the quest's world.*
   `grantQuestRewardTx` (`actions.go`) and `payCommissionRewardTx` (`commission_actions.go`) pay a
   quest's `spirit_stones` through `characterWalletDeltaTx`, the coin of wherever the player stands
@@ -81,7 +154,7 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   one right.
 - **deferred (design)** — *Python's map skips a city part's own roads; the engine's does not.*
   `_known_locations` walks only the city's `roads`, while `knownLocationsTx` adds the road neighbours
-  of both the part and the city. On the shipped content the two agree (none of the 477 parts carries
+  of both the part and the city. On the shipped content the two agree (none of the 375 city parts (484 locations in all) carries
   `roads`), but a district authored with its own roads would put a neighbour on the engine's map and
   not the picker's. A content gate that no part carries `roads`, or the twin walking both, is the
   fix, and which is the owner's call.

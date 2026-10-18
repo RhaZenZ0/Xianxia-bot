@@ -95,10 +95,32 @@ class TheNarratorStoppedCrashing(unittest.TestCase):
             "a bare subscript into the parsed content file is back; "
             "anybody it does not carry raises KeyError inside a narration call",
         )
+        # The same question of each field, off the tree as well: a bare
+        # `npc[field]` is a KeyError waiting, and the field is read through
+        # `npc.get(field)` somewhere - whichever quote marks spell it, and
+        # whether the read stands alone or sits inside `public_aim(...)`
+        # (v1.34.0), since the gate holds the rule, not its spelling.
+        tree = ast.parse(NARRATOR)
+        bare = {
+            node.slice.value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Subscript)
+            and isinstance(node.value, ast.Name) and node.value.id == "npc"
+            and isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str)
+        }
+        read_through_get = {
+            node.args[0].value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute) and node.func.attr == "get"
+            and isinstance(node.func.value, ast.Name) and node.func.value.id == "npc"
+            and node.args and isinstance(node.args[0], ast.Constant)
+        }
+        self.assertTrue(read_through_get, "the reader found no `npc.get(...)` at all")
         for field in ("role", "realm", "personality", "speech", "want", "fear"):
             with self.subTest(field=field):
-                self.assertNotIn(f"npc['{field}']", NARRATOR)
-                self.assertIn(f"npc.get('{field}')", NARRATOR)
+                self.assertNotIn(field, bare, f"a bare `npc[{field!r}]` is back")
+                self.assertIn(field, read_through_get, f"`{field}` is not read through `npc.get`")
 
     def test_the_resolver_is_injected_rather_than_imported(self):
         """`test_app_layout` puts `ai` below `database`, so this module may not

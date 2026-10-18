@@ -7779,3 +7779,595 @@ the raid door asks the player to type an encounter id before any raid exists; th
 journal's in-place edit does not clear the message's content and embed; and `QuestDashboardView`
 has no `interaction_check` and `MenuNextButton` checks no owner, so another member can press a
 public journal's door.
+
+### Goods cross a world untouched, and every ceiling was kept in one coin (v1.34.0)
+
+The shop economy's one defence against a mint is a ceiling under a shelf: a keeper never pays as much as the cheapest shelf asks, a market counter never pays it, the town at a stall pays one coin under it, a sect's points for a donation are capped at it. Every one of those read `cheapestShelfPrice`, and `cheapestShelfPrice` read the shelves **in one coin** (`merchant.Currency != currency` skipped the rest). Money converts when a cultivator crosses a world (`crossWorldsPurseTx`, a hundred to one a rung, rc.44); goods do not, and `teleportArrayActionGo` checks no cargo. So an Azure Flying Sword that a Mortal shelf sells for 260 stones was bought at a stall by the town for 259 crystals (25,900 stones, a hundred times the shelf), and the Immortal and Celestial keepers paid in coins ten thousand and a million times dearer again. The review measured 9,475 profitable (item, lower shop, upper keeper) pairs, the smallest at 16.7 times gross; one Mortal shelf (`azure_crown_apothecary`, cost 1,261, revenue 49,600) paid for both fares of the round trip. TODO.md recorded "no cross-shop profit" and it was true, per coin.
+
+The gates missed it for the reason the rc.44 purse fix left open: every price gate walks the catalogue **in one currency** (`TestNoRankTurnsAShopIntoAMint`, `TestAMarketCounterStaysInsideTheShopsBand`, `TestNothingBoughtAtAMarketSellsToAnNPCForMore` all take `shop.Currency` and a shelf in that same currency), so a catalogue that is sound in each coin passed while the exchange between the coins was never asked. The fix is one door: `cheapestShelfPrice` now carries a shelf in another world's coin into the one asked for through `ladderRate`/`ladderConvert` (the arithmetic `crossWorldsPurseTx` converts a purse with, extracted from it rather than copied) and rounds down, so every reader (`keeperBuyBase`, `highestNPCPays`, `marketUnitPrice`, `NPCStallCeiling`, `tradeRankSellPrice`, `sectDonationCap`) holds to the cheapest shelf in the whole world, in its own coin. A keeper's authored `buys` price is capped by it (`keeperBuyBase`, which `tradeSellQuoteTx`, `shop.sell`, the board and `highestKeeperBuy` all read), not re-authored. Where the cheapest shelf in the world asks less than one whole coin of the keeper's currency there is no price under it: the keeper does not buy, the board does not list the line, a market counter answers 0 and refuses. On the shipped content that is **1,154 keeper buy lines, 897 held lower (107 paid at a lower price, 790 not paid at all)**: Mortal 173 lines, 0 touched; Spiritual 258 lines, 13 lower, 209 refused; Immortal 331 lines, 27 lower, 267 refused; Celestial 392 lines, 67 lower, 314 refused. The upper worlds' keepers therefore buy what their own world makes and the Mortal goods that are worth more than a coin upstairs; they no longer buy Mortal herbs at crystal prices.
+
+`TestNoWorldCrossingTurnsAShopIntoAMint` is the gate: it states the ladder a third time off the raw currency table (`stonesPerCoin`), walks every (item, shelf in any world, ceiling in any world) pair - a keeper at the top rank of the trade, a market counter at any base, the stall, the sect - and asserts no ceiling is above a shelf, in stones (12,552 pairs, 9,557 across a world boundary, 135 items). Drill: make `shelfPriceAcross` return false for a different coin (the single-coin ceiling again) and it prints `13672 (shelf, ceiling) pairs print money; e.g. azure_flying_sword sells at the Azure Crown Forge (azure_crown_forge) for 260 Low-Grade Spirit Stone (260 stones) and the town at a stall pays 259 Low Spirit Crystal (25900 stones) for it: buy it on the lowest shelf, carry it across, and the sale prints money`. `TestAnUpperWorldKeeperHoldsItsLineUnderTheLowestShelfAnywhere` pins the sword and herb rows (260 stones is a 2-crystal shelf; a keeper pays 1; the herb has no price); its drill prints `260 Low-Grade Spirit Stones read as 260 (true) Low Spirit Crystals, want 2 (rounded down)`, and with the market's `shelf < 1` refusal removed `a market in low_spirit_crystal pays 1 for a Mortal herb, want 0`. `TestAnUpperWorldCounterRefusesWhatItsBoardDoesNotList` drives the board and the counter at a Spiritual keeper; its drill (the board's `keeperBuyBase` check removed) prints `Broken Halo Provisions lists a Mortal herb at a counter that pays crystals`. Five existing gates read a keeper's authored line or one coin and were moved onto the door (`keeperBuyBase`, a shelf of 1 read as a whole coin, not a profit): `TestNothingBoughtAtAMarketSellsToAnNPCForMore`, `TestAMarketCounterStaysInsideTheShopsBand`, `TestNoRankTurnsAShopIntoAMint`, `TestACraftedDonationCannotBeRedeemedForLess`, and the claim fixture below.
+
+### A caravan paid above every shelf (v1.34.0)
+
+`caravanDispatchActionGo` fixed the payout at `max(5, base) * qty * 1.15` (1.35 smuggled) and never looked at what the goods cost: 196 of 231 (coin, item) rows paid above the cheapest shelf after the toll, median 1.29 times, the Void-Stride Talisman 5.3 times, the margin the same for fifty as for one, and it compounded with the keeper loop. The gates missed it because nothing walked a caravan's payout against a shelf at all. `caravanUnitPayout` is now the one statement: per unit `min(round(max(5, base) * mult), one coin under the cheapest shelf anywhere)` (`shelfReference`, the grade-aware reference `NPCStallCeiling` now shares), an item no shop sells keeps its worth with the margin, and cargo whose cheapest shelf is under one whole coin of the origin world's money is refused before the road is paid for ("a caravan will not carry Spirit Herb: ..."). The shipped rows moved: 29 to 53 items per origin coin were paying above their shelf; 44 (crystal), 62 (immortal) and 75 (celestial) items are refused from the upper worlds' cities. `TestACaravanPaysNoMoreThanTheCheapestShelf` walks every (origin coin, item, margin) row in stones against the independent ladder; drill (the `min64` ceiling removed) prints `284 (coin, item) rows pay above the cheapest shelf; e.g. low_immortal_stone: a caravan leaving a city of the Immortal World pays 12150 for each void_stride_talisman and the cheapest shelf in the world asks 1800 of that coin (6.75x): buy it there, freight it, and the margin is the profit`. `TestACaravanOutOfAnUpperWorldRefusesCargoWorthLessThanACoin` drives the dispatch from the Spiritual capital: ten Mortal herbs are refused with the purse untouched, four swords fetch one crystal each.
+
+### A merchant bought any unsold lot at its starting bid (v1.34.0)
+
+`MerchantsBid` checks `merchantValuation` before a merchant bids; `MerchantBuysUnsoldLot`, the last bidder on a lot nobody bid on, checked a purse and a route and nothing else, so a lot listed at any starting bid inside a merchant's budget was bought at it, and the budget is refilled by NPC caravan payouts. A lot listed for a number the seller picked was a door out of the world's money. It now declines when `price > merchantValuation` exactly as the bidder does, and the lot expires unsold. `TestAMerchantDoesNotBuyAnUnsoldLotAboveItsValuation` lists a bone comb one stone over the dearest merchant's valuation; drill (the check removed) prints `old_hu_the_peddler bought one bone_comb for the seller's starting bid of 241 when the most any merchant values it at is 240`.
+
+### auction.sell's end time and currency were the caller's (v1.34.0)
+
+The engine checked that a lot ended in the future and, for a local floor, not too far off; it never asked how soon, and it accepted any currency the catalogue knew. A one-second lot is a lot nobody can answer (merchants skip anything under 300 seconds, so it fed the unsold-lot buyer above), and the bot's currency picker offered the sixteen currencies for a floor that deals in one. Now the engine refuses a lot shorter than `auctionMinLotMinutes` (5, with 30 seconds' slack for the request's own travel, held equal to the picker's `Range` floor by a test that reads both) and a currency that is not the base coin of the house's world, and `/auction sell` offers the house's own coin only (`auction_house_currency_autocomplete`; the GM's grant keeps the full list). An older bot's payload that names the right coin still works. Drills in `TestAuctionSellRefusesAShortLotAndAnotherWorldsCoin`: without the minimum `a lot of 1 seconds was listed on a floor whose minimum is 5 minutes: err=<nil>`; without the currency check `a Mortal floor listed a lot in crystals: err=<nil>`; `test_the_shortest_lot_the_picker_offers_is_the_shortest_the_engine_takes` with the picker floor at 1: `/auction sell offers lots from 1 minutes and the engine takes lots from 5`. `TestEveryHousesDefaultCurrencyIsItsWorldsOwn` holds the 49 houses' `default_currency` to the engine's rule. The engine playtest listed lots of two and five seconds to watch them settle; it now lists the shortest the floor accepts and closes the lot's clock on its scratch database (`end_lot_now`).
+
+### A player could claim a rival's neutral seat (v1.34.0)
+
+`simulation/sect_claims.go` kept a local `homeOf` map so the world's sects leave a rival's neutral seat alone; `territoryClaimActionGo` had no such rule, so a rank-30 member standing in a rival's seat could take it. (The old test of the claim's history row did exactly that: an Azure Cloud Deacon claiming Riverguard City, Blood River Sect's seat.) The rule is now one function, `game.SectHomes`, built sorted so two sects sharing a home resolve the same way every day; the world's claim step reads it and the player's neutral branch refuses with the seat's sect named ("Riverguard City is the seat of Blood River Sect, and no other sect may claim it while it lies neutral"). The war branch is unchanged. `TestAPlayerCannotClaimARivalsSeat` drives the claim on the shipped catalogue and then the seat's own sect claiming it; drill (the refusal disabled) prints `a Deacon of Azure Cloud Sect claimed Blood River Sect's neutral seat: err=<nil>`. `TestAPlayersClaimAndTheWorldsReadTheSameSeats` reads both files by AST for the `SectHomes` call. The Python panel has no padlock that anticipates a territory refusal, so none was added.
+
+### KEEPER_GRADE_CEILING was a number nothing read (v1.34.0)
+
+`app/rules/item_grades.py` restated the engine's `keeperGradeCeiling` in Python with no reader and no test holding it to the Go. Deleted. `TheGradeModuleStatesNoNumberNothingReads` holds the module: every constant it states is read by something in `app/` or `scripts/`; drill (the constant put back) prints `KEEPER_GRADE_CEILING in app/rules/item_grades.py is read by nothing: delete it or hold it to the engine`.
+
+### A reset or an erasure destroyed another player's auction lot, stranded the bidder's escrow and left a caravan that stalled the tick (v1.34.0)
+
+`character.reset` and `admin.player.erase` end a person's rows with one shared sweep,
+`applyErasureTargets`, and neither ran the escrow resolver a death runs. Three faults came of that
+one omission. `auctions.current_bidder_user_id` was classified a **delete** column in
+`erasureSubjectColumns` - the schema's own `ON DELETE SET NULL` said the opposite - and the sweep
+walks tables alphabetically, so a bidder's reset or erasure deleted the *seller's* lot, and the item
+the seller had put in escrow, with it. A seller's reset deleted the lot with the *bidder's* stones in
+it (a bid debits the wallet when it is placed, so the stones live only in the lot). And a player's
+`traveling` caravan was never swept: `caravans.owner_key` is TEXT, no column names a person, so an
+erased owner's caravan stayed on the road, and `payCaravanOwner` paid a wallet whose
+`currency_wallets -> characters` foreign key refused. The error went out of `advanceCaravans`, the
+advanced-maintenance bundle rolled back, and it did so every tick for as long as the row stayed
+`traveling` - which after an erasure is for ever, taking auctions, merchants, eras and seclusions
+with it. A reset healed itself only if the player came back and began again.
+
+Why the gates missed it: the Go reset and erasure fixtures built `auctions` and `caravans` by hand or
+not at all, and the simulation fixture's `currency_wallets` carried no foreign key, so the payout to
+an owner with no character succeeded in the test and failed in production (the npc_consignments
+lesson, a fixture that cannot fail the way production fails). `death_escrow.go` had said for
+fourteen releases that "there is one place a life ends"; a reset and an erasure are two more, and
+nothing held them to the same resolver.
+
+The fix is one function with three callers. `resolveLeavingEscrowTx` (auctions through
+`resolveDeadPlayersAuctionsTx`, caravans through `markPlayersCaravansLostTx`) is what
+`resolveIncarnationEscrowTx` now calls for a death, and what `character.reset` and
+`admin.player.erase` call before their sweep: the lots the person was selling close and refund their
+high bidder, a lot they were winning loses only the bid, and a caravan on the road is lost with its
+owner. `auctions.current_bidder_user_id` moves to `erasureAnonymise` (and to `characterResetReleased`,
+so a closed lot's winner link clears instead of refusing the reset). `adminErasePlayer` takes the
+catalogue, because the refund goes through `walletDeltaTx`. The reset reply carries the resolver's
+counts under `escrow`. `payCaravanOwner`'s caller, `advanceCaravans`, no longer returns an error over
+one row's data: a player's caravan whose owner has no `characters` row is marked `lost`, gets a
+`caravan_events` row, and the batch goes on (rc.28's rule: a batch skips a bad row).
+
+Drills, each run and restored from a copy:
+
+- Resolver turned into a no-op and the bidder column back to a delete: the bidder test prints
+  "character.reset took the seller's lot out of the world: 0 lot(s) left, want 1 - the item the
+  seller put in escrow went with it" (and the same for admin.player.erase); the seller test prints
+  "character.reset stranded the bidder's escrow: wallet is 100, want 150 (the 50 stones the lot held
+  come back)"; the caravan test prints "character.reset left 1 caravan(s) traveling for an owner who
+  is gone; the tick that settles them pays a wallet that no longer exists"; the closed-lot test prints
+  "deleted a closed lot that belongs to another seller"; the reply test prints "auctions_cancelled=0,
+  want 1".
+- Only the classification reverted: the closed-lot test is the one that fails ("character.reset
+  deleted a closed lot that belongs to another seller"), as it should - an active lot is already
+  cleared by the resolver, and the column is what remains for the closed ones.
+- `advanceCaravans` with the orphan check disabled (`if gone {` -> `if false && gone {`):
+  `TestACaravanWhoseOwnerIsGoneIsLostNotFatal` prints "one caravan with no owner ended the tick:
+  sqlite error 19: FOREIGN KEY constraint failed".
+- The Python contract (`test_privacy_erasure.py`) with the column back to a delete prints
+  "auctions.current_bidder_user_id is classified a delete again: erasing or resetting a bidder deletes
+  the seller's lot with the item in escrow"; with the reset's release dropped,
+  `test_character_reset.py` fails on the same column in `characterResetReleased`.
+
+### Lot cards and realm roles survived an erasure (v1.34.0)
+
+The auction floor keeps one Discord message per lot, and `sync_lots` handled a lot whose row had
+vanished by *forgetting the message id* - the card stayed on the public floor, still reading
+"Seller: <name>", for good. An erasure or reset of a seller is exactly how a row vanishes, and the
+stall card had been taken down at those two doors since v1.7.0 while the lot cards had never been
+looked at. `admin_erase` also revoked only the Cultivator role: the "Xianxia • <world>" access roles
+and the presence role of the capital the account stood in are generated for it by
+`require_character`, which never fires for an erased account again, so they stayed.
+
+`auction_feed.player_lot_cards` reads, before the engine call, the card records of the lots a person
+sells (role `seller`) or leads (role `bidder`); `settle_player_lot_cards` runs after the engine has
+committed - a seller's cards are deleted and forgotten, a bidder's card is refreshed so it stops
+naming the leaving high bidder - and neither raises. Both levers call them in the stall-card shape.
+`sync_lots` now deletes the message of a lot whose row is gone. `_revoke_realm_roles` (runtime.py)
+takes off exactly the access and presence roles the two syncs generate, beside the Cultivator role,
+from `admin_erase`.
+
+Why the gates missed it: the stall card's read-before / delete-after ordering was a test of the
+stall only, and the feed's tests drove `sync_lots` for cards that exist and for lots that settle, never
+for a lot that disappears. Drills:
+
+- `sync_lots` back to forgetting only the id: "sync_lots forgot a vanished lot's message id and left
+  the card standing on the floor, still naming its seller".
+- `admin_erase` stops reading the lot cards (`lot_cards = []`): "admin_erase never reads the
+  person's lot cards, so admin.player.erase leaves them standing" (the ordering test also fails if
+  the read moves after the engine call or the settle before it).
+- `_revoke_realm_roles` call removed: "an erased account keeps its realm access and presence roles,
+  and with them the view of every channel gated on having played".
+
+### Player-keyed world_state rows survived a rebirth, a reset and an erasure (v1.34.0)
+
+Seven `world_state` keys are one person's, spelled `<prefix>:<discord id>`: `cultivation_insight`,
+`cultivation_stance`, `cultivation_manual`, `cultivation_last_fail`, `cultivation_reroll`,
+`player_lifespan_clock` and `road_transit`. The id is inside the key, not in a column, so
+`erasureTargets` (which reads the schema for Discord ids) could not see them and nothing else swept
+them: a rebirth carried the old body's banked insight and, worse, its lifespan clock's
+`PausedGameMinutes` into the next body (a life that was paused for a retreat ages slower than its
+years); a reset left them for the next `/begin`; an erasure left a Discord id in the key of a row
+nobody owned. `realmGateOpen` also read a banked insight as "banked" and discarded the stored
+`realm_index`, so a bank from another realm (a GM's `set_realm`, a stale row) opened this realm's
+gate.
+
+`player_world_state.go` holds the one list of prefixes and `clearPlayerWorldStateTx`, the one
+function that deletes them; `clearIncarnationStateTx` (the rebirth) and `applyErasureTargets` (the
+sweep reset and erasure share) both call it. `bankedInsightAt(conn, userID, realm)` is the one answer
+to "is the insight I hold for this gate", used by the gate, the bank action and the status read; a
+bank that does not say its realm opens nothing (absent is not realm zero), and a stale bank no longer
+blocks banking at the right realm.
+
+Gates: `TestEveryPlayerWorldStateKeyIsInTheList` (the engine's seven key functions, written out in
+the test, against the list), a rebirth / reset / erasure test each that writes one row per writer for
+the subject, a neighbour and `world_clock` and holds the door to clearing exactly the first, and
+`TestABankedInsightOpensOnlyTheGateItWasBoughtAt`. The Python contract
+`test_player_world_state.py` finds every `func x(userID int64) string { return fmt.Sprintf("<p>:%d",
+userID) }` in the Go tree and holds the list equal, and holds the two doors to the call. Drills:
+
+- Rebirth door pointed at nobody (`clearPlayerWorldStateTx(conn, -1)`): "a rebirth left 7
+  player-keyed world_state row(s) under the subject: the next body, or an account that was erased,
+  still carries them"; the erasure door the same ("an erasure left 7"), the reset "a reset left 6"
+  (the sixth is the fixture's empty `road_transit` row, which every authoritative action's own
+  transit check settles and deletes before the reset body runs).
+- `road_transit` dropped from the list: `TestEveryPlayerWorldStateKeyIsInTheList` prints the two
+  lists, and the Python contract prints "These player-keyed world_state keys have a writer and are
+  on no list (cultivation_reroll from cultivationRerollKey)" for a dropped `cultivation_reroll`.
+- Realm comparison replaced by `return true`: "an insight banked at realm 1 opened the gate out of
+  realm 2: a bank from another realm is not a licence for this one".
+
+### A soul between lives had no door to Samsara (v1.34.0)
+
+Found by following a death through the menus. The death notice, `require_character` and the engine's
+reset refusal all send a dead cultivator to `/character -> Samsara -> Reincarnate`, and `reincarnate`
+and `afterlife` have no slash command of their own: the hub is the only road. The curriculum
+(`feature_unlocks`) held that page's leaves, and `soul` and `inheritances` on Overview, to realm 5, and
+`_curriculum_opened` - the provider that already steps aside for a sect member - never asked whether
+the character was alive. A cultivator who died at realm 2 met a collapsed "opens at realm 5" line
+where the way back to a life should have been, with every message in the game pointing at it.
+
+**Why no gate saw it.** The curriculum gates were written about the first hour and the living: the
+floors (`reset` open, the beginner path's leaves open, every status read open) are all things a
+*living* player needs, and the sect exemption's test drove a member, never a corpse. rc.32's "never the
+door into the system" was read as a rule about status reads and not as one about a road a player is
+*sent to*. This is the standing "check a rule against 'and the rest'" again: the dead are the rest.
+
+**The fix.** `_curriculum_opened` opens every leaf of the `character / Samsara` page (read off the live
+hub, so a leaf moved onto it is carried) plus `soul` and `inheritances` when the character's
+`life_status == "deceased"`. The sect read and the life read fail independently: a failed read opens
+nothing and does not take the other with it. Both callers already held the character row and pass it,
+so the extra read costs no round trip. `require_character`'s text and the engine's refusal stay; they
+are right once the page is open. Advertising only - nothing on a press consults it.
+
+**Drills.** `test_the_dead_have_a_door_to_samsara.py` builds the real `LayoutHubView` for a deceased
+realm-2 character. Comparing the status against `"never"` instead of `"deceased"` fails four tests, the
+first printing *"a dead cultivator at realm 2 has no door to Samsara: the curriculum still holds these
+back, and the death notice, the reset refusal and require_character send them there"* (the others:
+*"a dead cultivator at realm N is held back from what they need"*, the exemption-only-opens set
+difference, and the failed-read test). The living realm-2 cultivator's page still prints its collapsed
+line, which is what keeps the first half from being vacuous. The curriculum gate
+(`test_the_curriculum_opens_as_you_cultivate.py`) now also holds that the provider asks for
+`"deceased"`, calls `_the_dead_need`, and that set reads the live Samsara page.
+
+### The cultivate reply told a Perfection trainee to stop (v1.34.0)
+
+Reported from play. `/cultivate` at a full stage printed *"This stage is already full: the session
+gathered nothing, banked nothing and risked nothing. Break through before meditating again."* over a
+session that had just refined the Perfection path - the engine credits an open path on a full stage by
+design (rc.37), the `★ Realm refinement deepens` line printed two lines above it, and the card
+contradicted itself. At stage 9 the ready line said *"Choose /ascend -> Perfection -> Start"* to
+somebody already walking the path, and the body reply carried the same ready line.
+
+**Why the gates missed it.** The engine's training credit is tested in Go and the reply was never
+tested at all: the only pin on the line was `test_rc5_pacing`'s `assertIn("This stage is already full",
+SOURCE)`, a substring that proves the sentence exists, not when it is said. And the engine result
+carried nothing that said whether a path was open, so the reply *could not* have been right at stage 9.
+
+**The fix.** The engine's `perfectionTraining` now also returns whether a path is open and the result
+carries `perfection_active` (bool, on both `cultivation.train` and `cultivation.body_train`; true also
+when the path's training is already at its cap and gained nothing). Two helpers in
+`app/bot/commands/cultivation.py` are the one door for both replies: `_full_stage_line` (a session that
+refined the path says so; one on a capped path points at `/ascend -> Perfection`; the old line is kept
+for nobody-on-a-path) and `_ready_line` (stage 9 says *Start* only when no path is open, *Continue the
+path* when one is; an engine that does not send the key is read as having none, i.e. the old line, so a
+rolling deploy is safe). The reply decides nothing.
+
+**Drills.** Reverting the helpers to the old unconditional lines fails three tests, naming *"'refining
+your Perfection path' not found in '...Break through before meditating again.'"*, *"'/ascend ->
+Perfection' not found in '...'"* and *"'Continue the path under **/ascend -> Perfection**' not found in
+'...Stage 9 is full. Choose **/ascend -> Perfection -> Start** ...'"*. The Go test
+`TestTheCultivateReplyKnowsWhetherAPerfectionPathIsOpen` drives both tracks with the dice lent high:
+no path, an open path (gain > 0) and a path at its cap (gain 0, still open).
+
+### A "permanent" qi_max reward lasted until the next look at the pool (v1.34.0)
+
+`settleQi` rebuilds the pool from the body - realm, spirit, channels, method, dantian - and writes it
+back to `characters.qi_max` on every read of the pool. The three permanent rewards wrote `qi_max`
+alone: a perfected realm's +10% (+5% for the body path), a secret realm's inheritance, and
+`admin.player.set_resource_caps`'s qi_max. Each held until the cultivator next opened their qi - often
+the same minute - and was then gone. The verifier's probe: 543 -> 597 after the trial -> 543 after the
+next settle. `cultivation.py` promised "permanent".
+
+**Why the gates missed it.** Every test of a reward read `qi_max` straight after the write
+(`TestBatch5SecretRealm...` asserts `qi_max == 101`), on the connection that wrote it, before anything
+settled - the rc.38 shape, a read-back without the next reader. And nothing connected the two halves of
+the rule: the capacity formula had no term for an earned amount, so there was no place for a bonus to
+live and no test could name one.
+
+**The fix (schema 81).** `characters.qi_max_bonus INTEGER NOT NULL DEFAULT 0` (migration
+`qi_max_bonus_outlives_the_settle`, added by the migration alone and not in the base DDL: rc.57).
+`settleQi` adds it, flat, after the ghost-form multiplier (`qiMaxBonusOf`); the three writers go through
+one door, `addQiMaxBonusTx` (perfection and the admin lever by the rise they cause, the inheritance
+directly), and still write `qi_max` so the figure is right before the next settle. A rebirth leaves it
+behind (`incarnationScopedLaterColumns`: `qi_max_bonus` -> 0), since the install sets `qi_max` to a new
+life's pool and the old bonus would otherwise ride on top. Every read and write is guarded on the
+column (`qiMaxBonusColumn`) for the migration window (v1.1.0): without it the reward is paid as it
+always was and nothing refuses. `DASHBOARD_REVIEWED_SCHEMA_VERSION` is 81 (the column is on a table the
+Player Editor already reads; no lever is new).
+
+**The admin lever (decision).** `set_resource_caps` still means "the cap is N": the bonus moves by
+`N - qi_max` (the stored, settled figure), so the cap is N at the next settle. It may go negative, so a
+GM can lower a cap below the body's own and have it hold (before, a lowered cap also reverted). The
+audit row's before/after carry `qi_max_bonus`. The lever is still not reversible by
+`admin.audit.undo_last` ("cannot be safely undone", unchanged), so there is no undo to keep right; the
+audit row records both sides if one is wanted later.
+
+**Drills.** Removing the bonus term from `settleQi` fails four tests, each printing *"qi_max fell back
+to 4598 (capacity 4598) on the next settle after the trial raised it to 5057"* (the fixture's base is
+4598, not the probe's 543; the shape is the probe's; body track 4827), *"... after the inheritance raised
+it to 2962 from 2961"* and *"... after a GM set the cap to 5098"*. Reverting each writer alone (the
+perfection statement back to a plain `Execute`, the inheritance's `addQiMaxBonusTx` zeroed) fails its
+own test with the same sentence. Dropping `qi_max_bonus` from the rebirth list prints *"qi_max_bonus=60
+after a rebirth; the old life's qi rides into the new body"*. A fixture with no column (the
+absent-column test, and every other Go fixture) shows the window degrades: the reward is paid, the
+settle returns the body's own capacity, nothing errors.
+
+### An undo gives back what the lever moved, and a teleport goes home by the door (v1.34.0)
+
+A review of the GM's levers drove three undos with real play between the lever and the undo, which
+the v1.33.0 sweep had not (it fixed the progress levers; these three are the same fault, "restore the
+snapshot, not what the lever wrote", in the economy).
+
+- **A currency grant's undo mirrored the sheet by name.** The forward mirrors `characters.spirit_stones`
+  when the currency is the base currency of the world the target stands in (`characterBaseCurrencyTx`);
+  the undo did it when the currency was `low_spirit_stone`. At Spirit Jade Capital a grant of 7 crystals
+  moved the sheet 10 -> 17 and the undo left it at 17, while a grant of 5 stones (which never moved the
+  sheet) was "undone" by taking 5 off it, 17 -> 12. The fixture put the character at "Old Place", which
+  belongs to no world and so falls back to the Mortal stone: the one place the two rules agree.
+- **A grant's and an item adjustment's undo wrote the absolute snapshot.** Grant 500, the player earns
+  300, undo: the wallet went to the 0 the audit row held, taking the 300 with it. An adjustment of +3
+  herbs, +10 picked since, undo: the row was deleted.
+- **A teleport's undo was a bare `UPDATE characters SET location`.** The forward goes through
+  `moveCharacterTx`, which converts the purse across a world boundary and the scene row is rewritten to a
+  world scene at the destination. The undo (admin_undo.go's allowlist entry in `TestAWorldIsLeftByOneDoor`
+  said "the money was never converted", which is false for a teleport) put the location back and left
+  12,345 Mortal stones as 45 stones and 123 crystals, and the player on a scene at a place they were no
+  longer in.
+
+**Why no gate saw it.** Every undo test drove the lever and the undo back to back at a place outside the
+catalogue, so absolute-snapshot and delta were the same number and the world rules had nothing to
+disagree about; the one gate that read the teleport undo (`TestAWorldIsLeftByOneDoor`) was *given* the
+exemption in a sentence nobody re-derived.
+
+**The rule, extended.** An undo writes back what its lever wrote. For an additive lever that is the
+amount it moved, taken off again and clamped at zero: the audit row's `after.moved` (new) is the signed
+amount actually put on the row - an adjustment floored at zero moved less than it asked - the undo
+applies its negative and the redo its own positive. The grant's mirror follows the wallet by what the
+wallet actually moved, and only when the currency is the base currency of the world the character stands
+in *now*. The teleport undo goes home through `moveCharacterTx` and restores the `player_scene_state` row
+the forward snapshots (`before.scene` / `after.scene`, `null` for a player with no scene row). A reversal
+that has to use an engine door rather than a statement returns an `sqlStmt` with `run` set, which is handed
+the catalogue.
+
+**Old rows keep their old reversal.** An audit row written before this release carries no `moved` and no
+`scene`; the presence of the key is the marker, so such a row is undone exactly as it always was (absolute
+snapshot, bare location, mirror by name). Said in the code and held by
+`TestAnAuditRowFromBeforeTheDeltaKeepsItsOldReversal`.
+
+**What each drill prints** (every one run against the broken tree - the reversals forced down their old
+branch - and restored from a copy):
+
+- `admin_undo_levers_test.go:47: sheet=17 after the undo, want 10: the undo left the crystal mirror where the grant put it`
+- `wallet=0 after the undo, want the 300 play earned since the grant`
+- `herbs=0 after the undo, want the 10 play added since (the undo deleted the row)`
+- `stones=45 after the undo, want 12345: the purse stayed converted`
+
+Two gates changed with it, each for a stated reason: `TestAWorldIsLeftByOneDoor`'s `admin_undo.go` entry now
+says it is the legacy fallback only, and `TestThePurseHasOneDoor` names `admin_undo_levers.go` (the clamped
+undo cannot use `walletDeltaTx`, which refuses an overdraft); `TestAReversalDeletesARowOnlyThroughDeleteIfIdle`'s
+adjust-item entry is now keyed by the named function it resolves to, `reverseAdjustItem`.
+
+### Two automation toggles the engine refused (v1.34.0)
+
+`admin.automation.set` answered "unknown automation system" for `npc_consignments` and `secret_realms`:
+`adminAutomationSet`'s `defaults` table (which doubles as the allowlist) lacked both, while the Discord
+command offered both, the dashboard listed both and the simulator reads both (`world.go`'s
+`npc_consignments`, `advanced_maintenance.go`'s `secret_realms`). `get_automation_settings` also lacked
+`secret_realms`, so the bot's own reader did not know the switch existed. The dashboard's list was
+additionally a subset (five engine systems never shown); it is now the whole table.
+
+**Why no gate saw it.** Four copies of one vocabulary, each edited when the simulation grew a switch, none
+read against the others. `tests/python/contracts/test_automation_toggles_agree.py` holds the Go table the
+authority and the other three equal to it, by key and by default; each reader asserts it found something in
+`setUpClass` before the comparison is trusted.
+
+**Drills.** Removing the two Go keys: `ADMIN_AUTOMATION_CHOICES and the engine's adminAutomationSet disagree:
+the engine's table has [] that ADMIN_AUTOMATION_CHOICES lacks, and ADMIN_AUTOMATION_CHOICES has
+['npc_consignments', 'secret_realms'] the engine would refuse as an unknown automation system` (and the same
+for core.py and the dashboard). Removing `secret_realms` from core.py: `get_automation_settings and the
+engine's adminAutomationSet disagree: the engine's table has ['secret_realms'] that get_automation_settings
+lacks`. `TestTheAutomationSwitchAcceptsEverySystemTheSimulatorReads` drives the engine with both keys.
+
+### The Set interval button was dead (v1.34.0)
+
+The Simulation card's `<button id="setInterval">` was wired as a bare `setInterval.onclick = ...`. The
+dashboard reaches its controls by bare id, which works because a browser exposes ids as window properties -
+but it does not override a property the window already has, so the handler was set on the timer function and
+the button did nothing, silently, for as long as it shipped. The id is now `setSimInterval`.
+`tests/python/unit/test_no_dashboard_id_shadows_a_window_property.py` holds every id in `index.html` and
+`app.js` off a literal list of Window properties (node's globals are not the browser's); `setUpClass`
+asserts the reader found the known ids first. **Drill:** putting the id back prints `app.js gives an element
+the id ['setInterval'], which the window already owns: a bare reference to it reaches the window's property,
+not the element, and the control is dead (the Set interval button, v1.34.0)`.
+
+### Saving a quest in the Workbench wiped its variants and owner and cut long labels (v1.34.0)
+
+`questDraftFrom` built the draft from the stored row without `variants` or `owner_user_id`; the server's
+`_validated_quest` already carried both through *when present*, so it made `variants: []` and no owner, and
+the engine's `quest.save` UPDATE writes `variants_json` and `owner_user_id` from the draft. Opening and
+saving any commission wiped its three terms (all 140 had them), and a personal quest became one for the whole
+pool. `validate_quest_definition` also cut an objective label at 90 characters: 22 labels on the realm road
+carry the command to press in bold and run to 113, so the saved copy of `realm_road_4` ended `... Cla` with an
+unclosed `**`. Found beside it: `readQuestEditor` rebuilt `rewards` from its three form fields only, dropping
+any other reward key (`household_standing`).
+
+**Fix.** The draft carries `variants` and `owner_user_id` (a string or null; a snowflake) from the row; the
+form keeps reward keys it does not show; the label cap is `MAX_OBJECTIVE_LABEL = 200`.
+
+**Why no gate saw it.** Nothing round-tripped a stored quest through the editor: the existing tests built
+drafts by hand, which carry whatever the test author remembered. `QuestSaveValidationTests.
+test_saving_an_unchanged_quest_changes_nothing` takes every shipped commission and realm-road quest (and one
+personal quest), runs the real `questDraftFrom` and `readQuestEditor` under node, then the real
+`_validated_quest`, and asserts variants, objectives, rewards, owner and the plain columns come out equal; it
+asserts it checked every row and that it met variants, labels over 90 and the personal quest, so a loop that
+skipped everything cannot pass. The GM reward budget (which refuses 35 shipped quests outright - an honest
+refusal, not a change) is lifted inside the test so the realm road takes part.
+`test_the_label_cap_holds_every_shipped_label` holds the cap above the longest shipped label.
+
+**Drills.** Dropping the variants line from `questDraftFrom`: `commission_qiao_replaced_crate: saving wiped or
+changed its variants` (the stored list of three terms against `[]`). Dropping the owner line:
+`personal_one: saving changed who owns it` (`None != 123456789012345678`). Putting the cap back to 90:
+`realm_road_4: saving changed its objectives (a label is cut, a field dropped)` and `113 not less than or equal
+to 90 : a shipped objective label is longer than the cap validate_quest_definition cuts to`.
+
+### The operator's scripts said one thing and did another (v1.34.0)
+
+Three shell scripts, each finished and each with one wire missing; the tests stubbed everything *around* them and none ran the script itself.
+
+**A lock named before it was held.** `update.sh` set `LOCK_DIR` and then ran `mkdir "$LOCK_DIR"`. The EXIT trap removes `LOCK_DIR` unconditionally, so the second updater, the one `mkdir` refused with "Another Xianxia RP update appears to be running", left through the trap and deleted the directory the *first* updater was holding. A third copy walked in beside a live install. The lock path is now a separate name (`LOCK_PATH`) and `LOCK_DIR` is assigned only after `mkdir` succeeds, so the trap can only remove a lock this process made. Why nothing saw it: no test ever ran `update.sh` for real; `test_update_watcher.py` only fed the watcher a fake updater. Drill (the fix reverted, `update.sh` from HEAD): `AssertionError: False is not true : the refused updater removed the running one's lock`.
+
+**An up-to-date `--upgrade` that left as exit 3.** `fetch_release; rc=$?` under `set -e` ends the script on the function's own `return 3`, so the `[ "$rc" -eq 3 ] && exit 0` line below it never ran: "already the newest" exited 3 and `update_watch.sh`, which reads any nonzero exit that never printed "Stopping" as a refusal, reported `failed` with an empty detail after it had closed the world. It is `rc=0; fetch_release || rc=$?` now, and the exit is 0. That alone would have made the watcher report `done` and the card say "updated to vX" for an update that installed nothing, so the watcher keys on update.sh's own sentence ("is already the newest on the") with exit 0 and reports `failed` with "nothing was changed: Installed ... is already the newest ..." (the dashboard card prints `done` as "updated to v..."; it has no "nothing to do" outcome, and a request that changed nothing must not read as an install). It is keyed on the sentence and not on a missing "Stopping" line, because a tree without `stop.sh` installs without printing one. Drills: `update.sh` reverted, `AssertionError: 3 != 0 : --upgrade exited 3: Installed 1.3.5 is already the newest on the stable channel (1.3.5).`; the watcher branch reverted, `AssertionError: 'done' unexpectedly found in ['acked', 'fetching', 'done', 'heartbeat'] : an update that installed nothing was reported done`.
+
+**A reset that announced itself before it knew it could happen.** `reset_database.sh` deleted every tracked Discord thread and posted the "world reset" announcement, and only then took the safety backup, the one step that can abort ("Could not create a safe SQLite backup"). A failed backup left the database untouched and the threads and announcement gone. Its header contradicted itself: the usage line said "clean Discord, backup" and the paragraph under it said the backup is "always taken first". The backup block is now above the Discord cleanup, the header agrees, and `--help` (a `sed` over a fixed line range) is re-ranged to the longer header. The new tests run the script for real in a scratch folder with a stub `docker`: a failed engine backup must leave no call to the bot container and the database in place; a good one must run backup, then cleanup, then delete. Drill (script from HEAD): `AssertionError: Lists differ: ['compose exec -T -e XIANXIA_CONTROL_TOKEN...'] != []` (the bot was called although the backup failed), `AssertionError: 1 not less than 0 : the Discord cleanup ran before the safety backup`, and the header assertion naming `confirm, backup, clean Discord, reset, restart`.
+
+### The world's people take turns (v1.34.0)
+
+`npcTravel` read the living NPCs `ORDER BY npc_name` and broke at `travelMovedCap` (40); `npcConsignments` did the same to a cap of six finds. Both walks began at the top of the alphabet every tick, so the first forty names and the first few finders took every turn and the later half of the roster never moved or turned anything up. The verifier's Monte Carlo over the real roster, 400 ticks, reached 309 of 585 people with the sixths at [98, 97, 97, 17, 0, 0]; consignments were [98, 97, 71, 6, 0, 0]. The tests held only the cap (`TestNPCsActuallyTakeTheRoad` seeds exactly forty peddlers, so the cap and the roster were the same number) and no test ever asked who did not get a turn. One helper, `rosterTurn`, now rotates the ordered rows to a start taken from a hash of the tick's game minute, and both walks call it. A hash and not `gm % n`: ticks land a day (1440 minutes) apart, and 1440 shares a factor with 585 (45), so a modulo visits thirteen starts that never cover the roster. `TestTheWholeRosterGetsATurnOnTheRoad` and `TestEveryFinderEventuallyHasATurn` lend the dice so everybody acts and ask whether all hundred of a hundred-name fixture moved or consigned at least once. Drill (rotation replaced by `start := 0`): "60 of 100 people never took the road in sixty ticks; the last who never moved is Peddler 099" and "94 of 100 finders never consigned anything in 700 ticks; the last who never did is Grave-Robber 099". The other capped walks the reviewer listed (`npcCrimes`, `npcBeastHunts`, `npcChildbirth`) were not changed: their caps rarely bind (four criminal NPCs; ~5.3 expected hunts against a cap of 5), and childbirth consumes the state it walks.
+
+### An upper-world hall member could never climb (v1.34.0)
+
+`sectPopulation` stands a sect-hall NPC at their world's floor plus an offset (8, 16 or 24, plus 0-7), and none of those names is in the catalogue, so `npcTalentCeiling` measured their ceiling from realm 0: the highest it could be was 12. A Spiritual World hall member climbed only on the top 10% band; an Immortal or Celestial one (realm 16 and up) was at or above the ceiling the day they were made, and every breakthrough pass overwrote their activity with "Has gone as far as their talent allows". The talent tests used a Mortal World porter, where origin 0 is right, and no test put a hall member in an upper world. The origin is now the higher of the catalogue realm and `worldFloorRealm(world_name)`, the function `sectPopulation` places them with, so the two cannot disagree about where a world begins; `npcBreakthroughs` reads the NPC's `world_name` to pass it. `TestAnUpperWorldHallMemberCanStillClimb` uses the real catalogue, a name with two or three realms of talent, an Immortal World disciple at realm 17, and asserts they break through and the ceiling is floor + band. Drill (origin back to 0): `an Immortal World disciple at realm 17 is at realm 17 and "Has gone as far as their talent allows"`.
+
+### The public disappearance row no longer says where they are (v1.34.0)
+
+`RecordNPCMissingTx` wrote "The last anyone can place them is the road out of {where}" with `where` the NPC's current location, and a missing NPC stays exactly where they went missing. The row is public, so it reaches the narrator's RAG and the Quest Forge's quest story, which put the summary into the quest text: the place a searcher was supposed to have to work out was printed. v1.20.2 had said a missing person is never placed, and only the death notice carried an assertion for it. The summary now names only the home ("Nobody can say which of the roads out of {home} they took"); `where` is still accepted so the batch and the GM lever hand over what they have, and is never written into a public text. `TestAdminSetMissingLosesAnNPCTheWayTheBatchDoes` (game) gains the assertion the death-notice test has, and `TestTheDisappearanceNeverNamesWhereTheyAre` (simulation) drives the batch with the dice lent. Drill (old text restored): `the disappearance gives away where they are: "Herbalist Mo left Greenriver Town and never arrived. The last anyone can place them is the road out of Moonfen Marsh, ..."` and `the notice gives away "Riverguard City", where they are: ...`.
+
+### A world's households are written once (v1.34.0)
+
+`Bootstrap` runs after every character creation, reincarnation and start, and `seedHouseholds` read "the singles" each time, so every call married a fresh share of whoever was still single and planted retroactive children (no courtship, no mourning, no wedding cap). The probe: households seeded per call 94, 17, 3, 1, 0; married 188 to 230; children 111 to 133. The tests bootstrapped once. A `world_state` row, key `households_seeded` (`householdsSeededKey`), is written in the bootstrap transaction when there was a roster to read and consulted first; a world that predates the marker and already holds a spouse or a descendant is marked on its first bootstrap and left alone (a change reaches the worlds already running). `TestHouseholdsAreSeededOncePerWorld` bootstraps four times; `TestAWorldWithHouseholdsAlreadyIsNotSeededAgain` removes the marker and bootstraps again. Drill (marker check disabled): `bootstrap 2 seeded 17 household(s) and 18 child(ren) into a world that already had its past` and `a world with 188 married people was seeded 17 more household(s) on the first bootstrap after the marker`.
+
+### A missing master's bond is not ended as death (v1.34.0)
+
+`npcDiscipleBonds` ended any active bond whose master or disciple had `status<>'alive'`, which includes `missing`; the disappearance path never releases bonds, so a missing master's disciples were told "the master is dead" for good and a rescue does not restore an ended bond. Now `status='dead'` for both sweeps. `TestAMissingMastersBondSurvivesUntilTheyDie` holds the bond active while the master is missing and ends it with the same words when they die. Drill: `a missing master's bond was ended: "ended:the master is dead"`.
+
+### A newborn's name asks the registry (v1.34.0)
+
+`freeChildName` and `seededChildName` checked `npc_descendants` and `npc_civilization_state` but not `npc_registry`, which `freeSectMemberName` has always asked. A child who drew a registry-held name (rare: the relatives' pool overlaps only "Bo", and the surname must match) was accepted, grew up, and at maturation was marked `generated_as_npc=1` while `RegisterNPCTx` refused the name, so the child never became a person. Both walks now call one function, `childNameTaken`, which includes the registry when the table exists (the migration window). `TestAChildIsNeverNamedForSomebodyTheRegistryHolds`. Drill: `freeChildName named a newborn "Chen Jin" (err <nil>); the registry already holds that name`.
+
+### A party could be walked into, not emptied, and a raid waited for ever (v1.34.0)
+
+`party.join` asked nobody's leave and did not look at whether the party was fighting, so a stranger could join a party in the middle of a raid. Their seat was real and their `boss_participants` row was not (the roll is taken when the raid starts), so they could neither act nor leave until it ended, and an uninvited joiner standing away from the lair would make the leader's `boss.start` fail on "all party members must be alive at the lair". Nothing could put a member out, and the round gate (`COUNT(*) ... acted_round<round`) waited on every active raider for ever: one raider who closed Discord held the whole party at "to act" with no way past it.
+
+Four changes close it. `party.join` is refused while the party has an active encounter. A new leader-only `party.kick {user_id}` (the member's seat, formation places and, during a raid, their `boss_participants` row go together through `removePartyMemberTx`, the one door `party.leave` uses too; a kicked raider forfeits the claim, because a victory writes claims for the rows that remain; and the round is asked at once whether it was waiting on them). And the round gate is one function, `resolveBossRoundTx`, which waits only for a raider heard from within `raidAbsentSeconds` (30 real minutes, `RAID_ABSENT_MINUTES`, in the waits table beside the cooldowns): an absent raider's turn is skipped, not forfeited, they are struck as the rest are and the next round waits on them afresh. The clock is the raider's own `updated_at`, which their action, the boss's answer and the raid's start write; a support heal no longer writes it on the healed raider, or a leader could keep an absentee on the clock by healing them. Because a round that only an absentee holds up has nobody left to press anything, a raider who has already acted and presses again asks the gate first, and acts in the round that follows.
+
+The gates missed it because every raid test started a party of overwhelming cultivators who all act, and the fixtures wrote `updated_at=0` for participants, which no gate read. Drills (each on the Go test it names): dropping the encounter check from join prints "a stranger joined a party in the middle of a boss raid"; dropping the leader check prints "a member put the leader out"; leaving the kicked raider's row in place prints "the round still waits on a raider who is no longer in the party"; counting every raider as waiting prints "the round is still waiting on a raider gone quiet for two hours: round 1"; dropping the settle before an acted raider's press prints "an acted raider could not move on a round held up only by an absentee: you already acted this round"; writing `updated_at` on a healed raider prints "a heal kept an absent raider on the clock: round 1". The Python gates: compose without the key prints "compose falls back to RAID_ABSENT_MINUTES=nothing, the engine defaults to 30"; `.env.example` at 45 prints "...says RAID_ABSENT_MINUTES=45, the engine defaults to 30"; the harness not driving the kick prints "the engine playtest drives none of these" for `party.kick`.
+
+### A Spare after an easy fight paid every time (v1.34.0)
+
+`combat.start` has no cooldown, and `combat.finalize` paid insight XP (5 + the opponent's realm), the body's tempering by use, a Spare's +2 karma and Merciful standing, and the fate point at severity 3, on every win, uncapped, against the same opponent as often as the player cared to press Challenge. The karma deeds of v1.9.1 are capped through `event_log`; this payout never was.
+
+A win over the same opponent now pays once per world day. The fight is never refused: `battleRewardFreshTx` keys an `event_log` row `battle_reward:<target_key>:day:<game_minute/1440>`, the way `grantDeedKarmaTx` does, so a reset or erasure takes the memory with the character, and a second win the same day pays no insight, no tempering, no Spare karma, no Merciful standing, no fate; a kill's cost is not a payout and is never waived. An opponent with no `target_key` (an event manifestation, whose site is already finite) has no key and is not limited here. The reply carries `reward_repeated` and the card says so. An unreadable record pays, as the deed reads do.
+
+It slipped past because no Go test drove `combat.finalize` at all (the only mentions were the AST gates). Drill: letting every win pay prints "the second Spare of the day paid again: map[... fate_after:3 insight_xp_awarded:13 karma_score:54 ...]".
+
+### A pill in the battle panel was clean and free (v1.34.0)
+
+`combat.recovery_item` restored vitality and qi and did nothing else: no pill toxicity (`item.use` adds it on the same pill), no turn (an attack, a stance or a Law technique is answered by the opponent; a pill was not), and `condition.treat` healed `characters.vitality` while the fight read `battles.player_hp`, so a treatment taken mid-fight mended a body the fight never looked at.
+
+The toxicity step is one function, `addPillToxicityTx`, called by `item.use` and the panel's pill. The pill now ends the turn: the counter-attack and the defeat branch (fate rescue, wound, true death) that `combat.turn` and `combat.technique` each carried a copy of are now `opponentCounterTx` and `battleLostTx`, and all three call them (a third copy would have been the next drift); `counterStanceTx` gathers the Law, companion and armour terms for the technique and the pill. The payload takes `minutes_per_year`, `base_samsara_years` and `max_wait_seconds` as the other two do, and the bot sends them; an older bot sends none and the engine's defaults stand. `condition.treat` syncs `battles.player_hp` to the new vitality. The bot words the answer through one function (`_answer_lines`) for the technique and the pill, and a battle the pill's answer ended says what happened before it says the battle is over.
+
+Gates that read the old shape by AST moved with the rule (they fail exactly when the rule moves): the defeat-survival sweep now expects the two sites `battleLostTx` holds; the path-ability gate asks `battleLostTx` for its two `defeatWoundSeverity` calls and each of the three fight actions for one `battleLostTx` call; the one-counter-TN gate asks `opponentCounterTx` for the single `counterDefenceTN` roll and the three actions for a call each and no roll of their own. Drills: dropping the toxicity step prints "a pill drunk in battle left no toxicity"; dropping the counter prints "the opponent let a pill pass unanswered"; dropping the defeat prints "the pill's turn left the battle active at zero hp"; dropping the player_hp sync prints "the treatment healed the character to 18 and not the battle (10)"; and on the Python side the pill dropping the death scale prints `KeyError: 'minutes_per_year'`, the pill wording the answer itself prints "_use_battle_recovery_item words the opponent's answer on its own", and a kick carrying a field of its own prints "Lists differ: ['user_id', 'leader'] != ['user_id']".
+
+### A battle outlived the fighter (v1.34.0)
+
+`combat.start` and `combat.turn` checked `LifeStatus`; `combat.technique`, `combat.recovery_item` and `combat.finalize` did not (the C7 probe healed eight vitality on a deceased character and finalized a won battle after death), and an active battle survived every death: it kept its opponent locked, kept its panel pressable and kept a finalize to claim its rewards from the grave. The three actions now refuse a deceased incarnation as the turn does, and `recordTrueDeathAuthoritative`, which every death calls (a defeat, the old-age sweep, a GM's `true_death`), marks the person's active battles `abandoned`.
+
+The gates missed it because every combat test built a living character. Drills: dropping the abandon prints "a deceased character's battle is still active" (driven through the old-age sweep, the death no fight is near); dropping the check from the technique, the pill or the final decision prints "combat.technique answered a deceased character with opponent already defeated" (and the same for `combat.recovery_item` and `combat.finalize`, each naming the action).
+
+### The dialogue prompt named a hidden master's want (v1.34.0)
+
+`Narrator.talk_to_npc` redacted one line for a hidden master, `secret`, and printed `want` and
+`current_goal` as authored. `NarratorContextBuilder` had always substituted the goal ("Continue their
+established private affairs without exposing concealed identity or power"), so the two builders that
+name an NPC's aim had diverged: Old Gou's want ("cultivate a reputation large enough that people stop
+checking his claims") told the model, and through it a leading question, that he is a fake, and Old
+Beggar Chen's ("observe whether the younger generation still contains cultivators worth teaching")
+that he is no beggar. The gates missed it because the redaction was a hand-written `if` in each
+builder and the only test of it read the context builder.
+
+`public_aim` in `app/rules/npc_memory.py` is now the one place the substitution is written; the
+dialogue prompt (want and goal, the director's goal included) and both context-builder sites call it,
+and it asks for the `hidden_master` block, not for truthiness. `test_narrator_hidden_master.py` builds
+the real dialogue prompt for every shipped hidden master and holds the want absent (with a guard that
+the reader finds the masters and that the prompt reached the router, so a quiet reader cannot pass).
+Drill: reverting the long-term-want line prints `the dialogue prompt for hidden master Old Beggar Chen
+leaks their want: 'Observe whether the younger generation still contains cultivators worth teaching.'`
+
+### A tick that failed after the events spawned dropped them (v1.34.0)
+
+`RunDue` commits system by system and returns the runs it got through beside the error that stopped
+it. `simulationRunDue` answered 400 on any error and threw the runs away, and the bot's worker only
+opens a thread for an event that arrives in a run, so an `advancedMaintenance` error (or a transport
+failure) right after `autonomous_world_events` committed left an active `world_events` row nobody could
+walk into until it expired; nothing recovered it. Both halves were each correct alone: Go reported the
+error, Python raised on it.
+
+The engine now answers 200 with `{"runs": [...], "error": "..."}` when the tick committed anything
+(`runDueAnswer`; the 400 stays for a request error or a tick that did nothing), the client returns the
+runs and logs the error (an older bot ignores the extra key), and the worker sweeps every cycle, outside
+the tick's own `try`, for an active tick-spawned event (`auto:` and `secret_realm_rotation:` keys, the
+two shapes the tick mints; a player's or a GM's event gets its scene from its own command) with no
+`event_threads` row and no `thread_id`, at least a minute old, retried at most every five minutes. The
+per-event body of the worker moved into `open_engine_event_scene`, the one door both the run loop and
+the sweep use. Drills: reverting `runDueAnswer` prints `a tick that committed a run answered 400, so
+the bot never hears of its events`; disabling the sweep's reader prints `an active event has no thread,
+and the sweep did not open one exactly once`.
+
+### `/check` and the `/action` modal narrated live and spent nothing (v1.34.0)
+
+`test_narrator_budget.py` promised that every door is metered; it listed the doors the first author
+remembered. `/check` called `narrate_action` (a live `narrate_it` call) with no `serialized_user_action`,
+and the `/action` panel's modal resolved a scene action the same way, so two doors could spend the
+free-tier quota without touching the per-player bucket (the engine's gates still refused a closed or
+secluded player, in different words). `/check` now wears the decorator and keeps its place in
+`OPEN_COMMANDS` (the closed-door gate is the tree's, not the decorator's). The modal submits through
+`_submit_scene_action`, which wears it; the meter is spent there and not in `_resolve_scene_action`,
+because typed play reaches the resolver already holding the token its picker spent. The new gate walks
+every caller of `talk_to_npc` / `narrate_action` / `narrate_breakthrough` in `app/bot` by AST and asks
+what spends the token, with the two callers that are reached after a spend named. Drill: removing the
+decorator from `/check` prints `check (app/bot/commands/sense.py) reaches a live narration with no
+meter: /check and the /action modal were unmetered live-narration doors`.
+
+### The tribute button said Claimed before the engine answered (v1.34.0)
+
+`TributeClaimView.claim` disabled the button, relabelled it, stopped the view and edited the message,
+then called the engine. A refusal (the cooldown another press had spent, a closed world) left a card
+reading Claimed over a gift nobody was paid, and no button to press again. The view now defers, calls the
+engine, and only after a payment disables the button and edits it; a refusal leaves it pressable; a
+second press while the first is in flight is swallowed. The edit that follows a committed payment is
+guarded so a Discord failure cannot hide the receipt. Drill: disabling the button before the call prints
+`the tribute button disabled itself before the engine answered`.
+
+### The NPC-master picker offered masters at `max_disciples` (v1.34.0)
+
+`discipleship.npc_request` refuses a master who already keeps `max_disciples` (3) cultivators; the
+picker read the master's rank and realm and never the count, so a full master was a first choice and a
+dead end ("... already keeps 3 disciples and will take no more"). `get_sect_npc_roster` now carries
+`disciples`, counted the way the engine counts (`npc_mentorships` rows naming the master), and the
+picker's filter, now `_masters_who_would_hear`, leaves out a master at the cap. A row with no count is
+offered, since an unreadable count is not a zero that excuses nobody and the engine still refuses. The
+test seeds a real database with a master holding three mentorships and holds the Go source to the same
+count and comparison. Drill: neutralising the filter prints `the picker offers a master who already
+keeps the most disciples the engine allows`.
+
+### The fixture that took the rows production refuses (v1.34.0)
+
+`setupBatch4AuthorityDB`, the schema most of the `game` package's tests run on, declared
+`inventory`, `currency_wallets`, `profession_progress`, `character_recipes`, `cave_abodes`,
+`character_birth_family` and `item_provenance` with the columns production has and none of the
+keys. Every engine connection opens with `foreign_keys=ON`, so production refuses a row for a
+character who does not exist, and the fixture took it: a test could insert an orphan and pass on a
+database production would never have let it write. The rule was already in CLAUDE.md ("a fixture
+must carry the constraints production carries") and was learned once, on `npc_consignments`; the
+batch-4 fixture was not read against it because nothing compared the two DDLs.
+
+The keys are copied from `app/database/core.py` (`cave_abode_access` too, which is keyed on both
+`cave_abodes` and `characters`, and `character_birth_family` on both `characters` and
+`birth_families`). Adding them and running `go test ./...` found exactly **two** tests inserting
+orphans, out of the whole suite: `TestSenseGroundReadingTracksTheCultivationMultiplier` built a cave
+for user 1 who was never a character, and `TestTheRecordCarriesOnlyTradesPractisedPastNovice` wrote
+a trade row for user 9 with no character 9. Each now seeds its parent row. The tail was far shorter
+than the ~120 transitive callers suggested because almost every test seeds characters 42 and 43 in
+the fixture itself. `TestTheFixtureKeepsProductionsForeignKeys` (new, `fixture_foreign_keys_test.go`)
+holds it from now on: the fixture DDL was moved to the constant `batch4AuthoritySchema`, and the test
+reads `app/database/core.py`'s `CREATE TABLE` for each of the eight tables and requires every
+`REFERENCES` production writes (column, parent, parent column, `ON DELETE`) to be in the fixture. It
+asserts the reader found keys before it trusts the comparison. **Drill**: dropping the key from the
+`currency_wallets` line prints `currency_wallets: production keys "user_id -> characters(user_id) on
+delete cascade" and the batch-4 fixture does not - a test can insert a row production refuses; copy
+the REFERENCES clause from app/database/core.py and seed the parent rows the tests then miss`.
+
+Three gates also went quiet exactly when they should have been loudest: `shippedCatalog`
+(`currency_worlds_test.go`, forty-odd callers), `TestTheRealWorldIsWalkable`
+(`simulation/npc_movement_test.go`) and `TestProjectionMatchesTheRawEntries`
+(`contentsync/contentsync_test.go`) skipped when the content file could not be read, and the content
+file is always in the repository: a skip there turns every gate that rides on it green and silent.
+All three are `t.Fatalf` now. **Drill**: pointing `shippedCatalog` at a path that is not there makes
+the ladder gates print `--- FAIL: TestTheStoneLadderIsWholeInEveryWorld ... shipped content not
+readable from here: open ../../../content/nowhere.json: no such file or directory` instead of
+skipping.
+
+`OBJECTIVE_PATHS["raid_win"]` named **Boss Raids → Start**; the raid is won by the party and
+reported per raider from **Claim** (`_raid_claim`), so the line a bare-labelled quest printed pointed
+at the first step of the flow (the card Start opens does carry Claim, so the quest still advanced).
+It now names **Claim**. `test_a_quest_names_a_command_that_can_advance_it.py` read only the labels
+authored with a path of their own; it now also walks `OBJECTIVE_PATHS` (the door every bare label is
+sent down) and requires each hub-leaf door to resolve to a handler that reports that very type.
+**Drill**: reverting the entry prints `raid_win: '/combat → Boss Raids → Start', but boss_start()
+reports nothing`; it was the only entry that failed.
+
+### The Azure Reed Sect, and content nothing reads (v1.34.0)
+
+Greenriver Town's description, an elder's role and an NPC's secret all named an "Azure Reed Sect".
+The roster has no such sect (the Azure Cloud Sect is the one), and all three strings are what the
+narrator is handed, so it could send a player looking for a sect that was never in `sects`. Renamed
+at the three places and in the three simulation test files that copied the name. A new gate in
+`test_world_content_gate.py` (`EverySectNamedInProseExistsTests`) walks every string in the content
+file for `<Capitalised words> Sect` (a leading article stripped) and requires each to be a declared
+sect; the allowlist `UNDECLARED_SECTS_ALLOWED` holds one entry, "Major Sect", which is the title of a
+kind of sect in `sect_system` ("Major Sect Recruitment"), not a name. **Drill**: restoring "Azure
+Reed Sect" in the Greenriver description prints `content names a sect `sects` does not declare ...:
+'Azure Reed Sect' in 'A mortal town beneath ...'`.
+
+Five keys the content file carried and nothing read (measured with a grep over `go_core`, `app`,
+`dashboard`, `scripts` and `tests`; the Go `worlddata` structs do not parse any of them, so the
+field gate has nothing to say) were removed: `commission_givers.*.tier_ceiling` (120),
+`npcs.*.recommendation_tn` (6), `locations.*.meeting_channel_slug` (4),
+`world_rules.forbidden_arts.*_public_use.karma_multiplier` (2; `forbiddenPolicy` reads only
+`regional_unrest`, `family_stability_loss` and `sect_cohesion_loss`) and `items.*.use.consume` (39;
+the item-use action takes one from the carried inventory unconditionally, step 1 of `item_use_actions.go`). Two stay: `narration_pool.scenes.*.placeholders` is read
+by `FallbackPoolTests` in `test_narrator_budget.py` as the contract a scene's variants may format
+against (a removal made it KeyError, so it stayed and the plan's "read by nothing" was wrong about
+it), and `npcs.*.hidden_master.{true_name,true_title,public_threat,mentor_tags}` stay because the GM
+inspector prints them.
+
+README: the govulncheck paragraph no longer spells a Go patch version (the directive had already
+moved to `go 1.26.0` / `toolchain go1.26.9` and the sentence said `1.25.13`); it points at the `go`
+and `toolchain` lines in `go_core/go.mod`. "The whole 160-manual catalogue" became "the whole manual
+catalogue (`technique_system.manuals` in `content/world.json`)", with no number to drift.

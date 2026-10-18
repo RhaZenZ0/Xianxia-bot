@@ -164,7 +164,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 80; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 81; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### Subsystem notes (`docs/ARCHITECTURE.md`)
@@ -181,7 +181,7 @@ One line each; read the matching `###` section of `docs/ARCHITECTURE.md` before 
 - **RAG / memory** (`app/ai/rag`) — SQLite FTS5, permission-filtered before scoring; retrieval surfaces known canon and never creates it.
 - **Structured world history** — `world_history_events` with `public` / `participant` / `faction` / `hidden` visibility; hidden never reaches narrator RAG.
 - **World events and their sites** — an event is a row plus a finite site (`world_event_nodes`, `world_event_npcs`) from `event_sites` in content; every spawn path must call the site spawn.
-- **Narration routing** — routine and epic chains ending in procedural text; a live call only for dialogue, an epic beat or an explicit ask, behind one per-player action meter.
+- **Narration routing** — routine and epic chains ending in procedural text; a live call only for dialogue, an epic beat or an explicit ask, behind one per-player action meter that every door reaching a live call wears (an AST gate walks the callers, v1.34.0).
 - **Narration routes in the dashboard** — the panel picks the five slots from OpenRouter's live free catalogue; the engine write (`admin.narration.set_chain`) comes first, then a poke to the bot.
 - **Dashboard** (`app/dashboard`, `dashboard/`) — the authenticated GM control plane: reads through Go query sessions, every mutation audited, `/api/capabilities` as the coverage contract, the Player Editor owning every `player.*` lever.
 
@@ -195,11 +195,11 @@ wire missing, so before calling a change done, ask which door still does not rea
 
 - **One door per rule.** A rule written in two places drifts apart: the clock (rc.39), the purse (rc.43), a world's money and the way out of it (rc.44), the catalogue lookup (v1.7.0), insight XP (rc.58). One function, every site calls it, an AST gate holds it; a content vocabulary or a tuple is given a name and imported, never copied (v1.0.12).
 - **A bound that lives in the client is not a bound (rc.48).** The caller never says what time it is, how long a wait or a retreat lasts, or what happened (rc.56, v1.2.3, v1.3.1); the engine decides and refuses or ignores the caller's version. Presentation may anticipate a refusal, never be the only place the rule lives (v1.0.6).
-- **Gating is advertising, never a bound (v1.0.9).** The curriculum, a path's doors and a place's buttons decide only what is drawn; the engine stays the only refusal, and a floor on a leaf nothing but a hub press can reach is a bound (v1.1.0).
+- **Gating is advertising, never a bound (v1.0.9).** The curriculum, a path's doors and a place's buttons decide only what is drawn; the engine stays the only refusal, and a floor on a leaf nothing but a hub press can reach is a bound (v1.1.0). A floor is read against the character's state, not the realm alone: the dead sit at realm 0 and the only door out of death was behind a realm floor (v1.34.0).
 - **A surface must not offer what the engine will refuse (rc.46),** and a card must not name what its own picker will not offer (v1.0.8, v1.0.10): pickers, journals and next-step buttons ask the engine's own question (craft v1.0.5, a shop's door v1.7.1).
 - **Never hide a status read.** *"never a status read or the door into the system, because a road nobody can see is a road nobody learns exists"* (rc.32); every status read stays open at realm 0 (v1.0.13). Check a rule against "and the rest", not only the examples it cites.
 - **A promise a setting can falsify is a promise nobody is holding (rc.56, v1.0.13).** A card, panel or error that states a number, a wait or a window reads it from the engine or the setting; the bot prints the engine's numbers and restates no rule (rc.55, v1.30.0).
-- **Money and worlds each have one door (rc.43, rc.44).** Stones are written through `walletDeltaTx`, a price or reward is in the base currency of the world it is paid in, and `moveCharacterTx` is the only way out of a world.
+- **Money and worlds each have one door (rc.43, rc.44).** Stones are written through `walletDeltaTx`, a price or reward is in the base currency of the world it is paid in, and `moveCharacterTx` is the only way out of a world. A ceiling compared with a price from another world is converted along the currency ladder first (v1.34.0): a bound kept in one coin and read against another is no bound.
 - **A city's gate is that city (v1.0.9).** Compare places through `cityOf` / `city_of_place`, never by string equality; `world_of_location` answers None, not the Mortal World (rc.52).
 - **A price is walked against its loop before it ships (v1.0.17, v1.2.3, v1.8.0).** A sell price stays under every price that sells the item, anywhere in the same coin; walk the whole catalogue as the gate does.
 - **Hidden is hidden for every consumer.** A reader documented as a superset is filtered by each consumer (v1.0.13), and an unwitnessed deed is `hidden` (rc.24).
@@ -207,16 +207,18 @@ wire missing, so before calling a change done, ask which door still does not rea
 **Values and failures**
 
 - **A fallback that looks like a value is not a sentinel (rc.28).** `seller_user_id=0`, `gradeIndex` (rc.55), `0 or 50` (v1.0.13), a missing era key read as 0 (v1.0.7): ask whether a field is absent, never whether it is falsy; an unknown key refuses or answers 1, never the bottom rung; an unreadable reading says "unknown", never a zero (v1.0.8).
-- **One system's error ends the tick (`npc_consignments`, rc.28).** `runSystems` returns on the first error and takes every batch ordered after it; a batch skips a bad row and never returns an error over one row's data.
+- **One system's error ends the tick (`npc_consignments`, rc.28).** `runSystems` returns on the first error and takes every batch ordered after it; a batch skips a bad row and never returns an error over one row's data. What the systems before the error committed is reported beside it, not thrown away (v1.34.0): a run that answers 400 with the spawned events inside it leaves rows nobody is told to open.
 - **Read back on a fresh connection (rc.38).** A test that writes and reads on one open connection cannot see a handler that never committed (`npcFound`); drive the production dispatch with the real world file (v1.0.11).
 - **State a player sits behind is settled by the action, not by a flag-gated sweep (rc.56, v1.0.4);** a lock on state only an action can clear self-clears unconditionally, and the way out stays open.
 - **Record before the reply, tell after it (v1.0.5, rc.28).** A quest report is written before the command answers and announced after it; a reply that raises after the engine committed tells the player nothing happened (v1.0.3), so key every result a formatter reads.
 - **A panel provider never raises (v1.0.10).** A line drawn beside everything else (the Here line, hidden doors, the seat lines) costs the line, not the card; an unreadable flag or roster fails towards play (rc.41, v1.0.9).
-- **Anything that deletes a person's rows collects their Discord threads and cards first and deletes them after the engine commits (v1.0.8, v1.7.0);** a table keyed on a person is classified in `erasureAnonymise`.
+- **Anything that deletes a person's rows collects their Discord threads and cards first and deletes them after the engine commits (v1.0.8, v1.7.0);** a table keyed on a person is classified in `erasureAnonymise`. Death, rebirth, a reset and an erasure settle what the person left open - a bidder's escrow, a lot, a caravan, a player-keyed `world_state` row - through the same functions (v1.34.0): four ways out of a life, one set of doors.
 
 **Reach**
 
 - **Something built and read by nothing is a fault** (`/learn` rc.43, the peach rc.50, the root grade rc.55, dead modifiers rc.58, fields v1.0.1). A command is on a hub page or the tree, an item has a source, a quest has a giver, a stat is fetched where it is consumed; give the class a gate when you find one.
+- **A walk capped per tick starts somewhere new each tick (v1.34.0).** A roster read in name order and cut at forty gives the same forty people every turn and the rest of the world never acts; `rosterTurn` rotates the start, and a test asks who never got a turn, not only that the cap held.
+- **A browser id is a window property (v1.34.0).** An element whose id spells a name the window already owns (`setInterval`) is unreachable by bare reference and its control is silently dead; a gate holds every dashboard id off the Window properties.
 - **Fix every site of a rule, not the one reported.** Craft and forage (v1.0.3), the picker's three siblings (v1.0.8), `/stall` then `/boss` (v1.7.4, v1.7.10), five channel helpers (rc.59), nine doors (v1.12.3): grep for the siblings before calling it fixed.
 - **A change reaches the worlds already running.** Re-parent, migrate or grandfather (rc.51, rc.59, migrations 55 and 62), and a new rule never shortens what a player has already committed to (rc.56).
 - **Migrations.** A shipped one is frozen and carries frozen copies of the content it rewrites (migration 46, v1.19.1); a column a migration adds is not also in the base DDL (rc.57); a chain changed in content needs a migration (v1.23.2); a read of a newer table or column is guarded so the migration window degrades instead of failing (v1.1.0).
@@ -241,6 +243,10 @@ subsystem, a gate or an old release label (`rc.48`, `v1.0.8`) comes up, grep the
 `grep -n 'rc.48' docs/FINDINGS.md` - and read the section; code and tests cite those labels by the
 thousand. **A release's findings are appended to `docs/FINDINGS.md`** under a `### Title (v<version>)`
 heading, never here; a line is added to the Standing rules only when the lesson is new.
+**The punch list is two files (v1.34.0):** `docs/TODO.md` holds what is still open, every entry
+**deferred** with its reason, and `docs/history/TODO_FIXED.md` holds every entry ever closed, newest
+first as `**fixed (v<version>)**`; a fixed entry moves across and is never deleted, and
+`tests/python/contracts/test_playtest_gate.py` holds each file to its own status word.
 `tests/python/contracts/test_claude_md_stays_small.py` holds this file under 40,000 characters.
 Never `@import` either file and add no nested `CLAUDE.md`: both bring the weight back.
 
@@ -256,7 +262,9 @@ Never `@import` either file and add no nested `CLAUDE.md`: both bring the weight
   while production foreign-keys that column and opens every connection with `foreign_keys=ON`. The
   fixture accepted the one value production refused. A fixture that cannot fail the way production
   fails is not testing production — copy the real DDL, foreign keys included, and seed the parent
-  rows.
+  rows. The rule was prose alone and the batch-4 fixture broke it for seven tables (v1.34.0);
+  `TestTheFixtureKeepsProductionsForeignKeys` in `go_core/internal/game/fixture_foreign_keys_test.go`
+  now reads every key production declares against the fixture's DDL.
 - **Never assert that a random thing happened, however many iterations you give it.** The simulation
   is built out of low-probability rolls and `gamerng` is `crypto/rand` with no seed, so a
   "sixty ticks and surely one landed" test fails for no reason at some rate you cannot drive to
@@ -294,9 +302,10 @@ Never `@import` either file and add no nested `CLAUDE.md`: both bring the weight
   `DROPPED_TABLES` already use here. It is a **shape detector, not a proof**: it cannot compute a
   probability, and it deliberately ignores `!flag`, because in this tree a negation is almost always
   a comma-ok `!ok` or a predicate about the fixture and admitting it produced eleven false positives
-  against one true one. The thirteen `diceAllowed` entries are all one of two kinds — a count of
-  content (`len(location.Roads)`, the authored manuals) or a floor in the production code that makes
-  the zero unreachable (`law.comprehend` clamps its gain to 1) — and each says which.
+  against one true one. The fifteen `diceAllowed` entries are all one of three kinds — a count of
+  content (`len(location.Roads)`, the authored manuals), a floor in the production code that makes
+  the zero unreachable (`law.comprehend` clamps its gain to 1), or a deterministic write on a path
+  that happens to roll elsewhere (the `hash64`-keyed households) — and each says which.
 
 - **A success string is not an exit code, and `make check` has two that look alike.** The first
   thing `make check` runs is `ruff`, which prints **"All checks passed!"** when it is clean - a

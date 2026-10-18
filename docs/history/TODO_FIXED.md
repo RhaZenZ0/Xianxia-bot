@@ -9,6 +9,107 @@ section in it.
 
 ## Fixed
 
+- **fixed (v1.34.0)** — *Goods crossed a world untouched while every price ceiling was kept in one
+  coin.* The purse converts 100:1 at a crossing and an item does not, so anything bought on a Mortal
+  shelf sold to a Spiritual keeper for a hundred times its cost (9,475 profitable pairs measured).
+  `cheapestShelfPrice` reads across the currency ladder now and every sell-side ceiling (keeper, market,
+  the town at a stall, a sect donation, a caravan's payout) asks it; `TestNoWorldCrossingTurnsAShopIntoAMint`
+  walks every cross-world pair. A merchant buys an unsold lot only up to its valuation, a lot runs at
+  least five minutes in the house's world's coin, `KEEPER_GRADE_CEILING` is gone, and a player cannot
+  claim a rival sect's neutral seat.
+- **fixed (v1.34.0)** — *A reset or an erasure destroyed other players' auction lots and stranded the
+  bidder's escrow, and a lost owner's caravan stalled the tick.* `auctions.current_bidder_user_id` was a
+  delete column; both levers now run the death path's escrow resolver (`resolveLeavingEscrowTx`) before
+  the sweep, the bidder column is anonymised and released on a reset, the person's travelling caravans
+  are marked lost as a death marks them, and `advanceCaravans` marks a caravan whose owner has no
+  character lost instead of failing the bundle over one row.
+- **fixed (v1.34.0)** — *Auction lot cards and realm roles survived an erasure.* The lot cards are read
+  before the engine call and taken down after it, `sync_lots` deletes the message of a lot whose row is
+  gone, and `admin_erase` strips the generated realm access and presence roles beside the Cultivator
+  role.
+- **fixed (v1.34.0)** — *Player-keyed `world_state` rows survived a rebirth, a reset and an erasure.*
+  One list (`playerWorldStatePrefixes`) and one door (`clearPlayerWorldStateTx`) behind all three, a
+  contract holding the list to the engine's writers, and `realmGateOpen` honours a banked insight's
+  `realm_index`.
+- **fixed (v1.34.0)** — *A cultivator who died below realm 5 had no door to Samsara.* The curriculum
+  held the Samsara page and its `soul` / `inheritances` reads to realm 5 with no slash command behind
+  them while every death message pointed at the page; `_curriculum_opened` opens them for a deceased
+  character (`test_the_dead_have_a_door_to_samsara.py`).
+- **fixed (v1.34.0)** — *The cultivate reply told a Perfection trainee to stop.* The full-stage line and
+  the stage-9 ready line ignored the Perfection training the engine credits on a full stage; the result
+  carries `perfection_active` and one pair of helpers words both replies.
+- **fixed (v1.34.0)** — *Permanent qi_max rewards vanished on the next settle.* Schema 81 adds
+  `characters.qi_max_bonus`, which `settleQi` adds to the capacity; the perfection trial, the secret
+  realm inheritance and `admin.player.set_resource_caps` write it.
+- **fixed (v1.34.0)** — *The currency-grant, item-adjust and teleport undos restored the wrong thing.*
+  The grant's undo mirrored the sheet by the coin's name and both undos wrote the absolute snapshot,
+  erasing play since; the teleport's undo left the purse converted and the scene at the destination.
+  Each undoes the delta its audit row carries (`after.moved`, `scene`), mirrors by the target's world
+  coin and goes home through `moveCharacterTx`.
+- **fixed (v1.34.0)** — *Two automation toggles were offered and the engine refused them.*
+  `npc_consignments` and `secret_realms` are in the engine's defaults and `get_automation_settings`,
+  the dashboard shows the whole table, and `test_automation_toggles_agree.py` holds the four lists
+  equal.
+- **fixed (v1.34.0)** — *The dashboard's Set interval button was dead.* Its element id was
+  `setInterval`, which the window already owns; it is `setSimInterval`, and
+  `test_no_dashboard_id_shadows_a_window_property.py` refuses the next collision.
+- **fixed (v1.34.0)** — *Saving a quest in the Workbench wiped its variants and owner and cut long
+  labels.* The draft carries `variants` and `owner_user_id`, the label cap is 200 (the longest shipped
+  label is 113), reward keys the form does not show are kept, and a round-trip test holds that saving
+  an unchanged commission changes nothing.
+- **fixed (v1.34.0)** — *The operator's scripts said one thing and did another.* A refused second
+  `update.sh` deleted the running update's lock; an already-current `--upgrade` exited 3 under `set -e`
+  and the watcher closed the world and reported a failure with an empty reason; `reset_database.sh`
+  deleted threads and announced the reset before the backup that could abort it. All three are held by
+  `test_update_watcher.py`'s harness.
+- **fixed (v1.34.0)** — *NPC travel and consignments walked the roster alphabetically to a cap, so the
+  later half never took a turn.* `rosterTurn` starts each walk at a point hashed off the tick's game
+  minute; both batches call it.
+- **fixed (v1.34.0)** — *Upper-world hall members could never break through.* `npcTalentCeiling`
+  measured every NPC the catalogue does not carry from realm 0; the origin is now at least the floor
+  of the world they were made in.
+- **fixed (v1.34.0)** — *The public disappearance row told searchers where the missing NPC was.* The
+  summary names only the home they left; `npc_missing_test` holds it as it holds the death notice.
+- **fixed (v1.34.0)** — *Household seeding ran on every bootstrap.* A `world_state` marker
+  (`households_seeded`) is written once; a world that already holds a spouse or a descendant is marked
+  without seeding again.
+- **fixed (v1.34.0)** — *A missing master's bond was ended as "the master is dead".*
+  `npcDiscipleBonds` asks `status='dead'`.
+- **fixed (v1.34.0)** — *A newborn with a registry-held name never became a person.* `childNameTaken`
+  asks the registry as `freeSectMemberName` does.
+- **fixed (v1.34.0)** — *The dialogue prompt named a hidden master's want and goal.* `talk_to_npc`
+  redacted only the secret; one `public_aim` serves it and the context builder.
+- **fixed (v1.34.0)** — *A tick error after the events spawned left them with no thread.* `run-due`
+  answers 200 with the runs and the error, and the worker sweeps tick-spawned events that have no
+  thread.
+- **fixed (v1.34.0)** — *`/check` and the `/action` modal were unmetered live-narration doors.* Both
+  spend the action meter; the budget gate walks every caller of a live narration method.
+- **fixed (v1.34.0)** — *The tribute button said Claimed before the engine answered.* It is spent after
+  the payment and stays pressable on a refusal.
+- **fixed (v1.34.0)** — *The NPC-master picker offered masters at `max_disciples`.* The roster carries
+  the engine's own count and the picker skips a full master.
+- **fixed (v1.34.0)** — *The shared Go fixture took the rows production refuses, three content gates
+  skipped instead of failing, and `raid_win`'s door was Start.* `setupBatch4AuthorityDB` carries
+  production's foreign keys on eight tables (`TestTheFixtureKeepsProductionsForeignKeys` holds them),
+  `shippedCatalog` and its two siblings `t.Fatalf`, and `OBJECTIVE_PATHS["raid_win"]` names the Claim.
+- **fixed (v1.34.0)** — *The Azure Reed Sect, five content keys read by nothing and two README
+  numbers.* Three prose lines named a sect the file does not declare (a gate holds every named sect to
+  a real one); `tier_ceiling`, `recommendation_tn`, `meeting_channel_slug`, `karma_multiplier` and
+  `use.consume` are gone; the README's Go directive and manual count no longer spell a number.
+- **fixed (v1.34.0)** — *A party was joined without consent, could not kick, and a raid waited for
+  ever on an absent member.* Join is refused during a raid, the leader has `party.kick` (a kicked
+  raider forfeits that raid's reward), and the round gate skips a raider absent for
+  `RAID_ABSENT_MINUTES` (30). An explicit invite, the target accepting before they are seated, is
+  still not built; the leader's lever is a kick and a raid-time lock.
+- **fixed (v1.34.0)** — *A Spare after an easy fight paid uncapped karma, insight and fate.* A won
+  fight's rewards are paid once a world day per opponent, keyed on `event_log`; the fight itself is
+  never refused.
+- **fixed (v1.34.0)** — *Battle-panel pills carried no toxicity and cost no turn, and a mid-battle
+  treatment healed nothing the fight reads.* The pill shares `item.use`'s toxicity step and the
+  opponent answers it; `condition.treat` syncs the battle's own vitality.
+- **fixed (v1.34.0)** — *An active battle survived death and rebirth, and three combat actions had no
+  life check.* A death abandons the person's battles, and technique, recovery item and finalize
+  refuse a deceased character as a turn does.
 - **fixed (v1.33.0)** — *An undo wrote back columns its lever never wrote.* The perfection lever's
   reversal restored the whole quest state from whichever snapshot it read, deleted a row it had made
   whatever play had put on it, reopened a perfected realm, and redid a deleted row as an UPDATE on
@@ -388,7 +489,8 @@ section in it.
 - **fixed (v1.0.17)** — *A keeper paid a Saint what it paid a beggar.* Reported from play as the Qi
   Nourishing Pill selling for 11 and buying back for 4. The third itself is the authored rule and is
   kept: across all 831 things a shop both sells and buys the buy-back is a median of 33% and never
-  above 40%, and nothing can be bought in one shop and sold in another for a profit. What the check
+  above 40%, and nothing can be bought in one shop and sold in another for a profit. (per coin; since v1.34.0 across
+  the currency ladder too, held by `TestNoWorldCrossingTurnsAShopIntoAMint`.) What the check
   found was on the crafting side - three Mortal recipes (the Qi Nourishing Pill, the Spirit-Iron Sword,
   the Spirit-Iron Lamellar) sold back for less than their own ingredients. On the owner's call a rank
   in the item's trade now adds 2 of the shop's coin per rank above Novice to what the keeper pays,
