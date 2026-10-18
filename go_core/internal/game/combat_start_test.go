@@ -226,6 +226,7 @@ CREATE TABLE battles (
 	FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE
 );
 CREATE TABLE inventory(user_id INTEGER, item_id TEXT, quantity INTEGER, PRIMARY KEY(user_id,item_id));
+CREATE TABLE alchemy_state (user_id INTEGER PRIMARY KEY, pill_toxicity INTEGER NOT NULL DEFAULT 0, last_toxicity_game_minute INTEGER NOT NULL DEFAULT 0, total_refinements INTEGER NOT NULL DEFAULT 0, successful_refinements INTEGER NOT NULL DEFAULT 0, flawless_refinements INTEGER NOT NULL DEFAULT 0, best_margin INTEGER NOT NULL DEFAULT -99, last_quality TEXT NOT NULL DEFAULT '', updated_at REAL NOT NULL, FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE);
 CREATE TABLE character_spiritual_roots(user_id INTEGER PRIMARY KEY,grade TEXT NOT NULL DEFAULT 'Common',purity INTEGER NOT NULL DEFAULT 50,elements_json TEXT NOT NULL DEFAULT '[]',mutation TEXT NOT NULL DEFAULT '',stability INTEGER NOT NULL DEFAULT 100,refinement_progress INTEGER NOT NULL DEFAULT 0,compatibility INTEGER NOT NULL DEFAULT 50,updated_at REAL NOT NULL DEFAULT 0);
 CREATE TABLE character_bloodlines(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,bloodline_id TEXT NOT NULL,name TEXT NOT NULL,affinity TEXT NOT NULL DEFAULT 'None',purity INTEGER NOT NULL DEFAULT 0,state TEXT NOT NULL DEFAULT 'dormant',evolution_stage INTEGER NOT NULL DEFAULT 0,progress INTEGER NOT NULL DEFAULT 0,rejection INTEGER NOT NULL DEFAULT 0,mutation TEXT NOT NULL DEFAULT '',primary_lineage INTEGER NOT NULL DEFAULT 0,unlocked_techniques_json TEXT NOT NULL DEFAULT '[]',updated_at REAL NOT NULL DEFAULT 0);
 CREATE TABLE character_physiques(user_id INTEGER PRIMARY KEY,physique_id TEXT NOT NULL DEFAULT 'ordinary_mortal_body',name TEXT NOT NULL DEFAULT 'Ordinary Mortal Body',state TEXT NOT NULL DEFAULT 'ordinary',evolution_stage INTEGER NOT NULL DEFAULT 0,progress INTEGER NOT NULL DEFAULT 0,stability INTEGER NOT NULL DEFAULT 100,instability INTEGER NOT NULL DEFAULT 0,updated_at REAL NOT NULL DEFAULT 0);
@@ -236,6 +237,7 @@ CREATE TABLE equipment_instances(equipment_id INTEGER PRIMARY KEY AUTOINCREMENT,
 INSERT INTO characters(user_id,name,gender,path,spiritual_root,location,attributes_json,realm_index,phase,body_realm_index,body_phase,cultivation,body_cultivation,life_status,qi,qi_max,vitality,vitality_max,updated_at)
 	VALUES(101,'Tester','','Sword Cultivator','Fire','Greenriver Town','{"body":10,"spirit":10,"agility":10,"will":10,"insight":10}',1,2,0,1,0,0,'alive',5,20,3,20,0);
 INSERT INTO character_spiritual_roots(user_id) VALUES(101);
+INSERT INTO alchemy_state(user_id,updated_at) VALUES(101,0);
 -- The opponent is held for a turn, so the pill's counter-attack is the
 -- suppressed one and the tests below read the heal without a dice roll
 -- in it; the tests of the counter itself lend the dice.

@@ -2,7 +2,6 @@ package game
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -250,15 +249,15 @@ func TestARaiderGoneQuietForTenMinutesIsStillWaitedFor(t *testing.T) {
 	if got := roundOf(t, path, encounter); got != 1 {
 		t.Fatalf("the round went on without a raider who was gone ten minutes: round %d", got)
 	}
-	// The operator's key moves the line.
+	// The operator's key moves the line: with five minutes of patience the
+	// same ten-minute silence is an absence, the leader's second press settles
+	// the round, and the leader acts in the one that follows.
 	t.Setenv("RAID_ABSENT_MINUTES", "5")
-	if _, err := raidAct(t, path, 42, encounter, "guard"); err == nil {
-		// Still "already acted" in the engine's eyes unless the settle fires.
-		if got := roundOf(t, path, encounter); got != 2 {
-			t.Fatalf("a five-minute patience left a ten-minute absence waited for: round %d", got)
-		}
-	} else if !strings.Contains(err.Error(), "already acted") {
-		t.Fatalf("unexpected refusal: %v", err)
+	if _, err := raidAct(t, path, 42, encounter, "guard"); err != nil {
+		t.Fatalf("a five-minute patience left a ten-minute absence waited for: %v", err)
+	}
+	if got := roundOf(t, path, encounter); got != 2 {
+		t.Fatalf("a five-minute patience left a ten-minute absence waited for: round %d", got)
 	}
 }
 
@@ -282,10 +281,10 @@ func TestAnActedRaiderSettlesARoundOnlyAnAbsenteeHoldsUp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an acted raider could not move on a round held up only by an absentee: %v", err)
 	}
-	if out == nil || roundOf(t, path, encounter) != 3 && roundOf(t, path, encounter) != 2 {
-		t.Fatalf("the round did not move: %+v", out)
+	if got := roundOf(t, path, encounter); got != 2 {
+		t.Fatalf("the round did not move on: round %d (%+v)", got, out)
 	}
-	if got := i64(actionScalar(t, path, `SELECT acted_round FROM boss_participants WHERE encounter_id=? AND user_id=42`, encounter)); got < 2 {
+	if got := i64(actionScalar(t, path, `SELECT acted_round FROM boss_participants WHERE encounter_id=? AND user_id=42`, encounter)); got != 2 {
 		t.Fatalf("the raider's press settled the old round and did not act in the new one: acted_round %d", got)
 	}
 }
@@ -315,6 +314,9 @@ func pillWorldDB(t *testing.T) string {
 	withBattles(t, path)
 	batch4Exec(t, path, alchemyStateDDL)
 	batch4Exec(t, path, eventLogDDL)
+	// What the counter-attack reads about the cultivator: a companion's bonus.
+	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS spirit_beasts(beast_id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,species TEXT NOT NULL,rank INTEGER NOT NULL DEFAULT 0,element TEXT NOT NULL DEFAULT 'None',intelligence INTEGER NOT NULL DEFAULT 10,temperament TEXT NOT NULL DEFAULT 'wary',bloodline TEXT NOT NULL DEFAULT 'Common',evolution_stage INTEGER NOT NULL DEFAULT 0,loyalty INTEGER NOT NULL DEFAULT 25,contract_type TEXT NOT NULL DEFAULT 'temporary',active INTEGER NOT NULL DEFAULT 0,techniques_json TEXT NOT NULL DEFAULT '[]',created_at REAL NOT NULL,updated_at REAL NOT NULL)`)
+	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS artifact_bonds(user_id INTEGER NOT NULL, item_id TEXT NOT NULL, bond_level INTEGER NOT NULL DEFAULT 0, resonance INTEGER NOT NULL DEFAULT 0, awakened INTEGER NOT NULL DEFAULT 0, spirit_name TEXT NOT NULL DEFAULT '', temperament TEXT NOT NULL DEFAULT 'dormant', created_at REAL NOT NULL, updated_at REAL NOT NULL, PRIMARY KEY(user_id,item_id))`)
 	batch4Exec(t, path, `INSERT INTO alchemy_state(user_id,updated_at) VALUES(42,0)`)
 	batch4Exec(t, path, `UPDATE characters SET vitality=10,vitality_max=100,qi=20,qi_max=100,realm_index=1,phase=2 WHERE user_id=42`)
 	return path
@@ -603,7 +605,6 @@ func TestADeceasedCharacterTakesNoPartInABattle(t *testing.T) {
 	if n := i64(actionScalar(t, path, `SELECT quantity FROM inventory WHERE user_id=901 AND item_id='healing_pill'`)); n != 2 {
 		t.Fatalf("a refused pill was spent: %d left", n)
 	}
-	_ = fmt.Sprint
 }
 
 // The wait is the engine's, with its key.
