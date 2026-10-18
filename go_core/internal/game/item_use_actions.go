@@ -151,6 +151,30 @@ func normalizeEffectPayload(effectKey, name string, raw map[string]any) map[stri
 	}
 }
 
+// addPillToxicityTx is what drinking a pill leaves in the body (v1.34.0): the
+// decay is settled first, the residue added, then settled again so the
+// penalty effect matches the new value. It answers the gain and the toxicity
+// after, both 0 for an item that leaves none. `item.use` and the battle
+// panel's recovery pill both call it, so a pill is as dirty in a fight as out
+// of one.
+func addPillToxicityTx(conn *storage.Conn, userID int64, baseID string, item worlddata.Item, gameMinute int64, now float64) (gain, toxicity int64, err error) {
+	gain = pillToxicityValue(baseID, item)
+	if gain <= 0 {
+		return 0, 0, nil
+	}
+	if _, err = settlePillToxicityEffectTx(conn, userID, gameMinute); err != nil {
+		return 0, 0, err
+	}
+	if _, err = conn.Execute(`UPDATE alchemy_state SET pill_toxicity=MIN(100,MAX(0,pill_toxicity+?)),last_toxicity_game_minute=?,updated_at=? WHERE user_id=?`, []any{gain, gameMinute, now, userID}); err != nil {
+		return 0, 0, err
+	}
+	toxicity, err = settlePillToxicityEffectTx(conn, userID, gameMinute)
+	if err != nil {
+		return 0, 0, err
+	}
+	return gain, toxicity, nil
+}
+
 func itemUseActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p itemUsePayload
 	if e := json.Unmarshal(raw, &p); e != nil {
@@ -340,17 +364,9 @@ func itemUseActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	// 5. toxicity - settle the decay first (that is what Python's
 	// get_alchemy_state did before the add), add the residue, then settle
 	// again so the penalty effect matches the new value.
-	if gain := pillToxicityValue(baseID, item); gain > 0 {
-		if _, e = settlePillToxicityEffectTx(conn, userID, p.GameMinute); e != nil {
-			return authoritativeMutation{}, e
-		}
-		if _, e = conn.Execute(`UPDATE alchemy_state SET pill_toxicity=MIN(100,MAX(0,pill_toxicity+?)),last_toxicity_game_minute=?,updated_at=? WHERE user_id=?`, []any{gain, p.GameMinute, now, userID}); e != nil {
-			return authoritativeMutation{}, e
-		}
-		toxicity, e := settlePillToxicityEffectTx(conn, userID, p.GameMinute)
-		if e != nil {
-			return authoritativeMutation{}, e
-		}
+	if gain, toxicity, e := addPillToxicityTx(conn, userID, baseID, item, p.GameMinute, now); e != nil {
+		return authoritativeMutation{}, e
+	} else if gain > 0 {
 		out["toxicity_gain"], out["pill_toxicity"], out["toxicity_band"] = gain, toxicity, toxicityBand(toxicity)
 	}
 

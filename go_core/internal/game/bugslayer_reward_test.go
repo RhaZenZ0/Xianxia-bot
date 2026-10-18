@@ -331,8 +331,8 @@ CREATE TABLE equipment_instances(equipment_id INTEGER PRIMARY KEY AUTOINCREMENT,
 INSERT INTO characters(user_id,attributes_json,realm_index) VALUES(%[1]d,'%[3]s',2);
 INSERT INTO characters(user_id,attributes_json,realm_index) VALUES(%[2]d,'%[3]s',2);
 INSERT INTO boss_encounters(encounter_id,party_id,template_key,location,boss_name,boss_hp,boss_hp_max,phase_index,round_index,status,version,created_at,updated_at) VALUES(1,10,'%[4]s','Greenriver Town','Iron-Tusk Boar King',180,180,0,1,'active',0,0,0);
-INSERT INTO boss_participants(encounter_id,user_id,vitality,vitality_max,acted_round,total_damage,guard,status,updated_at) VALUES(1,%[1]d,20,20,0,0,0,'active',0);
-INSERT INTO boss_participants(encounter_id,user_id,vitality,vitality_max,acted_round,total_damage,guard,status,updated_at) VALUES(1,%[2]d,20,20,0,0,0,'active',0);
+INSERT INTO boss_participants(encounter_id,user_id,vitality,vitality_max,acted_round,total_damage,guard,status,updated_at) VALUES(1,%[1]d,20,20,0,0,0,'active',strftime('%%s','now'));
+INSERT INTO boss_participants(encounter_id,user_id,vitality,vitality_max,acted_round,total_damage,guard,status,updated_at) VALUES(1,%[2]d,20,20,0,0,0,'active',strftime('%%s','now'));
 INSERT INTO equipment_instances(equipment_id,user_id,item_id,slot,durability,max_durability,quality,equipped,bound_at,updated_at) VALUES(1,%[1]d,'bugslayer_sword','weapon',100,100,100,1,0,0);
 `, swordUser, plainUser, attrs, bugslayerBossTemplate)); err != nil {
 		t.Fatal(err)

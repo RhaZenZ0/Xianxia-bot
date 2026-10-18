@@ -186,6 +186,18 @@ func conditionTreatAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 				return authoritativeMutation{}, err
 			}
 			restored["vitality"], restored["qi"] = vit, qi
+			// A treatment taken in the middle of a fight heals the fight's
+			// figure as well (v1.34.0): the battle reads its own player_hp, not
+			// the character's vitality, so the pill mended a body the fight
+			// never looked at.
+			if vit > 0 {
+				if _, err = conn.Execute(
+					`UPDATE battles SET player_hp=(SELECT vitality FROM characters WHERE user_id=?),player_hp_max=MAX(player_hp_max,(SELECT vitality_max FROM characters WHERE user_id=?)),version=version+1,updated_at=? WHERE user_id=? AND status='active'`,
+					[]any{userID, userID, now, userID},
+				); err != nil {
+					return authoritativeMutation{}, err
+				}
+			}
 		}
 	}
 	result := map[string]any{"condition": p.Condition, "name": name, "treatment_item": item, "roll": roll, "success": roll["success"], "mended": reduction > 0, "reduction": reduction, "severity_before": severity, "severity_after": newSeverity, "resolved": resolved, "restored": restored}

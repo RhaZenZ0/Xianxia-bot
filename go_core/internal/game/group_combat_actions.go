@@ -183,6 +183,12 @@ type partyCreatePayload struct {
 type partyJoinPayload struct {
 	PartyID int64 `json:"party_id"`
 }
+
+// partyKickPayload names the member the leader puts out (v1.34.0).
+type partyKickPayload struct {
+	UserID     int64 `json:"user_id"`
+	GameMinute int64 `json:"game_minute"`
+}
 type formationCreatePayload struct {
 	Name string `json:"name"`
 }
@@ -393,11 +399,83 @@ func partyAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, ra
 		if firstRowMap(r) == nil {
 			return authoritativeMutation{}, errors.New("active party not found")
 		}
+		// A party in the middle of a raid takes nobody (v1.34.0). Joining asks
+		// nobody's leave, so a stranger could walk into a fight that was
+		// already waiting on its own, hold no seat in it (the raid's roll is
+		// taken at its start) and be unable to leave until it ended. The
+		// leader invites by waiting.
+		busy, e := conn.Execute(`SELECT 1 FROM boss_encounters WHERE party_id=? AND status='active'`, []any{p.PartyID})
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		if firstRowMap(busy) != nil {
+			return authoritativeMutation{}, errors.New("that party is in the middle of a boss raid and takes no new members until it ends")
+		}
 		_, e = conn.Execute(`INSERT INTO party_members(party_id,user_id,role,joined_at) VALUES(?,?,'member',?)`, []any{p.PartyID, userID, now})
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
 		result = map[string]any{"party_id": p.PartyID, "joined": true}
+	} else if op == "party.kick" {
+		var p partyKickPayload
+		if e := json.Unmarshal(raw, &p); e != nil {
+			return authoritativeMutation{}, e
+		}
+		party, e := activePartyRow(conn, userID)
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		if party == nil {
+			return authoritativeMutation{}, errors.New("not in an active party")
+		}
+		if i64(party["leader_user_id"]) != userID {
+			return authoritativeMutation{}, errors.New("only the party leader can put a member out")
+		}
+		if p.UserID == userID {
+			return authoritativeMutation{}, errors.New("you lead this party; leave it instead of putting yourself out")
+		}
+		pid := i64(party["party_id"])
+		held, e := boolRow(conn, `SELECT 1 FROM party_members WHERE party_id=? AND user_id=?`, []any{pid, p.UserID})
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		if !held {
+			return authoritativeMutation{}, errors.New("that cultivator is not in your party")
+		}
+		if e = removePartyMemberTx(conn, pid, p.UserID, now); e != nil {
+			return authoritativeMutation{}, e
+		}
+		result = map[string]any{"party_id": pid, "kicked_user_id": p.UserID, "kicked": true}
+		// A raid does not wait on somebody who is no longer in the party, and
+		// what the party wins is not theirs: the raider's row goes with them,
+		// and the claims a victory writes are written for the rows that remain.
+		er, e := conn.Execute(`SELECT encounter_id FROM boss_encounters WHERE party_id=? AND status='active'`, []any{pid})
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		for _, enc := range rowsToMaps(er) {
+			encounterID := i64(enc["encounter_id"])
+			gone, e := conn.Execute(`DELETE FROM boss_participants WHERE encounter_id=? AND user_id=?`, []any{encounterID, p.UserID})
+			if e != nil {
+				return authoritativeMutation{}, e
+			}
+			if gone.RowsAffected == 0 {
+				continue
+			}
+			result["forfeited_raid"] = true
+			// They may have been the one the round was waiting on.
+			res, e := resolveBossRoundTx(conn, catalog, encounterID, p.GameMinute, now)
+			if e != nil {
+				return authoritativeMutation{}, e
+			}
+			if res.Resolved {
+				result["round_events"] = res.Events
+				result["raid_status"] = res.Status
+				if res.Status != "active" {
+					closeFinishedRaidOnlyPartiesTx(conn, now)
+				}
+			}
+		}
 	} else {
 		party, e := activePartyRow(conn, userID)
 		if e != nil {
@@ -414,12 +492,9 @@ func partyAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, ra
 		if firstRowMap(r) != nil {
 			return authoritativeMutation{}, errors.New("cannot leave a party during an active boss encounter")
 		}
-		_, e = conn.Execute(`DELETE FROM party_members WHERE party_id=? AND user_id=?`, []any{pid, userID})
-		if e != nil {
+		if e = removePartyMemberTx(conn, pid, userID, now); e != nil {
 			return authoritativeMutation{}, e
 		}
-		_, _ = conn.Execute(`DELETE FROM formation_positions WHERE user_id=? AND formation_id IN (SELECT formation_id FROM party_formations WHERE party_id=?)`, []any{userID, pid})
-		_, _ = conn.Execute(`UPDATE party_formations SET active=0,updated_at=? WHERE party_id=? AND active=1 AND (SELECT COUNT(*) FROM formation_positions fp WHERE fp.formation_id=party_formations.formation_id)<2`, []any{now, pid})
 		if i64(party["leader_user_id"]) == userID {
 			rr, e := conn.Execute(`SELECT user_id FROM party_members WHERE party_id=? ORDER BY joined_at LIMIT 1`, []any{pid})
 			if e != nil {
@@ -437,6 +512,18 @@ func partyAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, ra
 		result = map[string]any{"party_id": pid, "left": true}
 	}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "party", EventType: op, EntityType: "party", EntityID: fmt.Sprint(result["party_id"]), Payload: result}}, nil
+}
+
+// removePartyMemberTx is the one way a member leaves a party, by their own
+// leave or the leader's kick (v1.34.0): the seat goes, and so do their places
+// in the party's formations - one left with fewer than two is stood down.
+func removePartyMemberTx(conn *storage.Conn, partyID, userID int64, now float64) error {
+	if _, e := conn.Execute(`DELETE FROM party_members WHERE party_id=? AND user_id=?`, []any{partyID, userID}); e != nil {
+		return e
+	}
+	_, _ = conn.Execute(`DELETE FROM formation_positions WHERE user_id=? AND formation_id IN (SELECT formation_id FROM party_formations WHERE party_id=?)`, []any{userID, partyID})
+	_, _ = conn.Execute(`UPDATE party_formations SET active=0,updated_at=? WHERE party_id=? AND active=1 AND (SELECT COUNT(*) FROM formation_positions fp WHERE fp.formation_id=party_formations.formation_id)<2`, []any{now, partyID})
+	return nil
 }
 func formationAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage, op string) (authoritativeMutation, error) {
 	party, e := activePartyRow(conn, userID)
@@ -778,6 +865,44 @@ func bossActActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 		return authoritativeMutation{}, errors.New("you are not an active raid participant")
 	}
 	round := i64(enc["round_index"])
+	// A raider who has already acted has nothing to do but wait, and a round
+	// that is waiting only on somebody gone for raidAbsentSeconds would wait
+	// for ever if nothing but a fresh action could end it (v1.34.0). Their
+	// press asks the gate whether the round is over; if it is, the boss
+	// answers and they act in the round that follows.
+	var settled []string
+	if i64(part["acted_round"]) >= round {
+		res, resErr := resolveBossRoundTx(conn, catalog, p.EncounterID, p.GameMinute, nowSeconds())
+		if resErr != nil {
+			return authoritativeMutation{}, resErr
+		}
+		if res.Resolved {
+			settled = res.Events
+			r, e = conn.Execute(`SELECT * FROM boss_encounters WHERE encounter_id=?`, []any{p.EncounterID})
+			if e != nil {
+				return authoritativeMutation{}, e
+			}
+			enc = firstRowMap(r)
+			round = i64(enc["round_index"])
+			r, e = conn.Execute(`SELECT * FROM boss_participants WHERE encounter_id=? AND user_id=? AND status='active'`, []any{p.EncounterID, userID})
+			if e != nil {
+				return authoritativeMutation{}, e
+			}
+			part = firstRowMap(r)
+			if res.Status != "active" || part == nil {
+				// The raid ended, or the answer that closed the round put this
+				// raider down: the settlement stands and the press is not an action.
+				if res.Status != "active" {
+					closeFinishedRaidOnlyPartiesTx(conn, nowSeconds())
+				}
+				out := enc
+				out["events"] = settled
+				out["action_damage"] = int64(0)
+				out["status"] = fmt.Sprint(enc["status"])
+				return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "boss", EventType: "boss.act", EntityType: "boss_encounter", EntityID: fmt.Sprint(p.EncounterID), GameMinute: p.GameMinute, Payload: out}}, nil
+			}
+		}
+	}
 	if i64(part["acted_round"]) >= round {
 		return authoritativeMutation{}, errors.New("you already acted this round")
 	}
@@ -804,7 +929,7 @@ func bossActActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	equip := equipmentPowerRows(erows)
 	form, _ := formationBonusGo(conn, i64(enc["party_id"]), userID)
 	base := max64(body, spirit) + i64(cr["realm_index"]) + equip["attack"] + form["attack"]
-	events := []string{}
+	events := append([]string{}, settled...)
 	damage := int64(0)
 	hit := false
 	hitChance := int64(0)
@@ -816,7 +941,9 @@ func bossActActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 		tar := firstRowMap(rr)
 		heal := max64(2, 2+spirit/2+form["support"])
 		if tar != nil {
-			_, e = conn.Execute(`UPDATE boss_participants SET vitality=MIN(vitality_max,vitality+?),updated_at=? WHERE encounter_id=? AND user_id=?`, []any{heal, now, p.EncounterID, i64(tar["user_id"])})
+			// The healed raider's updated_at is left alone (v1.34.0): it is the
+			// clock raidAbsentSeconds reads, and a heal is not them being heard.
+			_, e = conn.Execute(`UPDATE boss_participants SET vitality=MIN(vitality_max,vitality+?) WHERE encounter_id=? AND user_id=?`, []any{heal, p.EncounterID, i64(tar["user_id"])})
 			events = append(events, fmt.Sprintf("Support restores %d raid vitality.", heal))
 		}
 		if e == nil {
@@ -975,44 +1102,13 @@ func bossActActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 			_, _ = conn.Execute(`UPDATE boss_encounters SET phase_index=?,version=version+1,updated_at=? WHERE encounter_id=?`, []any{newPhase, now, p.EncounterID})
 			events = append(events, "Boss phase shifts to "+phase.Name)
 		}
-		rr, _ = conn.Execute(`SELECT COUNT(*) AS n FROM boss_participants WHERE encounter_id=? AND status='active' AND acted_round<?`, []any{p.EncounterID, round})
-		if i64(firstRowMap(rr)["n"]) == 0 {
-			rr, _ = conn.Execute(`SELECT * FROM boss_participants WHERE encounter_id=? AND status='active'`, []any{p.EncounterID})
-			for _, tar := range rowsToMaps(rr) {
-				tid := i64(tar["user_id"])
-				crr, _ := conn.Execute(`SELECT attributes_json,realm_index,path,phase FROM characters WHERE user_id=?`, []any{tid})
-				tc := firstRowMap(crr)
-				ta := rowAttributes(catalog, tc)
-				trs, _ := equipmentRows(conn, tid, true)
-				te := equipmentPowerRows(trs)
-				tf, _ := formationBonusGo(conn, i64(enc["party_id"]), tid)
-				def := i64(ta["body"]) + i64(tc["realm_index"]) + te["defense"] + tf["defense"] + stageLead(catalog, i64(tc["realm_index"]), i64(tc["phase"]), t.RealmIndex, 1)
-				incoming := max64(1, phase.Attack+stablePercentGo(p.EncounterID, round, tid, "boss")/20-def/2)
-				if i64(tar["guard"]) != 0 {
-					incoming = max64(1, incoming/2)
-				}
-				nv := max64(0, i64(tar["vitality"])-incoming)
-				st := "active"
-				if nv <= 0 {
-					st = "knocked_out"
-				}
-				_, _ = conn.Execute(`UPDATE boss_participants SET vitality=?,status=?,guard=0,updated_at=? WHERE encounter_id=? AND user_id=?`, []any{nv, st, now, p.EncounterID, tid})
-				_ = damageEquipmentGo(conn, tid, 1)
-				events = append(events, fmt.Sprintf("%s hits %d for %d raid vitality.", phase.Name, tid, incoming))
-			}
-			fr, _ := conn.Execute(`SELECT formation_id,stance FROM party_formations WHERE party_id=? AND active=1`, []any{i64(enc["party_id"])})
-			if f := firstRowMap(fr); f != nil {
-				loss := phase.CohesionDamage + formationStancesGo[fmt.Sprint(f["stance"])].CohesionCost
-				_, _ = conn.Execute(`UPDATE party_formations SET cohesion=MAX(0,cohesion-?),updated_at=? WHERE formation_id=?`, []any{loss, now, i64(f["formation_id"])})
-				events = append(events, fmt.Sprintf("Formation cohesion falls by %d.", loss))
-			}
-			sr, _ := conn.Execute(`SELECT COUNT(*) AS n FROM boss_participants WHERE encounter_id=? AND status='active'`, []any{p.EncounterID})
-			if i64(firstRowMap(sr)["n"]) <= 0 {
-				status = "defeat"
-				_, e = conn.Execute(`UPDATE boss_encounters SET status='defeat',finished_game_minute=?,version=version+1,updated_at=? WHERE encounter_id=?`, []any{p.GameMinute, now, p.EncounterID})
-			} else {
-				_, e = conn.Execute(`UPDATE boss_encounters SET round_index=round_index+1,version=version+1,updated_at=? WHERE encounter_id=?`, []any{now, p.EncounterID})
-			}
+		res, resErr := resolveBossRoundTx(conn, catalog, p.EncounterID, p.GameMinute, now)
+		if resErr != nil {
+			return authoritativeMutation{}, resErr
+		}
+		if res.Resolved {
+			events = append(events, res.Events...)
+			status = res.Status
 		} else {
 			_, e = conn.Execute(`UPDATE boss_encounters SET version=version+1,updated_at=? WHERE encounter_id=?`, []any{now, p.EncounterID})
 		}
@@ -1037,6 +1133,103 @@ func bossActActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 		out["status"] = fmt.Sprint(firstRowMap(rr)["status"])
 	}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "boss", EventType: "boss.act", EntityType: "boss_encounter", EntityID: fmt.Sprint(p.EncounterID), GameMinute: p.GameMinute, Payload: out}}, nil
+}
+
+// bossRoundResult is what resolveBossRoundTx answers: whether the boss
+// answered, what it did, and whether the raid ended in the answer.
+type bossRoundResult struct {
+	Resolved bool
+	Events   []string
+	Status   string
+}
+
+// raidAbsentSeconds is how long a raider may leave a round waiting on them
+// (v1.34.0): the real half hour a round of a raid is given before the boss
+// answers without them. It lives in the waits table with the rest, so the key
+// that retunes it is read and passed the way theirs are.
+func raidAbsentSeconds() int64 { return cooldownSecondsFor(cooldownRaidAbsent) }
+
+// resolveBossRoundTx lets the boss answer the round if the round is done, and
+// does nothing if it is not. It is the one door for the question "is everybody
+// who is coming in?", asked after every raid action, before an action by a
+// raider who has already acted, and when a member is put out of the party.
+//
+// The round waits for a raider who is active, has not acted this round and
+// has been heard from within raidAbsentSeconds. A raider who has not been
+// heard from for longer is skipped, not forfeited: they are still in the raid,
+// still struck by the boss as the rest are, and the round that follows waits
+// on them afresh. Their row's updated_at is the clock - their own action, the
+// boss's last answer and the raid's start each write it - so nothing here asks
+// the caller what time it is.
+func resolveBossRoundTx(conn *storage.Conn, catalog worlddata.Catalog, encounterID, gameMinute int64, now float64) (bossRoundResult, error) {
+	er, e := conn.Execute(`SELECT * FROM boss_encounters WHERE encounter_id=? AND status='active'`, []any{encounterID})
+	if e != nil {
+		return bossRoundResult{}, e
+	}
+	enc := firstRowMap(er)
+	if enc == nil {
+		return bossRoundResult{}, nil
+	}
+	t, ok := bossTemplatesGo[fmt.Sprint(enc["template_key"])]
+	if !ok || len(t.Phases) == 0 {
+		return bossRoundResult{}, nil
+	}
+	round := i64(enc["round_index"])
+	waiting, e := conn.Execute(`SELECT COUNT(*) AS n FROM boss_participants WHERE encounter_id=? AND status='active' AND acted_round<? AND updated_at>?`, []any{encounterID, round, now - float64(raidAbsentSeconds())})
+	if e != nil {
+		return bossRoundResult{}, e
+	}
+	if i64(firstRowMap(waiting)["n"]) != 0 {
+		return bossRoundResult{}, nil
+	}
+	phaseIdx := i64(enc["phase_index"])
+	if phaseIdx < 0 || phaseIdx >= int64(len(t.Phases)) {
+		phaseIdx = 0
+	}
+	phase := t.Phases[phaseIdx]
+	partyID := i64(enc["party_id"])
+	events := []string{}
+	rr, _ := conn.Execute(`SELECT * FROM boss_participants WHERE encounter_id=? AND status='active'`, []any{encounterID})
+	for _, tar := range rowsToMaps(rr) {
+		tid := i64(tar["user_id"])
+		crr, _ := conn.Execute(`SELECT attributes_json,realm_index,path,phase FROM characters WHERE user_id=?`, []any{tid})
+		tc := firstRowMap(crr)
+		ta := rowAttributes(catalog, tc)
+		trs, _ := equipmentRows(conn, tid, true)
+		te := equipmentPowerRows(trs)
+		tf, _ := formationBonusGo(conn, partyID, tid)
+		def := i64(ta["body"]) + i64(tc["realm_index"]) + te["defense"] + tf["defense"] + stageLead(catalog, i64(tc["realm_index"]), i64(tc["phase"]), t.RealmIndex, 1)
+		incoming := max64(1, phase.Attack+stablePercentGo(encounterID, round, tid, "boss")/20-def/2)
+		if i64(tar["guard"]) != 0 {
+			incoming = max64(1, incoming/2)
+		}
+		nv := max64(0, i64(tar["vitality"])-incoming)
+		st := "active"
+		if nv <= 0 {
+			st = "knocked_out"
+		}
+		_, _ = conn.Execute(`UPDATE boss_participants SET vitality=?,status=?,guard=0,updated_at=? WHERE encounter_id=? AND user_id=?`, []any{nv, st, now, encounterID, tid})
+		_ = damageEquipmentGo(conn, tid, 1)
+		events = append(events, fmt.Sprintf("%s hits %d for %d raid vitality.", phase.Name, tid, incoming))
+	}
+	fr, _ := conn.Execute(`SELECT formation_id,stance FROM party_formations WHERE party_id=? AND active=1`, []any{partyID})
+	if f := firstRowMap(fr); f != nil {
+		loss := phase.CohesionDamage + formationStancesGo[fmt.Sprint(f["stance"])].CohesionCost
+		_, _ = conn.Execute(`UPDATE party_formations SET cohesion=MAX(0,cohesion-?),updated_at=? WHERE formation_id=?`, []any{loss, now, i64(f["formation_id"])})
+		events = append(events, fmt.Sprintf("Formation cohesion falls by %d.", loss))
+	}
+	status := "active"
+	sr, _ := conn.Execute(`SELECT COUNT(*) AS n FROM boss_participants WHERE encounter_id=? AND status='active'`, []any{encounterID})
+	if i64(firstRowMap(sr)["n"]) <= 0 {
+		status = "defeat"
+		_, e = conn.Execute(`UPDATE boss_encounters SET status='defeat',finished_game_minute=?,version=version+1,updated_at=? WHERE encounter_id=?`, []any{gameMinute, now, encounterID})
+	} else {
+		_, e = conn.Execute(`UPDATE boss_encounters SET round_index=round_index+1,version=version+1,updated_at=? WHERE encounter_id=?`, []any{now, encounterID})
+	}
+	if e != nil {
+		return bossRoundResult{}, e
+	}
+	return bossRoundResult{Resolved: true, Events: events, Status: status}, nil
 }
 
 // bossStrikeLine is what an attack or a technique says happened (v1.9.1). A

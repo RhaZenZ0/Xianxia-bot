@@ -397,8 +397,8 @@ func TestTheRefinedCirculationIsAQiRefinersAlone(t *testing.T) {
 // shape TestEveryGoodDeedIsPaidWhereItHappens exists for.
 func TestEveryPathAbilityIsAppliedWhereItHappens(t *testing.T) {
 	want := map[string][]string{
-		"combatTurnAction":            {"swordIntentCap", "defeatWoundSeverity"},
-		"combatTechniqueAction":       {"defeatWoundSeverity"},
+		"combatTurnAction":            {"swordIntentCap", "battleLostTx"},
+		"combatTechniqueAction":       {"battleLostTx"},
 		"combatFinalizeAction":        {"bankSwordIntentTx"},
 		"pvpActAction":                {"bankSwordIntentTx"},
 		"settleVitalityRecoveryTx":    {"bodyRecoveryMult"},
@@ -410,6 +410,8 @@ func TestEveryPathAbilityIsAppliedWhereItHappens(t *testing.T) {
 		"manualCultivationMultiplier": {"manualGatheringMult"},
 		"cultivationManualAction":     {"manualGatheringMult"},
 		"practiseCultivatedManualTx":  {"manualPracticeGain"},
+		"battleLostTx":                {"defeatWoundSeverity"},
+		"combatRecoveryItemAction":    {"battleLostTx"},
 	}
 	calls := map[string]map[string]int{}
 	fset := token.NewFileSet()
@@ -452,10 +454,14 @@ func TestEveryPathAbilityIsAppliedWhereItHappens(t *testing.T) {
 			}
 		}
 	}
-	// Both defeat branches of both fight paths: a fate rescue and a lost fight.
-	for _, fn := range []string{"combatTurnAction", "combatTechniqueAction"} {
-		if got := calls[fn]["defeatWoundSeverity"]; got != 2 {
-			t.Errorf("%s lightens %d of its two defeat wounds", fn, got)
+	// Both defeat branches, a fate rescue and a lost fight, are battleLostTx's
+	// (v1.34.0), and the attack, the technique and the pill all lose through it.
+	if got := calls["battleLostTx"]["defeatWoundSeverity"]; got != 2 {
+		t.Errorf("battleLostTx lightens %d of its two defeat wounds", got)
+	}
+	for _, fn := range []string{"combatTurnAction", "combatTechniqueAction", "combatRecoveryItemAction"} {
+		if got := calls[fn]["battleLostTx"]; got != 1 {
+			t.Errorf("%s ends a lost fight through battleLostTx %d times, not once", fn, got)
 		}
 	}
 	if got := calls["pvpActAction"]["bankSwordIntentTx"]; got != 2 {

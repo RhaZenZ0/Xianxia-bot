@@ -208,18 +208,39 @@ func setupCombatRecoveryItemDB(t *testing.T) string {
 	defer conn.Close()
 	if err := conn.ExecScript(`
 CREATE TABLE characters(
-	user_id INTEGER PRIMARY KEY, qi INTEGER, qi_max INTEGER, vitality INTEGER, vitality_max INTEGER, updated_at REAL
+	user_id INTEGER PRIMARY KEY, name TEXT, gender TEXT, path TEXT, spiritual_root TEXT,
+	location TEXT, attributes_json TEXT, realm_index INTEGER, phase INTEGER,
+	body_realm_index INTEGER, body_phase INTEGER, cultivation INTEGER, body_cultivation INTEGER,
+	life_status TEXT, qi INTEGER, qi_max INTEGER, vitality INTEGER, vitality_max INTEGER, updated_at REAL
 );
-CREATE TABLE battles(
-	battle_id INTEGER PRIMARY KEY, user_id INTEGER, npc_name TEXT, npc_realm_index INTEGER, npc_stage INTEGER,
-	player_hp INTEGER, player_hp_max INTEGER, npc_hp INTEGER, npc_hp_max INTEGER, status TEXT, location TEXT,
-	source TEXT, target_key TEXT, npc_suppressed_turns INTEGER DEFAULT 0, version INTEGER DEFAULT 0,
-	created_at REAL, updated_at REAL
+CREATE TABLE battles (
+	battle_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, npc_name TEXT NOT NULL,
+	npc_realm_index INTEGER NOT NULL, npc_stage INTEGER NOT NULL,
+	player_hp INTEGER NOT NULL, player_hp_max INTEGER NOT NULL DEFAULT 1,
+	npc_hp INTEGER NOT NULL, npc_hp_max INTEGER NOT NULL DEFAULT 1,
+	status TEXT NOT NULL DEFAULT 'active', location TEXT NOT NULL, source TEXT NOT NULL,
+	target_key TEXT NOT NULL DEFAULT '', thread_id INTEGER,
+	npc_suppressed_turns INTEGER NOT NULL DEFAULT 0, version INTEGER NOT NULL DEFAULT 0,
+	final_outcome TEXT NOT NULL DEFAULT '', finalized_at REAL,
+	created_at REAL NOT NULL, updated_at REAL NOT NULL,
+	FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE
 );
 CREATE TABLE inventory(user_id INTEGER, item_id TEXT, quantity INTEGER, PRIMARY KEY(user_id,item_id));
-INSERT INTO characters(user_id,qi,qi_max,vitality,vitality_max,updated_at) VALUES(101,5,20,3,20,0);
+CREATE TABLE character_spiritual_roots(user_id INTEGER PRIMARY KEY,grade TEXT NOT NULL DEFAULT 'Common',purity INTEGER NOT NULL DEFAULT 50,elements_json TEXT NOT NULL DEFAULT '[]',mutation TEXT NOT NULL DEFAULT '',stability INTEGER NOT NULL DEFAULT 100,refinement_progress INTEGER NOT NULL DEFAULT 0,compatibility INTEGER NOT NULL DEFAULT 50,updated_at REAL NOT NULL DEFAULT 0);
+CREATE TABLE character_bloodlines(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,bloodline_id TEXT NOT NULL,name TEXT NOT NULL,affinity TEXT NOT NULL DEFAULT 'None',purity INTEGER NOT NULL DEFAULT 0,state TEXT NOT NULL DEFAULT 'dormant',evolution_stage INTEGER NOT NULL DEFAULT 0,progress INTEGER NOT NULL DEFAULT 0,rejection INTEGER NOT NULL DEFAULT 0,mutation TEXT NOT NULL DEFAULT '',primary_lineage INTEGER NOT NULL DEFAULT 0,unlocked_techniques_json TEXT NOT NULL DEFAULT '[]',updated_at REAL NOT NULL DEFAULT 0);
+CREATE TABLE character_physiques(user_id INTEGER PRIMARY KEY,physique_id TEXT NOT NULL DEFAULT 'ordinary_mortal_body',name TEXT NOT NULL DEFAULT 'Ordinary Mortal Body',state TEXT NOT NULL DEFAULT 'ordinary',evolution_stage INTEGER NOT NULL DEFAULT 0,progress INTEGER NOT NULL DEFAULT 0,stability INTEGER NOT NULL DEFAULT 100,instability INTEGER NOT NULL DEFAULT 0,updated_at REAL NOT NULL DEFAULT 0);
+CREATE TABLE active_effects(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,effect_key TEXT NOT NULL,name TEXT NOT NULL,source_type TEXT NOT NULL,source_id TEXT NOT NULL,effect_json TEXT NOT NULL,stacks INTEGER NOT NULL DEFAULT 1,starts_game_minute INTEGER NOT NULL,ends_game_minute INTEGER,created_at REAL NOT NULL,UNIQUE(user_id,effect_key,source_type,source_id));
+CREATE TABLE spirit_beasts(beast_id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,species TEXT NOT NULL,rank INTEGER NOT NULL DEFAULT 0,element TEXT NOT NULL DEFAULT 'None',intelligence INTEGER NOT NULL DEFAULT 10,temperament TEXT NOT NULL DEFAULT 'wary',bloodline TEXT NOT NULL DEFAULT 'Common',evolution_stage INTEGER NOT NULL DEFAULT 0,loyalty INTEGER NOT NULL DEFAULT 25,contract_type TEXT NOT NULL DEFAULT 'temporary',active INTEGER NOT NULL DEFAULT 0,techniques_json TEXT NOT NULL DEFAULT '[]',created_at REAL NOT NULL,updated_at REAL NOT NULL);
+CREATE TABLE artifact_bonds(user_id INTEGER NOT NULL, item_id TEXT NOT NULL, bond_level INTEGER NOT NULL DEFAULT 0, resonance INTEGER NOT NULL DEFAULT 0, awakened INTEGER NOT NULL DEFAULT 0, spirit_name TEXT NOT NULL DEFAULT '', temperament TEXT NOT NULL DEFAULT 'dormant', created_at REAL NOT NULL, updated_at REAL NOT NULL, PRIMARY KEY(user_id,item_id));
+CREATE TABLE equipment_instances(equipment_id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,item_id TEXT NOT NULL,slot TEXT NOT NULL,durability INTEGER NOT NULL,max_durability INTEGER NOT NULL,quality INTEGER NOT NULL DEFAULT 100,equipped INTEGER NOT NULL DEFAULT 0,bound_at REAL NOT NULL,updated_at REAL NOT NULL);
+INSERT INTO characters(user_id,name,gender,path,spiritual_root,location,attributes_json,realm_index,phase,body_realm_index,body_phase,cultivation,body_cultivation,life_status,qi,qi_max,vitality,vitality_max,updated_at)
+	VALUES(101,'Tester','','Sword Cultivator','Fire','Greenriver Town','{"body":10,"spirit":10,"agility":10,"will":10,"insight":10}',1,2,0,1,0,0,'alive',5,20,3,20,0);
+INSERT INTO character_spiritual_roots(user_id) VALUES(101);
+-- The opponent is held for a turn, so the pill's counter-attack is the
+-- suppressed one and the tests below read the heal without a dice roll
+-- in it; the tests of the counter itself lend the dice.
 INSERT INTO battles(battle_id,user_id,npc_name,npc_realm_index,npc_stage,player_hp,player_hp_max,npc_hp,npc_hp_max,status,location,source,target_key,npc_suppressed_turns,version,created_at,updated_at)
-	VALUES(9,101,'Iron Bandit',1,2,3,20,10,10,'active','Greenriver Town','challenge:npc:iron-bandit','challenge:npc:iron-bandit',0,0,0,0);
+	VALUES(9,101,'Iron Bandit',1,2,3,20,10,10,'active','Greenriver Town','challenge:npc:iron-bandit','challenge:npc:iron-bandit',1,0,0,0);
 INSERT INTO inventory(user_id,item_id,quantity) VALUES(101,'healing_pill',2);
 `); err != nil {
 		t.Fatal(err)
