@@ -270,6 +270,11 @@ under `APTITUDE_COOLDOWN_MINUTES` and `DAO_DUAL_COOLDOWN_MINUTES` of their own.
 Each is a costly, gated climb - an evolution risks stability and a forced
 mutation, and the rung it reaches prices a whole life's cultivation - so
 ordinary cultivation getting faster is deliberately not a reason for them to.
+`RAID_ABSENT_MINUTES` (default 30) is the one wait that is not a player's own:
+it is how long a boss raid waits on a raider who has not acted before the boss
+answers the round without them. The raider is skipped, not forfeited: they are
+struck as the rest are and the next round waits on them afresh. It is read by
+the engine like the cooldowns above, with the same bounds.
 `CULTIVATE_COOLDOWN_MINUTES`
 is the one that sets the pace of the whole game since v1.0.0-rc.5: a session is
 a share of the stage it fills (a twelfth of it), so a stage takes about a dozen

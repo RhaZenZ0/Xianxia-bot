@@ -1560,9 +1560,16 @@ async def run(url: str, token: str, db_path: str) -> Report:
             await step(report, "formation.assign the buyer to the core", act("formation.assign", PLAYER, {"formation_id": formation_id, "target_user_id": BUYER, "position": "core"}))
             await step(report, "formation.activate", act("formation.activate", PLAYER, {"formation_id": formation_id, "stance": "balanced"}))
             await step(report, "formation.stance", act("formation.stance", PLAYER, {"formation_id": formation_id, "stance": "aggressive"}))
+        # Only the leader puts a member out (v1.34.0); the buyer is put out and
+        # asks to come back, which is how the seat is proved gone and free.
+        await step(report, "party.kick by a member is refused", act("party.kick", BUYER, {"user_id": PLAYER}), expect_error="only the party leader")
+        await step(report, "party.kick puts the buyer out", act("party.kick", PLAYER, {"user_id": BUYER}))
+        await step(report, "party.join by the buyer again", act("party.join", BUYER, {"party_id": party_id}))
         await step(report, "party.leave by the buyer", act("party.leave", BUYER, {}))
         boss = await step(report, "boss.start the Iron-Tusk Boar King", act("boss.start", PLAYER, {"template_key": "iron_tusk_boar_king"}))
         encounter_id = int((boss or {}).get("encounter_id") or 0)
+        if encounter_id:
+            await step(report, "party.join during a raid is refused", act("party.join", BUYER, {"party_id": party_id}), expect_error="in the middle of a boss raid")
         status = "active"
         if encounter_id:
             try:

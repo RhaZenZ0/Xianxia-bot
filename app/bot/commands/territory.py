@@ -345,6 +345,22 @@ async def party_status(interaction: discord.Interaction) -> None:
     await interaction.response.send_message(f"👥 **{party['name']}** (`#{party['party_id']}`)\n{members}",ephemeral=False)
 
 
+@registered_group_command(party_group, name="kick", description="Put a member out of your party (the leader only)")
+@serialized_user_action
+async def party_kick(interaction: discord.Interaction, member: discord.Member) -> None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction): return
+    try:
+        envelope=await ENGINE.authoritative_action("party.kick",interaction.user.id,{"user_id":int(member.id)},action_id=f"discord:{interaction.id}:party.kick")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    # What the engine did to a raid the member was in, read off its reply: the
+    # member's share is forfeit and the round no longer waits for them.
+    note=" Their place in the raid, and its reward, went with them." if result.get("forfeited_raid") else ""
+    await interaction.followup.send(f"👢 {member.mention} is no longer in your party.{note}",ephemeral=False,allowed_mentions=discord.AllowedMentions.none())
+
+
 @registered_group_command(party_group, name="leave", description="Leave your current cultivation party")
 @serialized_user_action
 async def party_leave(interaction: discord.Interaction) -> None:

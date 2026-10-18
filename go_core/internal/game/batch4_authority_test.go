@@ -406,6 +406,8 @@ func TestBatch4LawComprehendPersistsLawDaoCooldownAndReceipt(t *testing.T) {
 func TestBatch4ConditionTreatConsumesMedicineAndResolvesCondition(t *testing.T) {
 	path := setupBatch4AuthorityDB(t)
 	world := batch4WorldPath(t)
+	// condition.treat keeps an active battle's hp in step (v1.34.0), so it reads the table.
+	withBattles(t, path)
 	batch4Exec(t, path, "INSERT INTO inventory(user_id,item_id,quantity) VALUES(42,'recovery_pill',1)")
 	batch4Exec(t, path, "INSERT INTO character_conditions(user_id,condition_key,category,name,severity,state,source_type,source_id,effect_json,created_game_minute,updated_game_minute,created_at,updated_at) VALUES(42,'flesh_wound','Injury','Flesh Wound',2,'active','test','seed','{}',0,0,0,0)")
 	batch4Exec(t, path, "INSERT INTO active_effects(user_id,effect_key,name,source_type,source_id,effect_json,stacks,starts_game_minute,ends_game_minute,created_at) VALUES(42,'condition:flesh_wound','Flesh Wound','condition','flesh_wound','{}',1,0,NULL,0)")

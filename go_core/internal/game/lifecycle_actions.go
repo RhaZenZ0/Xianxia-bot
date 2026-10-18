@@ -326,6 +326,14 @@ func recordTrueDeathAuthoritative(conn *storage.Conn, catalog worlddata.Catalog,
 	if _, err = conn.Execute(`UPDATE characters SET life_status='deceased',death_game_minute=?,reincarnation_ready_game_minute=?,true_death_count=true_death_count+1,updated_at=? WHERE user_id=?`, []any{p.GameMinute, readyMinute, now, userID}); err != nil {
 		return nil, err
 	}
+	// A battle does not outlive the fighter (v1.34.0). Every death comes through
+	// here - a defeat, the old-age sweep, a GM's - and an active battle left
+	// behind kept a locked opponent, a panel to press and a finalize to claim
+	// its rewards from the other side of the grave. The rebirth is a new life
+	// with no fight in it.
+	if _, err = conn.Execute(`UPDATE battles SET status='abandoned',version=version+1,updated_at=? WHERE user_id=? AND status='active'`, []any{now, userID}); err != nil {
+		return nil, err
+	}
 	// Escrow keyed by the persistent user id - auctions, bids, caravans, a
 	// seclusion in progress - is resolved here, in the same transaction as the
 	// death. See death_escrow.go for why it happens now and not at settlement.

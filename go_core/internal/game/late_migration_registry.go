@@ -40,7 +40,7 @@ func applyLateMigrationAction(conn *storage.Conn, catalog worlddata.Catalog, use
 		return bountyHunterActionGo(conn, catalog, userID, raw)
 	case "equipment.bind", "equipment.equip", "equipment.unequip", "equipment.repair":
 		return equipmentAction(conn, catalog, userID, raw, op)
-	case "party.create", "party.join", "party.leave":
+	case "party.create", "party.join", "party.leave", "party.kick":
 		return partyAction(conn, catalog, userID, raw, op)
 	case "formation.create", "formation.assign", "formation.activate", "formation.stance":
 		return formationAction(conn, catalog, userID, raw, op)

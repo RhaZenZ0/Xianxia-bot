@@ -220,7 +220,9 @@ class BattleView(CardView):
             else: result="🔄 Battle panel refreshed."
             updated=await DB.get_battle(self.battle_id,user_id=self.user_id,active_only=True)
             if not updated:
-                await _battle_reply(interaction,content="⌛ This battle has already ended.",view=None,edit_panel=True);return
+                # The turn may be what ended it (a pill's answer can lose the fight):
+                # say what happened before saying it is over (v1.34.0).
+                await _battle_reply(interaction,content=f"{result}\n\n⌛ This battle has already ended." if kind in {"item","technique"} else "⌛ This battle has already ended.",view=None,edit_panel=True);return
             c=await DB.get_character(self.user_id) or c
             embed,view=await _battle_panel(self.user_id,c,updated,result_text=result)
             await _battle_reply(interaction,view=view,edit_panel=True)
@@ -289,6 +291,9 @@ async def _use_battle_recovery_item(interaction: discord.Interaction, battle_id:
             battle_id=int(battle_id),
             item_id=item_id,
             game_minute=wt.total_minutes,
+            minutes_per_year=MINUTES_PER_YEAR,
+            base_samsara_years=SETTINGS.reincarnation_base_samsara_years,
+            max_wait_seconds=SETTINGS.reincarnation_max_wait_seconds,
             action_id=f"discord:{interaction.id}:combat.recovery_item:{int(battle_id)}:{item_id}",
         )
     except GameEngineError as exc:
@@ -299,6 +304,14 @@ async def _use_battle_recovery_item(interaction: discord.Interaction, battle_id:
         lines.append(f"Vitality: **{int(state.get('vitality', 0))}/{int(state.get('vitality_max', 0))}**")
     if int(state.get("qi_restore", 0)):
         lines.append(f"Qi: **{int(state.get('qi', 0))}/{int(state.get('qi_max', 0))}**")
+    # The residue and the turn it cost (v1.34.0), read off the reply: the same
+    # toxicity line `item.use` prints, and the opponent's answer as a technique's.
+    if int(state.get("toxicity_gain", 0)):
+        lines.append(
+            f"⚗️ Medicinal residue **+{int(state['toxicity_gain'])}** → pill toxicity "
+            f"**{int(state.get('pill_toxicity', 0))}/100 ({state.get('toxicity_band', '')})**."
+        )
+    lines.extend(await _answer_lines(state, wt.total_minutes, interaction.user.id))
     return "\n".join(lines)
 
 async def _execute_battle_manual_technique(interaction: discord.Interaction, battle: dict, technique: str) -> str:
@@ -390,6 +403,15 @@ async def _execute_battle_law_technique(interaction: discord.Interaction, battle
         lines.append("The opponent resists or tears free of your spatial authority.")
     if result.get("opponent_defeated"):
         return "\n".join(lines)
+    lines.extend(await _answer_lines(result, wt.total_minutes, interaction.user.id))
+    return "\n".join(lines)
+
+
+async def _answer_lines(result: dict[str, Any], game_minute: int, user_id: int) -> list[str]:
+    """The opponent's answer to a turn the cultivator spent, and how a defeat
+    in it reads: one statement for the Law technique and the pill (v1.34.0),
+    both of which are answered by the engine's one counter-attack."""
+    lines: list[str] = []
     if result.get("counter_suppressed"):
         lines.append("🌌 Opponent counter suppressed by spatial control.")
     elif result.get("counter_roll"):
@@ -405,7 +427,7 @@ async def _execute_battle_law_technique(interaction: discord.Interaction, battle
             )
         elif result.get("true_death"):
             death = dict(result.get("true_death") or {})
-            await _record_true_death_history(interaction.user.id, death, wt.total_minutes)
+            await _record_true_death_history(user_id, death, game_minute)
             years = int(death.get("private_years", SETTINGS.reincarnation_base_samsara_years))
             wait = max(1, int(death.get("real_wait_seconds", SETTINGS.reincarnation_max_wait_seconds)))
             lines.append(
@@ -420,7 +442,7 @@ async def _execute_battle_law_technique(interaction: discord.Interaction, battle
                 "Your body mends on its own with time — or `/condition treat` with a **Recovery Pill** "
                 "restores vitality at once *and* works on the injury, so spend it there rather than drinking it."
             )
-    return "\n".join(lines)
+    return lines
 
 async def _finish_battle(interaction:discord.Interaction,outcome:str,*,expected_battle_id:int|None=None,edit_panel:bool=False)->None:
     c=await DB.get_character(interaction.user.id)
@@ -488,6 +510,10 @@ async def _finish_battle(interaction:discord.Interaction,outcome:str,*,expected_
             lines.append(f"☯️ Karma shifts to **{int(result['karma_score']):+d}**.")
         if "fate_after" in result:
             lines.append(f"🌠 Meaningful mercy draws providence: **Fate {int(result['fate_after'])}/9**.")
+    if result.get("reward_repeated"):
+        # A win over the same opponent is paid once a world day (v1.34.0); the
+        # engine says it did not pay, and the card does not promise it did.
+        lines.append(f"⏳ You have already won against **{npc_name}** today; this victory teaches and tempers nothing more.")
     if int(result.get("sword_intent",0)):
         lines.append(f"🗡️ The win sharpens your sword intent: **{int(result['sword_intent'])}** held.")
     if tempered:=tempered_line(result,"fight"):
