@@ -485,7 +485,7 @@ HOUSEHOLD_STANDING_REWARD_MAX = 25
 MAX_OBJECTIVES = 4
 MAX_OBJECTIVE_COUNT = 5
 # A label is the line a card prints for an objective. The realm road's carry the
-# command to press in bold ("**/craft -> General Crafting -> Craft**") and the
+# command to press in bold ("**/craft → General Crafting → Craft**") and the
 # longest runs to 113; a cap below that cut the closing ** off the saved copy of
 # a quest a GM merely opened and saved. A gate holds every shipped label under it.
 MAX_OBJECTIVE_LABEL = 200

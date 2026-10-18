@@ -8456,3 +8456,12 @@ Reproduced here by building the image's context in a scratch directory: the gate
 passes with it, and the whole suite passes in that context. **Drill** (the COPY line removed): `a Go
 test reads app/database/core.py from outside go_core and go_core/Dockerfile does not COPY it into the
 build, so `go test ./...` inside the image fails on a file that is not there`.
+
+### A comment that spelled a hint path with the wrong arrow (v1.34.0)
+
+The `python (3/4)` job failed on `test_hint_paths`, which reads every `**/hub → Page → Leaf**` in the
+tracked sources and resolves it against the hubs: the objective-label cap's comment in
+`app/rules/quests.py` quoted the shape of a label as `**/craft -> General Crafting -> Craft**`, with
+ASCII arrows, and the resolver splits on `→` alone, so the quoted path resolved to nothing. The gate
+reads comments on purpose (a hint is a string, and a string in a comment is one copy away from a
+reply), so the comment now spells the arrow the way a reply must. Nothing a player sees changed.
