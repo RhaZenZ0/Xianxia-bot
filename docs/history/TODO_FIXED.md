@@ -1,0 +1,978 @@
+# TODO — what was fixed
+
+Every punch-list entry that was closed, newest first, each **fixed** in the release named: the
+record of what the item turned into, which the release write-ups in `docs/FINDINGS.md` cite by name.
+The open half is `docs/TODO.md`; an entry moves here when it is fixed and is never deleted.
+`tests/python/contracts/test_playtest_gate.py` holds this file to carrying only fixed entries, and
+`tests/python/contracts/test_claude_md_stays_small.py` resolves every pointer at a findings
+section in it.
+
+## Fixed
+
+- **fixed (v1.33.0)** — *An undo wrote back columns its lever never wrote.* The perfection lever's
+  reversal restored the whole quest state from whichever snapshot it read, deleted a row it had made
+  whatever play had put on it, reopened a perfected realm, and redid a deleted row as an UPDATE on
+  nothing; the trade, Law and contribution levers erased the crafts, sittings and points of play, and
+  the physique undo wrote an identity the call had not. An undo restores the columns the audit row
+  shows its action wrote, as an UPDATE, and removes a made row only through `deleteIfIdle`;
+  `TestAReversalDeletesARowOnlyThroughDeleteIfIdle` and `test_an_undo_deletes_only_an_idle_row.py`
+  hold it. Audit rows from v1.23.1 onward are repaired by the same keys; rows from before carry their
+  bar-only reversal.
+- **fixed (v1.33.0)** — *A banner sat on a street.* `territory.claim`, both banner branches of
+  `ResolveWarTx` and the war step's targets ignored v1.12.0's whole-place rule, and migration 74 left
+  an active war over each gate it neutralised. `game.TerritoryGround` is the one statement; a claim
+  from a part claims the city, a war over a part is set aside with no victor, and
+  `SetAsidePartialHoldingsTx` puts a running world right every maintenance pass.
+  `territory_ground_test.go` and `test_war_fronts.py` hold it.
+- **fixed (v1.33.0)** — *One Craft All could strand a trade's three examinations.* A batch of up to
+  fifty crafts crosses ranks 1 to 3 in one press and the hall sat only the rank held, so the quests
+  were handed over and could not be finished, the methods never taught and the trade never certified.
+  `professionExamsOpenTx` is the one rule (every examined rank at or below the rank held that this
+  life has not passed); the hall sits the lowest, the craft and the counter hand over every open
+  quest, and each examination's objective names its own quest key so a pass completes only that one
+  (migration 80 carries it onto a running world). `test_an_examination_is_never_lost.py` and
+  `profession_exam_test.go` hold it.
+- **fixed (v1.31.2)** — *A hub press made about ninety engine round trips.* The panel refresh after
+  every press opened a session per one-row read (thirty-two of them), read the clock once per circuit
+  walker to draw the Here line (twelve), and looked a plain town up in three private-property tables.
+  One `reuse_connection` scope per refresh (`hubs.register_read_scope`), the clock read once in
+  `npcs_present` and handed down, a lookup only for a private key, and a per-scope memo of the character
+  and membership reads; `test_a_panel_refresh_is_bounded.py` holds it.
+- **fixed (v1.27.0)** — *Missing system links.* Three read-only audits, re-checked against v1.26.0.
+  Navigation: every objective type has a door (`OBJECTIVE_PATHS`), bare tree commands, empty pickers,
+  padlock reasons and engine refusals earn buttons, forty-eight handlers that printed the engine's bare
+  words go through `_explain_engine_error`, the journal draws each quest's next door, and dashboard
+  names open their records. Engine: a world event's sect effect is scoped to its city's or world's
+  sects, war history reaches the Forge and RAG, the war step spares allies and other worlds, a
+  player's claim is told to the world, and an artifact bond needs the artifact.
+- **fixed (v1.28.0)** — *Built things that did nothing.* A homestead's Defensive Formation and
+  Storage, beast intelligence, the spirit sense in `/sense`, the hunting musk and the beast in the hunt,
+  six reputations no rule read, sect influence and master attention each have a reader; a bounty
+  surrender and capture cost restitution; a sponsor rolls the household and karma; six objective types.
+- **fixed (v1.31.0)** — *What v1.27–v1.30 left alone.* Focusing the Defensive Formation, the
+  storehouse, the herb garden, the beast pen or the merchant hall granted nothing; every room has an
+  effect now, made of stats a rule reads, and a focus lasts four real hours with one more before the
+  next (on the owner's call; it was four world hours). `world_history_events.world_name` was never
+  written by the engine's history door and read by nothing; it is filled from `content_locations`
+  and the narrator's recall leaves out another world's public news. A hunter killed by a beast marks
+  the region's security, and nothing else, because nobody did the killing.
+- **fixed (v1.30.0)** — *A home says what is in it.* The homestead's and the sect residence's
+  status list every facility with what it does at its level, what the next level adds and costs,
+  and what it still asks, read through `property.overview` off the helpers the rules use.
+- **fixed (v1.29.0)** — *The world's feedback.* Held territory stocks its sect's treasury, a war's
+  end and a member's contribution move the sect, recruitment pressure eases the trial, a manor under a
+  rival's banner lends nothing, caravans and market trades move their cities, era terms reach five NPC
+  rolls, the world's own killings mark their region and sect, a slain NPC's kin remember the killer,
+  and a household's year reads its real relations and branches.
+- **fixed (v1.24.0)** — *Expand the war system.* Asked for in three words, then a war channel and
+  fighting beside an allied sect were asked for mid-build. Reading the system found four faults: the
+  world's own sieges were fought for the attacker alone, so a defender with no players could never
+  hold; a territory's defense was never written; a war act earned nothing; and nothing followed a war
+  - no truce, no occupation window, no standing lost, no history of its end. On the owner's asks: act
+  and victory pay in sect contribution, allied sects fight beside their ally, walls that rise and
+  fall, truces and occupations, a two-walled siege tick, and a read-only war-front channel per world,
+  in a ⚔️ Sect Wars category of its own, with a live card per war (schema 78).
+- **fixed (v1.24.0)** — *What a war does beyond its ground.* Three things the release's first push left
+  alone, then fixed on the owner's call: the world's own sects fight beside an ally (half their
+  strength, capped, and the world hears them march); a war can be ended in peace - by a Deacon of a
+  warring sect for 100 contribution once it is three days old, or by the world's own sects when
+  morale breaks - on terms the siege sets; and a sect's NPC disciples add to its strength and are
+  named at the siege.
+- **fixed (v1.22.0)** — *A better menu layout for all the menus.* Researched and the first three of six
+  steps taken on the owner's call: a jump to any system on every multi-system hub panel, the menu's
+  tools row (the tutorial's next step pressed, the quest journal, the cooldowns) and Daily buttons
+  that say how long they are still cooling down, readable labels for the leaves named like code, and
+  a hand-set order on nine pages. Then step 4: a compact page, three described rows and the rest as
+  plain buttons, so every page shows all it holds at once. Asked in the same session, the GM
+  dashboard's Player Activity page shows the most-used commands.
+- **fixed (v1.20.0)** — *Body cultivation is too slow.* Asked for by the owner. Measured: body stages
+  cost 14-22% more than qi stages at the same realm, no body pill was sold or craftable, and every
+  qi-path multiplier skips the body. On the owner's call: Bone-Tempering and Iron-Blood pills beside
+  their qi twins on every shelf, a quarter of a body session for each successful hunt, dig and
+  battle won (`body_tempering.by_use`), and tempering grounds - hunting grounds, forge terraces,
+  garrison wards, the wilds - for body sessions at both cultivation doors. Cheaper body stages were
+  offered and declined.
+- **fixed (v1.19.0)** — *More capitals, with rivals.* Asked for as *"more capital cities with rivals,
+  maybe move the sects that fit"*; three shapes were offered and the owner took the smallest: one
+  capital per world stays, every public sect's gate becomes a `sect_gate` district of a seat city of
+  its world (`scripts/author_sect_seats.py`), the politics tick grows a sect out of its seat by road,
+  a delegation in a seat city recruits for the sect seated there, and the city card and panel header
+  name the seat, its banner and its standing. The seat is `cityOf(gate)`, never a field of the sect.
+- **fixed (v1.18.0)** — *The road stopped at the Mortal seam.* The second world-flow study's first
+  recommendation, on the owner's call ("Do the recommendations"): `realm_road` runs from realm 1 to
+  realm 31 now, twenty-four stages through the three upper worlds naming each world's capital,
+  flame, raid, keyed realm and job district, chained from the Mortal stages and handed over by the
+  crossing into each realm. Three objective types for it: `law_comprehend`, `law_technique`,
+  `personal_world`.
+- **fixed (v1.18.0)** — *Ten Laws had no technique.* Only Space had any; the other ten were a
+  comprehension number and nothing to do with it. Each has a control technique and a Domain now,
+  placed on realms 20-22 and 28-29, which the study found had no content of their own. The battle
+  resolves a control technique by its effect's tags (`damage` crushes, else holds) rather than by
+  two Space ids, and the technique picker offers only Laws begun.
+- **fixed (v1.18.0)** — *A sect was for life in one world.* `sect.ascend`: each public sect names
+  the allied sect one world above (`ascends_to`), and a member at its gate at the world's floor is
+  taken in as an Outer Disciple with standing reset. The promotion ladder reaches Elder (50) at
+  25,000 earned, the manor's construction rank. A sect residence (`sect_abodes`) is deliberately
+  left where it was on an ascent: the row names a Discord thread, and moving or deleting it is the
+  v1.0.8 thread question, which is a decision.
+- **fixed (v1.18.0)** — *Autonomous world events drew from every world evenly.* The weekly tick
+  picks a world a living cultivator stands in or has discovered a place in
+  (`worldsWithLivingCharacters`); with nobody living, every world is eligible as before.
+- **fixed (v1.19.0)** — *Open the Qi Refining pages at realm 1 rather than realm 2.* The second
+  study's measurement: realm 1 opened almost nothing the first hour did not already show, and the
+  curriculum's second band landed at Foundation Establishment. On the owner's call ("the next open
+  todo") the band is Qi Refining: every page `scripts/author_feature_unlocks.py` held to realm 2
+  opens at realm 1, the deeper floors stay where they were, and the first gate opens the game.
+- **fixed (v1.19.1)** — *The Celestial ring is a line.* Both world-flow studies: the Celestial
+  World's gates faced east ten times and west nine, north and south twice each. The roads were
+  always a ring; the compass folded at Starroad and Lunar Shadow, each facing both of its roads by
+  one gate. The entry's own plan - new gate rows, none removed - could not be done, because turning
+  a road moves its gate at both ends and the far end's gate faced nothing else. On the owner's call
+  the two folds turn north and south (`scripts/author_celestial_compass.py`), six gates are renamed
+  to the side their road leaves by (Celestial River City's west gate folds into its south gate), two
+  new gates have a captain each, and migration 75 carries a running world onto the new names. The
+  compass reads 7/6/6/5 now.
+- **fixed (v1.17.1)** — *Two doors on the panel opened for nobody.* The world-flow study's finding,
+  on the owner's call: the homestead asked sect rank 40 and the promotion ladder stopped at 30, the
+  manor asked rank 70 as a Go literal, and the Personal World page opened at realm 5 for a world the
+  engine refuses below 30 and Space Law 100. The ladder reaches Deacon (9,000 earned); the manor's
+  two ranks (`sect_abode_system.manor_founding_rank_level`, `manor_construction_rank_level`) and the
+  world's floors (`personal_world_system`) are content the engine and the panel both read; each door
+  is hidden below its floor with a lock line naming it; the page opens at the content's realm.
+- **fixed (v1.17.0)** — *Each upper world has a job.* The world-flow study's second recommendation,
+  on the owner's call ("Give each world a job. Or more"): each world above the Mortal carries a
+  district kind of its own read by one rule (`world_jobs.go`), a raid boss in the wilds of one of
+  its cities, a secret realm at that wild place, and a key to it on its array workshops' shelves;
+  and a raid's reward is paid in the money of the world it is fought in, where `boss.claim` paid
+  the Mortal stone everywhere (rc.44's class, found at a sixteenth site; true only for a
+  raider standing at the lair until v1.33.0 paid the lair's world's coin from anywhere).
+- **fixed (v1.19.2)** — *Commission realm bands above the Mortal World.* The entry said the band
+  was stored and read nowhere, and that was wrong: the offer an NPC makes in conversation reads it
+  (`realm_band_allows`), so none of the seventy-eight upper-world city commissions, banded "2-4" or
+  "4-8", was ever offered to anybody who could stand in its world, while the board read no band and
+  offered them all to anybody. On the owner's call each world's city work sits inside its own realms
+  (Spiritual 9-14, Immortal 18-23, Celestial 26-31, `scripts/author_commission_bands.py`), the board
+  and its accept picker read the band too, and migration 76 moves a running world's pool, leaving a
+  GM's own edit alone.
+- **fixed (v1.19.3)** — *`world_rules.physical_laws.local_time_flow` is read by nothing in Go.*
+  Nor was anything else in `physical_laws` or `social_laws`, in Go or Python: `/worldrules` printed
+  neither block. The faster-higher-worlds idea is already `world_qi_density`, so on the owner's call
+  both blocks went, with their defaults in `app/rules/advanced_catalog.py`, and
+  `test_every_world_rule_has_a_reader.py` holds every top-level world rule to a reader.
+- **fixed (v1.14.0)** — *Attributes grow every stage.* (Deferred from v1.13.0 on the owner's call "ship paths first".)
+  Asked for as "+1 on every attribute per level, and the types get +2 on some", then settled as: at
+  every **stage** a cultivator gains +1 to all six attributes and +2 instead on the two their path
+  grows (`pathGrowthAttributes`), with the rolls made harder to keep the odds where they are. The
+  plan: a `challengeDifficulty(realm, stage)` term added to a roll's TN, keyed on what the roll is
+  against - the opponent's realm and stage in a fight, the cultivator's own stage for a breakthrough
+  or a tribulation, a place's floor for its rooms and sites, a recipe's rank for a craft - so the
+  growth is felt against what you have outgrown and not against what matches you; a migration that
+  recomputes every existing character's attributes from their path, realm and stage; and the odds
+  of each family of roll measured before and after rather than argued. Deferred only so the path
+  abilities shipped first.
+- **fixed (v1.13.0)** — *Five paths did nothing of their own.* Each has an ability now (Sword
+  intent and the Intent Strike, the Qi Refiner's stance, the Body Refiner's mending, the Soul
+  Cultivator's Heart wave and sense, the Formation Adept's arrays), a manual of your own path
+  gathers and practises faster, every path has a Law affinity, both tied attributes grow a realm,
+  and six dark manuals that named paths that do not exist name real ones.
+- **fixed (v1.13.0)** — *Another path's doors were drawn.* The ghost road's leaves are left off the
+  panel for every other path with no padlock (`NOT_YOUR_PATH`), and a page of nothing else leaves
+  the page list; the Intent Strike and the refined stance are offered only to their own path.
+  `/ghost` itself still answers as a slash command, because Discord registers commands for the
+  whole guild and cannot hide one per member; the engine still refuses it.
+- **fixed (v1.12.3)** — *What a second deep review found.* Eight reviewers over v1.2.1 to v1.12.2,
+  then "fix all": the market counter sold for less than a ranked crafter or the town at a stall would
+  pay (`highestNPCPays` is the floor now); a sect's treasury could be donated to and redeemed from at
+  a profit and the lifetime count never fell (a treasury redeem costs at least what a donation earns
+  and debits the count); a Domain technique cast in battle buffed the opponent; every craft built the
+  spirit sense; samsara kept flames and the sense; an inheritance studied a manual below its realm
+  floor; a treaty broken by a killing ended from one side; a server-update request could wedge for
+  good with nothing to clear it (`admin.server.cancel_update`, and a watcher that no longer cuts JSON
+  by hand, remembers a nonce only after its ack, keeps its closing report, exits on a signal and
+  reopens only a world it closed); a skipped narration route spent a shared OpenRouter slot; the
+  dashboard waited on GitHub; and a dozen surfaces that offered what the engine refuses. The four
+  findings left as decisions are the `deferred` entries above.
+- **fixed (v1.7.10)** — *No `/boss` or `/party`.* Both groups backed a Combat hub page and were never
+  in `TREE_COMMANDS`, so the names a player types reached nothing (v1.7.4's `/stall`). Registered.
+- **fixed (v1.7.8)** — *A solo raid.* On the owner's call `/boss start` with no party forms a party
+  of one marked `raid_only` (schema 68), closed when the raid is won, lost or cleared by a GM, and a
+  party of one fights the boss at 70% of its health (`bossSoloHPScale`). A party made by hand is
+  never closed by its raid.
+- **fixed (v1.7.6)** — *Who may start a raid.* The leader alone, on the owner's call, with every
+  member at the boss's own `RealmIndex`, which every template carried and nothing read. A party of
+  one is still a party, so a solo player raids by creating one.
+- **fixed (v1.7.7)** — *Two raid lairs no road reaches.* Moonfen Marsh (the Drowned Serpent, and the
+  Verdant Immortal Grotto's entrance) and Cloudspine Foothills (the Nine-Echo Sword Wraith, and the
+  Sword Grave's entrance) carry `wilds_of` - Moonfen City and Cloudblade City, on the owner's call -
+  and exploring from that city can turn them up; `/travel` takes the road-less jump sect gates use.
+- **fixed (v1.7.6)** — *`/boss act` Defend always failed.* Discord sent `defend` and the engine
+  accepts `guard`. The button sends `guard`, and the engine reads `defend` as a guard for an older
+  bot mid-upgrade.
+- **fixed (v1.7.5)** — *Say what a weapon, armour or beast gives.* Every surface that shows gear
+  names its attack, defence and agility at its grade (agility as boss-raid hit chance, the only real
+  percentage), the equipment card sums them into what they do, and a beast's card names its 1v1
+  bonus. Graded gear read "No stat modifiers" on the equipment card and is fixed with it.
+- **fixed (v1.7.1)** — *A trade's goods need that trade's certificate at a stall.* On the owner's
+  call: anyone at the realm floor may open a stall, but an item a recipe makes is listed only by
+  somebody who has passed an examination of that trade in this life - any rank, because a rank rises
+  on crafting alone and somebody can reach the second without sitting the first. Raw materials stay
+  anybody's, a trade that authors no examination locks nothing, and listings already standing are
+  left alone. `stallCertificateTx` is the one statement; `stall.status` reports what the seller may
+  list and the `/stall list` picker offers only that. Stated in the notes: a shop-bought pill is a
+  recipe's output too, so an uncertified character cannot resell one at a stall; the counters still
+  buy it.
+- **fixed (v1.6.0)** — *More NPC and sect overview on the GM dashboard.* Asked for as heads of their
+  own, like World and Players. NPCs carries the roster, Population & Whereabouts, Marriage & Family,
+  Society and Deeds & Fates; Sects carries Sect Politics, Members & Lineage, Recruitment and
+  Holdings. Reads only, on the owner's call. Three faults found while reading are fixed with it: the
+  roster's status filter sent "undefined", the Player Editor's sect card demoted a player on an
+  unchanged save, and the sect cards showed two columns nothing writes. Territory and wars stay on
+  Conflicts.
+- **fixed (v1.6.0)** — *Mining inside a shop or an auction hall.* Nothing refused a dig on an
+  apothecary's floor. On the owner's call a dig is refused in private places, on shrines, in a shop,
+  on an auction floor and while an exploration event is open, and nowhere else; a waystation's yard
+  carries its keeper's stall and stays open ground.
+- **fixed (v1.5.0)** — *A player can own a shop.* Asked as a question - *"What are your thoughts on
+  a player owning a shop?"* - and answered with a stall in a city's street rather than a storefront in
+  the private homestead (nobody could walk in) or a catalogue shop bought outright (shops are content
+  tables, the keeper is a string, and every counter's price band is anchored on their shelves). The
+  homestead's `merchant` facility had been buildable, raisable and printed to the narrator since it
+  was written and read by no rule; `stallSlotsAndFee` is that rule. On the owner's call anyone at
+  Foundation Establishment may open one and the town buys too, bounded: never the last unit, never
+  above one coin under the cheapest shelf, out of its own wealth, three a city a day. See docs/FINDINGS.md,
+  "A stall in the city". Two omissions with reasons: no rename (close returns everything and open
+  again names it) and no `admin.stall.close` lever until a GM asks for one - a GM's erasure and reset
+  already take a stall with the character.
+- **fixed (v1.2.1)** — *A beast could not evolve past stage four.* Reported from play: *"it says loyalty
+  should be 110, but I can't go over 100"*. `beast.evolve` wanted `60 + 10 × stage` while feed and train
+  clamp loyalty at 100, and nothing caps the stage, so stage five asked for the impossible for ever. The
+  requirement is held under the cap (`beastLoyaltyCap`), stated once beside the two clamps.
+- **fixed (v1.2.1)** — *A homestead outside the Mortal World could never be upgraded.* `abode.upgrade`
+  charged `abode_system.currency` - the Mortal stone - in every world, while every reward above it is
+  paid in that world's crystal (rc.44). Charged through `characterBaseCurrencyTx` now; the rc.43 caravan
+  fare, one system over.
+- **fixed (v1.2.1)** — *Twelve smaller wires from a deep review of the tree.* A GM's currency grant
+  mirrored onto the sheet only for `low_spirit_stone` by name (now the target's world currency); the
+  household's support wait was the caller's (`cooldown_game_minutes`, now the engine's month); two NPC
+  death paths in `npc_deeds.go` never widowed the survivor; a restore's safety backup was the one
+  backup left in the clear on a sealed deployment; the narrator never asked `npc_registry`; the Quest
+  Editor's stand-in world had no `recipes`; `caught_up` stages were written into the quest result and
+  read by nothing; `/admin server maintenance` Vacuum and Cleanup wrote no audit row;
+  `reset_database.sh` drove the bot with `wget` inside an image that has none;
+  `ENGINE_SHUTDOWN_GRACE_SECONDS` was documented and passed by nothing; `search_catalog` treated `_`
+  and `%` as wildcards; and a grave's claim ignored its own guarded UPDATE's row count. Each has a
+  test; `test_engine_boundary.py` is the gate for the compose class.
+- **fixed (v1.2.3)** — *The review's eight deferred claims, read.* Six held. VACUUM stalled ten
+  seconds behind a session's open transaction and failed (`SessionManager.InTransaction`, a
+  `sessions_busy` refusal; `server_vacuum_session_test.go` reproduced the stall). The sect manor's
+  array priced a body retreat and a deployed array priced a hand-sat body session, each the other
+  door's opposite (`placeMultiplierForPath`; one rule, qi-gathering arrays are qi-path weather).
+  `combat.turn`'s counter-attack left out the dual-cultivation resonance `combat.technique` counted
+  (`counterDefenceTN`, held at both sites by AST). Undo, redo, undo refused (the chain is walked to
+  the original, direction by its length). The rank sell ceiling read only the shops' shelves, and
+  Madam Wen's talisman at 15 undercut a shelf of 17 (`cheapestShelfPrice` reads merchant wares;
+  `TestAMerchantsWaresAreAShelfToo`). `/auction sell` defaulted to the Mortal stone on every floor
+  (the house's `default_currency`). Two were read and left: `meridian.open` is paced by its insight
+  cost, a quarter of the pool rising each channel, not by a wait; and Reopen takes the road the Menu
+  button takes, since a panel opens and every leaf is re-checked on the press.
+- **fixed (v1.2.3)** — *The review's second tier, read.* `commission.resolve` paid `completed` off the
+  payload (refused now; `resolveCommissionTx` from `quest.progress` is the one door that pays, and
+  the tests that completed one through the action go through it); `market.trade` priced off sect
+  value with no eye on the shops - a Wind Gourd 9 at market against a keeper's 45, a tomb token 840
+  against a shelf's 420 (`marketUnitPrice` holds both directions inside the shops' band;
+  `TestAMarketCounterStaysInsideTheShopsBand` walks the catalogue); a lot was appraised from
+  anywhere; `duel.py` refused "opponent's turn" ahead of the engine's breach check; Narrate-it met
+  no gate; `creation.py` printed a refusal as a wiring failure; `sect.discover` took the caller's
+  minute; `ai_router` spent a route slot before the shared budget could end the walk; `health.py`
+  dropped a control request whose body timed out; an upper-world rebirth got no send-off
+  (`sendoffArchetypeFor`, below) and its sheet mirror was 0 outside the Mortal World; `mining.go`
+  kept a literal world list. `review_second_tier_test.go` and `test_review_decisions.py` hold them.
+- **fixed (v1.3.0)** — *Which Mortal house an upper-world house sends its child off as.* v1.2.3 read
+  a Mortal counterpart off the kind in each of the thirty-three upper-world templates' ids; on the
+  owner's call all thirty-three houses have `birth_family_sendoff` entries of their own in
+  `world.json` - a heirloom flying artifact each (flight 5 above wealth 60, 3 below, the Mortal rule),
+  a handover line and the trade - keyed by the house's archetype, and the reading is gone. What the
+  upper houses still do not have is a `birth_family_lesson`, so `/family → Hearth → Lesson` says the
+  head of an upper house has nothing to teach; authoring thirty-three lessons is content.
+- **fixed (v1.2.0)** — *The first hour showed the whole game.* Player feedback: *"we need to simplify
+  interface ... Cultivation, Breakthrough, Explore, Shop, Craft, Forge, Gather, Hunt, Mine, Quest until
+  Foundation Establishment - these things are enough"* and *"I still forget where to go what to do"*.
+  The curriculum is retuned to that list (120 of 250 leaves at Body Tempering, down from 142), the
+  menu leaves off the hubs with no lever open yet and names the tutorial's next step, and `/mine` is
+  built. See docs/FINDINGS.md, "The first hour is a short list".
+- **fixed (v1.2.0)** — *A road put a cultivator in transit for a real half hour.* `TRAVEL_TIME_PERCENT`,
+  default 0; the old pace is 100. The toll, the encounter and the road-side discoveries are untouched.
+- **fixed (v1.2.2)** — *"Journeyman sounds medieval."* v1.2.0 made the ladder Unranked, Grade 1-5 and
+  Saint; on the owner's call v1.2.2 makes it the genre's Nine-Tier ladder, Tier 1 Apprentice to Tier 9
+  Sovereign with each trade's own word in front, stated once (`PROFESSION_TIERS`,
+  `PROFESSION_TIER_WORDS`) and held equal to the examinations' `rank_name`s.
+- **fixed (v1.3.0)** — *The tutorial's forge burns materials on a miss.* On the owner's call a failed
+  craft returns half of each input, rounded down (`craftFailureRefund`), so one unit of anything is
+  the stake; the result carries `returned` and the reply names what was salvaged.
+- **fixed (v1.3.1)** — *The catch-up walked the content file's adjacency, and reached nobody holding
+  no quest.* `catchUpBeginnerPathTx` follows `seed_json.follow_on` from every completed quest now, so
+  a GM's re-pointed chain is obeyed, and it runs lazily on every authoritative action beside the
+  vitality settle, so a graduate holding no quest is handed an added stage the next time they do
+  anything at all.
+- **fixed (v1.3.1)** — *Forage's wait was its own literal.* It is `actionCooldowns`' now
+  (`FORAGE_COOLDOWN_MINUTES`, default 20, `.env.example` and compose passthrough), and its refusal
+  is the hunt's shape so the bot words it in hours and minutes.
+- **fixed (v1.3.0)** — *The Qi Body card hides a read.* On the owner's call the pool and the purity
+  are shown at every realm; only the channels, the page's own lever, wait with the page and say where
+  it opens.
+- **fixed (v1.1.0)** — *There was no road into a sect.* Reported in Discord: at a Major Sect
+  Recruitment event a player was told by the Visiting Elder that they were impatient and would not be
+  taken, and the next player asked *"What menu?"*. The event named no sect and its elder belonged to
+  none, so the refusal was the narrator improvising from a role reading "Decides who is taken"; no
+  road reaches any of the twelve sect gates, so `/explore` never finds one; the envoys' hall said the
+  routes were on your map and wrote nothing; Recommendation and Trial opened at realm 1 on leaves only
+  a hub press can reach, so a realm-0 player could not join at all while `road_to_a_sect` - handed to
+  everybody by the beginner path - asked for exactly that and had no reachable reporter; no sect work
+  was open to an outsider; and the recommendation's "+N" was never added to a roll. The recommendation
+  and the trial also took their gate from the caller, which writes a road-less place onto a travel
+  list. All of it is the engine's now. See docs/FINDINGS.md, "The door into a sect".
+- **fixed (v1.1.0)** — *A button was drawn where the engine would only refuse it because of where you
+  stand.* Reported from play as `/economy → City Shops → Browse` in the birth household. Every leaf
+  refused purely by place is a locked line naming why and where it works, asked with the engine's own
+  predicate; City Shops' Here is always drawn. See docs/FINDINGS.md, "A button is drawn where it works".
+- **fixed (v1.1.0)** — *A caravan could not leave from a city's gate.* `caravan.dispatch` planned from
+  the raw location while travel uses `cityOf`, so it refused at every gate and district of the city it
+  was standing in - v1.0.9's household-door fault in a second handler.
+- **fixed (v1.1.0)** — *Two exits named a door that refused.* A sect residence's way out was printed as
+  `/abode → Leave`, and `abode.leave` reads `cave_abodes` while a residence is a `sect_abodes` row; and
+  `abode leave`/`abode focus` were hidden from anybody owning no property, which is every invited guest
+  standing inside somebody else's.
+- **fixed (v1.2.3)** — *A sect's trial tuning is authored and not read.* On the owner's call:
+  `sectTrialTuningTx` reads `base_tn`, `path_bonuses`, `root_affinities`, `family_archetype_bonus`
+  and `karma_preference` off the sect's recruitment block, the bonus rides both rolls and the base
+  TN is the sect's own (14 to 20; the literal was 15 for all); the karma preference refuses a
+  notorious applicant at an orthodox gate without a sponsor, as `trial_modifier` in Python has
+  claimed since it was written. `sect_doors_test.go` lends the dice and holds each term;
+  `test_sect.py` holds that the engine reads every key the notes print.
+- **fixed (v1.3.1)** — *A catalogue sponsor's position was checked by the bot.* `npcWhereaboutsTx`
+  is the engine's own answer to where a catalogue NPC stands - the circuit a wandering master walks,
+  the simulation's row, the daily schedule while they are at home, the registry, a running event's
+  cast - in the order `current_npc_location` already used, and `resolveRecommenderTx` refuses a
+  sponsor who is not here or is dead.
+- **fixed (v1.3.1)** — *`sect.discover` took the sects from the caller.* The engine discovers the
+  sects whose gate stands on a place the cultivator knows (`knownLocationsTx` + `sectGate`); a list
+  sent by a client only narrows, never widens, and the bot's reconcile sends none.
+- **fixed (v1.3.0)** — *The "Impress the Visiting Elder" node rolled an attribute nobody has.* It and
+  the Possessed Villager node rolled `heart`, and so did five of the event action menu's rows
+  (`worldEventActionRules`: aid, support, evacuate, negotiate, withdraw). The elder is impressed on
+  presence, the villager resisted on will, the menu's rows split the same way, and `heart` is no
+  longer an attribute `canonicalAttribute` accepts, so the next node authored with it fails
+  `TestNoEventRollsAnAttributeNobodyHas` rather than rolling +0.
+- **fixed (v1.3.0)** — *The Nine-Echo Sword Wraith could never be fought.* Its lair names a secret
+  realm, and on the owner's call that is what it is: a secret floor beneath the Sword Grave of Nine
+  Echoes, fought at the realm's entrance by a party whose leader has walked the realm to its last
+  room (`bossLair`; the inheritance is the record). The two boss tables are untouched.
+- **fixed (v1.3.1)** — *Two place rules lived only in Python.* `commission.accept` refuses work from
+  another city's board (the giver's home through `cityOf`, on both sides) and `territory.claim`
+  refuses a territory whose region is not where the player stands.
+- **fixed (v1.3.0)** — *A property could be founded inside a birth household.* `abode.establish`
+  refuses `birth_family:` and the panel hides Establish there, naming why.
+- **fixed (v1.3.1)** — *Three place-only refusals were not hidden.* On the owner's call the panel
+  hides `ghost harvest` and `ghost appease` off `app/rules/death_qi.py`, the content twin of
+  `deathQiGroundMultiplier`, and `blackmarket buy`/`sell` and `array use` off one read each on a
+  refresh; a read that fails hides nothing.
+- **fixed (v1.0.16)** — *A condition could not be cured by the medicine made for it.* Reported
+  from play as six Heart-Calming Pills on a severity-3 Qi Deviation at 28%, six failures, and *"I
+  can't heal injuries"*. The treatment rolled Insight + Spirit against `10 + 2 × severity` through
+  `canonicalAttribute`, which counted the condition's own effect row - and Qi Deviation, Meridian
+  Damage and Dantian Damage take their severity off Spirit (Soul Wound off both), so the cure grew
+  harder exactly as the ailment grew worse; a failure mended nothing and still spent the pill. Every
+  treatment mends now (one level on a failure, two on a success, three on a strong success), the TN is
+  `10 + severity`, and the condition being treated is left out of its own roll. See docs/FINDINGS.md, "A
+  treatment always mends".
+- **fixed (v1.0.17)** — *A keeper paid a Saint what it paid a beggar.* Reported from play as the Qi
+  Nourishing Pill selling for 11 and buying back for 4. The third itself is the authored rule and is
+  kept: across all 831 things a shop both sells and buys the buy-back is a median of 33% and never
+  above 40%, and nothing can be bought in one shop and sold in another for a profit. What the check
+  found was on the crafting side - three Mortal recipes (the Qi Nourishing Pill, the Spirit-Iron Sword,
+  the Spirit-Iron Lamellar) sold back for less than their own ingredients. On the owner's call a rank
+  in the item's trade now adds 2 of the shop's coin per rank above Novice to what the keeper pays,
+  never reaching the cheapest shelf price in that coin, and shelf prices are untouched. See docs/FINDINGS.md,
+  "A keeper pays a craftsman by rank".
+- **fixed (v1.3.0)** — *The Starfall Talisman was a profit for anybody who could make it.* On the
+  owner's call the Celestial Mandate talisman hall's `buys` line is 96, beside the other Celestial
+  halls, under the 102 its makings cost; `NoTalismanHallPaysMoreThanTheMakingsCost` holds every
+  hall that buys it.
+- **fixed (v1.0.15)** — *The Heart Calming Pill could not be made in the only world that sold it.*
+  Reported from play, straight after the Apprentice examination in Jadewood: *"missing materials:
+  Twin Extremes Ice-Fire Fruit x1"*. The method's slip is shelved only in the Mortal World and the
+  examination teaches it anywhere; the fruit is on no shelf (auction-grade stock is refused by the
+  content gate) and is foraged only at `worldTier >= 1`. The recipe asks for a `moonveil_herb` now,
+  the Mortal World's four town apothecaries shelve it, and
+  `test_a_method_can_be_made_where_it_is_sold.py` holds every world that sells a method to offering
+  what it needs. The craft refusal names where each short material is sold, from where the player
+  stands. See docs/FINDINGS.md, "A method can be made where it is sold".
+- **fixed (v1.3.0)** — *A higher trade examination taught methods its own world cannot supply.* On
+  the owner's call a hall teaches only what its own world can make (`rankRecipesWhereTheyCanBeMade`,
+  off `worldOffers`), names what it withheld, and the slip or a hall in a world that can teaches the
+  rest. Measured off the shipped content: the Mortal World's third examinations teach nothing in
+  three trades and the Spiritual World's Tier 3 Inscription teaches nothing, because those ranks'
+  makings are shelved higher up; a certificate with nothing behind it is what the rule chooses over a
+  method that cannot be made.
+- **fixed (v1.0.14)** — *A reset was refused for ever once a character had done almost anything.*
+  Reported from play as the refusal itself: *"has already left a mark the world keeps
+  (world_history_events.related_user_id)"*. The first place a cultivator discovers writes a history
+  row naming them, so the reset stopped working minutes into a life, and the refusal named a column
+  and gave no way to tell a rule from a wait. On the owner's call a reset now **releases** every
+  shipped anonymise column (`characterResetReleased`): private history goes with the life, public
+  history and shared things stay with the name rewritten to an unknown cultivator, and a player
+  family goes through `playerFamilyDepartTx`, the rule a founder walking out already had. Building it
+  found the same family fault in `admin.player.erase` - the sweep deletes `characters` first and
+  `player_families` cascades off it - fixed with the same call.
+- **fixed (v1.0.13)** — *A GM could not see how many times a player had started over.* The record
+  was never missing: one `event_log` row per `character.reset`, kept out of the reset's own sweep so
+  the bound survives the action it bounds, carrying the abandoned life's name, path, root, realm and
+  phase. It had no Python reader anywhere in the tree, no dashboard view and no `/admin` panel, and
+  the only place `resets_used`/`resets_remaining` had ever appeared was the reply to the reset
+  itself. `character.reset_status` is the one door; `/admin player inspect` and the dashboard's
+  Player Editor ask it. See docs/FINDINGS.md, "The allowance nobody could look up".
+- **fixed (v1.3.0)** — *A player could not see how many restarts they had left before spending one.*
+  On the owner's call `/reset`'s "Are you sure?" names the count, read through `character.reset_status`
+  by a confirm-note provider (`register_confirm_note`); an engine that does not answer prints
+  "unknown", never a zero.
+- **fixed (v1.0.1)** — *A method you knew could not tell you what it needed.* Found by playing. A
+  player bought an Inscription slip, read it, and had no way to learn that a Swift-Wind Talisman
+  wants one `talisman_paper` and one `spirit_ink`. `character_recipes` had four writers and no
+  Python reader; `get_recipe_definition` parsed a recipe's `cost` and nothing printed it; and the
+  engine computed the exact shortfall and refused with the bare words "missing materials", which the
+  bot replaced with a vaguer line of its own. See docs/FINDINGS.md, "A method that could not say what it
+  needed".
+- **fixed (v1.0.1)** — *A player could not reset a character without a GM.* `/begin` refuses while a
+  `characters` row exists, dying is not a reset (`lifecycle.true_death` has three callers and none is
+  voluntary, and Samsara deliberately carries the echoes forward), and the only true wipe was
+  `admin.player.erase` — a data-protection lever being used as a restart button. `character.reset`
+  is the player's own door, on `/reset` and `/character → Samsara`, bounded by the anonymise
+  disposition (no reset once the character is named on a row a shared world keeps) and by an
+  allowance of three counted from rows the sweep keeps. See docs/FINDINGS.md, "Starting over without a GM".
+- **fixed (v1.0.2)** — *The reset was briefly uncapped, and the line to Samsara was held by
+  accident.* The allowance is three per Discord account, ever — not per character, not per life —
+  counted from `event_log` rows the sweep is told to keep. And `TestAResetIsNotASmallSamsara` now
+  holds the distinction that matters: **Samsara is what death opens and it remembers** (memory seed,
+  talent/law/insight echoes, legacy points, craft echo, a lineage rolled off the dead life's karma);
+  **a reset keeps none of it** and the account begins again at incarnation 1. That was already true,
+  because `soul_legacy` is swept like any other row — but true by accident, and a keep added to that
+  table later would have turned a reset into a cut-price samsara with nothing going red.
+- **fixed (v1.0.3)** — *A craft took your materials and told you it failed.* Found by playing:
+  *"it doesn't let you craft but also takes your items"*, from a player whose bag held six of the
+  pills they had been told they never made. `craftResolveAction` shipped the flattened `d1`/`d2` and
+  no `degree`, while the reply's `roll_line` reads `die1`/`die2`/`degree`, so every craft past the
+  materials check raised `AttributeError` **after** `applyAuthoritative` had committed. v1.0.1 found
+  and fixed exactly this shape for the forage reply forty lines above and did not carry it to the
+  craft. Neither harness could see it: the engine half asserts on the result map and renders no
+  reply, and the Discord half's generic sweep only ever reached the designed "missing materials"
+  refusal. The result carries the whole `roll` map now, and
+  `TestAResultThatReportsARollReportsTheWholeRoll` states the general rule once, in Go.
+- **fixed (v1.0.3)** — *Ninety-two defeats in a hundred left a cultivator at zero vitality with no
+  way off it.* `fatalChance` is `min(75, 8+gap*3)`, so a same-realm loss is fatal eight times in a
+  hundred and ended at `vitality=0` the other ninety-two — while the two *fate-rescue* branches, the
+  rarer and strictly worse outcome, each wrote `vitality=1`. Four branches, four answers, and nothing
+  in the game restored vitality with time. All four go through `survivedDefeatTx` now, and
+  `condition.treat` applies the treatment item's own `Use.Instant` restore, so a Recovery Pill heals
+  what it says it heals instead of being spent on the roll alone.
+- **fixed (v1.0.3)** — *The seventh cultivation path had no manuals, in a game with 160.*
+  `app/rules/advanced_catalog.py` named six paths where `content/world.json` offers seven, and the
+  generator's modulus is what picks a path per id — so **none** of the 160 manuals named the Ghost
+  Cultivator, while `death_qi_system`, a whole authored subsystem plus three hundred lines of Go,
+  opens with `"path": "Ghost Cultivator"` and exists to serve it. It has 23 now, the same as its
+  siblings. `PATHS` is pinned with the reason: the ids embed the path name, so widening the modulus
+  re-points every existing id.
+- **fixed (v1.0.4)** — *Nothing in the game restored vitality with time.* Twelve `SET vitality`
+  statements in `go_core`, four of them damage, and not one keyed on rest, cultivation, seclusion or
+  the scheduled tick — four pills and one technique were the whole of it. `vitality_recovery.go`
+  mends a quarter of a cultivator's own maximum per world day, settled lazily on the authoritative
+  path rather than as a simulation step, because those batches are daily and sit behind an automation
+  flag a GM can switch off and state a player is stuck behind must not depend on one. The leftover
+  minutes are carried, an active battle is excluded (the battle row and the sheet are kept in
+  lockstep), the rate is content and an unauthored one heals nobody. Schema 59 for the anchor,
+  because `updated_at` moves on every write.
+- **fixed (v1.0.5)** — *A quest was recorded only after the command had answered, so a failure while
+  drawing the reply lost progress the engine had already granted.* Seventeen sites wrote
+  `await announce_quest_progress(interaction, await QUESTS.progress(...))` and eight placed that one
+  statement after the reply, each citing rc.28 — a rule that is real and is about the
+  *announcement*, which falls back to `response.send_message` and would otherwise spend the
+  interaction on the quest line. Nesting the two made the record inherit the announcement's position,
+  and v1.0.3's craft is what it cost: six pills made and the errand still reading zero, reported as a
+  second bug. `record_quest_progress` is the record on its own, never raises, and runs before the
+  reply; `announce_quest_progress` still runs after it.
+- **fixed (v1.0.5)** — *The craft picker offered twenty-five methods to a cultivator who knew three.*
+  `recipe_autocomplete` read `DB.search_catalog("recipe", …)` — the whole 33-recipe catalogue, capped
+  at Discord's 25 — while `craft.resolve` refuses any method the player has not learned. That is the
+  rc.46 rule (a surface must not offer what the engine will refuse) in a place nothing was holding
+  it. It reads `DB.get_known_recipes` now, and an empty picker names the two doors that end it rather
+  than being a dead end. The hub renders the same callback as a drop-down, which is how *"why is
+  crafting a drop-down menu"* turned out to mean *"a menu of things I cannot make"*.
+- **fixed (v1.0.9)** — *Standing at your own city's gate, the household refused you and named that
+  city as somewhere else.* `familyHouseholdEnterAction` compared the character's location to the
+  household's town by bare string equality while `cityOf` — the engine's one statement of which city
+  a place is part of — was already read by travel and by `WhereAnNPCCanWalk`. 317 of the catalogue's
+  477 locations are parts of a household town, 92 of them gates, and `beginner_home` reports
+  `return_home` from this action, so the beginner path's last stage could not be finished by walking.
+  Both halves fixed: the engine's check and the panel's anticipation of it.
+- **fixed (v1.0.9)** — *A character three minutes old was shown every system the game has.* 249
+  leaves across 67 pages in 16 hubs, none of them refused — sect politics, territory war, caravan
+  dispatch and the auction floor beside `cultivate` and `talk`. `feature_unlocks` in
+  `content/world.json` holds 139 of them for a realm that can use them, so a new cultivator meets
+  110. It is a different rule from rc.32's (which hides only what the engine would refuse), and it
+  earns that limit back three ways: a gated page prints one collapsed line and `/locked` lists every
+  door with the realm it needs; the slash command still works, because gating is advertising and
+  never a bound; and the roster is content a GM can retune.
+- **fixed (v1.0.10)** — *The panel header named whoever content says lives here, while the picker
+  named whoever is here.* Live: the header said *Gate Captain Yue Dong* and `/talk` offered
+  *Drillmaster Zhai Kang*, whom the simulation had walked to that gate. `here_summary` read
+  `WORLD.npcs[...]["location"]` — residents, with no schedule and no simulation — and it is
+  synchronous, so it cannot know: who is standing somewhere is an engine round trip away. It takes
+  `present` now and names people only when a caller hands them over; both production callers were
+  already async and pass `npcs_present`'s answer, the same resolver rc.28 wrote and v1.0.8 pointed
+  the picker at. This was the third reader of one question; rc.28 fixed the cards and v1.0.8 the
+  picker.
+- **fixed (v1.3.3, closed)** — *The curriculum is realm-banded, and some systems are not about realm.*
+  On the owner's call, left as is: each of the three is refused by its real gate in the engine, and a
+  second axis in the roster needs a precedence rule before it is worth having.
+  The Ghost Cultivator's `ghost` page is path-specific, the hidden sect's door is a karma gate, and
+  a profession's rank is its own ladder — each is left open at realm 0 rather than given a realm
+  floor that would be wrong for the player it is actually for. Gating on something other than realm
+  is a second axis, and a roster with two axes needs a rule about which wins before it is worth
+  having.
+- **fixed (v1.0.11)** — *The `#updates` channel no longer skips versions.* `releases_between`
+  walks every changelog entry after the marker and up to the running version, oldest first, and the
+  marker is written once at the end - **at the last release actually posted**, so a send that fails
+  halfway does not make the ones it never reached look announced. Versions sort as integer tuples
+  with a candidate below the release it is a candidate for (`1.0.0-rc.59 < 1.0.0 < 1.0.10`), and a
+  gap longer than `MAX_ANNOUNCED_RELEASES` posts the newest of them under one line saying what is
+  not being repeated. The three neighbouring behaviours this entry named as working are untouched.
+  The gate this entry asked for exists, and writing it found that rc.59's own fixture stubbed
+  `release_notes_for` with a lambda - so the parse was never driven from `announce_release_if_new`
+  at all; it pins a temporary `VERSIONS.md` now. See docs/FINDINGS.md, "A server is told what it missed".
+- **fixed (v1.0.8)** — *The NPC picker offered whoever sorted first in the world, not whoever was
+  standing here.* `local_npc_autocomplete` searched all 574 catalogue NPCs, took the alphabetically
+  first twenty-five, and only then filtered by location — so `/talk`, `/npcinfo` and `/sense`
+  answered *"nothing to choose from right now"* in a room whose own scene card named the gate
+  captain in it. It asks `npcs_present` now, rc.28's one resolver, which is what `/scene status` and
+  `/sense` ask. (**This entry first said "which is what the card has always used", and that was
+  wrong about one card**: the *panel header* is `here_summary`, a pure catalogue read that asks
+  neither the schedule nor the engine — see the v1.0.10 entry above.) It blocked more than conversation: the beginner path stalls at its second stage, which asks
+  for a `talk`, and the commission ladder runs inside `/talk`, so 137 of the 140 authored
+  commissions could be neither offered nor finished.
+- **fixed (v1.3.3, closed)** — *An NPC nothing knows the location of is no longer offered anywhere.*
+  Measured off the shipped content: all 574 catalogue NPCs carry a `location`, so the case cannot
+  arise with shipped content; left as is on the owner's call.
+  `current_npc_location` answering `None` means "do not filter by location", and `/talk` honours
+  that, so such an NPC used to appear in every room's picker and now appears in none. That is the
+  safe side of rc.28's rule — never offering somebody `/talk` would allow costs discoverability,
+  while offering somebody it refuses is the fault the rule exists for — and it is what makes the
+  picker agree with the scene card exactly. Whether those NPCs should be reachable at all is a
+  question about the registry, not about the picker.
+- **fixed (v1.0.8)** — *A reset deleted the rows that name a player's private threads and left the
+  threads standing.* Four tables hold the only record of a Discord thread the bot made for one
+  player, and `character.reset` wiped all four — so an abandoned life's expedition journal stayed in
+  Discord with its whole scene log and nothing anywhere able to find it again.
+  `DB.all_managed_thread_ids` had stated the ordering since the world-wide reset was written and the
+  per-player lever never applied it. Both levers collect the ids before the engine call and delete
+  the threads after it succeeds; `admin.player.erase` had the same hole, where it was the difference
+  between removing somebody from the database and removing them from the server.
+- **fixed (v1.0.8)** — *The GM dashboard's status footer was painted only by the Overview.* Opening
+  the dashboard on any other view left both lines on their literal placeholders, `SQLite` and
+  `engine —`, for as long as the tab stayed open. Half the wire was already there: the boot path
+  fetched `/api/overview` and used it to set the world clock and nothing else, three lines above the
+  two spans made from the same response. Neither placeholder looks broken, which is why it went
+  unreported — a GM could not tell `engine —` from an engine that had answered and had nothing to
+  say. The shell paints itself from anywhere now and says when it cannot reach the engine.
+- **fixed (v1.0.7)** — *There was one era for the whole game, and half of what an era did reached no
+  rule.* Every reader asked `WHERE active=1 ORDER BY era_id DESC LIMIT 1`, so one row priced a siege
+  among the immortal courts and a cultivation session in a Mortal village alike — while the capitals
+  have been per world since schema 4 and a world's news since schema 56. Schema 60 gives an era a
+  world; each of the four now walks its own cycle of **six eras of sixty world days**, exactly one
+  world year, authored in `content/world.json` rather than in a Go literal (which had a third copy in
+  `app/rules/advanced_runtime.py`). And the counting is the finding: of the eight modifier keys the
+  old cycle authored, production Go fetched **four** — `secret_realm_frequency`, `market_volatility`,
+  `beast_encounter_rate` and `recovery_rate` each occurred exactly once in `go_core`, in their own
+  declaration — so the Beast Tide Era did nothing whatever to beasts. Two are wired
+  (`beast_encounter_rate` on the hunt margin, `recovery_rate` on v1.0.4's vitality recovery) and two
+  are refused. See docs/FINDINGS.md, "An era belongs to one world".
+- **fixed (v1.3.4)** — *`secret_realm_frequency` has nowhere honest to land.* Deleted from the vocabulary on
+  the owner's call; `unreadEraModifiers` is empty. Was: It would weight the
+  `kind: "secret_realm"` branch of `eligibleUnexpectedEvents`, whose weights rc.53 deliberately
+  balanced so each realm totals 3 and a deep realm is not both harder to reach and half as likely to
+  open. Letting an era scale them would undo that balance silently, and doing it properly means
+  deciding what an era should do to a realm that already fades once you outgrow its world. A
+  mechanic, not a wiring. No era authors it, and `TestNoEraAuthorsAModifierNothingReads` refuses one
+  that tries.
+- **fixed (v1.3.4)** — *`market_volatility` has no prices to move.* Deleted from the vocabulary on the
+  owner's call. Was: Nothing in the game varies a
+  price at all: a shop price is content times a fixed markup, and an auction settles on bids. An era
+  term would need a price mechanic to modify first, and inventing one to justify a modifier is
+  backwards. Same refusal as above.
+- **fixed (v1.3.4, accepted)** — *The Discord half drives the reset leaf but cannot guarantee it reaches a
+  success.* Accepted on the owner's call: the two harnesses together cover both outcomes. Section 9b presses `/reset` last of all and accepts either the reset or its designed
+  refusal, reporting which. Since v1.0.14 nothing the sweep leaves behind refuses a reset, so the
+  success path is the one it should now see; the refusal is still accepted for an anonymise column a
+  reset has not been told how to release. The success path is driven end to end by
+  `scripts/playtest_engine.py` on an account created for it (`QUITTER`), so both outcomes are covered
+  — but by two harnesses rather than one, and the Discord half's success wiring (the "is gone" reply,
+  the remaining count) is proven only when the dice go that way.
+- **fixed (v1.0.3)** — *A household's manual was never the household's.* `family.lesson` hands the
+  family's manual over at the head of the house's own lesson, beside its story and its keepsake, and
+  the tier was already right and already enforced. What was wrong was whose text it was: eight of the
+  thirteen households handed a child the Azure Cloud Sect's or the Jade Meridian Sect's entry manual
+  as the family's own teaching, and five handed out a generated `advanced_orthodox_NNN_<path>` with
+  its catalogue index in the title. The catalogue was why — of 160 manuals, 142 are generated-shaped
+  and of the 18 authored ones twelve carry a `sect` and the other six are all Demonic, so there was
+  **no authored, sect-less, non-forbidden manual anywhere in the game** for a household to teach.
+  `scripts/author_household_manuals.py` writes the thirteen, one per house, named out of its own
+  authored story, each deriving its element through `manual_element` rather than restating it — and
+  all thirteen are **Mortal** grade, because the old five-`Mortal`/four-`Spirit` split was a
+  permanent nine-percent cultivation difference decided by birth and stated nowhere.
+- **fixed (v1.0.1)** — *No gate held a parsed content field to having a reader, and the class
+  kept producing findings.* v1.0.0-rc.55 found `RootGrade.CultivationMult` and
+  `RootGrade.BreakthroughBonus` parsed and read by nothing — the grade decided how a cultivator was
+  made and nothing about what they were — and it was found by hand. rc.58 then built exactly this
+  gate one level down, for modifier *stats* (`modifier_vocabulary_test.go`, which requires each to be
+  **fetched** by a rule rather than merely named). Nobody built it for the fields themselves. A sweep
+  of `worlddata` finds 439 parsed fields across 63 structs, of which **seven** are never read through
+  a selector anywhere in production Go; four of those are legitimately read by Python for display
+  (`advantage`, `drawback`, `objective`, `channel_name`), which is the distinction a gate has to
+  make and the reason a naive one would be noise. The three that survive are the two entries below.
+  `field_readers_test.go` is that gate, in the rc.58 shape: a read is an `*ast.SelectorExpr`, never a
+  substring, and a composite-literal key is deliberately not one — writing a field is not reading it,
+  which is the whole distinction rc.55 turned on. `fieldsReadByPresentation` names the four and the
+  file that prints each; `unreadContentFields` names the three below with the decision each waits on.
+  It is a **floor, not a proof**: without `go/types` it cannot tell `PhysiqueDefinition.Name` from the
+  forty other structs with a `Name`, so a field sharing a read name passes unexamined. It never calls
+  a read field unread, and it catches the uniquely-named orphan — which is what every finding of this
+  class has been.
+- **fixed (v1.3.4)** — *Seven cultivation paths each name a skill, and the name reaches nothing.* `/sheet`
+  prints the skill under the path; `Path.Skill` moved to `fieldsReadByPresentation`. Was:
+  `worlddata.Path.Skill` is parsed from `paths.<name>.skill` — Sword, Spiritual Arts, Martial Arts,
+  Soul Arts, Beastcraft, Formations, Ghost Arts — and is read by no rule, no card and no Python
+  reader. Each of the seven strings occurs **exactly once in the whole 2.5 MB content file**: its own
+  declaration. So they do not name a manual, a technique, a profession or any roster the game has;
+  they are a vocabulary with nothing behind it, which is `/learn`'s shape (rc.43) with no mechanism
+  waiting at the other end rather than one. Deciding what a path's skill *is* — a display line on
+  `/sheet`, a bonus, or a field to delete — is content design, not a wiring fix, which is why this is
+  recorded rather than quietly wired.
+- **fixed (v1.0.6)** — *Both of an auction house's door fields were read by nothing, and the rule
+  they described was held only by the bot.* `protected_interior` and `door_rule` were set on all 48
+  houses and read nowhere; meanwhile `app/ai/narrator_context.py` told the narrator *"PROTECTED;
+  violence cannot mechanically begin here"* while `combat_actions.go` named `SafeZone` zero times —
+  so `/battle challenge`'s refusal lived entirely in `battle.py` (rc.48's rule, a fourth time) — and
+  `advanceHunters` raised pressure, engaged and **captured** a fugitive without reading a location
+  anywhere in it. `protected_interior` is wired as the sanctuary those 48 descriptions promise: a
+  hunter watches from the doors and cannot reach in, while pressure still rises. It is deliberately
+  a second predicate beside `safe_zone`, which is true on 446 of 477 places and so means *not the
+  wilds* rather than sanctuary — gating the hunter on it would end the bounty system rather than
+  give it a refuge. `door_rule` is retired: it restated the second half of the same sentence, no
+  house's prose can differ, and the engine already ends the protection at the door by standing the
+  ambush outside. See docs/FINDINGS.md, "The protection only the bot believed in".
+- **fixed (v1.0.12)** — *The Discord sweep could not see the curriculum, and had not been run since
+  v1.0.8.* v1.0.9 gave a page a third state - a door the curriculum has not introduced yet, which
+  prints one collapsed line per page and no per-leaf lock line - and `press_leaf` knows two, so 97 of
+  245 leaves were "neither drawn nor locked" and **100 of 345 steps went red**. The harness raises
+  the player past the roster's own ceiling (read off `feature_unlocks`, never written down) before
+  the sweep, so every leaf is pressed again, and asserts the curriculum first at realm 0 on the page
+  the roster says holds the most back. `test_playtest_coverage.py` was green throughout because it
+  only asked about the deferral set; it holds all three of those now. See docs/FINDINGS.md, "The curriculum
+  the sweep could not see".
+- **fixed (v1.0.12)** — *Every GM lever addressed an id a float had rounded off.* `decodeMap` is
+  `json.Unmarshal` into `map[string]any`, so a JSON number became a float64 - and a Discord snowflake
+  (~1.4e18) exceeds what a float carries exactly (2^53), so `admin.player.set_realm` was handed
+  1456074443989188610 and looked up ...608: "character not found", about a character the panel had
+  just drawn. Player actions were never affected, because `ActionRequest.ActorID` is a typed field.
+  `UseNumber()` is the fix and **no reader changed** - `storage.ParseInt` has had a `case
+  json.Number` since it was written and nothing could ever produce one. Found by the playtest, not by
+  reading. See docs/FINDINGS.md, "An id too big for a float".
+- **fixed (v1.0.12)** — *A hub panel went quiet after fifteen minutes, and the number was written
+  out five times.* Asked for in play. `HUB_PANEL_IDLE_MINUTES` (`0` = never) replaces a bare
+  `timeout=900` in five files; injected into `hubs.py` because the layering refuses a `runtime`
+  import there. The default shipped at 120 and was put back to **15** in v1.0.13 on the owner's
+  call: the Reopen card says fifteen, so a default that disagreed with it made the card a lie. The
+  module default is the same fifteen, so a missed registration preserves behaviour rather than
+  leaking a view per panel.
+- **fixed (v1.0.12)** — *Four places parsed `surface.py` to recover the command tree's tuple, and a
+  fifth wrote down how many there were.* The tuple was inline inside `register_command_surface`, so
+  rc.43's "never copy it" could only be obeyed by reading the source - four ways, each with its own
+  self-check - while `playtest_discord.py` asserted `9 + len(_HUB_COMMANDS)` and went stale on
+  `/locked`. `surface.TREE_COMMANDS` is a name; all four are imports.
+- **fixed (v1.0.11)** — *A GM can grant a physique, and can only set a root grade the ladder
+  carries.* Two levers, one sentence: **the writer a human drives is the one nothing held.**
+  `admin.player.set_physique` takes an optional `physique_id`, held to the catalogue the way
+  `aptitude_actions.go:203` already holds one, and writes `name` beside it; the identity goes into
+  the undo snapshot whether or not the call changes it, so an undo puts back what a grant replaced,
+  and a pre-v1.0.11 snapshot keeps the three-number statement because an old audit row must stay
+  undoable on the terms it was written. `admin.player.set_spiritual_root` reads
+  `spiritual_root_system.grades` instead of the six-name map literal it kept beside them, and
+  `dashboard/app.js` stopped keeping a third copy in `gradeOpts` - both cards are pickers fed from
+  the content file by `_aptitude_catalogue`. The finding underneath is the fixture: `Apply` passes
+  an **empty world path** and every admin test went through it, so a lever that refused everything
+  would have passed all of them. See docs/FINDINGS.md, "The writer a human drives is the one nothing held".
+- **fixed (v1.0.11)** — *🗺️ Cultivation World is gated behind having played.* One generated role
+  (`Xianxia • Cultivator`), granted at creation ahead of the first private thread, kept in step by
+  `require_character`, revoked at `admin.player.erase` - the one moment nothing else can notice -
+  and backfilled by `_sync_all_realm_access_roles`. The overwrite covers the category *and* both
+  anchors, because a category overwrite reaches only a channel synced to it; it allows the bot
+  before it denies `@everyone` (rc.52); and it **merges** rather than replaces, because
+  `set_permissions(**perms)` would have taken `send_messages=False` off `@everyone` with it and
+  left two read-only anchors writable to everybody holding the role. The name-family trap this
+  entry called out is now `test_server_layout.py`. See docs/FINDINGS.md, "A room for people
+  who have played".
+- **fixed (v1.0.1)** — *The release after a live pass would have deleted it.* The checklist is named
+  after `RELEASE_VERSION`, so the filename held still across all fifty-nine release candidates of
+  1.0.0 and `merge_ticks` carried every tick; on the first bump that renames it the target does not
+  exist, `old` is empty, and a fresh checklist is written with every box blank. The ticks are
+  inherited from the newest older checklist now, dated with the release each was walked on so
+  carrying one is not a claim that the new release was walked, and the superseded file is removed
+  because `docs/playtest/` is one checklist.
+- **fixed (v1.0.1)** — *No clan alliance had ever been formed at runtime, in any world.*
+  `martial_clan_relations` was seeded once per household behind a `COUNT(*)==0` guard, with an
+  **invented** partner — a surname off a list, `partner_family_id` left NULL although the column is
+  foreign-keyed to `birth_families` — and the only statement that could insert another was
+  `combat_aftermath.go`, which writes `blood_feud` alone. The `clan_dynamics` batch nudged existing
+  scores ±1 and created nothing. So four households meant four relations on the day the world opened
+  and four for ever after. `clanDiplomacy` is the step that forms one between two real households,
+  written from both sides; `npcPoliticalMarriages` had done the same for `sect_relations` since
+  rc.24, in the file whose own comment names the clan fault it did not fix.
+- **fixed (v1.3.3)** — *A safe zone refuses a fight somebody chose to start, and nothing else.* The
+  ambush is said to happen on the house's own doorstep, where its protection ends (`auctionDoorstep`,
+  read by the leave reply and told to the narrator off the battle's `source`); the mechanic is unchanged.
+  v1.0.6 put that rule in the engine, and it deliberately lets two involuntary fights through: a
+  world event that lands in a town (rc.49's asymmetry) and the auction door ambush, which
+  `auctionLeaveAction` stands at `EntranceLocation` — a safe zone for 47 of the 48 houses, since
+  Greenriver Town is the one rough entrance. Refusing those would delete the event battle in 446 of
+  477 places and the door risk in 47 of 48, so the asymmetry is the design. What is genuinely open
+  is whether a town being ambush-able *reads* right to a player who was just told the place is
+  protected; moving the ambush to the first unprotected ground the fugitive reaches is a mechanic
+  rather than a wiring, and wants its own change.
+- **fixed (v1.3.3)** — *Nothing ends a clan relation.* `endExhaustedClanRelations` runs after the tick's
+  drift: a treaty at or below zero ends and a rivalry opens from both sides at its opening score, with a
+  public history row; a rivalry at or above zero ends and nothing follows; a blood feud never ends by
+  drift. Was: `martial_clan_relations.active` is written
+  1 by every INSERT, read by every SELECT, and set to 0 by nothing in the tree. So an alliance warms
+  toward 100 and a rivalry cools toward −100 and neither can ever become the other, because no rule
+  re-types a row either. What a broken alliance leaves behind — a rivalry, or simply nothing — is a
+  decision about the fiction rather than a default, and adding a dissolution without making it would
+  be picking one silently.
+- **fixed (v1.0.0-rc.52)** — *Nothing in either harness reached a `create_category` call.*
+  Every provisioning helper defaults to `create_missing=False` and the one caller that passes True
+  is the GM dashboard's Full Setup, so no slash command and no hub button could reach it — the
+  categories, the four realm capitals, the nine auction channels and (now) the four per-world
+  events channels were provisioned by code no test had ever run. rc.51 recorded it as deferred
+  because the Discord sweep's own rule is that a loop goes through a surface rather than a handler.
+  The resolution is that the bot's **control plane is a surface** — it is just not a Discord one:
+  section 2b of `scripts/playtest_discord.py` posts `{"action": "setup"}` to
+  `POST /control/discord` with `X-Xianxia-Control`, exactly as the dashboard does, then asserts that
+  every category exists and stands in its stated order, that each capital and each world feed sits in
+  the right one, that nine auction channels were made, and that a second Repair over the same layout
+  creates nothing new.
+- **fixed (v1.0.0-rc.51)** — *Teardown never deleted an auction channel, so it never deleted the
+  capitals' category either.* `clear_discord_bindings` has `DELETE`d from `auction_house_channels`
+  since v0.33.1, while `teardown_managed_discord_layout` built its targets from the base bindings,
+  the realm hubs and `#bugs` and named no auction channel — so the nine of them were left standing
+  with their bindings forgotten, and because they sat inside it, `🌌 Realm Capitals` always had
+  "9 other channel(s) inside" and was never once deleted. Found while giving the auctions a
+  category of their own, which would have inherited the same fault.
+- **fixed (v0.36.1)** — *Greenriver Town had no roads.* The starting town sat outside the road
+  graph, so it had no gates (v0.36.0), could only be reached by direct travel, and a fresh
+  character's first road journey was the capital's rather than their own town's. It now has roads
+  to Azure Crown Imperial City and Riverguard City, with the gates to match. Found by asking why
+  the gate test skipped it; the engine playtest's city section (v0.36.1) now starts a road journey
+  from a real gate.
+- **fixed (v0.34.0)** — *A commission's last objective could never be turned in.* `quest.progress`
+  wrote the row `completed` and then asked `resolveCommissionTx` for an `active` row, which failed
+  with "no active commission by that name" and rolled the whole progress back. Every commission
+  since v0.24.0 could be taken and worked but not finished; only the dashboard's manual close
+  completed one. The row now stays `active` until the resolution flips it, and
+  `TestACommissionCompletesThroughProgressAlone` drives one through progress alone.
+- **fixed (v0.34.0)** — *Reset Cooldowns did not reset the sect trial's retry wait.* The wait is
+  read off the last failed `sect_recruitment_attempts` row, not the `cooldowns` table, so a GM
+  resetting a disciple's cooldowns left them waiting a day anyway. A full reset ages the failed
+  attempts out (the history stays) and reports `trial_retries_cleared`;
+  `TestResetCooldownsClearsTheTrialRetryWait` pins it.
+- **fixed (v0.33.1)** — *The Quest Forge's prompt listed forty-eight auction floors before the
+  town a story is set in.* Floors and their stewards are off the capped lists; validation accepts
+  them regardless.
+- **fixed (v1.0.0-rc.47)** — *The three live columns of the checklist asked a person for what a
+  machine now does.* Reachable from the hub, error text actionable, narration or fallback fired:
+  248 actions times three, seven hundred and forty-four boxes, written in v0.34.0 when nothing in
+  the tree could press a button. `scripts/playtest_discord.py` has pressed every leaf since rc.33
+  and `test_playtest_coverage.py` holds it to the live definitions, so the first column was asking
+  for work already done and the second for the wiring half of work already done. Not one box was
+  ever ticked, across twelve regenerations - and `merge_ticks` was carefully preserving them while
+  silently dropping the live-table ticks, the only ones that were ever a person's. The per-action
+  columns are one machine-filled `Swept` column now, read off the harness's own `DEFERRED_LEAVES`
+  so it cannot claim more than the sweep drives.
+- **fixed (v1.0.0)** — *The live pass on the NAS is unticked.* It is walked and ticked: every row
+  of the four live tables in `docs/playtest/v1.0.0.md`, against a real server running the release.
+  What it covers is what the sweep structurally cannot reach — real Discord, a live AI route (it
+  runs `NARRATOR_PROVIDER=procedural`), the auction channels, `/vote`, a mute expiring on its own,
+  `update.sh --fetch` against the published archive and its `.sha256` sidecar — plus the one
+  judgement neither harness can make, whether a refusal reads helpfully to a human, made against
+  the sweep's log rather than against 248 empty boxes. The ticks then survived their first
+  regeneration, which is rc.47's `merge_ticks` fix doing on real ticks what could only be argued
+  about while there were none.
+- **fixed (v1.0.0)** — *A release could ship a thing only a person can check with nothing asking a
+  person to check it.* The live tables are prose a release has to remember to extend, and rc.59 did
+  not: the category split, the re-parent of channels that already existed, the read-only lock on
+  ones the bot did not create and the retired `#event-scenes` had **no rows at all**, and were
+  walked off a hand-written page instead. The upgrade table was stale in the other direction — it
+  named `--channel beta`, where the release candidates went out, while a tag with no `-` in it is
+  published as GitHub's latest, so 1.0.0 is on `stable` and the row would have sent the next walker
+  to a channel with nothing newer on it. Both are in `scripts/playtest_checklist.py` now, the
+  layout as its own five-row table saying to walk it on a guild with history. There is no gate
+  behind this and deliberately so: which features need a person cannot be derived from the code,
+  which is exactly why the rule is written here instead.
+- **fixed (v1.0.0-rc.39)** — *`get_world_clock` in Python re-anchored the clock the engine owns
+  when the configured scale changed.* Named on the roadmap's remaining-authority list since v0.30.0.
+  The method is gone: `world.clock` is a read-only engine query and every surface reads through it,
+  `WORLD_TIME_SCALE` is the engine's key (compose passes it) and seeds a new world only, and
+  `/admin world advancetime` changes the rate only when asked to. It had one live consequence: a
+  rate a GM set on the dashboard was undone by the next command that asked the time.
+- **fixed (v1.0.0-rc.48)** — *The simulation's force and bootstrap requests trusted a
+  caller-supplied `game_minute`.* `RunDue` ignored one by design since the v0.22.2 review, with the
+  reason written on the field — *"a scheduled tick must not be able to tell the world what time it
+  is"* — while `ForceRequest` and `BootstrapRequest` carried the same field and used it, for
+  twenty-six more releases. `runSystem`'s own comment said it stamped the anchor "at a caller-chosen
+  minute", two hundred lines under the field that said the opposite. Both derive
+  `game.CanonicalWorldGameMinute` now, the one door `RunDue` already read. The wire still accepts the
+  field so an older bot mid-upgrade keeps working; the three Python client methods no longer take one,
+  and nine call sites stopped computing a minute the engine throws away. `caller_minute_test.go` sends
+  a wild minute and asserts the canonical one landed (it fails with `Force stamped 9999999` against
+  the old code), and `test_simulation_minute.py` holds the Python side — where the assertion that
+  encoded the fault lived, two tests below one refusing a forged minute on `/v1/game/action`.
+- **fixed (v1.0.0-rc.58)** — *An authored modifier stat could reach no rule, and nothing said so.*
+  `active_effects` modifiers were a vocabulary with no gate: content authored twenty stats and
+  production Go wrote twelve, and seven reached nothing. Two were the `characters` column name
+  written into a modifier slot — `sense_power_bonus` on `space_domain`, `sense_precision_bonus` in
+  the engine's own Soul Wound — which is why the gate has to read an argument position and a map
+  key rather than a name: that identifier occurs three times in production Go, twice as a column
+  inside a SQL string. `modifier_vocabulary_test.go` holds the vocabulary from both sides with an
+  empty allowlist, and its own drill found the last fault in it — pointing the content path at
+  nothing made the whole test SKIP, green and useless, so a read that fails is a `t.Fatalf` now.
+- **fixed (v1.3.3)** — *A Law control effect's modifiers are never applied to anybody.* Schema 63 gives
+  `battles` an `opponent_modifiers_json`; `combat.technique` sums the landed effect's modifiers into it,
+  the counter-attack loses the `agility`/`body` taken and the flee roll gains the opponent's lost
+  `escape_bonus`. Was:
+  `special_effects.spatial_lockdown` and `.spatial_strangulation` carry modifiers describing a
+  *target*, and `combat.technique` resolves both mechanically (suppression turns, damage) while
+  writing no `active_effects` row — a battle opponent is a name on `battles`, not a row anything
+  can modify, and there are no PvP techniques. So the modifiers describe something the engine has
+  nowhere to put. `combat.technique` names the effect that landed now, so the content reaches a
+  player as prose; applying it is a mechanic rather than a wiring, and wants its own change.
+- **fixed (v1.3.3, closed)** — *`nine_yang_solar_body` scorches only through the purge.* Left as is on
+  the owner's call: the drawback fires where the content names the mechanism. Its drawback
+  prose says "excess yang scorches the meridians" and v1.0.0-rc.58 gave it `fire_resistance -5`, so
+  it bites on `alchemy.purge` and nowhere else. A physique that scorches on its own schedule needs a
+  simulation pass over a body nothing currently ticks, which is a different change.
+- **fixed (v1.0.0-rc.59)** — *A category or a read-only lock reached a fresh guild and no other.*
+  Three of the five helpers that place a channel in a category computed it only inside
+  `if channel is None and can_create:`, so a channel that already existed — pre-existing,
+  name-matched, or bound by a GM — was bound where it lay and stayed there. The same line held
+  `READ_ONLY_BASE_CHANNELS`, so `#xianxia-info`, `#expeditions` and `#player-homes` were read-only
+  only where the bot had created them, and `ensure_base_xianxia_channels` returned `"repaired": []`
+  as a hardcoded empty list into an audit row that had therefore never carried anything. rc.51 had
+  already found and fixed this for the auction floors and rc.52 for the world feeds; the other
+  three never got it. `test_the_layout_reaches_an_existing_server.py` now holds all five, with an
+  empty allowlist.
+- **fixed (v1.0.4)** — *Nothing in the game restored vitality with time.* Twelve `SET vitality`
+  statements in `go_core`, four of them damage, and not one keyed on rest, cultivation, seclusion or
+  the scheduled tick. `vitality_recovery.go` mends a quarter of a cultivator's own maximum per world
+  day, settled lazily on the authoritative path (not as a simulation step, which is flag-gated), with
+  the leftover minutes carried and an active battle excluded. The rate is content and an unauthored
+  one heals nobody. Schema 59 for the anchor, because `updated_at` moves on every write.
+- **fixed (v1.3.4)** — *The ghost inheritance prefers the wrong path.* It prefers the Ghost Cultivator now,
+  and the Stygian Ghost Scripture is an authored Heaven-grade Ghost Cultivator manual (realm 4, three
+  techniques, Demonic); the tomb's rooms favour both paths. Was:
+  `inheritances.stygian_keeper_legacy` is "a forbidden soul inheritance dealing with ghosts, corpse
+  echoes and the boundary between life and death", grants `stygian_ghost_scripture`, and lists
+  `preferred_paths: ["Soul Cultivator"]` - written when the Ghost Cultivator had no manuals to
+  prefer. The scripture is also an item with `sect_value: 450` and no `type`, so it is worth 3,650
+  and does nothing; making it the path's high manual is the rc.50 shape (an authored, priced,
+  granted thing with no mechanism behind it) and is a content decision, not a wiring.
+- **fixed (v1.3.4)** — *`Inheritance.PreferredPaths` is read by nothing.* `grantInheritanceTx` reads it: a
+  cultivator of a preferred path has the inheritance's manual studied at once, anybody else is handed
+  the sealed copy. Was: The only
+  `.PreferredPaths` reader in production Go is `secret_realm_actions.go:310`, which reads
+  `SecretRealmRoom.PreferredPaths`. `field_readers_test.go` cannot tell the two apart - it is
+  name-based and says so - so this is the documented blind spot doing exactly what its own docstring
+  predicts rather than a gate failing.
+- **fixed (v1.3.3, closed)** — *An event scene is only visible to somebody who has reached that world.*
+  Left as is on the owner's call: somebody below a world's floor cannot cross into it either.
+  v1.0.0-rc.59 anchors an event's scene and its thread in that world's own feed, which is where
+  rc.52 already sent the announcement, and retires `#event-scenes`. Those feeds are gated by the
+  realm **access** role, so a scene in a world a player has not reached is now invisible to them
+  where the shared channel was not. That is the trade the change makes rather than an oversight:
+  an event is somewhere, and a cultivator who cannot reach the somewhere could not have joined it.
+- **fixed (v1.3.3, closed)** — *Moderation is a nudge on the engine's dispatch layer, not anti-cheat.*
+  `PLAYER_MUTATIONS` in `test_authority_boundary` is empty, so every gameplay write already goes
+  through an engine action; the statement in `moderation.go` is accurate and the entry is closed.
+  A muted or frozen player is blocked from the ~150 authoritative ops; raw `/v1/db` writes the
+  bot makes on their behalf and the simulation runner are not intercepted. Stated in
+  `moderation.go`; a stronger guarantee would need every presentation write to carry the actor.
+- **fixed (v1.0.0-rc.2)** — *The forty-three local auction floors share archetype prose.* Was:
+  twelve archetypes, four worlds; a riverside hall read like a riverside hall in every world. Each
+  floor now has a paragraph of its own - its river, crater, terrace or court, its broker by name, and
+  where its protection ends - and the content gate holds the forty-three apart.
+- **fixed (v0.39.0)** — *Typed play fills one argument, not two.* Was: `$ I give the pill to Qiao`
+  routed to talk or use. A root may now declare several arguments, each with its own source (a
+  known place, a carried item, an NPC present, a player present); `$ I give the pill to Li Feng`
+  is a trade offer to Li Feng, and a line that names an NPC instead says what it lacks rather than
+  guessing a cultivator.
+- **fixed (v1.0.13)** — *The sweep could not tell a question from a result.* Once the harness was
+  raised past the curriculum's ceiling, `/battle challenge` **resolved** for the first time in its
+  life and immediately failed with SimCord's *"That component is disabled - a real user could not
+  interact with it"*. A resolved challenge posts a `BattleView` whose technique and recovery selects
+  are `disabled=not available`, so a cultivator with no Law techniques and nothing to drink gets two
+  dead pickers carrying one explanatory option each - and `answer_generically` walks an action's
+  input steps by taking the first select on the **result's** message. The tell was in the payload all
+  along, as `disabled`, and the sweep never read it. The skip is in `select_by_placeholder`, the one
+  helper both answerers reach; a disabled **leaf button** is deliberately still a failure, because
+  that one means the panel timed out. See docs/FINDINGS.md, "A disabled control is not a question".
+- **fixed (v1.0.13)** — *Two more copies of the fifteen minutes, and only one of them spelled.*
+  v1.0.12 removed a bare `timeout=900` from five production files and its drill then found a sixth
+  pinned as a string in `test_gui_integrity.py`; both are in that release. The seventh was not the
+  number at all but an
+  *encoding* of it - `advance_time(901)`, one second past a deadline stated somewhere else - so no
+  search for `900` and no gate reading production for a literal could have found it, and raising the
+  default to 120 minutes left the step moving a panel an eighth of the way to its deadline and then
+  reporting that it would not expire. The harness pins the window in its own environment block now
+  and the step reads it back, and both bounds on that number were measured rather than chosen:
+  waiting the shipped two hours out costs minutes of woken periodic workers for no extra assurance,
+  and a one-minute window never settles at all — a view timer that near counts as runnable, which is
+  rc.35's finding met from the other side. `TheHarnessWaitsTheConfiguredWindowOut` holds it:
+  `advance_time` may not take a numeric literal, and the harness must call `panel_timeout()`. An
+  ordinary suite run then found the **eighth**: `test_playtest_gate.py` pinned the literal
+  `advance_time(901)` as its marker that this loop is driven at all, so correcting the step turned
+  that gate red — a check that pins how a rule is *written* failing exactly when the rule is fixed,
+  which is v1.0.8's lesson, met for the fourth time in four releases — v1.0.9, v1.0.10 and v1.0.12
+  each retired a hand-copy of the command tree's tuple for the same reason.
+- **fixed (v1.3.5)** — *Which commands are used most.* Asked for as a way to put the most used
+  systems first in the menus; the owner then decided the numbers reorder nothing (the daily five stay
+  first, in the order they choose by hand) and reversed the earlier "no" to a usage log now that the
+  numbers themselves are wanted. `command_usage` (schema 64) counts presses per command path per UTC
+  day, server-wide, thirty days deep; three doors record it and `/admin server observability` shows
+  the top ten. `test_command_use_is_counted.py` holds that nothing drawing a panel reads the counts.
+- **fixed (v1.4.0)** — *Updating from the GM dashboard.* Asked for; the owner chose a host-side
+  watcher over a privileged sidecar. The dashboard's Server update card writes an audited request
+  (`admin.server.request_update`); `update_watch.sh` on the NAS reads it through the engine the way
+  `update.sh` reaches `/v1/db/backups`, closes the world, runs `./update.sh --upgrade`, reopens the
+  world and reports under the request's nonce. Left out on purpose: unattended `.env` migration (the
+  watcher never touches the tokens), switching channel from the card, a rollback picker, and locking
+  the lockdown against a GM reopening the world mid-install.
+- **fixed (v1.21.0)** — *Craft All, and a craft menu that says what a method makes does.* Asked for
+  as "Multi craft system for pills", then "a better menu for selecting what you want to craft, and
+  what the crafted items does is needed", then "maybe a craft all would be better" in place of a
+  quantity step. `craft.resolve` takes `all: true` (counted by the engine, up to `craftBatchMax`, 50)
+  or a `quantity`: the whole batch's materials are taken first, then each unit is one
+  `craftOneUnitTx`, the body a single craft always ran. The picker and the panel's menu read through
+  `craft_menu` (ready first, how many the materials pay for, what the output does through
+  `World.item_does`), and the reply and the status page print the same line.
+- **fixed (v1.25.0)** — *A sect's doors by rank, its people, NPC masters and promotion by asking.*
+  The owner's calls: a member sees only the doors their rank may use (the engine refuses below it
+  too); each sect keeps a hall of about twenty-five NPCs; a member may take one as a master
+  (breakthrough +1, insight on a realm crossing, ×1.05 cultivation, the sect's next art once a life)
+  and is raised a rank by their master or an Elder once their contribution reaches it; and a player
+  master gives their disciple +1 on every trade roll and ×1.05 cultivation, where before a player bond
+  gave the disciple nothing.
