@@ -850,12 +850,23 @@ async def spawn_system_event_thread(
     )
     try:
         scene_message = await scene_channel.send(intro)
+    except (discord.Forbidden, discord.HTTPException):
+        log.exception("Could not post the autonomous event intro for %s", title); return None
+    try:
         thread = await scene_message.create_thread(
             name=(f"{'🌀' if realm else '🌌'} {title}")[:100], auto_archive_duration=_event_archive_minutes(),
             reason=f"Autonomous Xianxia event: {title}",
         )
     except (discord.Forbidden, discord.HTTPException):
-        log.exception("Could not create autonomous event thread for %s", title); return None
+        # The sweep retries an event with no thread every few minutes
+        # (v1.34.0), so an intro left behind here would be posted again on
+        # every retry: take it down so a failed open leaves no residue.
+        log.exception("Could not create autonomous event thread for %s", title)
+        try:
+            await scene_message.delete()
+        except (discord.Forbidden, discord.HTTPException):
+            log.warning("Could not remove the intro for %s after its thread failed", title)
+        return None
     announcement_message=None
     if announcement_channel:
         try: announcement_message=await announcement_channel.send(f"{announcement}\n\n💬 **Event scene:** {thread.mention}")

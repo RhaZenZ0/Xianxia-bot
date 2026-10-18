@@ -18,6 +18,7 @@ exemption with it.
 """
 from __future__ import annotations
 
+import ast
 import asyncio
 import importlib
 import json
@@ -149,6 +150,53 @@ class TheDeadHaveADoorToSamsara(unittest.TestCase):
                          "a failed sect read took the Samsara doors with it")
         self.assertEqual(self._opened(FakeDB(status="deceased", membership={"sect_name": "x"})),
                          sect | set(self.surface._the_dead_need()))
+
+
+class TheDoorsDrawnForTheDeadAdmitThem(unittest.TestCase):
+    """A leaf the curriculum draws for the dead is a door the dead can walk
+    through. The review that read this release found `inheritances` drawn on
+    the dead cultivator's Overview page while its own command called
+    `require_character` with the default `allow_deceased=False`, so the door
+    the page offered answered "X is dead... Use /character -> Samsara": the
+    test above held the drawing and never pressed the leaf. Read off the
+    syntax tree: every command registered under a name in `_the_dead_need()`
+    passes `allow_deceased=True` to every `require_character` it calls."""
+
+    COMMANDS = PROJECT_ROOT / "app" / "bot" / "commands"
+
+    @classmethod
+    def _registered(cls) -> dict[str, ast.AsyncFunctionDef]:
+        found = {}
+        for path in sorted(cls.COMMANDS.glob("*.py")):
+            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+                if not isinstance(node, (ast.AsyncFunctionDef, ast.FunctionDef)):
+                    continue
+                for deco in node.decorator_list:
+                    if isinstance(deco, ast.Call) and getattr(deco.func, "id", "") == "registered_root_command":
+                        name = next((k.value.value for k in deco.keywords
+                                     if k.arg == "name" and isinstance(k.value, ast.Constant)), None)
+                        if name:
+                            found[name] = node
+        return found
+
+    def test_every_door_drawn_for_the_dead_lets_them_in(self):
+        surface, _ = _modules()
+        need = sorted(surface._the_dead_need())
+        registered = self._registered()
+        self.assertGreater(len(registered), 20, "the command reader found almost nothing")
+        for leaf in need:
+            with self.subTest(leaf=leaf):
+                self.assertIn(leaf, registered, f"{leaf!r} is drawn for the dead and no command is registered under it")
+                calls = [n for n in ast.walk(registered[leaf])
+                         if isinstance(n, ast.Call) and getattr(n.func, "id", "") == "require_character"]
+                for call in calls:
+                    admits = any(k.arg == "allow_deceased" and isinstance(k.value, ast.Constant) and k.value.value is True
+                                 for k in call.keywords)
+                    self.assertTrue(
+                        admits,
+                        f"/{leaf} is drawn for the dead and its require_character refuses them: "
+                        "a surface offering what its own door refuses",
+                    )
 
 
 if __name__ == "__main__":

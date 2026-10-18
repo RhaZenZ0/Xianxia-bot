@@ -581,7 +581,10 @@ async def inventory(interaction: discord.Interaction) -> None:
 
 @registered_root_command(name="inheritances", description="View the ancient inheritances your character has obtained", guild=GUILD)
 async def inheritances(interaction: discord.Interaction) -> None:
-    c = await require_character(interaction)
+    # Inheritances belong to the soul, and the curriculum draws this leaf for
+    # the dead (`_THE_DEAD_ALSO_NEED`, v1.34.0): a door drawn for them that
+    # then refuses them is a surface offering what its door refuses.
+    c = await require_character(interaction, allow_deceased=True)
     if not c:
         return
     owned = await DB.get_inheritances(interaction.user.id)

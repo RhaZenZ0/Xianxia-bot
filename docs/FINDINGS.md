@@ -8371,3 +8371,35 @@ README: the govulncheck paragraph no longer spells a Go patch version (the direc
 moved to `go 1.26.0` / `toolchain go1.26.9` and the sentence said `1.25.13`); it points at the `go`
 and `toolchain` lines in `go_core/go.mod`. "The whole 160-manual catalogue" became "the whole manual
 catalogue (`technique_system.manuals` in `content/world.json`)", with no number to drift.
+
+### A door drawn for the dead that refused them (v1.34.0)
+
+The review that read this release's own diff found it. `_THE_DEAD_ALSO_NEED` opens `soul` and
+`inheritances` for a deceased character beside the Samsara page, and the test held the drawing:
+`inheritances` was on the dead cultivator's Overview page. Nobody pressed it. `inheritances` called
+`require_character(interaction)` with the default `allow_deceased=False`, so the door the page offered
+answered "X is dead... Use /character -> Samsara", while `soul`, `afterlife`, `reincarnate` and
+`reset` each pass `allow_deceased=True`: a surface offering what its own door refuses (rc.46), found
+in the same release that opened the surface. The command now admits the dead (inheritances belong
+to the soul; nothing in the body needs a living one). `TheDoorsDrawnForTheDeadAdmitThem` in
+`test_the_dead_have_a_door_to_samsara.py` reads every command registered under a name in
+`_the_dead_need()` by AST and asks that each `require_character` it calls passes
+`allow_deceased=True`, after asserting the command reader found more than twenty commands. **Drill**
+(the keyword removed): `/inheritances is drawn for the dead and its require_character refuses them:
+a surface offering what its own door refuses`.
+
+### A retried event re-posted its intro (v1.34.0)
+
+Also found by the review of this release. `sweep_events_without_a_scene` retries every active event
+with no `event_threads` row every five minutes, and `spawn_system_event_thread` posts the scene intro
+and then opens the thread on it. When the thread raised (the bot lacks Create Public Threads in that
+channel) it returned None with the intro already posted and nothing registered, so the sweep this
+release added would post a fresh "AUTONOMOUS WORLD EVENT" intro on every retry for the event's whole
+life: twenty-four orphans over a two-hour event, more for a realm rotation. Before the sweep, the
+same failure posted one. The intro is now taken down when its thread fails, so a retry leaves no
+residue, and a failure to post the intro at all returns before anything is touched.
+`test_a_failed_event_thread_leaves_no_intro.py` drives the spawn with a channel whose message
+refuses `create_thread` and asks that the message was deleted, beside a thread that opens (the reader
+works: it is registered and its intro stays) and an intro that cannot be posted (nothing registered).
+**Drill** (the delete removed): `the intro of an event whose thread failed to open is still posted:
+the sweep that retries events without a scene every few minutes will post it again on every retry`.
