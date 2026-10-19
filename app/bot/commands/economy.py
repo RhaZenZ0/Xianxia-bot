@@ -21,7 +21,7 @@ from ...rules.trade_receipt import format_trade_receipt
 from ..auction_feed import announce_lot, lot_identity, refresh_lot
 from ..stall_feed import refresh_stall
 from ..formatting import human_duration
-from ..pickers import auction_currency_autocomplete, usable_item_autocomplete
+from ..pickers import auction_house_currency_autocomplete, usable_item_autocomplete
 from ..hubs import register_hub_option_hint
 from ..registry import registered_group_command, registered_root_command
 from ..runtime import _explain_engine_error, DB, ENGINE, WORLD, carried_item_autocomplete, character_location_display, current_world_time, log, reply_long, require_character, respond, serialized_user_action
@@ -324,7 +324,7 @@ async def auction_browse(interaction:discord.Interaction)->None:
 
 
 @registered_group_command(auction_group, name="sell",description="List a carried item for protected auction")
-@app_commands.autocomplete(item=carried_item_autocomplete,currency=auction_currency_autocomplete)
+@app_commands.autocomplete(item=carried_item_autocomplete,currency=auction_house_currency_autocomplete)
 @serialized_user_action
 async def auction_sell(
     interaction:discord.Interaction,item:str,quantity:app_commands.Range[int,1,999999],

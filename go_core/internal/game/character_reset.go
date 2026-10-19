@@ -85,6 +85,7 @@ import (
 
 	"xianxia/core/internal/eventledger"
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 // characterResetAllowance is how many times one Discord account may abandon a
@@ -266,6 +267,7 @@ var characterResetReleased = map[string][2]string{
 	"quest_definitions.owner_user_id":      {"a quest they wrote", "quests they wrote"},
 	"sect_manors.founded_by_user_id":       {"the sect manor they founded", "sect manors they founded"},
 	"player_families.founder_user_id":      {"the family they founded", "families they founded"},
+	"auctions.current_bidder_user_id":      {"the winning bid on an auction lot that has closed", "winning bids on auction lots that have closed"},
 	"stall_sales.buyer_user_id":            {"a purchase at another cultivator's stall", "purchases at other cultivators' stalls"},
 }
 
@@ -568,7 +570,7 @@ func characterResetRemoveWelcomeTx(conn *storage.Conn, userID int64, characterNa
 // characterResetAction is the player's own way back to `/begin`. It takes no
 // payload: everything it decides is read from the database, so there is nothing
 // a caller could tell it that it does not already know.
-func characterResetAction(conn *storage.Conn, userID int64, _ json.RawMessage) (authoritativeMutation, error) {
+func characterResetAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, _ json.RawMessage) (authoritativeMutation, error) {
 	c, err := loadLifeSnapshot(conn, userID)
 	if err != nil {
 		return authoritativeMutation{}, errors.New("you have no cultivator to reset")
@@ -626,6 +628,15 @@ func characterResetAction(conn *storage.Conn, userID int64, _ json.RawMessage) (
 		[]any{userID, characterResetEvent, string(record), now}); err != nil {
 		return authoritativeMutation{}, err
 	}
+	// Escrow first, before the release and the sweep take the rows it comes
+	// back from: the lots this life was selling close and refund their high
+	// bidder, a lot it was winning loses only the bid, and a caravan still on
+	// the road is lost with its owner. What a death does, because a reset ends
+	// a body the same way.
+	escrow, err := resolveLeavingEscrowTx(conn, catalog, userID, now)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
 	released, err := characterResetReleaseTx(conn, userID, c.Name, targets)
 	if err != nil {
 		return authoritativeMutation{}, err
@@ -653,6 +664,7 @@ func characterResetAction(conn *storage.Conn, userID int64, _ json.RawMessage) (
 		"history_removed":  released.HistoryRemoved,
 		"history_unlinked": released.HistoryUnlinked,
 		"left_behind":      characterResetLeftBehind(released),
+		"escrow":           escrow,
 	}
 	if left := released.Family; left.FamilyID != 0 {
 		family := map[string]any{"name": left.Name, "dissolved": left.Dissolved}

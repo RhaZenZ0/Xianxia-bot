@@ -47,6 +47,27 @@ const (
 	defaultNPCCrossingRealmReach = 2
 )
 
+// rosterTurn is where this tick starts walking an ordered roster that a cap
+// will cut short. Both capped walks over the whole world's people - the road
+// (`npcTravel`) and the finds (`npcConsignments`) - read their rows by name and
+// stop at a count, so the same first forty or six names took every turn and the
+// alphabet's later half never moved or found anything: over four hundred ticks
+// over the real roster the sixths were [98 97 97 17 0 0]. The start is a hash
+// of the tick's game minute rather than the minute modulo the roster, because
+// ticks land a day apart and a day's minutes share a factor with the roster's
+// length, which would visit a few starts and leave gaps between them. One
+// function, so the two walks cannot turn differently.
+func rosterTurn(rows [][]any, gm int64) [][]any {
+	n := len(rows)
+	if n < 2 {
+		return rows
+	}
+	start := int(hash64("roster-turn", fmt.Sprint(gm)) % uint64(n))
+	turned := make([][]any, 0, n)
+	turned = append(turned, rows[start:]...)
+	return append(turned, rows[:start]...)
+}
+
 func travelChanceFor(profession string) int64 {
 	p := strings.ToLower(profession)
 	switch {
@@ -112,7 +133,7 @@ func (r *Runner) npcTravel(conn *storage.Conn, steps, gm int64) (int64, error) {
 	}
 	now := nowFloat()
 	moved := int64(0)
-	for _, row := range res.Rows {
+	for _, row := range rosterTurn(res.Rows, gm) {
 		if moved >= travelMovedCap {
 			break
 		}

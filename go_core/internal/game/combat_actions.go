@@ -35,6 +35,13 @@ type combatItemPayload struct {
 	BattleID   int64  `json:"battle_id"`
 	ItemID     string `json:"item_id"`
 	GameMinute int64  `json:"game_minute"`
+	// A pill drunk in a battle is a turn spent (v1.34.0), so the opponent's
+	// answer can end a life, and a life that ends here is scaled the way the
+	// attack's and the technique's are. An older bot sends none of these and
+	// the engine's own defaults stand.
+	MinutesPerYear   int64 `json:"minutes_per_year"`
+	BaseSamsaraYears int64 `json:"base_samsara_years"`
+	MaxWaitSeconds   int64 `json:"max_wait_seconds"`
 }
 type combatFinalizePayload struct {
 	BattleID   int64  `json:"battle_id"`
@@ -699,6 +706,133 @@ func combatStartAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "combat", EventType: "battle_started", EntityType: "battle", EntityID: fmt.Sprint(battleID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 
+// opponentCounterTx is the opponent's answer to a turn the cultivator spent
+// (v1.34.0): the one place a battle's counter-attack is rolled, for the attack
+// and the stances, the Law technique and the pill alike. A held opponent
+// spends a suppressed turn instead; otherwise the roll is made and a hit
+// takes vitality off the character. It answers the battle's vitality after.
+func opponentCounterTx(conn *storage.Conn, uid int64, b *battleRow, c mechanicsCharacter, lead, defence, lawBonus, companion, resonance, php int64, out map[string]any) (int64, error) {
+	if b.Suppressed > 0 {
+		b.Suppressed--
+		out["counter_suppressed"] = true
+		return php, nil
+	}
+	counter, e := roll2d10(4+b.NPCRealm*2+b.NPCStage/3+b.counterAttackDebuff()-lead, counterDefenceTN(c.RealmIndex, c.Phase, defence, lawBonus, companion, resonance))
+	if e != nil {
+		return php, e
+	}
+	out["counter_roll"] = counter
+	if bval(counter, "success") {
+		margin := i64(counter["margin"])
+		dmg := maxI64(1, 2+maxI64(0, margin)/4+maxI64(0, b.NPCRealm-c.RealmIndex))
+		php = maxI64(0, php-dmg)
+		out["damage_taken"] = dmg
+		if _, e = conn.Execute(`UPDATE characters SET vitality=MAX(0,vitality-?),updated_at=? WHERE user_id=?`, []any{dmg, float64(time.Now().UnixNano()) / 1e9, uid}); e != nil {
+			return php, e
+		}
+	}
+	return php, nil
+}
+
+// battleLostTx is what a defeat is: the battle is closed as lost, and the
+// character either lives through it hurt, is held back by fate, or dies the
+// true death. Written once (v1.34.0) because the attack, the technique and
+// the pill each end a battle this way and had each their own copy of it.
+func battleLostTx(conn *storage.Conn, catalog worlddata.Catalog, uid int64, c mechanicsCharacter, b battleRow, nhp int64, death trueDeathPayload, out map[string]any) error {
+	realm, stage := c.RealmIndex, c.Phase
+	gap := maxI64(0, (b.NPCRealm-realm)*9+(b.NPCStage-stage))
+	fatalChance := defeatFatalChance(gap, standingTx(conn, uid, "Merciful Reputation"))
+	rr, e := gamerng.Intn(100)
+	if e != nil {
+		return e
+	}
+	fatal := int64(rr) < fatalChance
+	out["fatality_roll"] = rr
+	out["fatality_chance"] = fatalChance
+	now := float64(time.Now().UnixNano()) / 1e9
+	_, e = conn.Execute(`UPDATE battles SET player_hp=0,npc_hp=?,status='lost',npc_suppressed_turns=?,version=version+1,updated_at=? WHERE battle_id=?`, []any{nhp, b.Suppressed, now, b.BattleID})
+	if e != nil {
+		return e
+	}
+	out["status"] = "lost"
+	if fatal {
+		fr, e := conn.Execute(`SELECT points FROM character_fate WHERE user_id=?`, []any{uid})
+		if e != nil {
+			return e
+		}
+		fate := int64(0)
+		if len(fr.Rows) > 0 {
+			fate = i64(fr.Rows[0][0])
+		}
+		if fate > 0 {
+			remaining, e := spendFateGo(conn, uid, "averted_true_death:"+b.NPCName, death.GameMinute)
+			if e != nil {
+				return e
+			}
+			key := "bone_fracture"
+			sev := int64(2)
+			if gap >= 18 {
+				key = "soul_wound"
+				sev = 3
+			}
+			// A Body Refiner's flesh takes it lighter (v1.13.0).
+			sev = defeatWoundSeverity(catalog, c.Path, sev)
+			inj, e := survivedDefeatTx(conn, uid, key, sev, "fate_rescue", fmt.Sprint(b.BattleID), death.GameMinute)
+			if e != nil {
+				return e
+			}
+			out["fate_rescue"] = true
+			out["fate_remaining"] = remaining
+			out["injury"] = inj
+			out["player_hp"] = int64(1)
+		} else {
+			death.Reason = "battle:" + b.NPCName
+			dead, e := recordTrueDeathAuthoritative(conn, catalog, uid, death)
+			if e != nil {
+				return e
+			}
+			out["true_death"] = dead
+		}
+		return nil
+	}
+	key := "flesh_wound"
+	sev := int64(1)
+	if gap >= 9 {
+		key = "bone_fracture"
+		sev = 2
+	}
+	// A Body Refiner's flesh takes it lighter (v1.13.0).
+	sev = defeatWoundSeverity(catalog, c.Path, sev)
+	inj, e := survivedDefeatTx(conn, uid, key, sev, "battle", fmt.Sprint(b.BattleID), death.GameMinute)
+	if e != nil {
+		return e
+	}
+	out["injury"] = inj
+	return nil
+}
+
+// counterStanceTx gathers what stands between a cultivator and the opponent's
+// counter-attack when they are not defending: their Law's combat bonus, their
+// companion's, the resonance of a dao partnership and the armour they wear.
+// The technique and the pill each answer the counter with it (v1.34.0).
+func counterStanceTx(conn *storage.Conn, catalog worlddata.Catalog, uid int64, c mechanicsCharacter, gameMinute int64) (lawBonus, companion, resonance, defence int64, err error) {
+	bundle, err := loadAptitudes(conn, uid)
+	if err != nil {
+		return
+	}
+	mods, err := loadEffectModifiers(conn, uid, gameMinute, bundle, c, catalog)
+	if err != nil {
+		return
+	}
+	resonance = dualCheckBonus(c)
+	lawBonus = int64(math.Round(mods.Add["combat_bonus"]))
+	if companion, err = combatCompanionBonus(conn, uid); err != nil {
+		return
+	}
+	_, defence, _, _, err = combatEquipment(conn, uid)
+	return
+}
+
 func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p combatTurnPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
@@ -852,95 +986,17 @@ func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		// The strike is not answered, and it spends no suppression turn a
 		// technique earned: those stay the opponent's to wait out.
 		out["counter_suppressed"] = true
-	} else if b.Suppressed > 0 {
-		b.Suppressed--
-		out["counter_suppressed"] = true
 	} else {
-		counter, e := roll2d10(4+b.NPCRealm*2+b.NPCStage/3+b.counterAttackDebuff()-lead, counterDefenceTN(realm, stage, defenseBonus, lawBonus, comp, resonance))
+		php, e = opponentCounterTx(conn, userID, &b, c, lead, defenseBonus, lawBonus, comp, resonance, php, out)
 		if e != nil {
 			return authoritativeMutation{}, e
-		}
-		out["counter_roll"] = counter
-		if bval(counter, "success") {
-			margin := i64(counter["margin"])
-			dmg := maxI64(1, 2+maxI64(0, margin)/4+maxI64(0, b.NPCRealm-realm))
-			php = maxI64(0, php-dmg)
-			out["damage_taken"] = dmg
-			_, e = conn.Execute(`UPDATE characters SET vitality=MAX(0,vitality-?),updated_at=? WHERE user_id=?`, []any{dmg, float64(time.Now().UnixNano()) / 1e9, userID})
-			if e != nil {
-				return authoritativeMutation{}, e
-			}
 		}
 	}
 	out["npc_hp"] = nhp
 	out["player_hp"] = php
 	if php <= 0 {
-		gap := maxI64(0, (b.NPCRealm-realm)*9+(b.NPCStage-stage))
-		fatalChance := defeatFatalChance(gap, standingTx(conn, userID, "Merciful Reputation"))
-		rr, e := gamerng.Intn(100)
-		if e != nil {
+		if e = battleLostTx(conn, catalog, userID, c, b, nhp, trueDeathPayload{GameMinute: p.GameMinute, MinutesPerYear: p.MinutesPerYear, BaseSamsaraYears: p.BaseSamsaraYears, MaxWaitSeconds: p.MaxWaitSeconds}, out); e != nil {
 			return authoritativeMutation{}, e
-		}
-		fatal := int64(rr) < fatalChance
-		out["fatality_roll"] = rr
-		out["fatality_chance"] = fatalChance
-		now := float64(time.Now().UnixNano()) / 1e9
-		_, e = conn.Execute(`UPDATE battles SET player_hp=0,npc_hp=?,status='lost',npc_suppressed_turns=?,version=version+1,updated_at=? WHERE battle_id=?`, []any{nhp, b.Suppressed, now, b.BattleID})
-		if e != nil {
-			return authoritativeMutation{}, e
-		}
-		out["status"] = "lost"
-		if fatal {
-			fr, e := conn.Execute(`SELECT points FROM character_fate WHERE user_id=?`, []any{userID})
-			if e != nil {
-				return authoritativeMutation{}, e
-			}
-			fate := int64(0)
-			if len(fr.Rows) > 0 {
-				fate = i64(fr.Rows[0][0])
-			}
-			if fate > 0 {
-				remaining, e := spendFateGo(conn, userID, "averted_true_death:"+b.NPCName, p.GameMinute)
-				if e != nil {
-					return authoritativeMutation{}, e
-				}
-				key := "bone_fracture"
-				sev := int64(2)
-				if gap >= 18 {
-					key = "soul_wound"
-					sev = 3
-				}
-				// A Body Refiner's flesh takes it lighter (v1.13.0).
-				sev = defeatWoundSeverity(catalog, c.Path, sev)
-				inj, e := survivedDefeatTx(conn, userID, key, sev, "fate_rescue", fmt.Sprint(b.BattleID), p.GameMinute)
-				if e != nil {
-					return authoritativeMutation{}, e
-				}
-				out["fate_rescue"] = true
-				out["fate_remaining"] = remaining
-				out["injury"] = inj
-				out["player_hp"] = int64(1)
-			} else {
-				death, e := recordTrueDeathAuthoritative(conn, catalog, userID, trueDeathPayload{GameMinute: p.GameMinute, Reason: "battle:" + b.NPCName, MinutesPerYear: p.MinutesPerYear, BaseSamsaraYears: p.BaseSamsaraYears, MaxWaitSeconds: p.MaxWaitSeconds})
-				if e != nil {
-					return authoritativeMutation{}, e
-				}
-				out["true_death"] = death
-			}
-		} else {
-			key := "flesh_wound"
-			sev := int64(1)
-			if gap >= 9 {
-				key = "bone_fracture"
-				sev = 2
-			}
-			// A Body Refiner's flesh takes it lighter (v1.13.0).
-			sev = defeatWoundSeverity(catalog, c.Path, sev)
-			inj, e := survivedDefeatTx(conn, userID, key, sev, "battle", fmt.Sprint(b.BattleID), p.GameMinute)
-			if e != nil {
-				return authoritativeMutation{}, e
-			}
-			out["injury"] = inj
 		}
 		return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "combat", EventType: "battle_lost", EntityType: "battle", EntityID: fmt.Sprint(b.BattleID), GameMinute: p.GameMinute, Payload: out}}, nil
 	}
@@ -975,6 +1031,12 @@ func combatTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	c, e := loadMechanicsCharacter(conn, catalog, userID)
 	if e != nil {
 		return authoritativeMutation{}, e
+	}
+	// combat.turn has always asked this; the technique, the pill and the final
+	// decision did not (v1.34.0), so a deceased incarnation's battle could be
+	// worked on from the other side of the grave.
+	if c.LifeStatus != "alive" {
+		return authoritativeMutation{}, errors.New("a deceased incarnation cannot fight")
 	}
 	b, e := loadBattle(conn, userID, p.BattleID)
 	if e != nil {
@@ -1102,113 +1164,20 @@ func combatTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	// counter-attack (respecting suppression) instead of being a free,
 	// risk-free way to bypass the risk/injury/fatality economy that every
 	// other offensive action in this battle system enforces.
-	bundle, e := loadAptitudes(conn, userID)
+	lawBonus, compBonus, resonance, def, e := counterStanceTx(conn, catalog, userID, c, p.GameMinute)
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	mods, e := loadEffectModifiers(conn, userID, p.GameMinute, bundle, c, catalog)
-	if e != nil {
-		return authoritativeMutation{}, e
-	}
-	resonance := dualCheckBonus(c)
-	lawBonus := int64(math.Round(mods.Add["combat_bonus"]))
-	compBonus, e := combatCompanionBonus(conn, userID)
-	if e != nil {
-		return authoritativeMutation{}, e
-	}
-	_, def, _, _, e := combatEquipment(conn, userID)
-	if e != nil {
-		return authoritativeMutation{}, e
-	}
-	realm, stage := c.RealmIndex, c.Phase
 	php := b.PlayerHP
-	if b.Suppressed > 0 {
-		b.Suppressed--
-		out["counter_suppressed"] = true
-	} else {
-		counter, e := roll2d10(4+b.NPCRealm*2+b.NPCStage/3+b.counterAttackDebuff()-lead, counterDefenceTN(realm, stage, def, lawBonus, compBonus, resonance))
-		if e != nil {
-			return authoritativeMutation{}, e
-		}
-		out["counter_roll"] = counter
-		if bval(counter, "success") {
-			margin := i64(counter["margin"])
-			dmg := maxI64(1, 2+maxI64(0, margin)/4+maxI64(0, b.NPCRealm-realm))
-			php = maxI64(0, php-dmg)
-			out["damage_taken"] = dmg
-			if _, e = conn.Execute(`UPDATE characters SET vitality=MAX(0,vitality-?),updated_at=? WHERE user_id=?`, []any{dmg, now, userID}); e != nil {
-				return authoritativeMutation{}, e
-			}
-		}
+	php, e = opponentCounterTx(conn, userID, &b, c, lead, def, lawBonus, compBonus, resonance, php, out)
+	if e != nil {
+		return authoritativeMutation{}, e
 	}
 	out["npc_hp"] = b.NPCHP
 	out["player_hp"] = php
 	if php <= 0 {
-		gap := maxI64(0, (b.NPCRealm-realm)*9+(b.NPCStage-stage))
-		fatalChance := defeatFatalChance(gap, standingTx(conn, userID, "Merciful Reputation"))
-		rr, e := gamerng.Intn(100)
-		if e != nil {
+		if e = battleLostTx(conn, catalog, userID, c, b, b.NPCHP, trueDeathPayload{GameMinute: p.GameMinute, MinutesPerYear: p.MinutesPerYear, BaseSamsaraYears: p.BaseSamsaraYears, MaxWaitSeconds: p.MaxWaitSeconds}, out); e != nil {
 			return authoritativeMutation{}, e
-		}
-		fatal := int64(rr) < fatalChance
-		out["fatality_roll"] = rr
-		out["fatality_chance"] = fatalChance
-		_, e = conn.Execute(`UPDATE battles SET player_hp=0,npc_hp=?,status='lost',npc_suppressed_turns=?,version=version+1,updated_at=? WHERE battle_id=?`, []any{b.NPCHP, b.Suppressed, now, b.BattleID})
-		if e != nil {
-			return authoritativeMutation{}, e
-		}
-		out["status"] = "lost"
-		if fatal {
-			fr, e := conn.Execute(`SELECT points FROM character_fate WHERE user_id=?`, []any{userID})
-			if e != nil {
-				return authoritativeMutation{}, e
-			}
-			fate := int64(0)
-			if len(fr.Rows) > 0 {
-				fate = i64(fr.Rows[0][0])
-			}
-			if fate > 0 {
-				remaining, e := spendFateGo(conn, userID, "averted_true_death:"+b.NPCName, p.GameMinute)
-				if e != nil {
-					return authoritativeMutation{}, e
-				}
-				key := "bone_fracture"
-				sev := int64(2)
-				if gap >= 18 {
-					key = "soul_wound"
-					sev = 3
-				}
-				// A Body Refiner's flesh takes it lighter (v1.13.0).
-				sev = defeatWoundSeverity(catalog, c.Path, sev)
-				inj, e := survivedDefeatTx(conn, userID, key, sev, "fate_rescue", fmt.Sprint(b.BattleID), p.GameMinute)
-				if e != nil {
-					return authoritativeMutation{}, e
-				}
-				out["fate_rescue"] = true
-				out["fate_remaining"] = remaining
-				out["injury"] = inj
-				out["player_hp"] = int64(1)
-			} else {
-				death, e := recordTrueDeathAuthoritative(conn, catalog, userID, trueDeathPayload{GameMinute: p.GameMinute, Reason: "battle:" + b.NPCName, MinutesPerYear: p.MinutesPerYear, BaseSamsaraYears: p.BaseSamsaraYears, MaxWaitSeconds: p.MaxWaitSeconds})
-				if e != nil {
-					return authoritativeMutation{}, e
-				}
-				out["true_death"] = death
-			}
-		} else {
-			key := "flesh_wound"
-			sev := int64(1)
-			if gap >= 9 {
-				key = "bone_fracture"
-				sev = 2
-			}
-			// A Body Refiner's flesh takes it lighter (v1.13.0).
-			sev = defeatWoundSeverity(catalog, c.Path, sev)
-			inj, e := survivedDefeatTx(conn, userID, key, sev, "battle", fmt.Sprint(b.BattleID), p.GameMinute)
-			if e != nil {
-				return authoritativeMutation{}, e
-			}
-			out["injury"] = inj
 		}
 		return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "combat", EventType: "battle_lost", EntityType: "battle", EntityID: fmt.Sprint(b.BattleID), GameMinute: p.GameMinute, Payload: out}}, nil
 	}
@@ -1224,6 +1193,13 @@ func combatRecoveryItemAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	var p combatItemPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
+	}
+	c, e := loadMechanicsCharacter(conn, catalog, userID)
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	if c.LifeStatus != "alive" {
+		return authoritativeMutation{}, errors.New("a deceased incarnation cannot drink a pill in battle")
 	}
 	b, e := loadBattle(conn, userID, p.BattleID)
 	if e != nil {
@@ -1265,24 +1241,94 @@ func combatRecoveryItemAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
+	// The pill leaves what it leaves (v1.34.0). The battle panel used to be
+	// the one place a pill was clean: `item.use` added the residue and this
+	// path did not, so the dirtiest pills were free to drink mid-fight.
+	toxicityGain, toxicity, e := addPillToxicityTx(conn, userID, itemBaseID(p.ItemID), item, p.GameMinute, now)
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
 	st, e := conn.Execute(`SELECT qi,qi_max,vitality,vitality_max FROM characters WHERE user_id=?`, []any{userID})
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
 	x := st.Rows[0]
 	newVitality, newVitalityMax := i64(x[2]), i64(x[3])
+	php, phpMax := b.PlayerHP, b.PlayerMax
 	if gradedAmount(item.Use.Instant.VitalityRestore, grade) > 0 {
 		// Keep battles.player_hp in lockstep with characters.vitality the same
 		// way every other combat mutation does (combat.turn/combat.technique
 		// decrement both together on damage) - a mid-battle heal that only
 		// touched characters.vitality left the battle panel's HP bar stale
 		// until the next turn recomputed it.
-		if _, e = conn.Execute(`UPDATE battles SET player_hp=?,player_hp_max=MAX(player_hp_max,?),version=version+1,updated_at=? WHERE battle_id=? AND status='active'`, []any{newVitality, newVitalityMax, now, b.BattleID}); e != nil {
+		php, phpMax = newVitality, maxI64(b.PlayerMax, newVitalityMax)
+	}
+	out := map[string]any{"battle_id": p.BattleID, "item_id": p.ItemID, "item_name": itemDisplayName(catalog, p.ItemID), "qi": i64(x[0]), "qi_max": i64(x[1]), "vitality": newVitality, "vitality_max": newVitalityMax, "qi_restore": reportedQi, "vitality_restore": gradedAmount(item.Use.Instant.VitalityRestore, grade), "status": "active"}
+	if toxicityGain > 0 {
+		out["toxicity_gain"], out["pill_toxicity"], out["toxicity_band"] = toxicityGain, toxicity, toxicityBand(toxicity)
+	}
+	// And it costs the turn (v1.34.0): swallowing a pill is not free of the
+	// opponent, who answers it as they answer an attack. An opponent already
+	// down has nothing to answer with.
+	if b.NPCHP > 0 {
+		lead := stageLead(catalog, c.RealmIndex, c.Phase, b.NPCRealm, b.NPCStage)
+		lawBonus, companion, resonance, defence, e := counterStanceTx(conn, catalog, userID, c, p.GameMinute)
+		if e != nil {
 			return authoritativeMutation{}, e
 		}
+		php, e = opponentCounterTx(conn, userID, &b, c, lead, defence, lawBonus, companion, resonance, php, out)
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		out["vitality"] = maxI64(0, newVitality-i64(out["damage_taken"]))
+		if php <= 0 {
+			if e = battleLostTx(conn, catalog, userID, c, b, b.NPCHP, trueDeathPayload{GameMinute: p.GameMinute, MinutesPerYear: p.MinutesPerYear, BaseSamsaraYears: p.BaseSamsaraYears, MaxWaitSeconds: p.MaxWaitSeconds}, out); e != nil {
+				return authoritativeMutation{}, e
+			}
+			return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "combat", EventType: "battle_lost", EntityType: "battle", EntityID: fmt.Sprint(p.BattleID), GameMinute: p.GameMinute, Payload: out}}, nil
+		}
 	}
-	out := map[string]any{"battle_id": p.BattleID, "item_id": p.ItemID, "item_name": itemDisplayName(catalog, p.ItemID), "qi": i64(x[0]), "qi_max": i64(x[1]), "vitality": newVitality, "vitality_max": newVitalityMax, "qi_restore": reportedQi, "vitality_restore": gradedAmount(item.Use.Instant.VitalityRestore, grade)}
+	if _, e = conn.Execute(`UPDATE battles SET player_hp=?,player_hp_max=?,npc_suppressed_turns=?,version=version+1,updated_at=? WHERE battle_id=? AND status='active'`, []any{php, phpMax, b.Suppressed, now, b.BattleID}); e != nil {
+		return authoritativeMutation{}, e
+	}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "combat", EventType: "recovery_item", EntityType: "battle", EntityID: fmt.Sprint(p.BattleID), GameMinute: p.GameMinute, Payload: out}}, nil
+}
+
+// battleRewardEventLogType is the record that a won fight against one
+// opponent has been paid on one world day. The count is event_log rows keyed on
+// the opponent and the day, the way the karma deeds are, so the record is the
+// memory and a reset or an erasure takes it with the character.
+const battleRewardEventLogType = "battle_reward"
+
+// battleRewardKey names what a win is paid once for: this opponent, this world
+// day. An opponent with no identity of its own - a manifestation drawn from an
+// event, whose site is already finite - has no key and is not limited here.
+func battleRewardKey(b battleRow, gameMinute int64) string {
+	target := strings.TrimSpace(b.TargetKey)
+	if target == "" {
+		return ""
+	}
+	return fmt.Sprintf("battle_reward:%s:day:%d", target, gameMinute/deedKarmaDayGameMinutes)
+}
+
+// battleRewardFreshTx answers whether this win pays, and records that it was
+// paid if so (v1.34.0). Insight, the body's tempering, a Spare's karma and
+// standing, and the fate point a meaningful mercy earns were paid on every win
+// over the same easy opponent, with no wait between fights, so the cheapest
+// fight in reach was the best income in the game. It never refuses the fight,
+// and an unreadable record pays, as the karma deeds' reads fail towards play.
+func battleRewardFreshTx(conn *storage.Conn, userID int64, b battleRow, outcome string, gameMinute int64, now float64) bool {
+	key := battleRewardKey(b, gameMinute)
+	if key == "" {
+		return true
+	}
+	paid, err := conn.Execute(`SELECT COUNT(*) FROM event_log WHERE user_id=? AND event_type=? AND json_extract(payload_json,'$.key')=?`, []any{userID, battleRewardEventLogType, key})
+	if err == nil && len(paid.Rows) > 0 && storage.ParseInt(paid.Rows[0][0]) > 0 {
+		return false
+	}
+	payload, _ := json.Marshal(map[string]any{"key": key, "outcome": outcome, "npc": b.NPCName})
+	_, _ = conn.Execute(`INSERT INTO event_log(user_id,event_type,payload_json,created_at) VALUES(?,?,?,?)`, []any{userID, battleRewardEventLogType, string(payload), now})
+	return true
 }
 
 func combatFinalizeAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
@@ -1293,6 +1339,13 @@ func combatFinalizeAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 	outcome := strings.ToLower(strings.TrimSpace(p.Outcome))
 	if outcome != "spare" && outcome != "kill" {
 		return authoritativeMutation{}, errors.New("outcome must be spare or kill")
+	}
+	c, e := loadMechanicsCharacter(conn, catalog, userID)
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	if c.LifeStatus != "alive" {
+		return authoritativeMutation{}, errors.New("a deceased incarnation cannot decide a battle")
 	}
 	b, e := loadBattle(conn, userID, p.BattleID)
 	if e != nil {
@@ -1306,20 +1359,29 @@ func combatFinalizeAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	reward, e := grantInsightXPTx(conn, userID, 5+b.NPCRealm, now)
-	if e != nil {
-		return authoritativeMutation{}, e
+	// The fight is never refused, but what a win over the same opponent pays
+	// is paid once a world day (v1.34.0).
+	repeated := !battleRewardFreshTx(conn, userID, b, outcome, p.GameMinute, now)
+	reward := int64(0)
+	if !repeated {
+		reward, e = grantInsightXPTx(conn, userID, 5+b.NPCRealm, now)
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
 	}
 	severity := clampI64(1+b.NPCRealm/4+b.NPCStage/3, 1, 10)
 	// A win sharpens a Sword Cultivator's intent (v1.13.0); anybody else banks
 	// nothing, and a lost point never costs the win.
 	intent := bankSwordIntentTx(conn, catalog, userID)
 	// A fight won tempers the body that came out of it standing (v1.20.0).
-	bodyTempered, e := temperBodyByUseTx(conn, catalog, userID, "battle", now)
-	if e != nil {
-		return authoritativeMutation{}, e
+	bodyTempered := int64(0)
+	if !repeated {
+		bodyTempered, e = temperBodyByUseTx(conn, catalog, userID, "battle", now)
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
 	}
-	out := map[string]any{"battle_id": b.BattleID, "outcome": outcome, "sword_intent": intent, "body_tempered": bodyTempered, "npc_name": b.NPCName, "npc_realm_index": b.NPCRealm, "npc_stage": b.NPCStage, "location": b.Location, "source": b.Source, "severity": severity, "insight_xp_awarded": reward, "event_manifestation": strings.HasPrefix(b.Source, "event:")}
+	out := map[string]any{"reward_repeated": repeated, "battle_id": b.BattleID, "outcome": outcome, "sword_intent": intent, "body_tempered": bodyTempered, "npc_name": b.NPCName, "npc_realm_index": b.NPCRealm, "npc_stage": b.NPCStage, "location": b.Location, "source": b.Source, "severity": severity, "insight_xp_awarded": reward, "event_manifestation": strings.HasPrefix(b.Source, "event:")}
 	if !strings.HasPrefix(b.Source, "event:") {
 		karmaDelta := int64(2)
 		repDelta := int64(2)
@@ -1339,7 +1401,7 @@ func combatFinalizeAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 				return authoritativeMutation{}, e
 			}
 			out["grudge_intensity_delta"] = maxI64(1, severity)
-		} else {
+		} else if !repeated {
 			_, e = conn.Execute(`UPDATE characters SET karma_score=MAX(-1000,MIN(1000,karma_score+2)),updated_at=? WHERE user_id=?`, []any{now, userID})
 			if e != nil {
 				return authoritativeMutation{}, e
@@ -1351,6 +1413,12 @@ func combatFinalizeAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 				}
 				out["fate_after"] = f
 			}
+		}
+		if outcome == "spare" && repeated {
+			// A mercy already shown to this opponent today earns no more
+			// standing for the second showing; the kill's cost is not a payout
+			// and is never waived.
+			repDelta = 0
 		}
 		_, e = conn.Execute(`INSERT INTO faction_reputation(user_id,faction_key,score,last_reason,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(user_id,faction_key) DO UPDATE SET score=MAX(-100,MIN(100,faction_reputation.score+excluded.score)),last_reason=excluded.last_reason,updated_at=excluded.updated_at`, []any{userID, "Merciful Reputation", repDelta, map[bool]string{true: "spared " + b.NPCName, false: "killed " + b.NPCName}[outcome == "spare"], now})
 		if e != nil {

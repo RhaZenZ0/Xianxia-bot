@@ -16,7 +16,7 @@ drills below can run it against a text that breaks the rule:
   phrase, and a rewrite that dropped one would leave the citation pointing at nothing;
 - every path it names exists, and every subsystem note and release label it cites resolves in the
   file that holds it;
-- every pointer to a section of docs/FINDINGS.md - in docs/TODO.md, in docs/ARCHITECTURE.md and in
+- every pointer to a section of docs/FINDINGS.md - in docs/TODO.md and docs/history/TODO_FIXED.md, in docs/ARCHITECTURE.md and in
   CLAUDE.md itself - names a heading that is there.
 
 The headings, paths and labels are read by small parsers, and a parser that silently finds nothing
@@ -34,6 +34,7 @@ CLAUDE_MD = PROJECT_ROOT / "CLAUDE.md"
 FINDINGS_MD = PROJECT_ROOT / "docs" / "FINDINGS.md"
 ARCHITECTURE_MD = PROJECT_ROOT / "docs" / "ARCHITECTURE.md"
 TODO_MD = PROJECT_ROOT / "docs" / "TODO.md"
+TODO_FIXED_MD = PROJECT_ROOT / "docs" / "history" / "TODO_FIXED.md"  # the closed half of the punch list
 
 # What the rest of the tree quotes from CLAUDE.md, and who quotes it. The citing files are held to
 # still saying it, so this table cannot go stale in the other direction: drop an entry when the
@@ -258,10 +259,10 @@ class ClaudeMdStaysSmallTests(unittest.TestCase):
         self.assertIn("Narration routing", headings(self.architecture))
         self.assertIn("docs/FINDINGS.md", named_paths(self.claude), "the path reader finds nothing in CLAUDE.md")
         self.assertIn("docs/ARCHITECTURE.md", named_paths(self.claude))
-        todo = TODO_MD.read_text(encoding="utf-8")
+        todo = TODO_MD.read_text(encoding="utf-8") + "\n" + TODO_FIXED_MD.read_text(encoding="utf-8")
         self.assertGreaterEqual(
             len(FINDINGS_POINTER.findall(flatten(todo))), 15,
-            "the pointer reader finds almost none of docs/TODO.md's pointers at the findings",
+            "the pointer reader finds almost none of the punch list's pointers at the findings",
         )
         self.assertTrue(RELEASE_LABEL.search("Standing rules (rc.48)"))
         self.assertGreaterEqual(len(self.claude.split("\n")), 100)
@@ -303,6 +304,7 @@ class ClaudeMdStaysSmallTests(unittest.TestCase):
     def test_every_pointer_at_a_findings_section_resolves(self):
         problems = []
         problems += pointer_problems(TODO_MD.read_text(encoding="utf-8"), self.findings, "docs/TODO.md")
+        problems += pointer_problems(TODO_FIXED_MD.read_text(encoding="utf-8"), self.findings, "docs/history/TODO_FIXED.md")
         problems += pointer_problems(self.architecture, self.findings, "docs/ARCHITECTURE.md")
         problems += pointer_problems(self.claude, self.findings, "CLAUDE.md")
         self.assertEqual(problems, [])

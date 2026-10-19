@@ -198,6 +198,11 @@ func shopBuysRows(conn *storage.Conn, catalog worlddata.Catalog, userID int64, s
 	sort.Strings(ids)
 	rows := []map[string]any{}
 	for _, id := range ids {
+		// A line the keeper cannot pay (keeperBuyBase) is not on the board:
+		// the counter would refuse the sale the board advertised.
+		if _, pays := keeperBuyBase(catalog, shop, id); !pays {
+			continue
+		}
 		name := itemDisplayNameOrEmpty(catalog, id)
 		if name == "" {
 			name = id
@@ -403,8 +408,15 @@ func shopSellAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 	if itemGradeIndex(catalog, p.ItemID) >= keeperGradeCeiling {
 		return authoritativeMutation{}, fmt.Errorf("a keeper will not price %s; sell it at a market stall or on the auction floor", itemDisplayName(catalog, p.ItemID))
 	}
-	if _, wanted := shop.Buys[p.ItemID]; !wanted {
+	if _, listed := shop.Buys[p.ItemID]; !listed {
 		return authoritativeMutation{}, fmt.Errorf("%s does not buy %s", shop.Name, itemDisplayName(catalog, p.ItemID))
+	}
+	// The line is held under the cheapest shelf in the whole world, in this
+	// keeper's coin (keeperBuyBase). Where that is less than one coin there is
+	// no price to pay: goods cross a world boundary untouched and money does
+	// not, so a coin up here is worth a hundred of the stones the shelf asks.
+	if _, pays := keeperBuyBase(catalog, shop, p.ItemID); !pays {
+		return authoritativeMutation{}, fmt.Errorf("%s will not pay for %s: the cheapest shelf in the world asks less than a single %s for it", shop.Name, itemDisplayName(catalog, p.ItemID), coinName(catalog, shop.Currency))
 	}
 	// A rank in the trade that makes it fetches more (v1.0.17).
 	quote, err := tradeSellQuoteTx(conn, catalog, userID, shop, p.ItemID)

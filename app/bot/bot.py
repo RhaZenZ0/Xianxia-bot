@@ -689,6 +689,73 @@ class XianxiaBot(commands.Bot):
                 except (discord.Forbidden, discord.HTTPException):
                     pass
 
+    async def open_engine_event_scene(self, event: dict[str, Any]) -> None:
+        """Open the scene for one event the tick spawned (the one door for it).
+
+        The run's own event carries the impacts and the site count; a sweep
+        rebuilds the event from its row and has only what the row keeps.
+        """
+        guild = self.get_guild(SETTINGS.guild_id)
+        if not guild:
+            return
+        impacts = [str(x) for x in list(event.get("impacts") or [])]
+        consequence = str(event.get("consequence_text") or "").strip()
+        # How much is actually in the scene, so the call to arms says what is
+        # waiting rather than only that something happened.
+        site_nodes = int(event.get("site_nodes") or 0)
+        # The type the engine gave the row rides through rather than being
+        # flattened to "random_event" here (v1.0.0-rc.22): a realm on rotation is
+        # a secret_realm, which is what closes it under its own label and draws
+        # it the realm's own panel.
+        event_type = str(event.get("event_type") or "random_event")
+        title = str(event.get("title") or "World Event")
+        headline = (
+            f"🌀 **SECRET REALM OPENS — {title}**" if event_type == "secret_realm"
+            else f"⚡ **AUTONOMOUS WORLD EVENT — {title}**"
+        )
+        await spawn_system_event_thread(
+            guild, title=title, event_type=event_type,
+            event_key=str(event.get("event_key") or ""), expires_at=float(event.get("expires_at") or time.time() + 7200),
+            announcement=(
+                f"{headline}\n📍 **{event.get('location','Unknown')}**\n{event.get('description','')}"
+                + (f"\n\n**Persistent consequence:** {consequence}" if consequence else "")
+                + (f"\n**Systems changed:** {'; '.join(impacts)}" if impacts else "")
+                + (f"\n**On site:** {site_nodes} things to fight, harvest or handle." if site_nodes else "")
+            ),
+        )
+
+    async def sweep_events_without_a_scene(self) -> None:
+        """Give every active tick-spawned event a thread, whatever lost it (v1.34.0).
+
+        The scene is opened from the run the tick hands back; a tick that failed
+        after committing the event, or a restart between the two, left an active
+        event nobody could walk into until it expired. This is the second door
+        to the same scene, and `open_engine_event_scene` is still the only one
+        that builds it. A row is retried no more than every five minutes, so a
+        guild with no scene channel is not hammered every cycle.
+        """
+        now = time.time()
+        tried = self.__dict__.setdefault("_scene_sweep_tried", {})
+        for key in [k for k, at in tried.items() if now - at > 3600]:
+            del tried[key]
+        # A spawn that is still in flight registers within seconds.
+        for row in await DB.get_active_events_without_a_scene(started_before=now - 60):
+            key = str(row["event_key"])
+            if now - tried.get(key, 0.0) < 300:
+                continue
+            tried[key] = now
+            payload = dict(row.get("payload") or {})
+            log.warning("Active event %s has no thread; opening its scene", key)
+            try:
+                await self.open_engine_event_scene({
+                    "event_key": key, "event_type": row.get("event_type"), "title": row.get("title"),
+                    "location": row.get("location"), "expires_at": row.get("ends_at"),
+                    "description": payload.get("description") or "",
+                    "consequence_text": payload.get("consequence_text") or "",
+                })
+            except Exception:
+                log.exception("Could not open the missing scene for event %s", key)
+
     async def event_expiry_worker(self) -> None:
         await self.wait_until_ready()
         try:
@@ -724,39 +791,17 @@ class XianxiaBot(commands.Bot):
                     for sim_run in simulation_runs:
                         log.info("World simulation %s: %s", sim_run.system, sim_run.summary)
                         for event in sim_run.events:
-                            guild=self.get_guild(SETTINGS.guild_id)
-                            if not guild: continue
-                            impacts=[str(x) for x in list(event.get("impacts") or [])]
-                            consequence=str(event.get("consequence_text") or "").strip()
-                            # How much is actually in the scene, so the call to
-                            # arms says what is waiting rather than only that
-                            # something happened.
-                            site_nodes=int(event.get("site_nodes") or 0)
-                            # The type the engine gave the row rides through
-                            # rather than being flattened to "random_event"
-                            # here (v1.0.0-rc.22): a realm on rotation is a
-                            # secret_realm, which is what closes it under its
-                            # own label and draws it the realm's own panel.
-                            event_type=str(event.get("event_type") or "random_event")
-                            title=str(event.get("title") or "World Event")
-                            headline=(
-                                f"🌀 **SECRET REALM OPENS — {title}**" if event_type=="secret_realm"
-                                else f"⚡ **AUTONOMOUS WORLD EVENT — {title}**"
-                            )
-                            await spawn_system_event_thread(
-                                guild,title=title,event_type=event_type,
-                                event_key=str(event.get("event_key") or ""),expires_at=float(event.get("expires_at") or time.time()+7200),
-                                announcement=(
-                                    f"{headline}\n📍 **{event.get('location','Unknown')}**\n{event.get('description','')}"
-                                    + (f"\n\n**Persistent consequence:** {consequence}" if consequence else "")
-                                    + (f"\n**Systems changed:** {'; '.join(impacts)}" if impacts else "")
-                                    + (f"\n**On site:** {site_nodes} things to fight, harvest or handle." if site_nodes else "")
-                                ),
-                            )
+                            await self.open_engine_event_scene(event)
                     if automation.get("maintenance_cleanup", True) and int(time.time()) % 3600 < 30:
                         await DB.maintenance_cleanup(wt.total_minutes)
                 except Exception:
                     log.exception("Event expiry worker failed")
+                # Outside the tick's own try: a tick that failed outright is
+                # exactly when a committed event is left without its scene.
+                try:
+                    await self.sweep_events_without_a_scene()
+                except Exception:
+                    log.exception("Could not sweep the events without a scene")
                 await asyncio.sleep(30)
         except asyncio.CancelledError:
             pass

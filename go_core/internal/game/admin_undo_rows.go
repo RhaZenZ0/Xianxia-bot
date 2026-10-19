@@ -82,7 +82,7 @@ func deleteIfIdle(table, where string, whereArgs []any, defaults []rowDefault) s
 		clauses = append(clauses, d.col+"=?")
 		args = append(args, d.value)
 	}
-	return sqlStmt{`DELETE FROM ` + table + ` WHERE ` + strings.Join(clauses, " AND "), args}
+	return sqlStmt{`DELETE FROM ` + table + ` WHERE ` + strings.Join(clauses, " AND "), args, nil}
 }
 
 func perfectionLeverTable(track string) (string, error) {
@@ -127,7 +127,7 @@ func reverseSetRealmPerfection(before, after map[string]any, target string, redo
 	snap := pickSnapshot(before, after, redo)
 	existed, tracked := before["existed"].(bool)
 	if !tracked {
-		return []sqlStmt{{`UPDATE ` + table + ` SET progress=? WHERE user_id=? AND realm_index=?`, []any{i64(snap["progress"]), uid, realm}}}, nil
+		return []sqlStmt{{`UPDATE ` + table + ` SET progress=? WHERE user_id=? AND realm_index=?`, []any{i64(snap["progress"]), uid, realm}, nil}}, nil
 	}
 	_, filled := after["completed_quests"]
 	cols := []string{"progress"}
@@ -166,7 +166,7 @@ func reverseSetRealmPerfection(before, after map[string]any, target string, redo
 		names, marks = append(names, "updated_at"), append(marks, "?")
 		args = append(args, now)
 		sets = append(sets, "updated_at=excluded.updated_at")
-		return []sqlStmt{{`INSERT INTO ` + table + `(` + strings.Join(names, ",") + `) VALUES(` + strings.Join(marks, ",") + `) ON CONFLICT(user_id,realm_index) DO UPDATE SET ` + strings.Join(sets, ","), args}}, nil
+		return []sqlStmt{{`INSERT INTO ` + table + `(` + strings.Join(names, ",") + `) VALUES(` + strings.Join(marks, ",") + `) ON CONFLICT(user_id,realm_index) DO UPDATE SET ` + strings.Join(sets, ","), args, nil}}, nil
 	}
 	sets, args := []string{}, []any{}
 	for _, c := range cols {
@@ -183,7 +183,7 @@ func reverseSetRealmPerfection(before, after map[string]any, target string, redo
 	}
 	sets = append(sets, "updated_at=?")
 	args = append(args, now, uid, realm)
-	stmts := []sqlStmt{{`UPDATE ` + table + ` SET ` + strings.Join(sets, ",") + ` WHERE user_id=? AND realm_index=?`, args}}
+	stmts := []sqlStmt{{`UPDATE ` + table + ` SET ` + strings.Join(sets, ",") + ` WHERE user_id=? AND realm_index=?`, args, nil}}
 	if !existed {
 		stmts = append(stmts, deleteIfIdle(table, "user_id=? AND realm_index=?", []any{uid, realm}, perfectionRowDefaults))
 	}

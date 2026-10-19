@@ -69,39 +69,115 @@ func itemTrade(catalog worlddata.Catalog, itemID string) string {
 }
 
 // cheapestShelfPrice is the lowest price any shop in the catalogue asks for an
-// item in one currency - and any travelling merchant's own wares, which are a
+// item, in one currency - and any travelling merchant's own wares, which are a
 // shelf that moves (v1.2.3): Madam Wen sells a Spirit Focus Talisman at 15
 // against a cheapest shelf of 17, so a ceiling read off the shops alone let a
 // rank sell it back at 16.
+//
+// "Anywhere" is every world, read across the ladder (v1.34.0). Goods cross a
+// world boundary untouched while money converts at a hundred to one a rung, so
+// a ceiling kept in one coin was a ceiling nobody upstairs was held to: a
+// Mortal herb at five stones sold to a Spiritual keeper for forty crystals,
+// which is four thousand stones, and the same goods bought off the lowest
+// shelf paid for the fare and the world. A shelf in another world's coin is
+// therefore carried into this one through ladderRate - the arithmetic the
+// purse crosses on - and rounded down, so a price is never read as higher
+// than the shelf it came from. It can come out as 0: the cheapest shelf in the
+// world asks less than one coin of this one, and no whole-coin price is under
+// it. A coin the content does not tier (a mid or high stone, or a currency the
+// catalogue does not carry) is compared only with itself, as it always was.
 func cheapestShelfPrice(catalog worlddata.Catalog, itemID, currency string) (int64, bool) {
 	best, found := int64(0), false
-	for _, merchant := range catalog.Merchants {
-		if merchant.Currency != currency {
-			continue
+	rates := map[string]shelfRate{}
+	consider := func(coin string, price int64) {
+		if price <= 0 {
+			return
 		}
+		converted, ok := shelfPriceAcross(catalog, rates, coin, currency, price)
+		if ok && (!found || converted < best) {
+			best, found = converted, true
+		}
+	}
+	for _, merchant := range catalog.Merchants {
 		for _, ware := range merchant.Wares {
-			if ware.ItemID != itemID || ware.Price <= 0 {
-				continue
-			}
-			if !found || ware.Price < best {
-				best, found = ware.Price, true
+			if ware.ItemID == itemID {
+				consider(merchant.Currency, ware.Price)
 			}
 		}
 	}
 	for _, shop := range catalog.Shops {
-		if shop.Currency != currency {
-			continue
-		}
 		for _, line := range shop.Sells {
-			if line.ItemID != itemID || line.Price <= 0 {
-				continue
-			}
-			if !found || line.Price < best {
-				best, found = line.Price, true
+			if line.ItemID == itemID {
+				consider(shop.Currency, line.Price)
 			}
 		}
 	}
 	return best, found
+}
+
+// coinName is a currency as a sentence names it; an id the catalogue does not
+// carry is named by its id.
+func coinName(catalog worlddata.Catalog, currency string) string {
+	if def, ok := catalog.Currencies[currency]; ok && def.Name != "" {
+		return def.Name
+	}
+	return currency
+}
+
+// shelfRate is one coin's way into another: how many rungs apart and the rate
+// across them. A coin that cannot be placed on the ladder has ok false.
+type shelfRate struct {
+	steps, rate int64
+	ok          bool
+}
+
+// shelfPriceAcross carries one shelf price from the coin it is asked in to the
+// coin a ceiling is wanted in. `rates` memoises the rung walk per source coin,
+// because worldTierIndex reads every location in the catalogue and a shelf
+// scan meets the same dozen coins hundreds of times.
+func shelfPriceAcross(catalog worlddata.Catalog, rates map[string]shelfRate, from, to string, price int64) (int64, bool) {
+	if from == to {
+		return price, true
+	}
+	r, seen := rates[from]
+	if !seen {
+		fromDef, fromOK := catalog.Currencies[from]
+		toDef, toOK := catalog.Currencies[to]
+		if fromOK && toOK && fromDef.Tier == 1 && toDef.Tier == 1 && fromDef.World != "" && toDef.World != "" {
+			r.steps, r.rate = ladderRate(catalog, fromDef.World, toDef.World)
+			r.ok = true
+		}
+		rates[from] = r
+	}
+	if !r.ok {
+		return 0, false
+	}
+	converted, _ := ladderConvert(price, r.steps, r.rate)
+	return converted, true
+}
+
+// keeperBuyBase is what a keeper pays anybody for one of an item: the
+// authored line, held under the cheapest shelf in the world (cheapestShelfPrice)
+// by one coin. A line that no whole coin of the keeper's currency sits under -
+// the cheapest shelf asks less than one - is not a price at all, and the
+// keeper does not buy (false), as a board that listed it would offer what the
+// counter refuses. An item the keeper never listed is also false; the caller
+// tells the two apart by asking the shop's own Buys.
+func keeperBuyBase(catalog worlddata.Catalog, shop worlddata.Shop, itemID string) (int64, bool) {
+	authored, listed := shop.Buys[itemID]
+	if !listed {
+		return 0, false
+	}
+	base := max64(1, authored)
+	if shelf, ok := cheapestShelfPrice(catalog, itemID, shop.Currency); ok {
+		if shelf < 1 {
+			return 0, false
+		}
+		if base >= shelf {
+			base = max64(1, shelf-1)
+		}
+	}
+	return base, true
 }
 
 // tradeRankSellPrice is what a keeper pays somebody of this rank for one of
@@ -132,7 +208,10 @@ type tradeSellQuote struct {
 }
 
 func tradeSellQuoteTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, shop worlddata.Shop, itemID string) (tradeSellQuote, error) {
-	base := max64(1, shop.Buys[itemID])
+	base, buys := keeperBuyBase(catalog, shop, itemID)
+	if !buys {
+		return tradeSellQuote{}, nil
+	}
 	quote := tradeSellQuote{Unit: base, Base: base}
 	trade := itemTrade(catalog, itemID)
 	if trade == "" {

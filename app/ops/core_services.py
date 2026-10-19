@@ -657,10 +657,19 @@ class CombatService:
 
     async def recovery_item(
         self, user_id: int, *, battle_id: int, item_id: str, game_minute: int, action_id: str,
+        minutes_per_year: int = 0, base_samsara_years: int = 0, max_wait_seconds: int = 0,
     ) -> dict[str, Any]:
+        """A pill drunk in a battle is a turn spent (v1.34.0): the opponent
+        answers it, and an answer that ends a life is scaled as the attack's
+        and the technique's are, so the three carry the same fields."""
         return await self.engine.authoritative_action(
             "combat.recovery_item", int(user_id),
-            {"battle_id": int(battle_id), "item_id": str(item_id)},
+            {
+                "battle_id": int(battle_id), "item_id": str(item_id),
+                "minutes_per_year": int(minutes_per_year),
+                "base_samsara_years": int(base_samsara_years),
+                "max_wait_seconds": int(max_wait_seconds),
+            },
             action_id=str(action_id),
         )
 

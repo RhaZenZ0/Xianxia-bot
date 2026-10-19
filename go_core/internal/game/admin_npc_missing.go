@@ -36,11 +36,19 @@ const (
 // where they were last seen (home) rather than where they are (`where`
 // stays on the NPC's own row), because the first is what the world knows and
 // the second is what a searcher has to work out.
+//
+// `where` is taken so both callers can hand over what they have, and is never
+// written into a public text. The summary used to say "the road out of
+// {where}", and the NPC stays where they went missing, so the row that reaches
+// the narrator's RAG and the Quest Forge's quest story named the very place a
+// searcher was meant to have to work out; only the death notice had been held
+// to this. What the world can honestly say is the home that was waiting.
 func RecordNPCMissingTx(conn *storage.Conn, name, home, where string, gm int64, now float64) error {
+	_ = where
 	return recordWorldHistoryTx(conn, fmt.Sprintf("npc_missing:%s:%d", name, gm), "npc_missing",
 		name+" has not come home",
-		fmt.Sprintf("%s left %s and never arrived. The last anyone can place them is the road out of %s, and nobody at %s has seen them since.",
-			name, home, where, home),
+		fmt.Sprintf("%s left %s and never arrived. Nobody can say which of the roads out of %s they took, and nobody at %s has seen them since.",
+			name, home, home, home),
 		NPCMissingSignificance, "public", home, "", "npc", name, name, "npc", name, name, nil, name,
 		[]string{"npc_missing"}, gm, map[string]any{}, now)
 }

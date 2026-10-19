@@ -15,6 +15,12 @@ COPY go_core/go.mod ./go_core/go.mod
 COPY go_core/cmd ./go_core/cmd
 COPY go_core/internal ./go_core/internal
 COPY content ./content
+# The fixture gate (fixture_foreign_keys_test.go, v1.34.0) reads production's
+# DDL out of app/database/core.py the same way, three directories up, and it
+# fails rather than skips when the file is not there - so the one file comes
+# along; tests/python/contracts/test_engine_image_carries_what_its_tests_read.py
+# holds every such path to a COPY line here.
+COPY app/database/core.py ./app/database/core.py
 WORKDIR /src/go_core
 RUN CGO_ENABLED=1 go test ./...
 RUN CGO_ENABLED=1 go build -trimpath -ldflags="-s -w" -o /out/xianxia-engine ./cmd/xianxia-core

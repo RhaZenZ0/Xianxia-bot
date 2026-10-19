@@ -151,6 +151,8 @@ func TestModerationOldAgeDeathStillFiresForFrozenCharacter(t *testing.T) {
 	path := setupModerationAuthorityDB(t)
 	world := batch4WorldPath(t)
 	setModerationFlags(t, path, 42, true, true, "under investigation")
+	// A death abandons the fighter's battles (v1.34.0), so it reads the table.
+	withBattles(t, path)
 	// Natural lifespan of 1 year, created at game_minute 0, evaluated far past
 	// that threshold (minutesPerYear=518400) - old enough to have died of old
 	// age many times over, regardless of the moderation flags.

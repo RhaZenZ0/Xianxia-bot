@@ -75,16 +75,14 @@ func syncPurse(t *testing.T, path string) {
 		ON CONFLICT(user_id,currency_id) DO UPDATE SET balance=excluded.balance`)
 }
 
-func setupBatch4AuthorityDB(t *testing.T) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "batch4_authority.sqlite3")
-	conn, err := storage.Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer conn.Close()
-
-	schema := `
+// batch4AuthoritySchema is the fixture's DDL, kept apart from the function so a
+// gate can read it. Every table that production keys on a character carries the
+// same REFERENCES clause here that app/database/core.py gives it, and
+// TestTheFixtureKeepsProductionsForeignKeys holds that: a fixture that takes the
+// orphan row production refuses is not testing production, and two tests here
+// inserted exactly that (an abode for a character who was never made, a trade
+// row for another one) until the keys were copied in.
+const batch4AuthoritySchema = `
 CREATE TABLE characters(
     user_id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
@@ -155,18 +153,18 @@ CREATE TABLE character_physiques(user_id INTEGER PRIMARY KEY,physique_id TEXT NO
 CREATE TABLE soul_legacy(user_id INTEGER PRIMARY KEY,incarnation_count INTEGER NOT NULL DEFAULT 1,legacy_points INTEGER NOT NULL DEFAULT 0,memory_seed INTEGER NOT NULL DEFAULT 0,talent_echo INTEGER NOT NULL DEFAULT 0,law_echo INTEGER NOT NULL DEFAULT 0,insight_echo INTEGER NOT NULL DEFAULT 0,karmic_fortune INTEGER NOT NULL DEFAULT 0,special_trait TEXT NOT NULL DEFAULT '',awakened_memory INTEGER NOT NULL DEFAULT 0,past_lives_json TEXT NOT NULL DEFAULT '[]',updated_at REAL NOT NULL DEFAULT 0);
 CREATE TABLE law_progress(user_id INTEGER NOT NULL,law_id TEXT NOT NULL,comprehension INTEGER NOT NULL DEFAULT 0,insights INTEGER NOT NULL DEFAULT 0,updated_at REAL NOT NULL,PRIMARY KEY(user_id,law_id));
 CREATE TABLE dao_progress(user_id INTEGER NOT NULL,dao_id TEXT NOT NULL,progress INTEGER NOT NULL DEFAULT 0,updated_at REAL NOT NULL,PRIMARY KEY(user_id,dao_id));
-CREATE TABLE inventory(user_id INTEGER NOT NULL,item_id TEXT NOT NULL,quantity INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user_id,item_id));
-CREATE TABLE IF NOT EXISTS item_provenance(provenance_id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,item_id TEXT NOT NULL,quantity INTEGER NOT NULL DEFAULT 1,source_type TEXT NOT NULL DEFAULT 'unknown',source_key TEXT NOT NULL DEFAULT '',ownership_mark TEXT NOT NULL DEFAULT '',legal_status TEXT NOT NULL DEFAULT 'clean',authenticity INTEGER NOT NULL DEFAULT 100,tracking_strength INTEGER NOT NULL DEFAULT 0,acquired_game_minute INTEGER NOT NULL DEFAULT 0,created_at REAL NOT NULL DEFAULT 0,updated_at REAL NOT NULL DEFAULT 0);
-CREATE TABLE profession_progress(user_id INTEGER NOT NULL,profession TEXT NOT NULL,level INTEGER NOT NULL DEFAULT 0,xp INTEGER NOT NULL DEFAULT 0,successes INTEGER NOT NULL DEFAULT 0,failures INTEGER NOT NULL DEFAULT 0,quality_points INTEGER NOT NULL DEFAULT 0,updated_at REAL NOT NULL DEFAULT 0,PRIMARY KEY(user_id,profession));
-CREATE TABLE character_recipes(user_id INTEGER NOT NULL,recipe TEXT NOT NULL,learned_game_minute INTEGER NOT NULL DEFAULT 0,source TEXT NOT NULL DEFAULT '',created_at REAL NOT NULL DEFAULT 0,PRIMARY KEY(user_id,recipe));
+CREATE TABLE inventory(user_id INTEGER NOT NULL,item_id TEXT NOT NULL,quantity INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user_id,item_id),FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE);
+CREATE TABLE IF NOT EXISTS item_provenance(provenance_id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,item_id TEXT NOT NULL,quantity INTEGER NOT NULL DEFAULT 1,source_type TEXT NOT NULL DEFAULT 'unknown',source_key TEXT NOT NULL DEFAULT '',ownership_mark TEXT NOT NULL DEFAULT '',legal_status TEXT NOT NULL DEFAULT 'clean',authenticity INTEGER NOT NULL DEFAULT 100,tracking_strength INTEGER NOT NULL DEFAULT 0,acquired_game_minute INTEGER NOT NULL DEFAULT 0,created_at REAL NOT NULL DEFAULT 0,updated_at REAL NOT NULL DEFAULT 0,FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE);
+CREATE TABLE profession_progress(user_id INTEGER NOT NULL,profession TEXT NOT NULL,level INTEGER NOT NULL DEFAULT 0,xp INTEGER NOT NULL DEFAULT 0,successes INTEGER NOT NULL DEFAULT 0,failures INTEGER NOT NULL DEFAULT 0,quality_points INTEGER NOT NULL DEFAULT 0,updated_at REAL NOT NULL DEFAULT 0,PRIMARY KEY(user_id,profession),FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE);
+CREATE TABLE character_recipes(user_id INTEGER NOT NULL,recipe TEXT NOT NULL,learned_game_minute INTEGER NOT NULL DEFAULT 0,source TEXT NOT NULL DEFAULT '',created_at REAL NOT NULL DEFAULT 0,PRIMARY KEY(user_id,recipe),FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE);
 CREATE TABLE civilization_regions(location TEXT PRIMARY KEY,world_name TEXT NOT NULL,spirit_resources INTEGER NOT NULL DEFAULT 50);
-CREATE TABLE cave_abodes(user_id INTEGER PRIMARY KEY,location_key TEXT NOT NULL UNIQUE,base_location TEXT NOT NULL,herb_garden_level INTEGER NOT NULL DEFAULT 0);
-CREATE TABLE cave_abode_access(owner_user_id INTEGER NOT NULL,guest_user_id INTEGER NOT NULL,PRIMARY KEY(owner_user_id,guest_user_id));
+CREATE TABLE cave_abodes(user_id INTEGER PRIMARY KEY,location_key TEXT NOT NULL UNIQUE,base_location TEXT NOT NULL,herb_garden_level INTEGER NOT NULL DEFAULT 0,FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE);
+CREATE TABLE cave_abode_access(owner_user_id INTEGER NOT NULL,guest_user_id INTEGER NOT NULL,PRIMARY KEY(owner_user_id,guest_user_id),FOREIGN KEY(owner_user_id) REFERENCES cave_abodes(user_id) ON DELETE CASCADE,FOREIGN KEY(guest_user_id) REFERENCES characters(user_id) ON DELETE CASCADE);
 CREATE TABLE birth_families(family_id INTEGER PRIMARY KEY AUTOINCREMENT,archetype TEXT NOT NULL);
-CREATE TABLE character_birth_family(user_id INTEGER PRIMARY KEY,family_id INTEGER NOT NULL);
+CREATE TABLE character_birth_family(user_id INTEGER PRIMARY KEY,family_id INTEGER NOT NULL,FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE,FOREIGN KEY(family_id) REFERENCES birth_families(family_id) ON DELETE CASCADE);
 CREATE TABLE character_conditions(condition_id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,condition_key TEXT NOT NULL,category TEXT NOT NULL,name TEXT NOT NULL,severity INTEGER NOT NULL DEFAULT 1,state TEXT NOT NULL DEFAULT 'active',source_type TEXT NOT NULL DEFAULT 'system',source_id TEXT NOT NULL DEFAULT '',effect_json TEXT NOT NULL DEFAULT '{}',created_game_minute INTEGER NOT NULL DEFAULT 0,updated_game_minute INTEGER NOT NULL DEFAULT 0,resolved_game_minute INTEGER,created_at REAL NOT NULL,updated_at REAL NOT NULL);
 CREATE UNIQUE INDEX idx_conditions_active_key ON character_conditions(user_id,condition_key) WHERE state='active';
-CREATE TABLE currency_wallets(user_id INTEGER NOT NULL,currency_id TEXT NOT NULL,balance INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user_id,currency_id));
+CREATE TABLE currency_wallets(user_id INTEGER NOT NULL,currency_id TEXT NOT NULL,balance INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user_id,currency_id),FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE);
 CREATE TABLE world_crossings(location_key TEXT PRIMARY KEY,name TEXT NOT NULL DEFAULT '',from_world TEXT NOT NULL,to_world TEXT NOT NULL,destination_location TEXT NOT NULL,min_realm_index INTEGER NOT NULL DEFAULT 0,opened_realm_index INTEGER NOT NULL DEFAULT 0,cost INTEGER NOT NULL DEFAULT 0,opened_by_user_id INTEGER,opened_game_minute INTEGER NOT NULL DEFAULT 0,player_uses INTEGER NOT NULL DEFAULT 0,npc_uses INTEGER NOT NULL DEFAULT 0,created_at REAL NOT NULL DEFAULT 0,FOREIGN KEY(opened_by_user_id) REFERENCES characters(user_id) ON DELETE SET NULL);
 CREATE TABLE tribulation_state(user_id INTEGER NOT NULL,gate_realm_index INTEGER NOT NULL,preparation INTEGER NOT NULL DEFAULT 0,attempts INTEGER NOT NULL DEFAULT 0,cleared INTEGER NOT NULL DEFAULT 0,last_result TEXT NOT NULL DEFAULT '',updated_game_minute INTEGER NOT NULL DEFAULT 0,updated_at REAL NOT NULL,PRIMARY KEY(user_id,gate_realm_index));
 CREATE TABLE tribulation_attempts(attempt_id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,gate_realm_index INTEGER NOT NULL,preparation_used INTEGER NOT NULL DEFAULT 0,waves_json TEXT NOT NULL DEFAULT '[]',success INTEGER NOT NULL DEFAULT 0,created_game_minute INTEGER NOT NULL DEFAULT 0,created_at REAL NOT NULL);
@@ -189,7 +187,17 @@ INSERT INTO character_physiques(user_id) VALUES(43);
 INSERT INTO soul_legacy(user_id,memory_seed,awakened_memory,law_echo,special_trait) VALUES(42,10,0,50,'Dao Memory');
 INSERT INTO character_fate(user_id,points,lifetime_earned,lifetime_spent,updated_at) VALUES(42,1,1,0,0);
 `
-	if err := conn.ExecScript(schema); err != nil {
+
+func setupBatch4AuthorityDB(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "batch4_authority.sqlite3")
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	if err := conn.ExecScript(batch4AuthoritySchema); err != nil {
 		t.Fatal(err)
 	}
 	return path
@@ -398,6 +406,8 @@ func TestBatch4LawComprehendPersistsLawDaoCooldownAndReceipt(t *testing.T) {
 func TestBatch4ConditionTreatConsumesMedicineAndResolvesCondition(t *testing.T) {
 	path := setupBatch4AuthorityDB(t)
 	world := batch4WorldPath(t)
+	// condition.treat keeps an active battle's hp in step (v1.34.0), so it reads the table.
+	withBattles(t, path)
 	batch4Exec(t, path, "INSERT INTO inventory(user_id,item_id,quantity) VALUES(42,'recovery_pill',1)")
 	batch4Exec(t, path, "INSERT INTO character_conditions(user_id,condition_key,category,name,severity,state,source_type,source_id,effect_json,created_game_minute,updated_game_minute,created_at,updated_at) VALUES(42,'flesh_wound','Injury','Flesh Wound',2,'active','test','seed','{}',0,0,0,0)")
 	batch4Exec(t, path, "INSERT INTO active_effects(user_id,effect_key,name,source_type,source_id,effect_json,stacks,starts_game_minute,ends_game_minute,created_at) VALUES(42,'condition:flesh_wound','Flesh Wound','condition','flesh_wound','{}',1,0,NULL,0)")

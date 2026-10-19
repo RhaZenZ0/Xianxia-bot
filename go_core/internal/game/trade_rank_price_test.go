@@ -93,12 +93,16 @@ func TestNoRankTurnsAShopIntoAMint(t *testing.T) {
 	catalog := shopCatalog(t)
 	checked := 0
 	for key, shop := range catalog.Shops {
-		for itemID, base := range shop.Buys {
-			if itemTrade(catalog, itemID) == "" {
+		for itemID := range shop.Buys {
+			base, pays := keeperBuyBase(catalog, shop, itemID)
+			if itemTrade(catalog, itemID) == "" || !pays {
 				continue
 			}
-			paid := tradeRankSellPrice(catalog, itemID, shop.Currency, max64(1, base), saintRank)
-			if shelf, ok := cheapestShelfPrice(catalog, itemID, shop.Currency); ok && paid >= shelf {
+			paid := tradeRankSellPrice(catalog, itemID, shop.Currency, base, saintRank)
+			// A shelf of 1 is a shelf in another world's coin read down a rung and
+			// rounded down (cheapestShelfPrice): one whole coin is the least a keeper
+			// can pay and it is not above the shelf it came from.
+			if shelf, ok := cheapestShelfPrice(catalog, itemID, shop.Currency); ok && paid >= shelf && shelf >= 2 {
 				t.Fatalf("%s pays a Saint %d for %s, and it sells for %d on a shelf: buying and reselling prints money", key, paid, itemID, shelf)
 			}
 			checked++

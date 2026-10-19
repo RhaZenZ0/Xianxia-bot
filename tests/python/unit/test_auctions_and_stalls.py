@@ -46,6 +46,7 @@ import asyncio
 import importlib
 import json
 import os
+import re
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -81,6 +82,50 @@ class ALotIsListedInTheHousesCoin(unittest.TestCase):
         self.assertGreater(len(houses), 40)
         missing = [h["name"] for h in houses if not str(h.get("default_currency") or "").strip()]
         self.assertEqual(missing, [], "a house with no default_currency would list in nothing")
+
+    def test_the_shortest_lot_the_picker_offers_is_the_shortest_the_engine_takes(self):
+        # A bound the client states and the engine does not is not a bound
+        # (rc.48): the engine refuses a lot shorter than auctionMinLotMinutes
+        # (v1.34.0), and the duration picker's floor is the same number.
+        tree = ast.parse(bot_function_source("auction_sell"))
+        fn = next(n for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef) and n.name == "auction_sell")
+        arg = next((a for a in fn.args.args if a.arg == "duration_minutes"), None)
+        self.assertIsNotNone(arg, "the duration parameter could not be read; the reader is broken, not the tree")
+        bounds = [e.value for e in ast.walk(arg.annotation) if isinstance(e, ast.Constant) and isinstance(e.value, int)]
+        self.assertGreaterEqual(len(bounds), 2, "the Range of duration_minutes could not be read")
+        go = (ROOT / "go_core" / "internal" / "game" / "economy_actions.go").read_text(encoding="utf-8")
+        found = re.search(r"auctionMinLotMinutes\s*=\s*(\d+)", go)
+        self.assertIsNotNone(found, "the engine's minimum lot could not be read; the reader is broken, not the tree")
+        self.assertEqual(bounds[0], int(found.group(1)),
+                         f"/auction sell offers lots from {bounds[0]} minutes and the engine takes lots from {found.group(1)}")
+
+    def test_the_currency_picker_offers_only_the_houses_coin(self):
+        # The engine lists a lot in the money of the house's own world and
+        # refuses any other (v1.34.0); the picker may not offer the other fifteen.
+        with patch.dict(os.environ, ENV):
+            pickers = importlib.import_module("app.bot.pickers")
+        wired = bot_function_source("auction_sell")
+        self.assertIn("currency=auction_house_currency_autocomplete", wired.split("async def auction_sell")[0])
+        world = pickers.WORLD
+        offered = {}
+        for house_id, house in sorted(world.auction_houses.items()):
+            async def character(_uid, location=house["location"]):
+                return {"location": location}
+
+            interaction = type("I", (), {"user": type("U", (), {"id": 1})()})()
+            with patch.object(pickers.DB, "get_character", character):
+                choices = asyncio.run(pickers.auction_house_currency_autocomplete(interaction, ""))
+            offered[house_id] = [c.value for c in choices]
+        self.assertGreater(len(offered), 40)
+        wrong = {h: v for h, v in offered.items() if v != [str(world.auction_houses[h]["default_currency"])]}
+        self.assertEqual(wrong, {}, "a floor's picker offers something other than its own coin")
+        nowhere = type("I", (), {"user": type("U", (), {"id": 1})()})()
+
+        async def street(_uid):
+            return {"location": "Greenriver Town"}
+
+        with patch.object(pickers.DB, "get_character", street):
+            self.assertEqual(asyncio.run(pickers.auction_house_currency_autocomplete(nowhere, "")), [])
 
 
 # --- from test_a_public_lot_card_does_not_name_an_unread_lot.py ---

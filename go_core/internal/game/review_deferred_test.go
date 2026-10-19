@@ -52,17 +52,20 @@ func TestAQiGatheringArrayIsQiPathWeatherAtBothDoors(t *testing.T) {
 	}
 }
 
-// Both of a player's turns defend against the counter-attack with one TN.
+// Every turn a player spends is answered by the counter-attack with one TN,
+// rolled in opponentCounterTx and nowhere else (v1.34.0: the attack, the
+// technique and the pill used to carry a copy each).
 func TestBothTurnsDefendWithOneCounterTN(t *testing.T) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, "combat_actions.go", nil, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	sites := map[string]int{}
+	answered := map[string]int{}
+	rolled := map[string]int{}
 	for _, decl := range file.Decls {
 		fn, ok := decl.(*ast.FuncDecl)
-		if !ok || (fn.Name.Name != "combatTurnAction" && fn.Name.Name != "combatTechniqueAction") {
+		if !ok {
 			continue
 		}
 		ast.Inspect(fn, func(n ast.Node) bool {
@@ -70,19 +73,32 @@ func TestBothTurnsDefendWithOneCounterTN(t *testing.T) {
 			if !ok {
 				return true
 			}
-			if id, ok := call.Fun.(*ast.Ident); ok && id.Name == "roll2d10" && len(call.Args) == 2 {
+			id, ok := call.Fun.(*ast.Ident)
+			if !ok {
+				return true
+			}
+			if id.Name == "opponentCounterTx" {
+				answered[fn.Name.Name]++
+			}
+			if id.Name == "roll2d10" && len(call.Args) == 2 {
 				if inner, ok := call.Args[1].(*ast.CallExpr); ok {
 					if fid, ok := inner.Fun.(*ast.Ident); ok && fid.Name == "counterDefenceTN" && len(inner.Args) == 6 {
-						sites[fn.Name.Name]++
+						rolled[fn.Name.Name]++
 					}
 				}
 			}
 			return true
 		})
 	}
-	for _, name := range []string{"combatTurnAction", "combatTechniqueAction"} {
-		if sites[name] == 0 {
-			t.Fatalf("%s rolls its counter-attack against a TN of its own rather than counterDefenceTN", name)
+	if rolled["opponentCounterTx"] != 1 {
+		t.Fatalf("opponentCounterTx rolls its counter-attack against counterDefenceTN %d times, not once", rolled["opponentCounterTx"])
+	}
+	for _, name := range []string{"combatTurnAction", "combatTechniqueAction", "combatRecoveryItemAction"} {
+		if answered[name] == 0 {
+			t.Fatalf("%s is answered by no counter-attack: a turn spent that the opponent does not answer is a free one", name)
+		}
+		if rolled[name] != 0 {
+			t.Fatalf("%s rolls a counter-attack of its own rather than opponentCounterTx", name)
 		}
 	}
 }

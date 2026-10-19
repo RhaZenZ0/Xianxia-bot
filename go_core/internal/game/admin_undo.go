@@ -9,14 +9,21 @@ import (
 	"time"
 
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 // sqlStmt is one statement in a reversal - most reversible admin actions need
-// exactly one, admin.player.grant_currency needs two (currency_wallets, and
-// characters.spirit_stones when the currency is low_spirit_stone).
+// exactly one.
+//
+// A reversal that has to go through one of the engine's doors rather than a
+// statement - the teleport's, which is a journey and so converts the purse
+// (moveCharacterTx), and the currency grant's, whose sheet mirror follows the
+// world the character stands in now - sets run instead. run is handed the
+// catalogue, which a reverseFunc is not, and answers the rows it changed.
 type sqlStmt struct {
 	sql  string
 	args []any
+	run  func(conn *storage.Conn, catalog worlddata.Catalog) (int64, error)
 }
 
 // reverseFunc computes the SQL needed to move an already-applied admin action
@@ -95,7 +102,7 @@ var reversibleAdminActions = map[string]reverseFunc{
 			return nil, err
 		}
 		snap := pickSnapshot(before, after, redo)
-		return []sqlStmt{{`UPDATE characters SET karma_score=? WHERE user_id=?`, []any{i64(snap["karma"]), uid}}}, nil
+		return []sqlStmt{{`UPDATE characters SET karma_score=? WHERE user_id=?`, []any{i64(snap["karma"]), uid}, nil}}, nil
 	},
 	"admin.player.set_realm": func(before, after map[string]any, target string, redo bool) ([]sqlStmt, error) {
 		uid, err := parseTargetUserID(target)
@@ -103,41 +110,16 @@ var reversibleAdminActions = map[string]reverseFunc{
 			return nil, err
 		}
 		snap := pickSnapshot(before, after, redo)
-		stmts := []sqlStmt{{`UPDATE characters SET realm_index=?,phase=? WHERE user_id=?`, []any{i64(snap["realm_index"]), i64(snap["phase"]), uid}}}
+		stmts := []sqlStmt{{`UPDATE characters SET realm_index=?,phase=? WHERE user_id=?`, []any{i64(snap["realm_index"]), i64(snap["phase"]), uid}, nil}}
 		// The body ladder rides the snapshot only when the lever set it
 		// (v1.0.0-rc.37); an older row restores the qi pair alone.
 		if _, ok := snap["body_realm_index"]; ok {
-			stmts = append(stmts, sqlStmt{`UPDATE characters SET body_realm_index=?,body_phase=? WHERE user_id=?`, []any{i64(snap["body_realm_index"]), i64(snap["body_phase"]), uid}})
+			stmts = append(stmts, sqlStmt{`UPDATE characters SET body_realm_index=?,body_phase=? WHERE user_id=?`, []any{i64(snap["body_realm_index"]), i64(snap["body_phase"]), uid}, nil})
 		}
 		return stmts, nil
 	},
-	"admin.player.teleport": func(before, after map[string]any, target string, redo bool) ([]sqlStmt, error) {
-		uid, err := parseTargetUserID(target)
-		if err != nil {
-			return nil, err
-		}
-		snap := pickSnapshot(before, after, redo)
-		return []sqlStmt{{`UPDATE characters SET location=? WHERE user_id=?`, []any{fmt.Sprint(snap["location"]), uid}}}, nil
-	},
-	"admin.player.grant_currency": func(before, after map[string]any, target string, redo bool) ([]sqlStmt, error) {
-		uid, err := parseTargetUserID(target)
-		if err != nil {
-			return nil, err
-		}
-		currency := fmt.Sprint(after["currency"])
-		amount := i64(after["amount"])
-		snap := pickSnapshot(before, after, redo)
-		targetBalance := i64(snap["balance"])
-		walletDelta := -amount
-		if redo {
-			walletDelta = amount
-		}
-		stmts := []sqlStmt{{`UPDATE currency_wallets SET balance=? WHERE user_id=? AND currency_id=?`, []any{targetBalance, uid, currency}}}
-		if currency == "low_spirit_stone" {
-			stmts = append(stmts, sqlStmt{`UPDATE characters SET spirit_stones=MAX(0,spirit_stones+?) WHERE user_id=?`, []any{walletDelta, uid}})
-		}
-		return stmts, nil
-	},
+	"admin.player.teleport":       reverseTeleport,
+	"admin.player.grant_currency": reverseGrantCurrency,
 	// The reversal reads the audit row for what the lever wrote and restores that
 	// and nothing else; admin_undo_rows.go.
 	"admin.player.set_realm_perfection": reverseSetRealmPerfection,
@@ -148,7 +130,7 @@ var reversibleAdminActions = map[string]reverseFunc{
 		}
 		snap := pickSnapshot(before, after, redo)
 		if snap["grade"] == nil {
-			return []sqlStmt{{`DELETE FROM character_spiritual_roots WHERE user_id=?`, []any{uid}}}, nil
+			return []sqlStmt{{`DELETE FROM character_spiritual_roots WHERE user_id=?`, []any{uid}, nil}}, nil
 		}
 		mutation := fmt.Sprint(snap["mutation"])
 		if mutation == "<nil>" {
@@ -159,9 +141,9 @@ var reversibleAdminActions = map[string]reverseFunc{
 		if redo {
 			return []sqlStmt{{`INSERT INTO character_spiritual_roots(user_id,grade,purity,mutation,updated_at) VALUES(?,?,?,?,?)
 				ON CONFLICT(user_id) DO UPDATE SET grade=excluded.grade,purity=excluded.purity,mutation=excluded.mutation,updated_at=excluded.updated_at`,
-				[]any{uid, fmt.Sprint(snap["grade"]), i64(snap["purity"]), mutation, float64(time.Now().UnixNano()) / 1e9}}}, nil
+				[]any{uid, fmt.Sprint(snap["grade"]), i64(snap["purity"]), mutation, float64(time.Now().UnixNano()) / 1e9}, nil}}, nil
 		}
-		return []sqlStmt{{`UPDATE character_spiritual_roots SET grade=?,purity=?,mutation=? WHERE user_id=?`, []any{fmt.Sprint(snap["grade"]), i64(snap["purity"]), mutation, uid}}}, nil
+		return []sqlStmt{{`UPDATE character_spiritual_roots SET grade=?,purity=?,mutation=? WHERE user_id=?`, []any{fmt.Sprint(snap["grade"]), i64(snap["purity"]), mutation, uid}, nil}}, nil
 	},
 	"admin.player.set_bloodline": func(before, after map[string]any, target string, redo bool) ([]sqlStmt, error) {
 		uid, err := parseTargetUserID(target)
@@ -174,7 +156,7 @@ var reversibleAdminActions = map[string]reverseFunc{
 		}
 		snap := pickSnapshot(before, after, redo)
 		return []sqlStmt{{`UPDATE character_bloodlines SET purity=?,evolution_stage=?,progress=? WHERE user_id=? AND bloodline_id=?`,
-			[]any{i64(snap["purity"]), i64(snap["evolution_stage"]), i64(snap["progress"]), uid, bloodlineID}}}, nil
+			[]any{i64(snap["purity"]), i64(snap["evolution_stage"]), i64(snap["progress"]), uid, bloodlineID}, nil}}, nil
 	},
 	"admin.player.set_physique": func(before, after map[string]any, target string, redo bool) ([]sqlStmt, error) {
 		uid, err := parseTargetUserID(target)
@@ -196,10 +178,10 @@ var reversibleAdminActions = map[string]reverseFunc{
 		_, wroteIdentity := after["physique_id"]
 		if id := strings.TrimSpace(fmt.Sprint(snap["physique_id"])); wroteIdentity && id != "" && id != "<nil>" {
 			return []sqlStmt{{`UPDATE character_physiques SET physique_id=?,name=?,evolution_stage=?,progress=?,stability=? WHERE user_id=?`,
-				[]any{id, fmt.Sprint(snap["name"]), i64(snap["evolution_stage"]), i64(snap["progress"]), i64(snap["stability"]), uid}}}, nil
+				[]any{id, fmt.Sprint(snap["name"]), i64(snap["evolution_stage"]), i64(snap["progress"]), i64(snap["stability"]), uid}, nil}}, nil
 		}
 		return []sqlStmt{{`UPDATE character_physiques SET evolution_stage=?,progress=?,stability=? WHERE user_id=?`,
-			[]any{i64(snap["evolution_stage"]), i64(snap["progress"]), i64(snap["stability"]), uid}}}, nil
+			[]any{i64(snap["evolution_stage"]), i64(snap["progress"]), i64(snap["stability"]), uid}, nil}}, nil
 	},
 	"admin.player.set_tribulation": func(before, after map[string]any, target string, redo bool) ([]sqlStmt, error) {
 		uid, err := parseTargetUserID(target)
@@ -231,22 +213,9 @@ var reversibleAdminActions = map[string]reverseFunc{
 			return nil, errors.New("this action cannot be safely undone")
 		}
 		args = append(args, uid, gateRealmIndex)
-		return []sqlStmt{{`UPDATE tribulation_state SET ` + strings.Join(sets, ",") + ` WHERE user_id=? AND gate_realm_index=?`, args}}, nil
+		return []sqlStmt{{`UPDATE tribulation_state SET ` + strings.Join(sets, ",") + ` WHERE user_id=? AND gate_realm_index=?`, args, nil}}, nil
 	},
-	"admin.player.adjust_item": func(before, after map[string]any, target string, redo bool) ([]sqlStmt, error) {
-		uid, err := parseTargetUserID(target)
-		if err != nil {
-			return nil, err
-		}
-		snap := pickSnapshot(before, after, redo)
-		itemID := fmt.Sprint(snap["item_id"])
-		quantity := i64(snap["quantity"])
-		if quantity <= 0 {
-			return []sqlStmt{{`DELETE FROM inventory WHERE user_id=? AND item_id=?`, []any{uid, itemID}}}, nil
-		}
-		return []sqlStmt{{`INSERT INTO inventory(user_id,item_id,quantity) VALUES(?,?,?) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=excluded.quantity`,
-			[]any{uid, itemID, quantity}}}, nil
-	},
+	"admin.player.adjust_item": reverseAdjustItem,
 	"admin.player.force_end_scene": func(before, after map[string]any, target string, redo bool) ([]sqlStmt, error) {
 		uid, err := parseTargetUserID(target)
 		if err != nil {
@@ -254,7 +223,7 @@ var reversibleAdminActions = map[string]reverseFunc{
 		}
 		snap := pickSnapshot(before, after, redo)
 		return []sqlStmt{{`UPDATE player_scene_state SET scene_type=?,scene_label=? WHERE user_id=?`,
-			[]any{fmt.Sprint(snap["scene_type"]), fmt.Sprint(snap["scene_label"]), uid}}}, nil
+			[]any{fmt.Sprint(snap["scene_type"]), fmt.Sprint(snap["scene_label"]), uid}, nil}}, nil
 	},
 	"admin.npc.relocate": func(before, after map[string]any, target string, redo bool) ([]sqlStmt, error) {
 		name, err := parseNPCTarget(target)
@@ -262,7 +231,7 @@ var reversibleAdminActions = map[string]reverseFunc{
 			return nil, err
 		}
 		snap := pickSnapshot(before, after, redo)
-		return []sqlStmt{{`UPDATE npc_civilization_state SET current_location=? WHERE npc_name=?`, []any{fmt.Sprint(snap["location"]), name}}}, nil
+		return []sqlStmt{{`UPDATE npc_civilization_state SET current_location=? WHERE npc_name=?`, []any{fmt.Sprint(snap["location"]), name}, nil}}, nil
 	},
 	// A disappearance the GM staged, or a return (v1.0.0-rc.38): the row
 	// goes back to the status and minute the snapshot holds. The history
@@ -274,7 +243,7 @@ var reversibleAdminActions = map[string]reverseFunc{
 		}
 		snap := pickSnapshot(before, after, redo)
 		return []sqlStmt{{`UPDATE npc_civilization_state SET status=?,missing_since_game_minute=? WHERE npc_name=?`,
-			[]any{fmt.Sprint(snap["status"]), storage.ParseInt(snap["missing_since_game_minute"]), name}}}, nil
+			[]any{fmt.Sprint(snap["status"]), storage.ParseInt(snap["missing_since_game_minute"]), name}, nil}}, nil
 	},
 	// Only the single-condition_id variant of admin.player.clear_condition is
 	// reversible - the clear_all variant shares this same action name but
@@ -297,10 +266,10 @@ var reversibleAdminActions = map[string]reverseFunc{
 		state := fmt.Sprint(snap["state"])
 		if state == "active" {
 			return []sqlStmt{{`UPDATE character_conditions SET state='active',severity=?,resolved_game_minute=NULL WHERE condition_id=?`,
-				[]any{i64(snap["severity"]), conditionID}}}, nil
+				[]any{i64(snap["severity"]), conditionID}, nil}}, nil
 		}
 		return []sqlStmt{{`UPDATE character_conditions SET state=?,severity=? WHERE condition_id=?`,
-			[]any{state, i64(snap["severity"]), conditionID}}}, nil
+			[]any{state, i64(snap["severity"]), conditionID}, nil}}, nil
 	},
 	"admin.player.set_moderation": func(before, after map[string]any, target string, redo bool) ([]sqlStmt, error) {
 		uid, err := parseTargetUserID(target)
@@ -315,8 +284,17 @@ var reversibleAdminActions = map[string]reverseFunc{
 		// v0.32.0 added the expiry pair and the ban flag to the snapshot; an
 		// older row without them reads as 0, which is what it stored.
 		return []sqlStmt{{`UPDATE characters SET is_muted=?,muted_until=?,is_frozen=?,frozen_until=?,is_banned=?,moderation_reason=? WHERE user_id=?`,
-			[]any{i64(snap["is_muted"]), toFloat(snap["muted_until"]), i64(snap["is_frozen"]), toFloat(snap["frozen_until"]), i64(snap["is_banned"]), reason, uid}}}, nil
+			[]any{i64(snap["is_muted"]), toFloat(snap["muted_until"]), i64(snap["is_frozen"]), toFloat(snap["frozen_until"]), i64(snap["is_banned"]), reason, uid}, nil}}, nil
 	},
+}
+
+// legacyLocationRestore is the reversal of a teleport audit row written before
+// the row carried a scene snapshot: the location alone, with no journey. The
+// money was converted by the forward move and is not converted back, which is
+// what such a row was always undone as; a row written now goes home through
+// moveCharacterTx (reverseTeleport) and never reaches this.
+func legacyLocationRestore(uid int64, location string) sqlStmt {
+	return sqlStmt{sql: `UPDATE characters SET location=? WHERE user_id=?`, args: []any{location, uid}}
 }
 
 func decodeSnapshot(raw any) map[string]any {
@@ -352,7 +330,7 @@ func decodeSnapshot(raw any) map[string]any {
 // admin.audit.undo_last row re-fetches the action it undid and re-invokes
 // that action's own reversal function against its after_json instead of its
 // before_json, landing back on the state the original action produced.
-func adminUndoLastAction(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
+func adminUndoLastAction(conn *storage.Conn, catalog worlddata.Catalog, adminUserID int64, raw json.RawMessage) (any, error) {
 	p, err := decodeMap(raw)
 	if err != nil {
 		return nil, err
@@ -429,6 +407,14 @@ func adminUndoLastAction(conn *storage.Conn, adminUserID int64, raw json.RawMess
 
 	rowsAffected := int64(0)
 	for _, stmt := range stmts {
+		if stmt.run != nil {
+			n, err := stmt.run(conn, catalog)
+			if err != nil {
+				return nil, err
+			}
+			rowsAffected += n
+			continue
+		}
 		r, err := conn.Execute(stmt.sql, stmt.args)
 		if err != nil {
 			return nil, err

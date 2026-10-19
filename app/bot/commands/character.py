@@ -48,6 +48,7 @@ from ..runtime import (
     respond,
     serialized_user_action,
 )
+from ..auction_feed import player_lot_cards, settle_player_lot_cards
 from ..stall_feed import card_record as stall_card_record, take_down_card
 from ..threads import delete_player_threads
 from ..ui.commissions import AbandonCommissionView, abandon_warning
@@ -580,7 +581,10 @@ async def inventory(interaction: discord.Interaction) -> None:
 
 @registered_root_command(name="inheritances", description="View the ancient inheritances your character has obtained", guild=GUILD)
 async def inheritances(interaction: discord.Interaction) -> None:
-    c = await require_character(interaction)
+    # Inheritances belong to the soul, and the curriculum draws this leaf for
+    # the dead (`_THE_DEAD_ALSO_NEED`, v1.34.0): a door drawn for them that
+    # then refuses them is a surface offering what its door refuses.
+    c = await require_character(interaction, allow_deceased=True)
     if not c:
         return
     owned = await DB.get_inheritances(interaction.user.id)
@@ -1094,6 +1098,10 @@ async def reset(interaction: discord.Interaction) -> None:
     # And their stall's card in the world's market channel (v1.7.0), by the
     # same ordering: the sweep takes the row that names the message.
     stall_card = await stall_card_record(interaction.guild, interaction.user.id)
+    # And the cards of the lots they sold or led on the auction floor (v1.34.0):
+    # the engine closes the first and clears the second's high bid, and the
+    # cards that still name them come down or are brought up to date after.
+    lot_cards = await player_lot_cards(interaction.guild, interaction.user.id)
     try:
         envelope = await ENGINE.authoritative_action(
             "character.reset",
@@ -1108,6 +1116,7 @@ async def reset(interaction: discord.Interaction) -> None:
     # The engine committed, so the rooms go with the life.
     threads = await delete_player_threads(interaction.guild, doomed_threads)
     await take_down_card(interaction.guild, stall_card)
+    await settle_player_lot_cards(interaction.guild, lot_cards)
     remaining = int(result.get("resets_remaining", 0))
     lines = [
         f"🌱 **{result.get('name') or c['name']} is gone.** The household's record of them closes, "

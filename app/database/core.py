@@ -27,7 +27,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 80
+SCHEMA_VERSION = 81
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -3336,6 +3336,20 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                   AND json_type(terms_json,'$.objectives[0].target') IS NULL""",
         ),
     ),
+    (
+        81,
+        "qi_max_bonus_outlives_the_settle",
+        (
+            # v1.34.0: the qi a cultivator earns for good - a perfected realm's
+            # tenth, an inheritance's, a GM's cap - was written onto `qi_max`
+            # alone, and the engine rebuilds the pool from the body on every
+            # settle, so it lasted until the next read of the pool and was then
+            # gone. The bonus has a column now and the settle adds it. It starts
+            # at 0 for everyone: what a settle already took cannot be told from
+            # the body's own figure, so it is not recovered.
+            "ALTER TABLE characters ADD COLUMN qi_max_bonus INTEGER NOT NULL DEFAULT 0",
+        ),
+    ),
 )
 
 
@@ -6161,6 +6175,48 @@ class Database:
             )
             return [dict(row) for row in await cur.fetchall()]
 
+    # The two key shapes the tick itself mints (Go: `auto:%s:%d:%d` in
+    # simulation/world.go, `secret_realm_rotation:%s:%d` in
+    # game/secret_realm_rotation.go). A player's or a GM's event gets its scene
+    # from the command that made it, so only these two are the sweep's business;
+    # `test_world_event_sweep.py` reads both Go files to hold the prefixes.
+    ENGINE_EVENT_KEY_PREFIXES = ("auto:", "secret_realm_rotation:")
+
+    async def get_active_events_without_a_scene(self, *, started_before: float) -> list[dict[str, Any]]:
+        """Active tick-spawned world events that have no event thread (v1.34.0).
+
+        The tick commits an event and the bot opens its scene afterwards, from
+        the run it was handed. When that hand-over was lost (the tick answered
+        an error, the bot restarted between the two) the event sat active with
+        nothing to walk into until it expired; the worker sweeps these each
+        cycle. `started_before` leaves a row alone while its own spawn may still
+        be in flight.
+        """
+        now = time.time()
+        keyed = " OR ".join("substr(w.event_key,1,?)=?" for _ in self.ENGINE_EVENT_KEY_PREFIXES)
+        params: list[Any] = [now, float(started_before)]
+        for prefix in self.ENGINE_EVENT_KEY_PREFIXES:
+            params.extend((len(prefix), prefix))
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                f"""SELECT w.* FROM world_events w
+                     WHERE w.active=1 AND w.ends_at>? AND w.starts_at<=? AND w.thread_id IS NULL
+                       AND ({keyed})
+                       AND NOT EXISTS (SELECT 1 FROM event_threads t WHERE t.event_key=w.event_key)
+                     ORDER BY w.starts_at""",
+                tuple(params),
+            )
+            rows = []
+            for row in await cur.fetchall():
+                d = dict(row)
+                try:
+                    d["payload"] = json.loads(d.pop("payload_json") or "{}")
+                except (TypeError, ValueError):
+                    d["payload"] = {}
+                rows.append(d)
+            return rows
+
     async def get_live_exploration_events(self) -> list[dict[str, Any]]:
         """Every player still standing in an unresolved exploration encounter.
 
@@ -7167,11 +7223,17 @@ class Database:
     async def get_sect_npc_roster(self, sect_name: str) -> list[dict[str, Any]]:
         """The sect's own people (v1.25.0): every living NPC of the sect, by
         rank and then realm. No place is read - where somebody stands is the
-        whereabouts rule's to say, not a roster's."""
+        whereabouts rule's to say, not a roster's.
+
+        `disciples` is how many cultivators the person already keeps
+        (v1.34.0), counted the way `discipleship.npc_request` counts them
+        (`npc_mentorships` rows naming them), so a picker can leave out a master
+        the engine would refuse for being full."""
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             cur = await db.execute(
-                """SELECT c.npc_name AS name,c.realm_index,c.phase,l.sect_rank
+                """SELECT c.npc_name AS name,c.realm_index,c.phase,l.sect_rank,
+                          (SELECT COUNT(*) FROM npc_mentorships m WHERE m.master_npc_name=c.npc_name) AS disciples
                    FROM npc_civilization_state c JOIN npc_life_state l ON l.npc_name=c.npc_name
                    WHERE c.faction=? AND c.status='alive'
                    ORDER BY CASE l.sect_rank WHEN 'Ancestor' THEN 0 WHEN 'Sect Master' THEN 1 WHEN 'Grand Elder' THEN 2
@@ -8383,6 +8445,7 @@ class Database:
             # under the hammer, or take the illegal ones to the night market.
             "npc_consignments": True,
             "merchants": True,
+            "secret_realms": True,
             # v0.31.0: the GM scene flag - model narration for explore and
             # hunt by default, instead of the procedural pool plus a button.
             "ai_routine_narration": False,

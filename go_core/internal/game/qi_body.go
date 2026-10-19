@@ -188,6 +188,78 @@ func qiCapacityFor(realms []worlddata.Realm, index, phase, spirit int64, body qi
 	return maxI64(1, int64(math.Round(base)))
 }
 
+// qiMaxBonusColumn is whether `characters` carries the permanent bonus yet
+// (schema 81). In the compose stack the engine is healthy before db-init
+// migrates, so every read and write of it is guarded and degrades to "no
+// bonus" rather than refusing a cultivator over a column a later schema owns.
+func qiMaxBonusColumn(conn *storage.Conn) (bool, error) {
+	return tableHasColumns(conn, "characters", "qi_max_bonus")
+}
+
+// qiMaxBonusOf is the permanent qi a cultivator has earned on top of what the
+// body holds (a perfected realm, an inheritance, a GM's cap). The pool is
+// recomputed from the body on every settle, so a bonus written only onto
+// `qi_max` lasted until the next read of the pool and was then gone.
+func qiMaxBonusOf(conn *storage.Conn, userID int64) (int64, error) {
+	ok, err := qiMaxBonusColumn(conn)
+	if err != nil || !ok {
+		return 0, err
+	}
+	res, err := conn.Execute(`SELECT qi_max_bonus FROM characters WHERE user_id=?`, []any{userID})
+	if err != nil {
+		return 0, err
+	}
+	if row := firstRowMap(res); row != nil {
+		return i64(row["qi_max_bonus"]), nil
+	}
+	return 0, nil
+}
+
+// addQiMaxBonusTx is the one door a permanent qi_max reward goes through: it
+// raises `qi_max_bonus`, which settleQi adds to the capacity. The caller still
+// writes `qi_max` itself so the figure is right before the next settle. Where
+// the column does not exist yet it does nothing, as before schema 81.
+func addQiMaxBonusTx(conn *storage.Conn, userID, delta int64) error {
+	if delta == 0 {
+		return nil
+	}
+	ok, err := qiMaxBonusColumn(conn)
+	if err != nil || !ok {
+		return err
+	}
+	_, err = conn.Execute(`UPDATE characters SET qi_max_bonus=qi_max_bonus+? WHERE user_id=?`, []any{delta, userID})
+	return err
+}
+
+// raiseQiMaxTx runs a statement that raises `characters.qi_max` for good and
+// records the rise as the permanent bonus, so the next settle keeps it. The
+// rise is read off the column before and after, which keeps the percentage a
+// reward is worth in the statement that already says it.
+func raiseQiMaxTx(conn *storage.Conn, userID int64, statement string, args []any) error {
+	read := func() (int64, error) {
+		res, err := conn.Execute(`SELECT qi_max FROM characters WHERE user_id=?`, []any{userID})
+		if err != nil {
+			return 0, err
+		}
+		if row := firstRowMap(res); row != nil {
+			return i64(row["qi_max"]), nil
+		}
+		return 0, nil
+	}
+	before, err := read()
+	if err != nil {
+		return err
+	}
+	if _, err = conn.Execute(statement, args); err != nil {
+		return err
+	}
+	after, err := read()
+	if err != nil {
+		return err
+	}
+	return addQiMaxBonusTx(conn, userID, after-before)
+}
+
 // qiRegenPerGameMinute is what the pool recovers while the world turns.
 func qiRegenPerGameMinute(capacity int64, body qiBody, manualGrade string) float64 {
 	rate := float64(capacity) / qiRefillGameMinutes
@@ -285,6 +357,12 @@ func settleQi(conn *storage.Conn, catalog worlddata.Catalog, userID int64, gameM
 	body = normaliseQiType(catalog, body, fmt.Sprint(row["path"]))
 	capacity := qiCapacityFor(catalog.Realms, realm, phase, i64(attributes["spirit"]), body, manualGrade)
 	capacity = maxI64(1, int64(math.Round(float64(capacity)*ghostFormCapacityMultiplier(catalog, body))))
+	// What the cultivator earned for good is flat, on top of what the body holds.
+	bonus, err := qiMaxBonusOf(conn, userID)
+	if err != nil {
+		return qiState{}, err
+	}
+	capacity = maxI64(1, capacity+bonus)
 	regen := qiRegenPerGameMinute(capacity, body, manualGrade)
 
 	qi := i64(row["qi"])

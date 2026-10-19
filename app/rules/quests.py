@@ -440,7 +440,7 @@ OBJECTIVE_PATHS: dict[str, str] = {
     "gather": "**/forage**",
     "breakthrough": "**/breakthrough**",
     "flame_capture": "**/craft → Flames → Capture**",
-    "raid_win": "**/combat → Boss Raids → Start**",
+    "raid_win": "**/combat → Boss Raids → Claim**",
     "black_market": "**/economy → Black Market → Buy**",
     "perfection_start": "**/ascend → Perfection → Start**",
     "realm_enter": "**/realm → Secret Realms → Enter**",
@@ -484,6 +484,11 @@ HOUSEHOLD_STANDING_REWARD_KEY = "household_standing"
 HOUSEHOLD_STANDING_REWARD_MAX = 25
 MAX_OBJECTIVES = 4
 MAX_OBJECTIVE_COUNT = 5
+# A label is the line a card prints for an objective. The realm road's carry the
+# command to press in bold ("**/craft → General Crafting → Craft**") and the
+# longest runs to 113; a cap below that cut the closing ** off the saved copy of
+# a quest a GM merely opened and saved. A gate holds every shipped label under it.
+MAX_OBJECTIVE_LABEL = 200
 
 
 def quest_key_for(title: str, existing: set[str] | None = None, *, prefix: str = "forge") -> str:
@@ -692,7 +697,7 @@ def validate_quest_definition(draft: dict[str, Any], world: Any, budget: dict[st
         if objective_id in seen_ids:
             objective_id = f"{objective_id}_{index + 1}"
         seen_ids.add(objective_id)
-        label = str(raw.get("label") or "").strip()[:90]
+        label = str(raw.get("label") or "").strip()[:MAX_OBJECTIVE_LABEL]
         if not label:
             printed = target_label or target
             label = spec["label"].format(target=printed.title() if spec["target"] == "scene_action" else printed) if target else spec["untargeted"]

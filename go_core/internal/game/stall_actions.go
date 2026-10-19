@@ -194,23 +194,35 @@ func stallCityAt(catalog worlddata.Catalog, location string) (string, bool) {
 // shelves, never above. That opens no loop, because no shelf and no merchant
 // sells the grade: the only way to have one to sell is to make it.
 func NPCStallCeiling(catalog worlddata.Catalog, itemID, currency string) (int64, bool) {
-	shelf, ok := cheapestShelfPrice(catalog, itemID, currency)
-	if !ok {
-		base := itemBaseID(itemID)
-		if base == itemID {
-			return 0, false
-		}
-		_, rung, known := itemDef(catalog, itemID)
-		lowShelf, shelved := cheapestShelfPrice(catalog, base, currency)
-		if !known || !shelved {
-			return 0, false
-		}
-		shelf, ok = lowShelf*max64(1, rung.PriceMult), true
-	}
-	if shelf <= 1 {
+	shelf, ok := shelfReference(catalog, itemID, currency)
+	if !ok || shelf <= 1 {
 		return 0, false
 	}
 	return shelf - 1, true
+}
+
+// shelfReference is the price every ceiling on an item is measured against:
+// its cheapest shelf anywhere in the world, in one coin (cheapestShelfPrice),
+// or for a grade no shelf carries the Low item's shelf at the grade's worth.
+// It can be 0 - the cheapest shelf asks less than a coin of this one - and
+// the caller decides what no whole-coin price under it means. The stall's
+// ceiling and the caravan's payout both read it, so the two cannot price a
+// finer grade differently.
+func shelfReference(catalog worlddata.Catalog, itemID, currency string) (int64, bool) {
+	shelf, ok := cheapestShelfPrice(catalog, itemID, currency)
+	if ok {
+		return shelf, true
+	}
+	base := itemBaseID(itemID)
+	if base == itemID {
+		return 0, false
+	}
+	_, rung, known := itemDef(catalog, itemID)
+	lowShelf, shelved := cheapestShelfPrice(catalog, base, currency)
+	if !known || !shelved {
+		return 0, false
+	}
+	return lowShelf * max64(1, rung.PriceMult), true
 }
 
 func stallByOwnerTx(conn *storage.Conn, userID int64) (map[string]any, error) {

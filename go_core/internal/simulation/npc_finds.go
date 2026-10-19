@@ -124,7 +124,7 @@ func (r *Runner) npcConsignments(conn *storage.Conn, steps, gm int64) (string, e
 		return "", err
 	}
 	consigned, smuggled := int64(0), int64(0)
-	for _, row := range res.Rows {
+	for _, row := range rosterTurn(res.Rows, gm) {
 		if consigned+smuggled >= findCap {
 			break
 		}

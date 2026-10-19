@@ -26,6 +26,7 @@ import unittest
 from tests.support import PROJECT_ROOT, code_only
 
 TODO_FILE = PROJECT_ROOT / "docs" / "TODO.md"
+TODO_FIXED_FILE = PROJECT_ROOT / "docs" / "history" / "TODO_FIXED.md"
 VERSION = (PROJECT_ROOT / "VERSION").read_text(encoding="utf-8").strip()
 CHECKLIST = PROJECT_ROOT / "docs" / "playtest" / f"v{VERSION}.md"
 ENGINE_SCRIPT = (PROJECT_ROOT / "scripts" / "playtest_engine.py").read_text(encoding="utf-8")
@@ -34,15 +35,25 @@ DISCORD_SCRIPT = (PROJECT_ROOT / "scripts" / "playtest_discord.py").read_text(en
 
 class ThePunchListIsHonest(unittest.TestCase):
     def test_it_exists_and_every_entry_is_fixed_or_deferred_with_a_reason(self):
-        self.assertTrue(TODO_FILE.exists())
-        text = TODO_FILE.read_text(encoding="utf-8")
-        entries = re.findall(r"^- \*\*(fixed|deferred)(?: \(([^)]+)\))?\*\* — ", text, re.M)
-        self.assertGreaterEqual(len(entries), 5)
-        bullets = [line for line in text.splitlines() if line.startswith("- ")]
-        self.assertEqual(len(bullets), len(entries), "every bullet starts with **fixed** or **deferred**")
-        for status, reason in entries:
-            with self.subTest(status=status, reason=reason):
-                self.assertTrue(reason, "a status carries its release or its reason in parentheses")
+        # Two files since v1.34.0: the open half carries only **deferred**
+        # entries and the history only **fixed** ones, so a closed item is moved
+        # and an open one cannot hide among a hundred closed ones.
+        for path, status_wanted in ((TODO_FILE, "deferred"), (TODO_FIXED_FILE, "fixed")):
+            with self.subTest(file=path.name):
+                self.assertTrue(path.exists())
+                text = path.read_text(encoding="utf-8")
+                entries = re.findall(r"^- \*\*(fixed|deferred)(?: \(([^)]+)\))?\*\* — ", text, re.M)
+                self.assertGreaterEqual(len(entries), 5)
+                bullets = [line for line in text.splitlines() if line.startswith("- ")]
+                self.assertEqual(len(bullets), len(entries), "every bullet starts with **fixed** or **deferred**")
+                for status, reason in entries:
+                    with self.subTest(status=status, reason=reason):
+                        self.assertEqual(status, status_wanted,
+                                         f"a {status} entry sits in {path.name}; a fixed entry moves to the history")
+                        if status == "fixed":
+                            self.assertRegex(reason or "", r"^v\d", "a fixed entry names its release")
+                        else:
+                            self.assertTrue(reason, "a deferred entry names its reason")
 
     def test_the_two_engine_findings_are_pinned_by_go_tests(self):
         game = PROJECT_ROOT / "go_core" / "internal" / "game"

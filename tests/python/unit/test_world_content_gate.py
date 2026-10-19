@@ -1363,3 +1363,48 @@ class SpecialEffectContentTests(unittest.TestCase):
         self.assertLessEqual(set(low), set(high), "the capstone drops something the domain below it grants")
         for stat, value in low.items():
             self.assertGreater(high[stat], value, f"the capstone grants {stat} no more than space_domain does")
+
+
+# "Major Sect Recruitment" is the title of a kind of sect (`sect_system`), not a
+# name of one; any other deliberate fictional sect a description wants to mention
+# goes here with its reason. Empty of those today.
+UNDECLARED_SECTS_ALLOWED = {"Major Sect"}
+SECT_NAME = re.compile(r"\b((?:[A-Z][\w'\-]*\s+){1,4}Sect)\b")
+
+
+class EverySectNamedInProseExistsTests(unittest.TestCase):
+    """A description that names a sect names one the file declares.
+
+    The Greenriver Town description, an elder's role and an NPC's secret all
+    named an "Azure Reed Sect" - the narrator reads those, so it sent players
+    looking for a sect that was never in `sects`. The real one is the Azure
+    Cloud Sect. Nothing held prose to the roster, so a one-word slip lived in
+    three places until a read-through found it.
+    """
+
+    @staticmethod
+    def named_sects(node, found=None):
+        found = {} if found is None else found
+        if isinstance(node, dict):
+            for value in node.values():
+                EverySectNamedInProseExistsTests.named_sects(value, found)
+        elif isinstance(node, list):
+            for value in node:
+                EverySectNamedInProseExistsTests.named_sects(value, found)
+        elif isinstance(node, str):
+            for match in SECT_NAME.finditer(node):
+                name = re.sub(r"^(?:The|A|An|This|That|Every|Each)\s+", "", match.group(1))
+                found.setdefault(name, node[:80])
+        return found
+
+    def test_every_sect_the_prose_names_is_declared(self):
+        named = self.named_sects(WORLD)
+        # Asserted before it is trusted: a reader that finds no sect at all makes
+        # the check below true of anything.
+        self.assertIn("Jade Meridian Sect", named, "the reader found no sect in the prose; the gate is broken, not the tree")
+        self.assertGreaterEqual(len(set(named) & set(WORLD["sects"])), 4)
+        undeclared = {name: where for name, where in named.items()
+                      if name not in WORLD["sects"] and name not in UNDECLARED_SECTS_ALLOWED}
+        self.assertEqual(undeclared, {}, (
+            "content names a sect `sects` does not declare (a mistyped name sends the narrator, and a player, "
+            "to a sect that does not exist): " + "; ".join(f"{n!r} in {w!r}" for n, w in undeclared.items())))

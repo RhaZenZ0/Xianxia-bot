@@ -2321,7 +2321,7 @@
   },
   "locations": {
     "Greenriver Town": {
-      "description": "A mortal town beneath the Azure Reed Sect, surrounded by rice terraces, spirit-herb gardens and the misty Jade River.",
+      "description": "A mortal town beneath the Azure Cloud Sect, surrounded by rice terraces, spirit-herb gardens and the misty Jade River.",
       "encounters": [
         "A wounded spirit fox watches from beneath a broken shrine.",
         "A merchant argues that his spirit-stone crate was replaced with river rocks.",
@@ -2420,7 +2420,6 @@
       "min_realm_index": 0,
       "safe_zone": true,
       "realm_hub": true,
-      "meeting_channel_slug": "mortal-world-capital",
       "encounters": [
         "A steward from a local cultivation family asks for help with a succession dispute spilling into the streets.",
         "The inner-city market is trading tribute goods, but a sudden shortage has pushed smaller shops into a bidding dispute.",
@@ -2461,7 +2460,6 @@
       "min_realm_index": 8,
       "safe_zone": true,
       "realm_hub": true,
-      "meeting_channel_slug": "spiritual-world-capital",
       "encounters": [
         "Ascended cultivators gather around a jade plaza where sect representatives recruit proven juniors.",
         "An ancient family convoy arrives beneath a canopy of spirit banners and protective formations.",
@@ -2495,7 +2493,6 @@
       "min_realm_index": 16,
       "safe_zone": true,
       "realm_hub": true,
-      "meeting_channel_slug": "immortal-world-court",
       "encounters": [
         "Immortal clan delegates debate a territorial petition beneath floating law tablets.",
         "A cloud-market convoy docks at the court and unloads rare immortal-grade materials.",
@@ -2529,7 +2526,6 @@
       "min_realm_index": 24,
       "safe_zone": true,
       "realm_hub": true,
-      "meeting_channel_slug": "celestial-world-palace",
       "encounters": [
         "Celestial envoys arrive through a sovereign gate carrying decrees from distant star regions.",
         "A heavenly market opens beneath a rotating constellation array for only a few hours.",
@@ -12273,7 +12269,7 @@
   },
   "npcs": {
     "Elder Su Yan": {
-      "role": "Azure Reed Sect elder and mentor",
+      "role": "Azure Cloud Sect elder and mentor",
       "realm": "Foundation Establishment",
       "personality": "Dry, observant, restrained, values difficult questions over blind obedience.",
       "speech": "Calm and precise, rarely more words than necessary.",
@@ -12480,7 +12476,7 @@
         "Night": "Azure Crown Imperial City"
       },
       "personality": "Patient, watchful, a listener who lets others overreach before he speaks; warm in private, immovable in court.",
-      "secret": "He has secretly funded the Azure Reed Sect's guard on a damaged world-meridian seal for twenty years, and has never told the court why the treasury is short."
+      "secret": "He has secretly funded the Azure Cloud Sect's guard on a damaged world-meridian seal for twenty years, and has never told the court why the treasury is short."
     },
     "Jade Sovereign Lian Xue": {
       "role": "Public ruler of the Spiritual World",
@@ -12581,7 +12577,6 @@
       },
       "sect_affiliation": "Blood River Sect",
       "can_recommend": true,
-      "recommendation_tn": 13,
       "recommendation_bonus": 3
     },
     "Lantern Keeper Mo": {
@@ -12605,7 +12600,6 @@
       },
       "sect_affiliation": "Corpse Lantern Pavilion",
       "can_recommend": true,
-      "recommendation_tn": 14,
       "recommendation_bonus": 3
     },
     "Inquisitor Shen Rui": {
@@ -12629,7 +12623,6 @@
       },
       "sect_affiliation": "Azure Cloud Sect",
       "can_recommend": true,
-      "recommendation_tn": 14,
       "recommendation_bonus": 2
     },
     "Mei Yeguang": {
@@ -12666,7 +12659,6 @@
       "public_family": "A collateral Huo branch supplies herbs to Crimson Furnace Sect.",
       "sect_affiliation": "Crimson Furnace Sect",
       "can_recommend": true,
-      "recommendation_tn": 13,
       "recommendation_bonus": 2,
       "schedule": {
         "Dawn": "Greenriver Town",
@@ -12690,7 +12682,6 @@
       "public_family": "A minor Bai scholar household sent her to the palace as a child.",
       "sect_affiliation": "Frozen Moon Palace",
       "can_recommend": true,
-      "recommendation_tn": 14,
       "recommendation_bonus": 2,
       "schedule": {
         "Dawn": "Frozen Moon Terrace",
@@ -12714,7 +12705,6 @@
       "public_family": "A cadet She branch keeps serpent pens for the main clan.",
       "sect_affiliation": "Black Serpent Clan",
       "can_recommend": true,
-      "recommendation_tn": 13,
       "recommendation_bonus": 2,
       "schedule": {
         "Dawn": "Black Serpent Ravine",
@@ -23635,8 +23625,7 @@
       "use": {
         "instant": {
           "vitality_restore": 8
-        },
-        "consume": true
+        }
       },
       "base_price": 18
     },
@@ -23648,7 +23637,6 @@
         "effect_key": "qi_nourishment",
         "name": "Qi Nourishment",
         "duration_game_minutes": 240,
-        "consume": true,
         "effect": {
           "description": "Medicinal qi makes cultivation more efficient for a short period.",
           "modifiers": [
@@ -23717,7 +23705,6 @@
         "effect_key": "heart_calm",
         "name": "Heart-Calming State",
         "duration_game_minutes": 360,
-        "consume": true,
         "effect": {
           "description": "The mind becomes tranquil and resistant to disturbance.",
           "modifiers": [
@@ -23752,8 +23739,7 @@
       "use": {
         "instant": {
           "qi_restore": 12
-        },
-        "consume": true
+        }
       },
       "base_price": 21
     },
@@ -23765,7 +23751,6 @@
         "effect_key": "phoenix_purge",
         "name": "Purging Phoenix Flame",
         "duration_game_minutes": 120,
-        "consume": true,
         "effect": {
           "description": "Medicinal flame burns through toxins; without cooling support it may scorch meridians.",
           "modifiers": [
@@ -23934,8 +23919,7 @@
       "description": "A refined life-extension pill that replenishes fading vitality and permanently adds ten years to natural lifespan.",
       "sect_value": 120,
       "use": {
-        "lifespan_years": 10,
-        "consume": true
+        "lifespan_years": 10
       },
       "base_price": 469
     },
@@ -23944,8 +23928,7 @@
       "description": "A rare life-aspected herb. Consuming it directly permanently adds five years to natural lifespan.",
       "sect_value": 90,
       "use": {
-        "lifespan_years": 5,
-        "consume": true
+        "lifespan_years": 5
       },
       "auction_interest": "special",
       "door_event_chance": 30,
@@ -23957,8 +23940,7 @@
       "description": "A legendary spirit fruit rich in life essence. A complete fruit permanently extends lifespan by fifty years.",
       "sect_value": 1500,
       "use": {
-        "lifespan_years": 50,
-        "consume": true
+        "lifespan_years": 50
       },
       "auction_interest": "legendary",
       "door_event_chance": 65,
@@ -24060,7 +24042,6 @@
         "effect_key": "swift_wind_talisman",
         "name": "Swift-Wind Talisman",
         "duration_game_minutes": 180,
-        "consume": true,
         "effect": {
           "description": "Inscribed wind qi accelerates movement.",
           "modifiers": [
@@ -24087,7 +24068,6 @@
         "effect_key": "stone_skin_talisman",
         "name": "Stone-Skin Talisman",
         "duration_game_minutes": 180,
-        "consume": true,
         "effect": {
           "description": "Earth-aspected inscription reinforces the body.",
           "modifiers": [
@@ -24119,7 +24099,6 @@
         "effect_key": "spirit_focus_talisman",
         "name": "Spirit-Focus Talisman",
         "duration_game_minutes": 180,
-        "consume": true,
         "effect": {
           "description": "The inscription steadies spiritual perception and comprehension.",
           "modifiers": [
@@ -25667,8 +25646,7 @@
       "use": {
         "instant": {
           "vitality_restore": 20
-        },
-        "consume": true
+        }
       },
       "base_price": 61
     },
@@ -25680,7 +25658,6 @@
         "effect_key": "spirit_condensation_pill",
         "name": "Spirit Condensation Pill",
         "duration_game_minutes": 240,
-        "consume": true,
         "effect": {
           "description": "Condenses ambient qi around the meridians; cultivation runs faster while it lasts.",
           "modifiers": [
@@ -25707,7 +25684,6 @@
         "effect_key": "crystal_ward_talisman",
         "name": "Crystal-Ward Talisman",
         "duration_game_minutes": 180,
-        "consume": true,
         "effect": {
           "description": "A talisman drawn in crystal ink; the body hardens against blows while the ink glows.",
           "modifiers": [
@@ -25760,8 +25736,7 @@
       "use": {
         "instant": {
           "vitality_restore": 45
-        },
-        "consume": true
+        }
       },
       "base_price": 150
     },
@@ -25773,7 +25748,6 @@
         "effect_key": "immortal_marrow_pill",
         "name": "Immortal Marrow Pill",
         "duration_game_minutes": 300,
-        "consume": true,
         "effect": {
           "description": "Refines the marrow so it holds more qi; cultivation runs half again as fast while it lasts.",
           "modifiers": [
@@ -25800,7 +25774,6 @@
         "effect_key": "golden_edge_talisman",
         "name": "Golden-Edge Talisman",
         "duration_game_minutes": 180,
-        "consume": true,
         "effect": {
           "description": "A talisman of gold ink; the spirit sharpens to a blade's edge while it burns.",
           "modifiers": [
@@ -25853,8 +25826,7 @@
       "use": {
         "instant": {
           "vitality_restore": 90
-        },
-        "consume": true
+        }
       },
       "base_price": 374
     },
@@ -25866,7 +25838,6 @@
         "effect_key": "starlight_dao_pill",
         "name": "Starlight Dao Pill",
         "duration_game_minutes": 360,
-        "consume": true,
         "effect": {
           "description": "A pill that holds a night sky; cultivation runs nearly twice as fast under it.",
           "modifiers": [
@@ -25893,7 +25864,6 @@
         "effect_key": "starfall_talisman",
         "name": "Starfall Talisman",
         "duration_game_minutes": 180,
-        "consume": true,
         "effect": {
           "description": "A talisman of starlight ink; the feet find the sky's road while it holds.",
           "modifiers": [
@@ -26455,8 +26425,7 @@
       "sect_value": 6,
       "base_price": 30,
       "use": {
-        "homeward": true,
-        "consume": true
+        "homeward": true
       }
     },
     "waymark_talisman": {
@@ -26465,8 +26434,7 @@
       "sect_value": 6,
       "base_price": 30,
       "use": {
-        "waymark": true,
-        "consume": true
+        "waymark": true
       }
     },
     "hearth_return_talisman_method": {
@@ -27394,8 +27362,7 @@
       "market_excluded": true,
       "use": {
         "vitality_max_percent": 10,
-        "vitality_max_min": 2,
-        "consume": true
+        "vitality_max_min": 2
       }
     },
     "marrow_tempering_pill_method": {
@@ -27415,7 +27382,6 @@
         "effect_key": "cloud_sword_intent_talisman",
         "name": "Cloud-Sword Intent Talisman",
         "duration_game_minutes": 240,
-        "consume": true,
         "effect": {
           "description": "A strip of cloud-white paper folded around a sliver of the sect's practice sword. Burned, it lends the sword intent the Azure Cloud teaches its own.",
           "modifiers": [
@@ -27447,7 +27413,6 @@
         "effect_key": "furnace_heart_pill",
         "name": "Furnace-Heart Pill",
         "duration_game_minutes": 240,
-        "consume": true,
         "effect": {
           "description": "A pill still warm from the sect's great furnace. The hands steady over a cauldron and the flesh remembers that fire is a tool.",
           "modifiers": [
@@ -27479,7 +27444,6 @@
         "effect_key": "frost_moon_array_chalk",
         "name": "Frost-Moon Array Chalk",
         "duration_game_minutes": 240,
-        "consume": true,
         "effect": {
           "description": "Chalk ground from moon-frost stone. Lines drawn with it stay cold and exact, and the mind that draws them stays cold with them.",
           "modifiers": [
@@ -27511,7 +27475,6 @@
         "effect_key": "serpent_coil_antidote",
         "name": "Serpent-Coil Antidote",
         "duration_game_minutes": 240,
-        "consume": true,
         "effect": {
           "description": "The clan's own counter-venom, taken before a purge. It teaches the blood to throw off poison and the body to slip a grip.",
           "modifiers": [
@@ -27543,7 +27506,6 @@
         "effect_key": "blood_river_essence",
         "name": "Blood-River Essence",
         "duration_game_minutes": 240,
-        "consume": true,
         "effect": {
           "description": "A vial of refined battlefield blood. Drunk, it drives the body's cultivation and quickens it for violence.",
           "modifiers": [
@@ -27575,7 +27537,6 @@
         "effect_key": "soul_lantern_wick",
         "name": "Soul-Lantern Wick",
         "duration_game_minutes": 240,
-        "consume": true,
         "effect": {
           "description": "A wick cut from a pavilion soul-lantern. Its pale flame shows the spirit what is hidden and keeps the heart's demons at arm's length.",
           "modifiers": [
@@ -27607,7 +27568,6 @@
         "effect_key": "meridian_jade_pill",
         "name": "Meridian-Jade Pill",
         "duration_game_minutes": 240,
-        "consume": true,
         "effect": {
           "description": "A translucent green pill that settles along the meridians and holds them open while the qi runs.",
           "modifiers": [
@@ -27639,7 +27599,6 @@
         "effect_key": "beastblood_hunting_musk",
         "name": "Beastblood Hunting Musk",
         "duration_game_minutes": 240,
-        "consume": true,
         "effect": {
           "description": "A musk the valley's hunters rub into their collars. Beasts misjudge the wearer, and the wearer does not misjudge beasts.",
           "modifiers": [
@@ -27671,7 +27630,6 @@
         "effect_key": "heavenblade_whetstone",
         "name": "Heavenblade Whetstone",
         "duration_game_minutes": 240,
-        "consume": true,
         "effect": {
           "description": "A whetstone worn smooth by a thousand immortal-gold blades. Worked across an edge, it lends the smith's hands the sect's own discipline.",
           "modifiers": [
@@ -27703,7 +27661,6 @@
         "effect_key": "ashen_lotus_incense",
         "name": "Ashen Lotus Incense",
         "duration_game_minutes": 240,
-        "consume": true,
         "effect": {
           "description": "Incense rolled from lotus ash. Its smoke quiets the heart until the demons in it have nothing to hold on to.",
           "modifiers": [
@@ -27735,7 +27692,6 @@
         "effect_key": "mandate_scroll",
         "name": "Mandate Scroll",
         "duration_game_minutes": 240,
-        "consume": true,
         "effect": {
           "description": "A scroll of the Academy's commentaries on the mandate of heaven. Read before meditation, it makes every insight go further.",
           "modifiers": [
@@ -27767,7 +27723,6 @@
         "effect_key": "void_serpent_scale",
         "name": "Void-Serpent Scale",
         "duration_game_minutes": 240,
-        "consume": true,
         "effect": {
           "description": "A black scale shed by one of the cult's void serpents. Held under the tongue, it hardens the body and loosens its place in space.",
           "modifiers": [
@@ -27857,7 +27812,6 @@
         "effect_key": "bone_tempering",
         "name": "Bone Tempering",
         "duration_game_minutes": 240,
-        "consume": true,
         "effect": {
           "description": "Medicinal heat soaks into the bones; body tempering runs faster for a short period.",
           "modifiers": [
@@ -27883,7 +27837,6 @@
         "effect_key": "iron_blood_pill",
         "name": "Iron-Blood Pill",
         "duration_game_minutes": 240,
-        "consume": true,
         "effect": {
           "description": "The blood runs hot and heavy; body tempering runs faster while it lasts.",
           "modifiers": [
@@ -27978,7 +27931,6 @@
         "effect_key": "gilded_heart_ward_talisman",
         "name": "Gilded Heart-Ward Talisman",
         "duration_game_minutes": 180,
-        "consume": true,
         "effect": {
           "description": "A talisman of gold ink over dawnlotus paste; the heart keeps its own counsel while it burns, and no demon gets a word in.",
           "modifiers": [
@@ -28016,7 +27968,6 @@
         "effect_key": "heaven_stepping_talisman",
         "name": "Heaven-Stepping Talisman",
         "duration_game_minutes": 180,
-        "consume": true,
         "effect": {
           "description": "Starsteel dust in heavenpetal ink; the feet find a road where there is none, and nothing closes it behind them.",
           "modifiers": [
@@ -35190,13 +35141,11 @@
   "world_rules": {
     "forbidden_arts": {
       "orthodox_public_use": {
-        "karma_multiplier": 1,
         "regional_unrest": 2,
         "family_stability_loss": 2,
         "sect_cohesion_loss": 2
       },
       "demonic_public_use": {
-        "karma_multiplier": 1,
         "regional_unrest": 1,
         "family_stability_loss": 1,
         "sect_cohesion_loss": 0
@@ -50831,838 +50780,718 @@
     "Steward Qiao": {
       "location": "Golden Pavilion Auction House",
       "title": "Pavilion Steward",
-      "board": "the Pavilion's discreet commission board",
-      "tier_ceiling": 3
+      "board": "the Pavilion's discreet commission board"
     },
     "Magistrate Xu Wenbo": {
       "location": "Greenriver Town",
       "title": "Magistrate of Greenriver",
-      "board": "the Greenriver district register",
-      "tier_ceiling": 2
+      "board": "the Greenriver district register"
     },
     "Madam Pei Suyin": {
       "location": "Greenriver Town",
       "title": "Black Tide Broker",
-      "board": "Black Tide's standing requests",
-      "tier_ceiling": 3
+      "board": "Black Tide's standing requests"
     },
     "Old Beggar Chen": {
       "location": "Greenriver Town",
       "title": "The old beggar at the gate",
       "board": "whatever he happens to want done",
-      "tier_ceiling": 1,
       "terms": "undisclosed"
     },
     "Old Gou": {
       "location": "Greenriver Town",
       "title": "Self-proclaimed hidden expert",
       "board": "the great works only he is qualified to delegate",
-      "tier_ceiling": 1,
       "terms": "undisclosed"
     },
     "Gate Elder Jian Mu": {
       "location": "Azure Cloud Mountain Gate",
       "title": "Gate Elder",
       "board": "the Azure Cloud duty roster",
-      "tier_ceiling": 2,
       "sect": "Azure Cloud Sect"
     },
     "Furnace Examiner Huo Ren": {
       "location": "Crimson Furnace Valley",
       "title": "Furnace Examiner",
       "board": "the Furnace work-list",
-      "tier_ceiling": 2,
       "sect": "Crimson Furnace Sect"
     },
     "Moon Warden Lin Yue": {
       "location": "Frozen Moon Terrace",
       "title": "Moon Warden",
       "board": "the Terrace watch-book",
-      "tier_ceiling": 2,
       "sect": "Frozen Moon Palace"
     },
     "Handler She Ruo": {
       "location": "Black Serpent Ravine",
       "title": "Serpent Handler",
       "board": "the Clan's standing tasks",
-      "tier_ceiling": 2,
       "sect": "Black Serpent Clan"
     },
     "Blood Gatekeeper Yan Luo": {
       "location": "Blood River Gorge",
       "title": "Blood Gatekeeper",
       "board": "the Gorge's debts",
-      "tier_ceiling": 2,
       "sect": "Blood River Sect"
     },
     "Lantern Registrar Wu Ming": {
       "location": "Corpse Lantern Necropolis",
       "title": "Lantern Registrar",
       "board": "the Pavilion register",
-      "tier_ceiling": 2,
       "sect": "Corpse Lantern Pavilion"
     },
     "Gate Captain Ma Rong": {
       "location": "Adamant Body Immortal City East Gate",
       "title": "Adamant Body Immortal City captain of the gate guard",
       "board": "the notice board at the Adamant Body Immortal City East Gate",
-      "tier_ceiling": 3,
       "city_board": "Adamant Body Immortal City"
     },
     "Assayer Zhao Zhen": {
       "location": "Adamant Body Ore Terraces",
       "title": "Adamant Body Immortal City assayer of the day's ore",
       "board": "Assayer Zhao Zhen's standing request",
-      "tier_ceiling": 3,
       "city_board": "Adamant Body Immortal City"
     },
     "Gate Captain Zhou Guo": {
       "location": "Ashenwall City North Gate",
       "title": "Ashenwall City captain of the gate guard",
       "board": "the notice board at the Ashenwall City North Gate",
-      "tier_ceiling": 1,
       "city_board": "Ashenwall City"
     },
     "Old Sentry Fan Ze": {
       "location": "Ashenwall Ruin Quarter",
       "title": "Ashenwall City sentry of the broken wall",
       "board": "Old Sentry Fan Ze's standing request",
-      "tier_ceiling": 1,
       "city_board": "Ashenwall City"
     },
     "Gate Captain Qian En": {
       "location": "Azure Crown Imperial City North Gate",
       "title": "Azure Crown Imperial City captain of the gate guard",
       "board": "the notice board at the Azure Crown Imperial City North Gate",
-      "tier_ceiling": 1,
       "city_board": "Azure Crown Imperial City"
     },
     "Steward Du Wu": {
       "location": "Azure Crown North District",
       "title": "Azure Crown Imperial City steward of a great clan's townhouse",
       "board": "the quest pavilion of Azure Crown Imperial City",
-      "tier_ceiling": 1,
       "city_board": "Azure Crown Imperial City"
     },
     "Abbot Kuang Lian": {
       "location": "Azure Crown East District",
       "title": "Azure Crown Imperial City abbot of the temple courtyards",
       "board": "the quest pavilion of Azure Crown Imperial City",
-      "tier_ceiling": 1,
       "city_board": "Azure Crown Imperial City"
     },
     "Beggar King Pan Hong": {
       "location": "Azure Crown South District",
       "title": "Azure Crown Imperial City the beggars' king of the lower town",
       "board": "the quest pavilion of Azure Crown Imperial City",
-      "tier_ceiling": 1,
       "city_board": "Azure Crown Imperial City"
     },
     "Gate Captain Tu Ai": {
       "location": "Broken Halo Spirit City North Gate",
       "title": "Broken Halo Spirit City captain of the gate guard",
       "board": "the notice board at the Broken Halo Spirit City North Gate",
-      "tier_ceiling": 2,
       "city_board": "Broken Halo Spirit City"
     },
     "Old Sentry Yu Qi": {
       "location": "Broken Halo Ruin Quarter",
       "title": "Broken Halo Spirit City sentry of the broken wall",
       "board": "Old Sentry Yu Qi's standing request",
-      "tier_ceiling": 2,
       "city_board": "Broken Halo Spirit City"
     },
     "Gate Captain Zhan Xi": {
       "location": "Celestial Mandate Palace North Gate",
       "title": "Celestial Mandate Palace captain of the gate guard",
       "board": "the notice board at the Celestial Mandate Palace North Gate",
-      "tier_ceiling": 3,
       "city_board": "Celestial Mandate Palace"
     },
     "Steward Chai Ning": {
       "location": "Celestial Mandate North District",
       "title": "Celestial Mandate Palace steward of a great clan's townhouse",
       "board": "the quest pavilion of Celestial Mandate Palace",
-      "tier_ceiling": 3,
       "city_board": "Celestial Mandate Palace"
     },
     "Abbot Fu Cheng": {
       "location": "Celestial Mandate East District",
       "title": "Celestial Mandate Palace abbot of the temple courtyards",
       "board": "the quest pavilion of Celestial Mandate Palace",
-      "tier_ceiling": 3,
       "city_board": "Celestial Mandate Palace"
     },
     "Beggar King Jiang Wan": {
       "location": "Celestial Mandate South District",
       "title": "Celestial Mandate Palace the beggars' king of the lower town",
       "board": "the quest pavilion of Celestial Mandate Palace",
-      "tier_ceiling": 3,
       "city_board": "Celestial Mandate Palace"
     },
     "Gate Captain Ouyang Mu": {
       "location": "Celestial River City East Gate",
       "title": "Celestial River City captain of the gate guard",
       "board": "the notice board at the Celestial River City East Gate",
-      "tier_ceiling": 3,
       "city_board": "Celestial River City"
     },
     "Barge Master Teng Zhi": {
       "location": "Celestial River River Landings",
       "title": "Celestial River City master of a river barge",
       "board": "Barge Master Teng Zhi's standing request",
-      "tier_ceiling": 3,
       "city_board": "Celestial River City"
     },
     "Gate Captain Xin Xin": {
       "location": "Cloudblade City North Gate",
       "title": "Cloudblade City captain of the gate guard",
       "board": "the notice board at the Cloudblade City North Gate",
-      "tier_ceiling": 1,
       "city_board": "Cloudblade City"
     },
     "Drillmaster Zhai Kang": {
       "location": "Cloudblade Blade Yards",
       "title": "Cloudblade City drillmaster of the blade yards",
       "board": "Drillmaster Zhai Kang's standing request",
-      "tier_ceiling": 1,
       "city_board": "Cloudblade City"
     },
     "Gate Captain Cen Xue": {
       "location": "Cloudedge Spirit City East Gate",
       "title": "Cloudedge Spirit City captain of the gate guard",
       "board": "the notice board at the Cloudedge Spirit City East Gate",
-      "tier_ceiling": 2,
       "city_board": "Cloudedge Spirit City"
     },
     "Drillmaster Ge Han": {
       "location": "Cloudedge Blade Yards",
       "title": "Cloudedge Spirit City drillmaster of the blade yards",
       "board": "Drillmaster Ge Han's standing request",
-      "tier_ceiling": 2,
       "city_board": "Cloudedge Spirit City"
     },
     "Gate Captain Jing Su": {
       "location": "Divine Herb Celestial City East Gate",
       "title": "Divine Herb Celestial City captain of the gate guard",
       "board": "the notice board at the Divine Herb Celestial City East Gate",
-      "tier_ceiling": 3,
       "city_board": "Divine Herb Celestial City"
     },
     "Gardener Lian Hua": {
       "location": "Divine Herb Herb Gardens",
       "title": "Divine Herb Celestial City head gardener of the herb terraces",
       "board": "Gardener Lian Hua's standing request",
-      "tier_ceiling": 3,
       "city_board": "Divine Herb Celestial City"
     },
     "Gate Captain Pu Yun": {
       "location": "Emberforge City North Gate",
       "title": "Emberforge City captain of the gate guard",
       "board": "the notice board at the Emberforge City North Gate",
-      "tier_ceiling": 1,
       "city_board": "Emberforge City"
     },
     "Foreman Rui Ling": {
       "location": "Emberforge Forge Terraces",
       "title": "Emberforge City foreman of the forge terraces",
       "board": "Foreman Rui Ling's standing request",
-      "tier_ceiling": 1,
       "city_board": "Emberforge City"
     },
     "Gate Captain Tai Yan": {
       "location": "Fallen Star Immortal City East Gate",
       "title": "Fallen Star Immortal City captain of the gate guard",
       "board": "the notice board at the Fallen Star Immortal City East Gate",
-      "tier_ceiling": 3,
       "city_board": "Fallen Star Immortal City"
     },
     "Old Sentry Yi Ou": {
       "location": "Fallen Star Ruin Quarter",
       "title": "Fallen Star Immortal City sentry of the broken wall",
       "board": "Old Sentry Yi Ou's standing request",
-      "tier_ceiling": 3,
       "city_board": "Fallen Star Immortal City"
     },
     "Gate Captain Zhuge Ting": {
       "location": "Firmament Blade City East Gate",
       "title": "Firmament Blade City captain of the gate guard",
       "board": "the notice board at the Firmament Blade City East Gate",
-      "tier_ceiling": 3,
       "city_board": "Firmament Blade City"
     },
     "Drillmaster Bu Kun": {
       "location": "Firmament Blade Blade Yards",
       "title": "Firmament Blade City drillmaster of the blade yards",
       "board": "Drillmaster Bu Kun's standing request",
-      "tier_ceiling": 3,
       "city_board": "Firmament Blade City"
     },
     "Gate Captain Ding Zhen": {
       "location": "Four-Roads Caravan City East Gate",
       "title": "Four-Roads Caravan City captain of the gate guard",
       "board": "the notice board at the Four-Roads Caravan City East Gate",
-      "tier_ceiling": 1,
       "city_board": "Four-Roads Caravan City"
     },
     "Caravan Master Gui Mo": {
       "location": "Four-Roads Caravan Yards",
       "title": "Four-Roads Caravan City master of a caravan in the yards",
       "board": "Caravan Master Gui Mo's standing request",
-      "tier_ceiling": 1,
       "city_board": "Four-Roads Caravan City"
     },
     "Gate Captain Ju Ze": {
       "location": "Froststar Border City North Gate",
       "title": "Froststar Border City captain of the gate guard",
       "board": "the notice board at the Froststar Border City North Gate",
-      "tier_ceiling": 3,
       "city_board": "Froststar Border City"
     },
     "Fire Keeper Ma Qi": {
       "location": "Froststar Frost Market",
       "title": "Froststar Border City keeper of the market's braziers",
       "board": "Fire Keeper Ma Qi's standing request",
-      "tier_ceiling": 3,
       "city_board": "Froststar Border City"
     },
     "Gate Captain Hu Xi": {
       "location": "Frostwatch City North Gate",
       "title": "Frostwatch City captain of the gate guard",
       "board": "the notice board at the Frostwatch City North Gate",
-      "tier_ceiling": 1,
       "city_board": "Frostwatch City"
     },
     "Fire Keeper Zhou Wei": {
       "location": "Frostwatch Frost Market",
       "title": "Frostwatch City keeper of the market's braziers",
       "board": "Fire Keeper Zhou Wei's standing request",
-      "tier_ceiling": 1,
       "city_board": "Frostwatch City"
     },
     "Gate Captain Xie Cheng": {
       "location": "Galevein Spirit City North Gate",
       "title": "Galevein Spirit City captain of the gate guard",
       "board": "the notice board at the Galevein Spirit City North Gate",
-      "tier_ceiling": 2,
       "city_board": "Galevein Spirit City"
     },
     "Caravan Master Fan Pei": {
       "location": "Galevein Caravan Yards",
       "title": "Galevein Spirit City master of a caravan in the yards",
       "board": "Caravan Master Fan Pei's standing request",
-      "tier_ceiling": 2,
       "city_board": "Galevein Spirit City"
     },
     "Gate Captain Shi Bei": {
       "location": "Golden Spear Immortal City East Gate",
       "title": "Golden Spear Immortal City captain of the gate guard",
       "board": "the notice board at the Golden Spear Immortal City East Gate",
-      "tier_ceiling": 3,
       "city_board": "Golden Spear Immortal City"
     },
     "Quartermaster He Ru": {
       "location": "Golden Spear Garrison Ward",
       "title": "Golden Spear Immortal City the ward's quartermaster",
       "board": "Quartermaster He Ru's standing request",
-      "tier_ceiling": 3,
       "city_board": "Golden Spear Immortal City"
     },
     "Gate Captain Kuang Yao": {
       "location": "Greenriver Town North Gate",
       "title": "Greenriver Town captain of the gate guard",
       "board": "the notice board at the Greenriver Town North Gate",
-      "tier_ceiling": 1,
       "city_board": "Greenriver Town"
     },
     "Gate Captain Mei Ping": {
       "location": "Heavenblade Immortal City East Gate",
       "title": "Heavenblade Immortal City captain of the gate guard",
       "board": "the notice board at the Heavenblade Immortal City East Gate",
-      "tier_ceiling": 3,
       "city_board": "Heavenblade Immortal City"
     },
     "Drillmaster Qu Dong": {
       "location": "Heavenblade Blade Yards",
       "title": "Heavenblade Immortal City drillmaster of the blade yards",
       "board": "Drillmaster Qu Dong's standing request",
-      "tier_ceiling": 3,
       "city_board": "Heavenblade Immortal City"
     },
     "Gate Captain Tu Qing": {
       "location": "Hundred Herb Spirit City North Gate",
       "title": "Hundred Herb Spirit City captain of the gate guard",
       "board": "the notice board at the Hundred Herb Spirit City North Gate",
-      "tier_ceiling": 2,
       "city_board": "Hundred Herb Spirit City"
     },
     "Gardener Xiong Chan": {
       "location": "Hundred Herb Herb Gardens",
       "title": "Hundred Herb Spirit City head gardener of the herb terraces",
       "board": "Gardener Xiong Chan's standing request",
-      "tier_ceiling": 2,
       "city_board": "Hundred Herb Spirit City"
     },
     "Gate Captain Zhan Ni": {
       "location": "Immortal River City North Gate",
       "title": "Immortal River City captain of the gate guard",
       "board": "the notice board at the Immortal River City North Gate",
-      "tier_ceiling": 3,
       "city_board": "Immortal River City"
     },
     "Barge Master Dai Hua": {
       "location": "Immortal River River Landings",
       "title": "Immortal River City master of a river barge",
       "board": "Barge Master Dai Hua's standing request",
-      "tier_ceiling": 3,
       "city_board": "Immortal River City"
     },
     "Gate Captain Gu Yun": {
       "location": "Ironbanner City East Gate",
       "title": "Ironbanner City captain of the gate guard",
       "board": "the notice board at the Ironbanner City East Gate",
-      "tier_ceiling": 1,
       "city_board": "Ironbanner City"
     },
     "Quartermaster Lai Ren": {
       "location": "Ironbanner Garrison Ward",
       "title": "Ironbanner City the ward's quartermaster",
       "board": "Quartermaster Lai Ren's standing request",
-      "tier_ceiling": 1,
       "city_board": "Ironbanner City"
     },
     "Gate Captain Mao Yan": {
       "location": "Jade Cauldron Immortal City East Gate",
       "title": "Jade Cauldron Immortal City captain of the gate guard",
       "board": "the notice board at the Jade Cauldron Immortal City East Gate",
-      "tier_ceiling": 3,
       "city_board": "Jade Cauldron Immortal City"
     },
     "Gardener Ran Jia": {
       "location": "Jade Cauldron Herb Gardens",
       "title": "Jade Cauldron Immortal City head gardener of the herb terraces",
       "board": "Gardener Ran Jia's standing request",
-      "tier_ceiling": 3,
       "city_board": "Jade Cauldron Immortal City"
     },
     "Gate Captain Teng Ting": {
       "location": "Jade Crown Spirit City East Gate",
       "title": "Jade Crown Spirit City captain of the gate guard",
       "board": "the notice board at the Jade Crown Spirit City East Gate",
-      "tier_ceiling": 2,
       "city_board": "Jade Crown Spirit City"
     },
     "Clerk Xin Kun": {
       "location": "Jade Crown Ministry Row",
       "title": "Jade Crown Spirit City clerk of the ministry halls",
       "board": "Clerk Xin Kun's standing request",
-      "tier_ceiling": 2,
       "city_board": "Jade Crown Spirit City"
     },
     "Gate Captain Zhai Zhen": {
       "location": "Jadeflow Spirit City North Gate",
       "title": "Jadeflow Spirit City captain of the gate guard",
       "board": "the notice board at the Jadeflow Spirit City North Gate",
-      "tier_ceiling": 2,
       "city_board": "Jadeflow Spirit City"
     },
     "Barge Master Diao Shan": {
       "location": "Jadeflow River Landings",
       "title": "Jadeflow Spirit City master of a river barge",
       "board": "Barge Master Diao Shan's standing request",
-      "tier_ceiling": 2,
       "city_board": "Jadeflow Spirit City"
     },
     "Gate Captain Hong En": {
       "location": "Jadewood Medicine City South Gate",
       "title": "Jadewood Medicine City captain of the gate guard",
       "board": "the notice board at the Jadewood Medicine City South Gate",
-      "tier_ceiling": 1,
       "city_board": "Jadewood Medicine City"
     },
     "Gardener Kou Pin": {
       "location": "Jadewood Herb Gardens",
       "title": "Jadewood Medicine City head gardener of the herb terraces",
       "board": "Gardener Kou Pin's standing request",
-      "tier_ceiling": 1,
       "city_board": "Jadewood Medicine City"
     },
     "Gate Captain Min Jian": {
       "location": "Lunar Shadow Celestial City North Gate",
       "title": "Lunar Shadow Celestial City captain of the gate guard",
       "board": "the notice board at the Lunar Shadow Celestial City North Gate",
-      "tier_ceiling": 3,
       "city_board": "Lunar Shadow Celestial City"
     },
     "Ferrywoman Pu Lian": {
       "location": "Lunar Shadow Mist Docks",
       "title": "Lunar Shadow Celestial City ferrywoman of the mist docks",
       "board": "Ferrywoman Pu Lian's standing request",
-      "tier_ceiling": 3,
       "city_board": "Lunar Shadow Celestial City"
     },
     "Gate Captain Rui Bao": {
       "location": "Lunar Veil Immortal City North Gate",
       "title": "Lunar Veil Immortal City captain of the gate guard",
       "board": "the notice board at the Lunar Veil Immortal City North Gate",
-      "tier_ceiling": 3,
       "city_board": "Lunar Veil Immortal City"
     },
     "Ferrywoman Tai Nuo": {
       "location": "Lunar Veil Mist Docks",
       "title": "Lunar Veil Immortal City ferrywoman of the mist docks",
       "board": "Ferrywoman Tai Nuo's standing request",
-      "tier_ceiling": 3,
       "city_board": "Lunar Veil Immortal City"
     },
     "Gate Captain Xiao Ai": {
       "location": "Mandate Crown Celestial City East Gate",
       "title": "Mandate Crown Celestial City captain of the gate guard",
       "board": "the notice board at the Mandate Crown Celestial City East Gate",
-      "tier_ceiling": 3,
       "city_board": "Mandate Crown Celestial City"
     },
     "Clerk Zhuge Lei": {
       "location": "Mandate Crown Ministry Row",
       "title": "Mandate Crown Celestial City clerk of the ministry halls",
       "board": "Clerk Zhuge Lei's standing request",
-      "tier_ceiling": 3,
       "city_board": "Mandate Crown Celestial City"
     },
     "Gate Captain Bu Xi": {
       "location": "Mandate Spear City North Gate",
       "title": "Mandate Spear City captain of the gate guard",
       "board": "the notice board at the Mandate Spear City North Gate",
-      "tier_ceiling": 3,
       "city_board": "Mandate Spear City"
     },
     "Quartermaster Fei Wei": {
       "location": "Mandate Spear Garrison Ward",
       "title": "Mandate Spear City the ward's quartermaster",
       "board": "Quartermaster Fei Wei's standing request",
-      "tier_ceiling": 3,
       "city_board": "Mandate Spear City"
     },
     "Gate Captain Gui Cheng": {
       "location": "Moonfen City North Gate",
       "title": "Moonfen City captain of the gate guard",
       "board": "the notice board at the Moonfen City North Gate",
-      "tier_ceiling": 1,
       "city_board": "Moonfen City"
     },
     "Ferrywoman Ju Pei": {
       "location": "Moonfen Mist Docks",
       "title": "Moonfen City ferrywoman of the mist docks",
       "board": "Ferrywoman Ju Pei's standing request",
-      "tier_ceiling": 1,
       "city_board": "Moonfen City"
     },
     "Gate Captain Mi Bei": {
       "location": "Moonfrost Spirit City North Gate",
       "title": "Moonfrost Spirit City captain of the gate guard",
       "board": "the notice board at the Moonfrost Spirit City North Gate",
-      "tier_ceiling": 2,
       "city_board": "Moonfrost Spirit City"
     },
     "Ferrywoman Hu Ni": {
       "location": "Moonfrost Mist Docks",
       "title": "Moonfrost Spirit City ferrywoman of the mist docks",
       "board": "Ferrywoman Hu Ni's standing request",
-      "tier_ceiling": 2,
       "city_board": "Moonfrost Spirit City"
     },
     "Gate Captain Zhao Zhu": {
       "location": "Nine-Heavens Immortal Court North Gate",
       "title": "Nine-Heavens Immortal Court captain of the gate guard",
       "board": "the notice board at the Nine-Heavens Immortal Court North Gate",
-      "tier_ceiling": 3,
       "city_board": "Nine-Heavens Immortal Court"
     },
     "Steward Xie Rui": {
       "location": "Nine-Heavens North District",
       "title": "Nine-Heavens Immortal Court steward of a great clan's townhouse",
       "board": "the quest pavilion of Nine-Heavens Immortal Court",
-      "tier_ceiling": 3,
       "city_board": "Nine-Heavens Immortal Court"
     },
     "Abbot Fan Fang": {
       "location": "Nine-Heavens East District",
       "title": "Nine-Heavens Immortal Court abbot of the temple courtyards",
       "board": "the quest pavilion of Nine-Heavens Immortal Court",
-      "tier_ceiling": 3,
       "city_board": "Nine-Heavens Immortal Court"
     },
     "Beggar King Chu Yan": {
       "location": "Nine-Heavens South District",
       "title": "Nine-Heavens Immortal Court the beggars' king of the lower town",
       "board": "the quest pavilion of Nine-Heavens Immortal Court",
-      "tier_ceiling": 3,
       "city_board": "Nine-Heavens Immortal Court"
     },
     "Gate Captain Kuang Ou": {
       "location": "Ninefold Noble Immortal City North Gate",
       "title": "Ninefold Noble Immortal City captain of the gate guard",
       "board": "the notice board at the Ninefold Noble Immortal City North Gate",
-      "tier_ceiling": 3,
       "city_board": "Ninefold Noble Immortal City"
     },
     "Clerk Pan Kun": {
       "location": "Ninefold Noble Ministry Row",
       "title": "Ninefold Noble Immortal City clerk of the ministry halls",
       "board": "Clerk Pan Kun's standing request",
-      "tier_ceiling": 3,
       "city_board": "Ninefold Noble Immortal City"
     },
     "Gate Captain Sima Zhen": {
       "location": "Northwind Spirit City North Gate",
       "title": "Northwind Spirit City captain of the gate guard",
       "board": "the notice board at the Northwind Spirit City North Gate",
-      "tier_ceiling": 2,
       "city_board": "Northwind Spirit City"
     },
     "Fire Keeper Xiong Shan": {
       "location": "Northwind Frost Market",
       "title": "Northwind Spirit City keeper of the market's braziers",
       "board": "Fire Keeper Xiong Shan's standing request",
-      "tier_ceiling": 2,
       "city_board": "Northwind Spirit City"
     },
     "Gate Captain Yu Ze": {
       "location": "Polar Gate Immortal City North Gate",
       "title": "Polar Gate Immortal City captain of the gate guard",
       "board": "the notice board at the Polar Gate Immortal City North Gate",
-      "tier_ceiling": 3,
       "city_board": "Polar Gate Immortal City"
     },
     "Fire Keeper Chai Pin": {
       "location": "Polar Gate Frost Market",
       "title": "Polar Gate Immortal City keeper of the market's braziers",
       "board": "Fire Keeper Chai Pin's standing request",
-      "tier_ceiling": 3,
       "city_board": "Polar Gate Immortal City"
     },
     "Gate Captain Dai Wu": {
       "location": "Riverguard City East Gate",
       "title": "Riverguard City captain of the gate guard",
       "board": "the notice board at the Riverguard City East Gate",
-      "tier_ceiling": 1,
       "city_board": "Riverguard City"
     },
     "Barge Master Huang Tao": {
       "location": "Riverguard River Landings",
       "title": "Riverguard City master of a river barge",
       "board": "Barge Master Huang Tao's standing request",
-      "tier_ceiling": 1,
       "city_board": "Riverguard City"
     },
     "Gate Captain Lai Hong": {
       "location": "Ruined Constellation City South Gate",
       "title": "Ruined Constellation City captain of the gate guard",
       "board": "the notice board at the Ruined Constellation City South Gate",
-      "tier_ceiling": 3,
       "city_board": "Ruined Constellation City"
     },
     "Old Sentry Ran Ai": {
       "location": "Ruined Constellation Ruin Quarter",
       "title": "Ruined Constellation City sentry of the broken wall",
       "board": "Old Sentry Ran Ai's standing request",
-      "tier_ceiling": 3,
       "city_board": "Ruined Constellation City"
     },
     "Gate Captain Shao Feng": {
       "location": "Skyroad Immortal City North Gate",
       "title": "Skyroad Immortal City captain of the gate guard",
       "board": "the notice board at the Skyroad Immortal City North Gate",
-      "tier_ceiling": 3,
       "city_board": "Skyroad Immortal City"
     },
     "Caravan Master Wen Qi": {
       "location": "Skyroad Caravan Yards",
       "title": "Skyroad Immortal City master of a caravan in the yards",
       "board": "Caravan Master Wen Qi's standing request",
-      "tier_ceiling": 3,
       "city_board": "Skyroad Immortal City"
     },
     "Gate Captain Yue Qiu": {
       "location": "Solar Crucible Celestial City East Gate",
       "title": "Solar Crucible Celestial City captain of the gate guard",
       "board": "the notice board at the Solar Crucible Celestial City East Gate",
-      "tier_ceiling": 3,
       "city_board": "Solar Crucible Celestial City"
     },
     "Foreman Ba Wei": {
       "location": "Solar Crucible Forge Terraces",
       "title": "Solar Crucible Celestial City foreman of the forge terraces",
       "board": "Foreman Ba Wei's standing request",
-      "tier_ceiling": 3,
       "city_board": "Solar Crucible Celestial City"
     },
     "Gate Captain Diao Jin": {
       "location": "Solar Furnace Immortal City South Gate",
       "title": "Solar Furnace Immortal City captain of the gate guard",
       "board": "the notice board at the Solar Furnace Immortal City South Gate",
-      "tier_ceiling": 3,
       "city_board": "Solar Furnace Immortal City"
     },
     "Foreman Hong Wan": {
       "location": "Solar Furnace Forge Terraces",
       "title": "Solar Furnace Immortal City foreman of the forge terraces",
       "board": "Foreman Hong Wan's standing request",
-      "tier_ceiling": 3,
       "city_board": "Solar Furnace Immortal City"
     },
     "Gate Captain Kou Gang": {
       "location": "Spearwall Spirit City East Gate",
       "title": "Spearwall Spirit City captain of the gate guard",
       "board": "the notice board at the Spearwall Spirit City East Gate",
-      "tier_ceiling": 2,
       "city_board": "Spearwall Spirit City"
     },
     "Quartermaster Pu Yao": {
       "location": "Spearwall Garrison Ward",
       "title": "Spearwall Spirit City the ward's quartermaster",
       "board": "Quartermaster Pu Yao's standing request",
-      "tier_ceiling": 2,
       "city_board": "Spearwall Spirit City"
     },
     "Gate Captain Que Zhi": {
       "location": "Spirit Jade Capital East Gate",
       "title": "Spirit Jade Capital captain of the gate guard",
       "board": "the notice board at the Spirit Jade Capital East Gate",
-      "tier_ceiling": 2,
       "city_board": "Spirit Jade Capital"
     },
     "Steward Sang Xin": {
       "location": "Spirit Jade North District",
       "title": "Spirit Jade Capital steward of a great clan's townhouse",
       "board": "the quest pavilion of Spirit Jade Capital",
-      "tier_ceiling": 2,
       "city_board": "Spirit Jade Capital"
     },
     "Abbot Wei Kang": {
       "location": "Spirit Jade East District",
       "title": "Spirit Jade Capital abbot of the temple courtyards",
       "board": "the quest pavilion of Spirit Jade Capital",
-      "tier_ceiling": 2,
       "city_board": "Spirit Jade Capital"
     },
     "Beggar King Zhuge Chan": {
       "location": "Spirit Jade South District",
       "title": "Spirit Jade Capital the beggars' king of the lower town",
       "board": "the quest pavilion of Spirit Jade Capital",
-      "tier_ceiling": 2,
       "city_board": "Spirit Jade Capital"
     },
     "Gate Captain Chi Su": {
       "location": "Starroad Celestial City North Gate",
       "title": "Starroad Celestial City captain of the gate guard",
       "board": "the notice board at the Starroad Celestial City North Gate",
-      "tier_ceiling": 3,
       "city_board": "Starroad Celestial City"
     },
     "Caravan Master Ding Zhu": {
       "location": "Starroad Caravan Yards",
       "title": "Starroad Celestial City master of a caravan in the yards",
       "board": "Caravan Master Ding Zhu's standing request",
-      "tier_ceiling": 3,
       "city_board": "Starroad Celestial City"
     },
     "Gate Captain Gui Rui": {
       "location": "Stoneback Mountain City North Gate",
       "title": "Stoneback Mountain City captain of the gate guard",
       "board": "the notice board at the Stoneback Mountain City North Gate",
-      "tier_ceiling": 1,
       "city_board": "Stoneback Mountain City"
     },
     "Assayer Le Ling": {
       "location": "Stoneback Ore Terraces",
       "title": "Stoneback Mountain City assayer of the day's ore",
       "board": "Assayer Le Ling's standing request",
-      "tier_ceiling": 1,
       "city_board": "Stoneback Mountain City"
     },
     "Gate Captain Mi Ren": {
       "location": "Stoneheart Spirit City South Gate",
       "title": "Stoneheart Spirit City captain of the gate guard",
       "board": "the notice board at the Stoneheart Spirit City South Gate",
-      "tier_ceiling": 2,
       "city_board": "Stoneheart Spirit City"
     },
     "Assayer Yang Kai": {
       "location": "Stoneheart Ore Terraces",
       "title": "Stoneheart Spirit City assayer of the day's ore",
       "board": "Assayer Yang Kai's standing request",
-      "tier_ceiling": 2,
       "city_board": "Stoneheart Spirit City"
     },
     "Gate Captain Zhao Pin": {
       "location": "Vermilion Furnace City North Gate",
       "title": "Vermilion Furnace City captain of the gate guard",
       "board": "the notice board at the Vermilion Furnace City North Gate",
-      "tier_ceiling": 2,
       "city_board": "Vermilion Furnace City"
     },
     "Foreman Xie Jian": {
       "location": "Vermilion Furnace Forge Terraces",
       "title": "Vermilion Furnace City foreman of the forge terraces",
       "board": "Foreman Xie Jian's standing request",
-      "tier_ceiling": 2,
       "city_board": "Vermilion Furnace City"
     },
     "Gate Captain Fan Tao": {
       "location": "Worldstone Celestial City East Gate",
       "title": "Worldstone Celestial City captain of the gate guard",
       "board": "the notice board at the Worldstone Celestial City East Gate",
-      "tier_ceiling": 3,
       "city_board": "Worldstone Celestial City"
     },
     "Assayer Chu Nuo": {
       "location": "Worldstone Ore Terraces",
       "title": "Worldstone Celestial City assayer of the day's ore",
       "board": "Assayer Chu Nuo's standing request",
-      "tier_ceiling": 3,
       "city_board": "Worldstone Celestial City"
     },
     "Gate Warden Yu Lanxin": {
       "location": "Jade Meridian Stone Gate",
       "title": "Gate Warden",
       "board": "the Jade Meridian Sect duty roster",
-      "tier_ceiling": 2,
       "sect": "Jade Meridian Sect"
     },
     "Valley Warden Hao Zhen": {
       "location": "Thousand Beast Valley Mouth",
       "title": "Valley Warden",
       "board": "the Thousand Beast Valley duty roster",
-      "tier_ceiling": 2,
       "sect": "Thousand Beast Valley"
     },
     "Terrace Elder Xue Tianfeng": {
       "location": "Heavenblade Sword Terrace",
       "title": "Terrace Elder",
       "board": "the Heavenblade Immortal Sect duty roster",
-      "tier_ceiling": 2,
       "sect": "Heavenblade Immortal Sect"
     },
     "Ash Keeper Mo Ruyan": {
       "location": "Ashen Lotus Shrine Gate",
       "title": "Ash Keeper",
       "board": "the Ashen Lotus Pavilion duty roster",
-      "tier_ceiling": 2,
       "sect": "Ashen Lotus Pavilion"
     },
     "Star Lecturer Wen Qianyu": {
       "location": "Mandate Academy Star Steps",
       "title": "Star Lecturer",
       "board": "the Celestial Mandate Academy duty roster",
-      "tier_ceiling": 2,
       "sect": "Celestial Mandate Academy"
     },
     "Pit Speaker Gu Heilong": {
       "location": "Void Serpent Pit",
       "title": "Pit Speaker",
       "board": "the Void Serpent Cult duty roster",
-      "tier_ceiling": 2,
       "sect": "Void Serpent Cult"
     }
   },
@@ -75734,6 +75563,7 @@
       "meridian open": 8,
       "party create": 1,
       "party join": 1,
+      "party kick": 1,
       "party leave": 1,
       "realmhub go": 1,
       "reincarnate": 5,
@@ -75746,13 +75576,16 @@
       "sect contribute": 1,
       "sect discipleship accept": 1,
       "sect discipleship leave": 1,
+      "sect discipleship npcmaster": 1,
       "sect discipleship reject": 1,
       "sect discipleship request": 1,
+      "sect discipleship teach": 1,
       "sect family": 1,
       "sect form": 1,
       "sect manor establish": 1,
       "sect manor upgrade": 1,
       "sect politics": 1,
+      "sect promote": 1,
       "sect redeem": 1,
       "sect roster": 1,
       "sect shadow": 1,
@@ -75771,7 +75604,8 @@
       "trade accept": 1,
       "trade decline": 1,
       "trade offer": 1,
-      "war act": 4
+      "war act": 4,
+      "war peace": 4
     },
     "pages": {
       "abode / Access": 3,

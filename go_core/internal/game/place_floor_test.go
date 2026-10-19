@@ -120,11 +120,14 @@ func TestABodyCultivatorSendsACaravanFromTheCapitalOfAHigherWorld(t *testing.T) 
 	if catalog.Locations[capital].MinRealmIndex < 5 || catalog.Locations[destination].World != catalog.Locations[capital].World {
 		t.Fatalf("the shipped Spiritual World no longer opens at a high floor with a road city beside its capital; the fixture is wrong, not the rule")
 	}
-	batch4Exec(t, path, `INSERT INTO inventory(user_id,item_id,quantity) VALUES(42,'spirit_herb',10)
+	// A Mortal herb is worth less than one crystal on the cheapest shelf in the
+	// world, and a caravan out of this capital pays whole crystals (v1.34.0), so
+	// the cargo is something that is worth more than one.
+	batch4Exec(t, path, `INSERT INTO inventory(user_id,item_id,quantity) VALUES(42,'azure_flying_sword',10)
 		ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=10`)
 	batch4Exec(t, path, `INSERT INTO currency_wallets(user_id,currency_id,balance) VALUES(42,'low_spirit_crystal',5000)
 		ON CONFLICT(user_id,currency_id) DO UPDATE SET balance=5000`)
-	raw, err := json.Marshal(map[string]any{"destination": destination, "item_id": "spirit_herb", "quantity": 2, "escort": 0})
+	raw, err := json.Marshal(map[string]any{"destination": destination, "item_id": "azure_flying_sword", "quantity": 2, "escort": 0})
 	if err != nil {
 		t.Fatal(err)
 	}

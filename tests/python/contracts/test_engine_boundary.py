@@ -400,22 +400,23 @@ class TheTickSpawnsAThreadPerEvent(unittest.TestCase):
         worker = _body(BOT_PY, "event_expiry_worker")
         self.assertIn("for sim_run in simulation_runs:", worker)
         self.assertIn("for event in sim_run.events:", worker)
-        self.assertIn("spawn_system_event_thread(", worker)
+        self.assertIn("open_engine_event_scene(event)", worker)
+        self.assertIn("spawn_system_event_thread(", _body(BOT_PY, "open_engine_event_scene"))
         # The loop walks every run, not only the one system that used to
         # report events - the rotation rides out on advanced_world.
         self.assertNotIn('sim_run.system == "autonomous_world_events"', worker)
 
     def test_the_engines_event_type_is_not_flattened(self):
-        worker = _body(BOT_PY, "event_expiry_worker")
-        self.assertIn('event_type=str(event.get("event_type") or "random_event")', worker)
-        self.assertIn("event_type=event_type", worker)
+        scene = _body(BOT_PY, "open_engine_event_scene")
+        self.assertIn('event_type = str(event.get("event_type") or "random_event")', scene)
+        self.assertIn("event_type=event_type", scene)
         # The old line named every autonomous event a random one.
-        self.assertNotIn('event_type="random_event"', worker)
+        self.assertNotIn('event_type="random_event"', scene)
 
     def test_a_realm_is_announced_as_a_realm(self):
-        worker = _body(BOT_PY, "event_expiry_worker")
-        self.assertIn('event_type=="secret_realm"', worker)
-        self.assertIn("SECRET REALM OPENS", worker)
+        scene_opener = _body(BOT_PY, "open_engine_event_scene")
+        self.assertIn('event_type == "secret_realm"', scene_opener)
+        self.assertIn("SECRET REALM OPENS", scene_opener)
         scene = _body(EVENT_SCENE, "spawn_system_event_thread")
         self.assertIn('str(event_type) == "secret_realm"', scene)
         self.assertIn("SECRET REALM", scene)

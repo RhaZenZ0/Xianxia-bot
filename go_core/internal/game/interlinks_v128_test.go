@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"sort"
 	"testing"
 	"xianxia/core/internal/storage"
 )
@@ -221,16 +222,18 @@ INSERT INTO character_birth_family(user_id,family_id) VALUES(42,1);
 func TestAPlayersClaimIsHeardLikeASects(t *testing.T) {
 	path := setupBatch4AuthorityDB(t)
 	world := batch4WorldPath(t)
+	// Ground nobody's seat: a rival's home may not be claimed (SectHomes).
+	city := aCityNoSectIsSeatedIn(t)
 	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS sect_membership(user_id INTEGER PRIMARY KEY,sect_name TEXT NOT NULL,rank_name TEXT NOT NULL DEFAULT 'Disciple',rank_level INTEGER NOT NULL DEFAULT 0,joined_at REAL NOT NULL,contribution_points INTEGER NOT NULL DEFAULT 0,influence INTEGER NOT NULL DEFAULT 0,contribution_earned INTEGER NOT NULL DEFAULT 0)`)
 	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS territory_state(territory_key TEXT PRIMARY KEY, name TEXT NOT NULL, region TEXT NOT NULL, controller_type TEXT NOT NULL DEFAULT 'neutral', controller_key TEXT NOT NULL DEFAULT '', resource_type TEXT NOT NULL DEFAULT 'mixed', prosperity INTEGER NOT NULL DEFAULT 50, defense INTEGER NOT NULL DEFAULT 50, unrest INTEGER NOT NULL DEFAULT 0, updated_game_minute INTEGER NOT NULL DEFAULT 0, updated_at REAL NOT NULL)`)
 	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS world_history_events(history_id INTEGER PRIMARY KEY AUTOINCREMENT, source_key TEXT UNIQUE, event_type TEXT, title TEXT, summary TEXT, significance INTEGER, visibility TEXT, location TEXT, world_name TEXT, faction TEXT, actor_type TEXT, actor_key TEXT, actor_name TEXT, target_type TEXT, target_key TEXT, target_name TEXT, related_user_id INTEGER, related_npc_name TEXT, tags TEXT, game_minute INTEGER, metadata_json TEXT, created_at REAL, updated_at REAL)`)
 	batch4Exec(t, path, `INSERT INTO sect_membership(user_id,sect_name,rank_name,rank_level,joined_at) VALUES(42,'Azure Cloud Sect','Deacon',40,0)`)
-	batch4Exec(t, path, `INSERT INTO territory_state(territory_key,name,region,updated_at) VALUES('Riverguard City','Riverguard City','Riverguard City',0)`)
-	batch4Exec(t, path, `UPDATE characters SET location='Riverguard City' WHERE user_id=42`)
-	if _, err := batch4ApplyErr(path, world, "territory.claim", 42, 1, map[string]any{"territory_key": "Riverguard City"}); err != nil {
+	batch4Exec(t, path, `INSERT INTO territory_state(territory_key,name,region,updated_at) VALUES('`+city+`','`+city+`','`+city+`',0)`)
+	batch4Exec(t, path, `UPDATE characters SET location='`+city+`' WHERE user_id=42`)
+	if _, err := batch4ApplyErr(path, world, "territory.claim", 42, 1, map[string]any{"territory_key": city}); err != nil {
 		t.Fatalf("the claim refused: %v", err)
 	}
-	row := fmt.Sprint(actionScalar(t, path, `SELECT event_type||'|'||significance||'|'||actor_key FROM world_history_events WHERE location='Riverguard City'`))
+	row := fmt.Sprint(actionScalar(t, path, `SELECT event_type||'|'||significance||'|'||actor_key FROM world_history_events WHERE location='`+city+`'`))
 	if row != "territory_claimed|60|Azure Cloud Sect" {
 		t.Fatalf("a player's claim left history %q, want the world's own territory_claimed row", row)
 	}
@@ -241,6 +244,27 @@ func TestAPlayersClaimIsHeardLikeASects(t *testing.T) {
 	if got := storage.ParseInt(actionScalar(t, path, `SELECT contribution_earned FROM sect_membership WHERE user_id=42`)); got != WarRules(eventScopeCatalog(t)).ActPoints || got <= 0 {
 		t.Fatalf("a claim on neutral ground paid %d contribution, want one war act (%d)", got, WarRules(eventScopeCatalog(t)).ActPoints)
 	}
+}
+
+// aCityNoSectIsSeatedIn is the first whole Mortal-world city in the shipped
+// content that is no sect's home, so a claim made there is a claim on open
+// ground.
+func aCityNoSectIsSeatedIn(t *testing.T) string {
+	t.Helper()
+	catalog := eventScopeCatalog(t)
+	homes := SectHomes(catalog)
+	names := make([]string, 0, len(catalog.Locations))
+	for name := range catalog.Locations {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if _, seat := homes[name]; !seat && catalog.Locations[name].World == "Mortal World" && TerritoryIsWholePlace(catalog, name) && catalog.Locations[name].RealmHub {
+			return name
+		}
+	}
+	t.Fatal("every whole city in the Mortal World is a sect's seat; the fixture has nowhere open to claim")
+	return ""
 }
 
 // v1.27.0: an awakened artifact bond counted in every fight whether or not

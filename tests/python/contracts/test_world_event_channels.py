@@ -257,11 +257,12 @@ class TheHarnessReachesTheProvisioner(unittest.TestCase):
                       "without a token the control endpoint answers 404 and the step cannot run")
 
     def test_the_limitation_is_no_longer_recorded_as_open(self):
-        known = (PROJECT_ROOT / "docs" / "TODO.md").read_text(encoding="utf-8")
-        for line in known.splitlines():
-            if "create_category" in line:
-                self.assertNotIn("**deferred", line,
-                                 "the harness reaches it now; the entry should say fixed")
+        # The punch list is two files since v1.34.0: a fixed entry lives in the
+        # history, so the open half must not carry this one at all.
+        open_half = (PROJECT_ROOT / "docs" / "TODO.md").read_text(encoding="utf-8")
+        fixed_half = (PROJECT_ROOT / "docs" / "history" / "TODO_FIXED.md").read_text(encoding="utf-8")
+        self.assertNotIn("create_category", open_half, "the harness reaches it now; the entry should be fixed, in the history")
+        self.assertIn("create_category", fixed_half, "the record of the fix left the punch list")
 
 
 if __name__ == "__main__":  # pragma: no cover

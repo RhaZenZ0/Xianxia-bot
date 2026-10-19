@@ -463,6 +463,30 @@ async def _revoke_cultivator_role(guild: discord.Guild | None, user_id: int) -> 
         await member.remove_roles(role, reason="Xianxia: the account's data was erased")
     except (discord.Forbidden, discord.HTTPException):
         log.exception("Could not revoke the cultivator role from %s", user_id)
+async def _revoke_realm_roles(guild: discord.Guild | None, user_id: int) -> None:
+    """Take every generated realm role off an erased account (v1.34.0).
+
+    `_sync_realm_access_roles` and `_sync_realm_presence_roles` ride
+    `require_character` like the cultivator role does, so after an erasure
+    nothing will ever run them for the account again: the "Xianxia • <world>"
+    access roles and the presence role of the capital it stood in stayed, and
+    with them a view of channels that are gated on having played. The set is
+    the one the two syncs generate - one of each name per hub - and nothing
+    else on the member is touched."""
+    if guild is None:
+        return
+    member = guild.get_member(int(user_id))
+    if member is None:
+        return
+    names = {_realm_access_role_name(world) for world in REALM_HUBS}
+    names |= {realm_presence_role_name(world) for world in REALM_HUBS}
+    held = [role for role in member.roles if role.name in names]
+    if not held:
+        return
+    try:
+        await member.remove_roles(*held, reason="Xianxia: the account's data was erased")
+    except (discord.Forbidden, discord.HTTPException):
+        log.exception("Could not revoke the realm roles from %s", user_id)
 async def _sync_realm_access_roles(
     guild: discord.Guild | None, member: discord.Member | discord.User, character: dict[str, Any]
 ) -> None:

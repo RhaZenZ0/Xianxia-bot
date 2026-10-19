@@ -33,6 +33,18 @@ CREATE TABLE characters(
 	user_id INTEGER PRIMARY KEY, name TEXT, path TEXT, location TEXT, life_status TEXT DEFAULT 'alive',
 	realm_index INTEGER NOT NULL DEFAULT 0, phase INTEGER NOT NULL DEFAULT 1, attributes_json TEXT, qi INTEGER, qi_max INTEGER, vitality INTEGER, vitality_max INTEGER, updated_at REAL
 );
+CREATE TABLE battles (
+	battle_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, npc_name TEXT NOT NULL,
+	npc_realm_index INTEGER NOT NULL, npc_stage INTEGER NOT NULL,
+	player_hp INTEGER NOT NULL, player_hp_max INTEGER NOT NULL DEFAULT 1,
+	npc_hp INTEGER NOT NULL, npc_hp_max INTEGER NOT NULL DEFAULT 1,
+	status TEXT NOT NULL DEFAULT 'active', location TEXT NOT NULL, source TEXT NOT NULL,
+	target_key TEXT NOT NULL DEFAULT '', thread_id INTEGER,
+	npc_suppressed_turns INTEGER NOT NULL DEFAULT 0, version INTEGER NOT NULL DEFAULT 0,
+	final_outcome TEXT NOT NULL DEFAULT '', finalized_at REAL,
+	created_at REAL NOT NULL, updated_at REAL NOT NULL,
+	FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE
+);
 CREATE TABLE character_conditions(
 	condition_id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES characters(user_id),
 	condition_key TEXT, category TEXT, name TEXT, severity INTEGER, state TEXT,
@@ -249,8 +261,12 @@ func TestEveryDefeatBranchGoesThroughTheDoor(t *testing.T) {
 		return true
 	})
 
-	if through+len(bare) != 4 {
-		t.Fatalf("the sweep found %d defeat-survival sites, not the four this file has; it is broken, not the tree", through+len(bare))
+	// Two, since v1.34.0: the attack, the technique and the pill each lose a
+	// fight through battleLostTx, so the fate rescue and the plain wound are
+	// written once and not once per path. That each path reaches it is
+	// TestEveryPathAbilityIsAppliedWhereItHappens' to say.
+	if through+len(bare) != 2 {
+		t.Fatalf("the sweep found %d defeat-survival sites, not the two battleLostTx has; it is broken, not the tree", through+len(bare))
 	}
 	if len(bare) > 0 {
 		t.Fatalf("%v mark a cultivator who lost a fight without leaving them a heartbeat; "+

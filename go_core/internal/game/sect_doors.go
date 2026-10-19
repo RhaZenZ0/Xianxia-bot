@@ -288,6 +288,28 @@ func SectHome(catalog worlddata.Catalog, sect string) string {
 	return sectGate(catalog, sect)
 }
 
+// SectHomes maps every sect's home (SectHome) to the sect it belongs to. It is
+// the one statement of "a neutral home belongs to its own sect alone": the
+// world's claim step reads it to leave a rival's seat alone, and a player's
+// territory.claim reads it to refuse the same claim - the rule was written
+// only in the first, so a rank-30 member standing in a rival's seat could take
+// it (v1.34.0). Sects are walked sorted, so two sharing a home cannot be
+// resolved a different way on different days.
+func SectHomes(catalog worlddata.Catalog) map[string]string {
+	names := make([]string, 0, len(catalog.Sects))
+	for name := range catalog.Sects {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	homes := map[string]string{}
+	for _, name := range names {
+		if home := SectHome(catalog, name); home != "" {
+			homes[home] = name
+		}
+	}
+	return homes
+}
+
 // TerritoryIsWholePlace says whether a location is a place in its own right
 // - a city, a road site, a stretch of wilds, a sect's gate in the wilderness -
 // rather than a part of a city (a gate, a district, a shop, an auction hall, a

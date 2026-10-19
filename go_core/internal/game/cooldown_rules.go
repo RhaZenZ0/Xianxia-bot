@@ -47,6 +47,10 @@ const (
 	// One focus of a home's room at a time (v1.31.0): the four real hours a
 	// focus lasts (abodeFocusRealMinutes) and one more before the next.
 	cooldownAbodeFocus = "abode_focus"
+	// How long a raid waits on a raider who has not acted (v1.34.0). It is a
+	// wait in the sense that a person is served it - the rest of the party's
+	// half hour - so it is stated here, with its key, beside the others.
+	cooldownRaidAbsent = "raid_absent"
 )
 
 // cultivateWaitMinutes is the pace of the whole game: a session is a share of
@@ -122,6 +126,9 @@ var actionCooldowns = map[string]cooldownRule{
 	cooldownGhostAppease: {60, ""},
 	cooldownWarAction:    {30, ""},
 	cooldownAbodeFocus:   {abodeFocusRealMinutes + 60, ""},
+	// The party's patience with a raider who has gone quiet (v1.34.0): past it
+	// the boss answers the round without them. See resolveBossRoundTx.
+	cooldownRaidAbsent: {30, "RAID_ABSENT_MINUTES"},
 }
 
 // cooldownSecondsFor is how long the wait is, now. An unknown action is an

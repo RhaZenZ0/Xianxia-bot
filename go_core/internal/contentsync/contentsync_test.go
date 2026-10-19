@@ -232,7 +232,7 @@ func TestABrokenFileWritesNothing(t *testing.T) {
 func TestProjectionMatchesTheRawEntries(t *testing.T) {
 	real := filepath.Join("..", "..", "..", "content", "world.json")
 	if _, err := os.Stat(real); err != nil {
-		t.Skip("shipped content not beside the package")
+		t.Fatalf("shipped content not beside the package: %v", err)
 	}
 	data, err := os.ReadFile(real)
 	if err != nil {

@@ -562,7 +562,7 @@ OWNERS = {
                       ),
     "locations.py": ("current_npc_location", "_world_min_realm_index", "_world_is_unlocked", "_known_locations",
                      "_location_is_visible", "location_autocomplete", "local_npc_autocomplete"),
-    "pickers.py": ("auction_currency_autocomplete", "_market_item_matches", "usable_item_autocomplete"),
+    "pickers.py": ("auction_currency_autocomplete", "auction_house_currency_autocomplete", "_market_item_matches", "usable_item_autocomplete"),
     "discovery.py": ("LOCATION_DISCOVERY_IMAGES", "location_discovery_image_path", "location_discovery_card",
                      "send_location_discovery_image", "travel_first_discovers_location"),
     "character_state.py": ("current_effect_modifiers",
@@ -916,7 +916,7 @@ SURFACE = {
             "territory_group": ('status', 'claim'),
             "war_group": ('status', 'act', 'peace'),
             "caravan_group": ('dispatch', 'status', 'events'),
-            "party_group": ('create', 'join', 'status', 'leave'),
+            "party_group": ('create', 'join', 'status', 'kick', 'leave'),
         },
     },
     "surface.py": {
@@ -1001,7 +1001,7 @@ class CommandSurfaceTests(unittest.TestCase):
         # `@app_commands.autocomplete(npc=local_npc_autocomplete)` evaluates
         # at import; a deferred import can never serve it.
         for name in ("location_autocomplete", "local_npc_autocomplete", "carried_item_autocomplete",
-                     "auction_currency_autocomplete", "usable_item_autocomplete"):
+                     "auction_currency_autocomplete", "auction_house_currency_autocomplete", "usable_item_autocomplete"):
             owner = next(m for m, names in OWNERS.items() if name in names)
             for module, src in self.src.items():
                 if module == owner or f"={name}" not in src:

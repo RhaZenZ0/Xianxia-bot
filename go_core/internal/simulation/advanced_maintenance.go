@@ -731,6 +731,22 @@ func (r *Runner) advanceCaravans(conn *storage.Conn, gm int64) (int64, error) {
 	}
 	rows := maps(res)
 	for _, c := range rows {
+		// An owner who is no longer anybody (an erasure, a reset that was
+		// never followed by /begin) cannot be paid, and a payout the wallet's
+		// foreign key refuses would end this whole bundle's transaction, every
+		// tick, for the rest of the world's life. The venture is lost with its
+		// owner - what the reset and the erasure now do themselves - and the
+		// batch goes on to the next row.
+		gone, goneErr := r.caravanOwnerGone(conn, c)
+		if goneErr != nil {
+			return 0, goneErr
+		}
+		if gone {
+			if err = r.loseOrphanedCaravan(conn, c, gm, now); err != nil {
+				return 0, err
+			}
+			continue
+		}
 		// A caravan's risk is the age of the world its road departs from.
 		rm := r.eraTermFor(byWorld, fmt.Sprint(c["origin"]), "caravan_risk", .25)
 		cargo := map[string]any{}
@@ -808,6 +824,39 @@ func (r *Runner) advanceCaravans(conn *storage.Conn, gm int64) (int64, error) {
 		}
 	}
 	return int64(len(rows)), nil
+}
+
+// caravanOwnerGone says whether a player's caravan belongs to nobody any more.
+// Only a row that names a player by a real user id can be orphaned: an NPC's
+// caravan has no character to look for, and a key that is not a number is paid
+// to nobody by payCaravanOwner already.
+func (r *Runner) caravanOwnerGone(conn *storage.Conn, c map[string]any) (bool, error) {
+	if fmt.Sprint(c["owner_type"]) != "player" {
+		return false, nil
+	}
+	uid, err := strconv.ParseInt(strings.TrimSpace(fmt.Sprint(c["owner_key"])), 10, 64)
+	if err != nil {
+		return false, nil
+	}
+	res, err := conn.Execute(`SELECT 1 AS ok FROM characters WHERE user_id=? LIMIT 1`, []any{uid})
+	if err != nil {
+		return false, err
+	}
+	return firstMap(res) == nil, nil
+}
+
+// loseOrphanedCaravan closes a caravan whose owner is gone: `lost` is terminal,
+// the cargo is not delivered and nothing is paid, and the road's own record
+// says why.
+func (r *Runner) loseOrphanedCaravan(conn *storage.Conn, c map[string]any, gm int64, now float64) error {
+	id := i64(c["caravan_id"])
+	if _, err := conn.Execute(`UPDATE caravans SET status='lost',updated_at=? WHERE caravan_id=?`, []any{now, id}); err != nil {
+		return err
+	}
+	detail, _ := json.Marshal(map[string]any{"reason": "owner_gone"})
+	_, err := conn.Execute(`INSERT INTO caravan_events(caravan_id,event_type,detail_json,game_minute,created_at) VALUES(?,?,?,?,?)`,
+		[]any{id, "lost", string(detail), gm, now})
+	return err
 }
 
 // payCaravanOwner credits whoever sent the load (v1.0.0-rc.18).

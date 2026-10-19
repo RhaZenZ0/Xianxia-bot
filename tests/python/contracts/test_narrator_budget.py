@@ -75,6 +75,52 @@ def _returns_before_generate_when_not_upgraded(fn: ast.AsyncFunctionDef) -> bool
     return False
 
 
+# Callers of a live narration that do not wear the decorator, and who spent the
+# token for them instead.
+TOKEN_SPENT_BEFORE_THE_CALL = {
+    # Typed play spends it at the picker (`budget_refusal`); the panel's modal is
+    # `_submit_scene_action`, held in the test below.
+    "_resolve_scene_action",
+    # Reached only by an @mention or the picker's "Narrate it", each of which
+    # spent the token (`budget_refusal`) before it called.
+    "narrate_freeform",
+}
+LIVE_NARRATION_METHODS = {"talk_to_npc", "narrate_action", "narrate_breakthrough"}
+
+
+def _wears_the_meter(fn: ast.AST) -> bool:
+    """Wears `@serialized_user_action` bare - `metered=False` keeps the lock and drops the meter."""
+    for dec in getattr(fn, "decorator_list", []):
+        if isinstance(dec, ast.Name) and dec.id == "serialized_user_action":
+            return True
+    return False
+
+
+def _live_narration_callers() -> dict[str, tuple[bool, str]]:
+    """Every function in the bot that calls a live narration method, innermost first."""
+    out: dict[str, tuple[bool, str]] = {}
+    for path in sorted((PROJECT_ROOT / "app" / "bot").rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        stack: list[ast.AST] = []
+
+        class Walker(ast.NodeVisitor):
+            def visit_FunctionDef(self, node):  # noqa: N802
+                stack.append(node)
+                self.generic_visit(node)
+                stack.pop()
+
+            visit_AsyncFunctionDef = visit_FunctionDef
+
+            def visit_Call(self, node):  # noqa: N802
+                if isinstance(node.func, ast.Attribute) and node.func.attr in LIVE_NARRATION_METHODS and stack:
+                    fn = stack[-1]
+                    out[fn.name] = (_wears_the_meter(fn), str(path.relative_to(PROJECT_ROOT)))
+                self.generic_visit(node)
+
+        Walker().visit(tree)
+    return out
+
+
 class RouteByTierTests(unittest.TestCase):
     def test_no_generate_call_runs_by_default_outside_dialogue_epic_and_explicit_asks(self):
         methods = _narrator_methods()
@@ -118,6 +164,49 @@ class BudgetOnEveryDoorTests(unittest.TestCase):
         typed = (PROJECT_ROOT / "app" / "bot" / "typed_play.py").read_text(encoding="utf-8")
         self.assertIn('def budget_refusal(user_id: int, door: str = "typed")', typed)
         self.assertIn('budget_refusal(interaction.user.id, door="narrate_it")', typed)
+
+    def test_every_command_that_reaches_a_live_narration_spends_the_meter(self):
+        """`/check` and the `/action` modal narrated live and spent nothing (v1.34.0).
+
+        Both are doors on the live methods (`talk_to_npc`, `narrate_action`,
+        `narrate_breakthrough`) and neither wore `serialized_user_action`, so
+        the promise above - every door is metered - held for the doors the first
+        author remembered. This walks every caller of those methods in the bot
+        and asks what spends the token for it.
+        """
+        callers = _live_narration_callers()
+        self.assertGreaterEqual(len(callers), 4, f"the reader finds too few callers to prove anything: {sorted(callers)}")
+        self.assertIn("check", callers, "the reader no longer finds /check")
+        for name, (wears, path) in sorted(callers.items()):
+            if name in TOKEN_SPENT_BEFORE_THE_CALL:
+                continue
+            self.assertTrue(
+                wears,
+                f"{name} ({path}) reaches a live narration with no meter: /check and the /action modal were unmetered live-narration doors",
+            )
+
+    def test_the_scene_action_modal_spends_the_token_and_typed_play_does_not_spend_it_twice(self):
+        scene = (PROJECT_ROOT / "app" / "bot" / "commands" / "scene.py").read_text(encoding="utf-8")
+        tree = ast.parse(scene)
+        funcs = {n.name: n for n in ast.walk(tree) if isinstance(n, (ast.AsyncFunctionDef, ast.FunctionDef))}
+        self.assertTrue(_wears_the_meter(funcs["_submit_scene_action"]), "the modal's door is not metered")
+        modal = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "SceneActionDetailModal")
+        submit = next(n for n in modal.body if isinstance(n, ast.AsyncFunctionDef) and n.name == "on_submit")
+        called = {c.func.id for c in ast.walk(submit) if isinstance(c, ast.Call) and isinstance(c.func, ast.Name)}
+        self.assertIn("_submit_scene_action", called)
+        self.assertNotIn("_resolve_scene_action", called, "the modal resolves without spending a token")
+        resolver = funcs["_resolve_scene_action"]
+        self.assertFalse(_wears_the_meter(resolver), "typed play's picker already spent the token the resolver would spend again")
+        self.assertNotIn("budget_refusal_line", ast.get_source_segment(scene, resolver) or "")
+
+    def test_check_keeps_its_place_among_the_reads_a_closed_door_leaves_open(self):
+        # Read off the source: importing the bot package needs a token in the environment.
+        tree = ast.parse((PROJECT_ROOT / "app" / "bot" / "seclusion.py").read_text(encoding="utf-8"))
+        literal = next(
+            ast.literal_eval(n.value.args[0]) for n in tree.body
+            if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "OPEN_COMMANDS"
+        )
+        self.assertIn("check", literal, "/check lost its place among the reads a closed door leaves open")
 
     def test_idle_locks_are_evicted(self):
         runtime = (PROJECT_ROOT / "app" / "bot" / "runtime.py").read_text(encoding="utf-8")

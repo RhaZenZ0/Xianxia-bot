@@ -5,7 +5,7 @@ services:
       dockerfile: go_core/Dockerfile
     container_name: xianxia-game-engine
     labels:
-      xianxia.release: "1.33.0"
+      xianxia.release: "1.34.0"
     restart: unless-stopped
     # The engine drains in-flight requests on SIGTERM (default 20s, see
     # ENGINE_SHUTDOWN_GRACE_SECONDS). Docker's default grace is 10s, which
@@ -44,6 +44,9 @@ services:
       SECRET_REALM_COOLDOWN_MINUTES: "${SECRET_REALM_COOLDOWN_MINUTES:-15}"
       PERFECT_QUEST_COOLDOWN_MINUTES: "${PERFECT_QUEST_COOLDOWN_MINUTES:-60}"
       PERFECT_TRIAL_COOLDOWN_MINUTES: "${PERFECT_TRIAL_COOLDOWN_MINUTES:-360}"
+      # How long a boss raid waits on a raider who has not acted before the boss
+      # answers the round without them (v1.34.0).
+      RAID_ABSENT_MINUTES: "${RAID_ABSENT_MINUTES:-30}"
       # Backups (v0.32.0): retention, size cap and the optional key that
       # seals every backup. docs/CONFIGURATION.md, "Backups".
       XIANXIA_BACKUP_KEEP_DAILY: "${XIANXIA_BACKUP_KEEP_DAILY:-14}"
@@ -82,7 +85,7 @@ services:
     build: .
     container_name: xianxia-roleplay-bot
     labels:
-      xianxia.release: "1.33.0"
+      xianxia.release: "1.34.0"
     restart: unless-stopped
     env_file:
       - .env

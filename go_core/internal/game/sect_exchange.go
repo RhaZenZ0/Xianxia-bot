@@ -271,8 +271,10 @@ func sectCraftedDonation(conn *storage.Conn, catalog worlddata.Catalog, userID i
 // uses for a grade no shelf carries). Without it a point could be bought for
 // a third of a stone - the three realm keys are worth 700 to 1,200 points
 // and sell for 280 to 420 - and issued stock sold on to a keeper at a profit.
-// An item no Mortal shelf sells has no cap; its price anywhere above is a
-// hundred stones a unit or more.
+// "Cheapest shelf" is the cheapest in any world, carried down into the stone
+// (cheapestShelfPrice, v1.34.0): an item only an upper world sells is capped
+// at that shelf's worth in stones, a hundred a unit or more, and an item no
+// shop sells at all has no cap.
 func sectDonationCap(catalog worlddata.Catalog, itemID string) (int64, bool) {
 	_, rung, ok := itemDef(catalog, itemID)
 	if !ok {

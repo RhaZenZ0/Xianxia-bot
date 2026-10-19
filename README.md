@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v1.33.0
+# Xianxia RP Discord Bot v1.34.0
 
 *A cultivation RPG played entirely through Discord commands: deterministic rules in Go, an AI that
 narrates but never decides, self-hosted on your own hardware.*
@@ -420,7 +420,7 @@ trial rolls) and whose trial reveals the gate. Each sect's gate keeper has one p
 work open to somebody in no sect, which earns standing with it and eases its trial. Every
 public sect bestows its own entry manual on passing, chosen inside the trial transaction, and the
 sect residence grows facility by facility with contribution points. A manual is an item, studied
-through the engine, which enforces its realm requirement; the whole 160-manual catalogue is content.
+through the engine, which enforces its realm requirement; the whole manual catalogue (`technique_system.manuals` in `content/world.json`) is content.
 
 ### Quests and commissions
 
@@ -675,7 +675,7 @@ report is safe to paste into an issue.
 - If narration goes flat after an image rebuild, check **/admin → Server → Ai Status** for a TLS
   banner first. If SQLite reports contention, verify only the engine opens the database.
 
-Keep the whole `data/` directory persistent across rebuilds. The current schema is **80**; every
+Keep the whole `data/` directory persistent across rebuilds. The current schema is **81**; every
 historical migration is kept so an old database upgrades in place.
 
 ## Development
@@ -723,8 +723,9 @@ Two security scans sit beside them. `govulncheck` is the Go half: `go_core` has 
 dependencies — SQLite is direct cgo — so what it reports is standard-library advisories against the
 Go version in `go.mod`, and the fix for one is a Go bump. Its first run was one: the `go` directive
 said `1.23.0`, CI installs the toolchain that directive names, and Go 1.23.0 carried 26 advisories
-this code reaches. The directive is `1.25.13` now — the oldest release that clears all of them —
-which is why the floor is where it is. It needs the network, so it is `make
+this code reaches. The `go` line and the `toolchain` line in `go_core/go.mod` are where that floor
+lives now — each raised to the oldest release that clears what the scan reports, so read the
+number there rather than here. It needs the network, so it is `make
 audit` rather than part of `make lint`; `make check` stays runnable offline. The Python half needs
 nothing and rides the `ruff` call that was already there: `flake8-bandit` rules, with seven off for
 reasons written out in `pyproject.toml` and every other rule clean — so `eval`, `exec`, `pickle`,

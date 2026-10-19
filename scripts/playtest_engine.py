@@ -22,6 +22,7 @@ import asyncio
 import json
 import os
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -74,6 +75,22 @@ DEFERRED_OPERATIONS: dict[str, str] = {
     # answers is driven below. An entry here is a deferral with a reason, and
     # the gate refuses one that is also driven or that names nothing.
 }
+
+
+def end_lot_now(db_path: str, lot_id: int) -> None:
+    """Bring one lot's closing time forward on the scratch database.
+
+    The engine refuses a lot shorter than five minutes (auctionMinLotMinutes,
+    v1.34.0), so a step that wants a lot to end cannot list one that runs for
+    seconds: it lists the shortest the floor accepts and closes the clock here.
+    It is the one place this harness touches the file the engine owns, and only
+    the scratch copy a --launch run builds."""
+    conn = sqlite3.connect(db_path, timeout=20)
+    try:
+        conn.execute("UPDATE auctions SET ends_at=? WHERE auction_id=?", (time.time() - 1, int(lot_id)))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 async def run(url: str, token: str, db_path: str) -> Report:
@@ -530,11 +547,11 @@ async def run(url: str, token: str, db_path: str) -> Report:
     await step(report, "auction.enter (seller)", act("auction.enter", PLAYER, {}))
     await step(report, "teleport the buyer to town", gm("admin.player.teleport", {"user_id": BUYER, "location": "Greenriver Town", "reason": "playtest"}))
     await step(report, "auction.enter (buyer)", act("auction.enter", BUYER, {}))
-    lot = await step(report, "auction.sell", act("auction.sell", PLAYER, {"item_id": "spirit_herb", "quantity": 1, "currency_id": "low_spirit_stone", "starting_bid": 10, "anonymous": False, "ends_at": time.time() + 5}))
+    lot = await step(report, "auction.sell", act("auction.sell", PLAYER, {"item_id": "spirit_herb", "quantity": 1, "currency_id": "low_spirit_stone", "starting_bid": 10, "anonymous": False, "ends_at": time.time() + 301}))
     lot_id = int((lot or {}).get("auction_id") or 0)
     if lot_id:
         await step(report, "auction.bid", act("auction.bid", BUYER, {"auction_id": lot_id, "amount": 25}))
-        await asyncio.sleep(6)
+        end_lot_now(db_path, lot_id)
         await step(report, "the tick settles the lot", engine.run_due_simulation({"auction_settlement": True}))
         settled = await db.get_auction(lot_id)
         report.add("PASS" if settled and not int(settled.get("active") or 0) and int(settled.get("current_bidder_user_id") or 0) == BUYER else "FAIL",
@@ -637,10 +654,10 @@ async def run(url: str, token: str, db_path: str) -> Report:
     find_item = "bone_comb"
     await step(report, "grant the seller a curio for the floor", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": find_item, "quantity": 1, "reason": "playtest"}))
     await step(report, "auction.enter at the capital", act("auction.enter", PLAYER, {}))
-    unsold = await step(report, "auction.sell with no bidder", act("auction.sell", PLAYER, {"item_id": find_item, "quantity": 1, "currency_id": "low_spirit_stone", "starting_bid": 10, "anonymous": False, "ends_at": time.time() + 2}))
+    unsold = await step(report, "auction.sell with no bidder", act("auction.sell", PLAYER, {"item_id": find_item, "quantity": 1, "currency_id": "low_spirit_stone", "starting_bid": 10, "anonymous": False, "ends_at": time.time() + 301}))
     unsold_id = int((unsold or {}).get("auction_id") or 0)
     if unsold_id:
-        await asyncio.sleep(3)
+        end_lot_now(db_path, unsold_id)
         await step(report, "the tick settles the unsold lot", engine.run_due_simulation({"auction_settlement": True, "merchants": True}))
         settled = await db.get_auction(unsold_id)
         buyer = str((settled or {}).get("merchant_buyer") or "")
@@ -1543,9 +1560,16 @@ async def run(url: str, token: str, db_path: str) -> Report:
             await step(report, "formation.assign the buyer to the core", act("formation.assign", PLAYER, {"formation_id": formation_id, "target_user_id": BUYER, "position": "core"}))
             await step(report, "formation.activate", act("formation.activate", PLAYER, {"formation_id": formation_id, "stance": "balanced"}))
             await step(report, "formation.stance", act("formation.stance", PLAYER, {"formation_id": formation_id, "stance": "aggressive"}))
+        # Only the leader puts a member out (v1.34.0); the buyer is put out and
+        # asks to come back, which is how the seat is proved gone and free.
+        await step(report, "party.kick by a member is refused", act("party.kick", BUYER, {"user_id": PLAYER}), expect_error="only the party leader")
+        await step(report, "party.kick puts the buyer out", act("party.kick", PLAYER, {"user_id": BUYER}))
+        await step(report, "party.join by the buyer again", act("party.join", BUYER, {"party_id": party_id}))
         await step(report, "party.leave by the buyer", act("party.leave", BUYER, {}))
         boss = await step(report, "boss.start the Iron-Tusk Boar King", act("boss.start", PLAYER, {"template_key": "iron_tusk_boar_king"}))
         encounter_id = int((boss or {}).get("encounter_id") or 0)
+        if encounter_id:
+            await step(report, "party.join during a raid is refused", act("party.join", BUYER, {"party_id": party_id}), expect_error="in the middle of a boss raid")
         status = "active"
         if encounter_id:
             try:

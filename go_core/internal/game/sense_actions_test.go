@@ -117,6 +117,13 @@ func TestSenseGroundReadingTracksTheCultivationMultiplier(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// An abode belongs to somebody: production keys cave_abodes on characters, so
+	// the owner is a row before the cave is.
+	if _, err := conn.Execute(
+		`INSERT INTO characters(user_id,name,path,spiritual_root,location,attributes_json)
+		 VALUES(1,'Cave Owner','Qi Refiner','Single','Greenriver Town','{}')`, nil); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := conn.Execute(
 		`INSERT INTO cave_abodes(user_id,location_key,base_location,name,cultivation_level,formation_level)
 		 VALUES(?,?,?,?,?,?)`,
