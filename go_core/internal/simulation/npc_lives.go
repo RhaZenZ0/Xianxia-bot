@@ -128,7 +128,11 @@ func (r *Runner) npcChildbirth(conn *storage.Conn, steps, gm int64) (int64, erro
 	}
 	now := nowFloat()
 	born := int64(0)
-	for _, row := range res.Rows {
+	// The cap of six is cut from a roster of up to a hundred and fifty
+	// couples, so the tick starts somewhere new each time (rosterTurn,
+	// v1.36.0); a birth does move a couple down the list, but the first six
+	// names by the alphabet were still the first six to bear every tick.
+	for _, row := range rosterTurn(res.Rows, gm) {
 		if born >= childbirthCap {
 			break
 		}

@@ -99,14 +99,29 @@ func arbitrageCeilings(t *testing.T, catalog worlddata.Catalog, itemID string, v
 		}
 		add("keeper "+key, shop.Currency, price)
 	}
+	tradeable := false
+	if item, _, ok := itemDef(catalog, itemID); ok {
+		tradeable = item.MarketTradeable()
+	}
 	for _, coin := range coins {
-		add("a market counter", coin, marketUnitPrice(catalog, itemID, coin, 1<<40, 5.0, false))
+		// The counter buys only what the ordinary markets carry
+		// (MarketTradeable, the one rule); a manual it never lists has no
+		// counter price, however the arithmetic would read for one.
+		if tradeable {
+			add("a market counter", coin, marketUnitPrice(catalog, itemID, coin, 1<<40, 5.0, false))
+		}
 		if ceiling, ok := NPCStallCeiling(catalog, itemID, coin); ok {
 			add("the town at a stall", coin, ceiling)
 		}
 		// An underworld broker buying ordinary goods (v1.35.0), per unit.
 		if fence, ok := blackMarketOrdinaryFence(catalog, itemID, coin); ok {
 			add("an underworld broker", coin, fence)
+		}
+		// And buying back the post's own stock (v1.36.0), at the dearest ask
+		// a rotation or a smuggler can put on the row: the hottest post, one
+		// unit left.
+		if item, _, ok := itemDef(catalog, itemID); ok && UnderworldGood(item) {
+			add("an underworld broker buying its own stock", coin, blackMarketStockPay(catalog, itemID, coin, 1<<40))
 		}
 	}
 	if cap, ok := sectDonationCap(catalog, itemID); ok {
@@ -186,6 +201,26 @@ func TestNoWorldCrossingTurnsAShopIntoAMint(t *testing.T) {
 			if ware.Price > 0 {
 				shelves[ware.ItemID] = append(shelves[ware.ItemID], shelf{"the merchant " + key, merchant.Currency, ware.Price, new(big.Int).Mul(big.NewInt(ware.Price), value[merchant.Currency])})
 			}
+		}
+	}
+	// A post is a shelf too (v1.36.0): every world's post stocks the
+	// underworld goods in its own coin, at the cheapest ask a rotation can set
+	// (the coolest post, the most units), so a keeper or a merchant paying
+	// more than that in any coin is a mint with a broker at one end.
+	for id, item := range catalog.Items {
+		if !UnderworldGood(item) {
+			continue
+		}
+		for coin, def := range catalog.Currencies {
+			if def.Tier != 1 || value[coin] == nil {
+				continue
+			}
+			base, ok := UnderworldBase(catalog, id, coin)
+			if !ok {
+				continue
+			}
+			ask := BlackMarketStockAsk(base, BlackMarketHeatFloor, BlackMarketStockMostUnits)
+			shelves[id] = append(shelves[id], shelf{"the underworld post of the " + def.World, coin, ask, new(big.Int).Mul(big.NewInt(ask), value[coin])})
 		}
 	}
 	items := make([]string, 0, len(shelves))

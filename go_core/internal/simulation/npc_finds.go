@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strings"
 
+	"xianxia/core/internal/game"
 	"xianxia/core/internal/gamerng"
 	"xianxia/core/internal/storage"
 	"xianxia/core/internal/worlddata"
@@ -239,14 +240,13 @@ func (r *Runner) smuggleToNightMarket(conn *storage.Conn, world, itemID string, 
 		return false, err
 	}
 	heat := i64(postRes.Rows[0][0])
-	base := item.BasePrice
-	if base <= 0 {
-		base = max64(8, item.SectValue*8)
+	// A find worth less than a coin of this world's is not worth the post's
+	// while (v1.36.0): it goes nowhere, as a keeper's board would not list it.
+	base, ok := game.UnderworldBase(r.World, itemID, r.blackMarketCurrency(world))
+	if !ok {
+		return false, nil
 	}
-	price := base + base*heat/100
-	if price < 1 {
-		price = 1
-	}
+	price := game.BlackMarketSmuggledAsk(base, heat)
 	legal := strings.ToLower(strings.TrimSpace(item.LegalStatus))
 	if legal == "" {
 		legal = "restricted"

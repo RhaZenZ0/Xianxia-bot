@@ -586,7 +586,34 @@ def objective_target_choices(world: Any) -> dict[str, list[dict[str, str]]]:
     }
 
 
-def validate_quest_definition(draft: dict[str, Any], world: Any, budget: dict[str, int]) -> tuple[dict[str, Any] | None, list[str]]:
+def _baseline_int(baseline: dict[str, Any], key: str) -> int | None:
+    """The number a stored quest already pays under `key`, or None when it pays none."""
+    try:
+        value = int(baseline.get(key))
+    except (TypeError, ValueError):
+        return None
+    return value
+
+
+def _baseline_items(baseline: dict[str, Any]) -> dict[str, int]:
+    """The items a stored quest already pays, in the validator's own normalised shape."""
+    raw = baseline.get("items")
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, int] = {}
+    for item_id, qty in raw.items():
+        try:
+            amount = int(qty)
+        except (TypeError, ValueError):
+            continue
+        if amount > 0:
+            out[str(item_id).strip().lower().replace(" ", "_")] = amount
+    return out
+
+
+def validate_quest_definition(
+    draft: dict[str, Any], world: Any, budget: dict[str, int], *, baseline: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any] | None, list[str]]:
     """Normalise a draft into the catalog shape, or explain why it cannot be.
 
     Returns (definition, errors). `definition` is None when any error is
@@ -594,10 +621,18 @@ def validate_quest_definition(draft: dict[str, Any], world: Any, budget: dict[st
     quantity). Anything the draft names that the world does not have is an
     error, not a silent drop - a quest that points at a location that does not
     exist is a dead end, which is the one thing the Forge must never make.
+
+    `baseline` is the rewards the quest already pays, when it is an edit of a
+    stored quest (v1.36.0). The budget bounds what a GM *raises* a reward to;
+    a reward left exactly as it was passes even above the budget, because 35
+    shipped commissions and realm-road quests pay more than the default budget
+    and could not be opened and saved without first being cut. A reward that
+    differs from the baseline in any way is held to the budget as before.
     """
     errors: list[str] = []
     if not isinstance(draft, dict):
         return None, ["draft is not an object"]
+    baseline = dict(baseline) if isinstance(baseline, dict) else {}
     title = str(draft.get("title") or "").strip()
     if not 3 <= len(title) <= 80:
         errors.append("title must be 3-80 characters")
@@ -803,7 +838,7 @@ def validate_quest_definition(draft: dict[str, Any], world: Any, budget: dict[st
             cap = int(budget.get(cap_key, 0))
             if value < 0:
                 errors.append(f"reward {key} cannot be negative")
-            elif value > cap:
+            elif value > cap and value != _baseline_int(baseline, key):
                 errors.append(f"reward {key}={value} exceeds the GM budget ({cap})")
             elif value:
                 rewards[key] = value
@@ -829,7 +864,7 @@ def validate_quest_definition(draft: dict[str, Any], world: Any, budget: dict[st
                 clean_items[key] = amount
                 total += amount
             cap = int(budget.get("max_items", 0))
-            if total > cap:
+            if total > cap and clean_items != _baseline_items(baseline):
                 errors.append(f"reward items total {total} exceeds the GM budget ({cap})")
             elif clean_items:
                 rewards["items"] = clean_items

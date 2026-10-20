@@ -112,6 +112,24 @@ func cheapestShelfPrice(catalog worlddata.Catalog, itemID, currency string) (int
 			}
 		}
 	}
+	// A post is a shelf too (v1.36.0): a cultivator the brokers trust buys the
+	// underworld goods there, in each world's own coin, for no less than the
+	// coolest rotation asks with the most units on hand. Read here, every
+	// ceiling that reads this - a keeper's line, a merchant's valuation, a
+	// counter, a stall's town - is held under it in one place; a floor
+	// merchant used to pay 2,200 stones' worth of crystal for a manual the
+	// Mortal post sold for 133, because no shop sold it and so nothing capped
+	// the merchant.
+	if item, _, ok := itemDef(catalog, itemID); ok && UnderworldGood(item) {
+		for coin, def := range catalog.Currencies {
+			if def.Tier != 1 {
+				continue
+			}
+			if base, ok := UnderworldBase(catalog, itemID, coin); ok {
+				consider(coin, BlackMarketStockAsk(base, BlackMarketHeatFloor, BlackMarketStockMostUnits))
+			}
+		}
+	}
 	return best, found
 }
 

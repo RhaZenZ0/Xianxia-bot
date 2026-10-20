@@ -56,14 +56,16 @@ const (
 // of the tick's game minute rather than the minute modulo the roster, because
 // ticks land a day apart and a day's minutes share a factor with the roster's
 // length, which would visit a few starts and leave gaps between them. One
-// function, so the two walks cannot turn differently.
-func rosterTurn(rows [][]any, gm int64) [][]any {
+// function, so the two walks cannot turn differently. Generic since v1.36.0,
+// when the three walks that read their people as structs rather than rows
+// (`npcCrimes`, `npcBeastHunts`, `npcChildbirth`) joined it.
+func rosterTurn[T any](rows []T, gm int64) []T {
 	n := len(rows)
 	if n < 2 {
 		return rows
 	}
 	start := int(hash64("roster-turn", fmt.Sprint(gm)) % uint64(n))
-	turned := make([][]any, 0, n)
+	turned := make([]T, 0, n)
 	turned = append(turned, rows[start:]...)
 	return append(turned, rows[:start]...)
 }

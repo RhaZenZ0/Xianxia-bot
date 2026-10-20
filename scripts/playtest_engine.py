@@ -1943,6 +1943,27 @@ async def run(url: str, token: str, db_path: str) -> Report:
         if elder_home:
             await audited("admin.npc.relocate", {"npc_name": elder_name, "location": elder_home, "reason": "playtest: home again"}, name="admin.npc.relocate the Elder home")
         await step(report, "the buyer's realm is put back", gm("admin.player.set_realm", {"user_id": BUYER, "realm_index": int(buyer_before.get("realm_index") or 0), "phase": int(buyer_before.get("phase") or 1), "reason": "playtest"}))
+    # A sect holds a city, not one of its streets (v1.33.0): a claim made from
+    # a gate, naming the gate, lands on the city's row. Driven here against a
+    # real server for the first time (v1.36.0); the Go tests and the Python
+    # command tests held the redirect before, and neither is a server. The
+    # imperial city is nobody's seat, so the claim is the sect's to make - and
+    # if the world's own sects got there first the claim starts a war instead,
+    # which is as good a proof: the war is over the city, never the gate.
+    gate_city, city_gate = "Azure Crown Imperial City", "Azure Crown Imperial City North Gate"
+    await step(report, "to a city's gate", gm("admin.player.teleport", {"user_id": PLAYER, "location": city_gate, "reason": "playtest"}))
+    from_gate = await step(report, "territory.claim from a gate, naming the gate", act("territory.claim", PLAYER, {"territory_key": city_gate}))
+    if from_gate is not None:
+        report.add("PASS" if str(from_gate.get("territory_key")) == gate_city else "FAIL",
+                   "a claim naming a gate is a claim on its city", str(from_gate.get("territory_key")))
+        city_rows = {str(r.get("territory_key")): r for r in await db.get_territories(region=gate_city)}
+        gate_rows = {str(r.get("territory_key")): r for r in await db.get_territories(region=city_gate)}
+        city_row, gate_row = city_rows.get(gate_city) or {}, gate_rows.get(city_gate) or {}
+        banner = str(city_row.get("controller_key") or "")
+        report.add("PASS" if (from_gate.get("claimed") and banner == sect) or (from_gate.get("war_id") and banner) else "FAIL",
+                   "the city's row carries the banner (or the war is over the city)", f"claimed={from_gate.get('claimed')} war={from_gate.get('war_id')} city holder={banner!r}")
+        report.add("PASS" if not str(gate_row.get("controller_key") or "") else "FAIL",
+                   "the gate's own row carries no banner", f"gate holder={gate_row.get('controller_key')!r}")
     # A territory is claimed standing in its region (v1.3.1); both claims were
     # made from the town and refused (v1.7.1).
     await step(report, "to the hills to claim them", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Cloudspine Foothills", "reason": "playtest"}))

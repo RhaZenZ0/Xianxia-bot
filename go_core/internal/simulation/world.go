@@ -743,12 +743,10 @@ func (r *Runner) clans(conn *storage.Conn, steps, gm int64) (string, error) {
 func (r *Runner) blackMarkets(conn *storage.Conn, steps, gm int64) (string, error) {
 	_ = steps
 	candidates := make([]string, 0)
-	for id, item := range r.Catalog.Items {
-		legal := strings.ToLower(item.LegalStatus)
-		interest := strings.ToLower(item.AuctionInterest)
-		typ := strings.ToLower(item.Type)
-		name := strings.ToLower(item.Name)
-		if legal == "forbidden" || legal == "contraband" || legal == "restricted" || (typ == "manual" && containsAny(name, "demon", "blood", "soul", "nether", "bone", "venom")) || interest == "special" || interest == "legendary" {
+	for id := range r.Catalog.Items {
+		// One predicate, the engine's (game.UnderworldGood, v1.36.0): the
+		// arbitrage gate walks the same goods this stocks.
+		if game.UnderworldGood(worldItem(r.World, id)) {
 			candidates = append(candidates, id)
 		}
 	}
@@ -784,7 +782,7 @@ func (r *Runner) blackMarkets(conn *storage.Conn, steps, gm int64) (string, erro
 		}
 		sort.Strings(pool)
 		location := pool[int(hash64(world, fmt.Sprint(gm))%uint64(len(pool)))]
-		heat := int64(20 + hash64(location, fmt.Sprint(gm))%61)
+		heat := game.BlackMarketHeatFloor + int64(hash64(location, fmt.Sprint(gm))%uint64(game.BlackMarketHeatCeiling-game.BlackMarketHeatFloor+1))
 		_, err := conn.Execute(`INSERT INTO black_market_posts(world_name,location,heat,opens_game_minute,closes_game_minute,active,created_at,updated_at) VALUES(?,?,?,?,?,1,?,?) ON CONFLICT(world_name) DO UPDATE SET location=excluded.location,heat=excluded.heat,opens_game_minute=excluded.opens_game_minute,closes_game_minute=excluded.closes_game_minute,active=1,updated_at=excluded.updated_at`, []any{world, location, heat, gm, gm + blackMarketOpen, now, now})
 		if err != nil {
 			return "", err
@@ -793,31 +791,39 @@ func (r *Runner) blackMarkets(conn *storage.Conn, steps, gm int64) (string, erro
 		if err != nil {
 			return "", err
 		}
-		n := 6
-		if len(candidates) < n {
-			n = len(candidates)
+		// What this world's post can price at all (v1.36.0): an item worth
+		// less than a whole coin of the world's own once the ladder is read
+		// has no base here, as it has no line on the keepers' boards.
+		priced := make([]string, 0, len(candidates))
+		bases := map[string]int64{}
+		for _, id := range candidates {
+			if base, ok := game.UnderworldBase(r.World, id, currency[world]); ok {
+				priced = append(priced, id)
+				bases[id] = base
+			}
 		}
-		start := int(hash64(world, "stock", fmt.Sprint(gm)) % uint64(len(candidates)))
+		if len(priced) == 0 {
+			continue
+		}
+		n := 6
+		if len(priced) < n {
+			n = len(priced)
+		}
+		start := int(hash64(world, "stock", fmt.Sprint(gm)) % uint64(len(priced)))
 		used := map[string]bool{}
 		for j := 0; j < n; j++ {
-			idx := (start + j*7) % len(candidates)
-			for used[candidates[idx]] {
-				idx = (idx + 1) % len(candidates)
+			idx := (start + j*7) % len(priced)
+			for used[priced[idx]] {
+				idx = (idx + 1) % len(priced)
 			}
-			id := candidates[idx]
+			id := priced[idx]
 			used[id] = true
 			item := worldItem(r.World, id)
-			base := game.ItemBasePrice(r.World, id)
-			if base <= 0 {
-				base = max64(8, game.ItemSectValue(r.World, id)*8)
-			}
-			qty := int64(1 + hash64(id, world, fmt.Sprint(gm))%4)
-			scarcity := 1.0 + float64(max64(0, 8-qty))*0.05
-			danger := 1.15 + float64(heat)/250.0
-			price := int64(math.Round(float64(base) * scarcity * danger))
-			if price < 1 {
-				price = 1
-			}
+			qty := 1 + int64(hash64(id, world, fmt.Sprint(gm))%uint64(game.BlackMarketStockMostUnits))
+			// The ask is the engine's arithmetic (game.BlackMarketStockAsk),
+			// so the gate that holds a broker's pay under every shelf reads
+			// the same number this writes.
+			price := game.BlackMarketStockAsk(bases[id], heat, qty)
 			legal := item.LegalStatus
 			if legal == "" {
 				legal = "restricted"
@@ -832,14 +838,6 @@ func (r *Runner) blackMarkets(conn *storage.Conn, steps, gm int64) (string, erro
 	return fmt.Sprintf("batch-rotated %d underworld trading post(s)", rotated), nil
 }
 
-func containsAny(text string, words ...string) bool {
-	for _, w := range words {
-		if strings.Contains(text, w) {
-			return true
-		}
-	}
-	return false
-}
 func max1(v int64) int64 {
 	if v < 1 {
 		return 1

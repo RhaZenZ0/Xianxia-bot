@@ -3074,7 +3074,14 @@ class AdminDashboardController:
             # as an edit, so a collision would silently overwrite a different
             # quest that happened to be called something similar.
             quest_key = quest_key_for(title, await self._existing_quest_keys(), prefix="quest")
-        definition, errors = validate_quest_definition(draft, self.store.quest_world(), self.store.quest_budget())
+        # An edit is held to the budget only where it raises a reward (v1.36.0):
+        # what the stored row already pays is the baseline, so a shipped quest
+        # above the budget opens and saves unchanged, and a GM who types a
+        # bigger number is refused as before.
+        baseline = await self._stored_rewards(quest_key) if draft.get("quest_key") else None
+        definition, errors = validate_quest_definition(
+            draft, self.store.quest_world(), self.store.quest_budget(), baseline=baseline,
+        )
         if definition is None:
             raise ValueError("This quest cannot be saved yet:\n- " + "\n- ".join(errors[:8]))
         saved = {
@@ -3097,6 +3104,20 @@ class AdminDashboardController:
         if draft.get("owner_user_id") not in (None, ""):
             saved["owner_user_id"] = int(draft["owner_user_id"])
         return saved, errors[:8]
+
+    async def _stored_rewards(self, quest_key: str) -> dict[str, Any] | None:
+        """The rewards a stored quest pays now, or None for a key no row carries."""
+        async with self.store._connect() as db:
+            rows = await self.store._fetchall_if_table(
+                db, "quest_definitions", "SELECT rewards_json FROM quest_definitions WHERE quest_key=?", (quest_key,),
+            )
+        for row in rows:
+            try:
+                rewards = json.loads(row.get("rewards_json") or "{}")
+            except (TypeError, ValueError):
+                return None
+            return rewards if isinstance(rewards, dict) else None
+        return None
 
     async def _existing_quest_keys(self) -> set[str]:
         async with self.store._connect() as db:

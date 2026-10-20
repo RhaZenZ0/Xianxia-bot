@@ -191,7 +191,10 @@ func (r *Runner) npcCrimes(conn *storage.Conn, gm int64) (int64, int64, int64, e
 	byWorld := r.eraModifiersOrNone(conn)
 	now := nowFloat()
 	committed, witnessed, fatal := int64(0), int64(0), int64(0)
-	for _, criminal := range people {
+	// The cap cuts the walk short, so where it starts turns with the tick
+	// (rosterTurn, v1.36.0): read in name order from the top every tick, the
+	// same five criminals robbed and the rest of the underworld never did.
+	for _, criminal := range rosterTurn(people, gm) {
 		if committed >= crimeCap {
 			break
 		}
@@ -418,7 +421,7 @@ func (r *Runner) npcBeastHunts(conn *storage.Conn, gm int64) (int64, int64, int6
 	byWorld := r.eraModifiersOrNone(conn)
 	now := nowFloat()
 	hunted, took, died := int64(0), int64(0), int64(0)
-	for _, hunter := range people {
+	for _, hunter := range rosterTurn(people, gm) {
 		if hunted >= huntCap {
 			break
 		}

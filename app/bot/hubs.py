@@ -3236,7 +3236,12 @@ async def open_hub_in_place(
             )
             await view.refresh_status(interaction)
             view.rebuild()
-            await interaction.response.edit_message(view=view)
+            # A V2 message carries no content and no embeds (v1.8.x), so the
+            # message this turns into the panel has both cleared: the classic
+            # journal is an embed, and an edit that left it in place was
+            # refused, which sent a new panel and never pressed the leaf
+            # (v1.36.0).
+            await interaction.response.edit_message(content=None, embed=None, view=view)
             view.message = getattr(interaction, "message", None)
             return view
         except Exception:
