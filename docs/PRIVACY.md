@@ -95,6 +95,14 @@ Two deliberate exceptions, because deleting them would be wrong:
   many rows it touched. It contains none of your game data. It exists so the
   operator can show your request was honoured.
 
+Three places hold your ID where no column carries it, so the schema walk cannot
+find them, and the erasure handles each by name: the `world_state` rows keyed
+on your ID (your banked insight, stance and chosen manual, your last failed
+breakthrough and spent reroll, your lifespan clock and the road you were on)
+are deleted; every caravan you ever sent (`caravans.owner_key`) loses its
+owner; and if you were an administrator who requested a server update, the
+`requested_by` inside the update request and result rows is cleared.
+
 Your erasure does mean some shared records disappear entirely — a trade between
 you and another player, a duel you fought — because those rows are as much
 yours as theirs.

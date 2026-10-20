@@ -49,6 +49,7 @@ from ..rules.quests import (
     MAX_OBJECTIVES,
     OBJECTIVE_TYPES,
     REWARD_KEYS,
+    objective_target_choices,
     rewardable_items,
     SCENE_ACTION_KEYS,
     quest_key_for,
@@ -2177,6 +2178,11 @@ class ReadOnlyDashboardStore:
                         if not isinstance((npc or {}).get("hidden_master"), dict)
                     ),
                     "items": sorted(rewardable_items(self.quest_world())),
+                    # One picker per target kind (v1.35.0), built by the
+                    # validator's own lookups: a realm, a flame, a boss, a
+                    # secret realm, a Law or its technique, an examination,
+                    # a recipe or an item is picked from what it may name.
+                    "targets": objective_target_choices(self.quest_world()),
                     "max_objectives": MAX_OBJECTIVES,
                     "max_objective_count": MAX_OBJECTIVE_COUNT,
                     "budget": self.quest_budget(),
@@ -2601,7 +2607,7 @@ UPDATE_WATCHER_STALE_SECONDS = 15 * 60
 UPDATE_INSTALL_LEASE_SECONDS = 2 * 60 * 60
 # The states that close an update request. Mirrors the engine's
 # updateRequestState.open (go_core/internal/game/update_request.go).
-UPDATE_TERMINAL_STATUSES = ("", "done", "failed", "cancelled")
+UPDATE_TERMINAL_STATUSES = ("", "done", "unchanged", "failed", "cancelled")
 
 
 def update_card_state(rows: dict[str, Any] | None, release: dict[str, Any] | None, now: float) -> dict[str, Any]:
@@ -2629,8 +2635,9 @@ def update_card_state(rows: dict[str, Any] | None, release: dict[str, Any] | Non
             checked_ago = max(0, int(float(now) - float(release["checked_at"])))
         except (TypeError, ValueError):
             checked_ago = None
-    # A request is open until it is terminal: done, failed or (v1.12.3)
-    # cancelled. The engine's `updateRequestState.open` is the same list.
+    # A request is open until it is terminal: done, unchanged (v1.35.0: an
+    # up-to-date run), failed or (v1.12.3) cancelled. The engine's
+    # `updateRequestState.open` is the same list.
     in_progress = bool(request) and str(request.get("status") or "") not in UPDATE_TERMINAL_STATUSES
     # v1.12.3: the check ran and GitHub answered, but nothing is published on
     # this channel. That is an answer, not a silence - blaming the bot for it

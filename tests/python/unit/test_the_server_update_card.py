@@ -254,6 +254,32 @@ class AnOpenRequestCanBeClosed(unittest.TestCase):
             if status:
                 self.assertIn(f'"{status}"', open_body.group(1), f"the engine does not treat {status} as closed")
 
+    def test_every_reader_of_a_closed_request_names_the_same_outcomes(self):
+        """A third outcome, `unchanged` (v1.35.0), showed how many readers the
+        closed list has: the engine's open(), its `terminal` line and
+        `updateStatuses`, the watcher's own case list, the dashboard's
+        UPDATE_TERMINAL_STATUSES and the card's "Last outcome" line. Each of
+        the watcher's terminal reports (every closed status but `cancelled`,
+        which only the GM writes) is named in all of them."""
+        go = (PROJECT_ROOT / "go_core" / "internal" / "game" / "update_request.go").read_text(encoding="utf-8")
+        watcher = (PROJECT_ROOT / "update_watch.sh").read_text(encoding="utf-8")
+        card = (PROJECT_ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
+        reports = [s for s in UPDATE_TERMINAL_STATUSES if s and s != "cancelled"]
+        self.assertIn("unchanged", reports, "the third outcome is not in the dashboard's list; the gate cannot see it")
+        terminal = re.search(r"\n\tterminal := (.+)\n", go)
+        self.assertIsNotNone(terminal, "the engine's terminal line could not be read; this gate is broken, not the tree")
+        statuses = re.search(r"var updateStatuses = map\[string\]bool\{(.*?)\n\}", go, re.S)
+        self.assertIsNotNone(statuses)
+        case = re.search(r'\n\s+(""\|[a-z|]+)\) open=0 ;;', watcher)
+        self.assertIsNotNone(case, "the watcher's closed-status case list could not be read")
+        outcome = re.search(r"Last outcome:</b> \$\{(.+?)\}\$\{updRes\.detail", card)
+        self.assertIsNotNone(outcome, "the card's Last outcome line could not be read")
+        for status in reports:
+            self.assertIn(f'"{status}"', terminal.group(1), f"the engine does not write update_result for {status}")
+            self.assertIn(f'"{status}"', statuses.group(1), f"the engine refuses a {status} report")
+            self.assertIn(f"|{status}", case.group(1), f"the watcher keeps polling after {status}")
+            self.assertIn(status, outcome.group(1), f"the card prints {status} as something else")
+
 
 class WhenTheChannelHasNoRelease(unittest.TestCase):
     """v1.12.3: GitHub answered and nothing is published on the channel. The

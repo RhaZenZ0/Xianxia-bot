@@ -41,6 +41,48 @@ func TestAMemberAtTheAlliedGateIsTakenInAsAnOuterDisciple(t *testing.T) {
 	}
 }
 
+// A GM's placement out of a sect ends its bonds the way the ascent does
+// (v1.35.0): the NPC master's row and the lineage rows in both directions.
+// admin.player.set_sect left both, so a player moved out kept the master's
+// terms until they pressed Leave; a placement in the same sect, a rank change,
+// keeps them.
+func TestAGMsPlacementOutOfASectEndsTheMasterBonds(t *testing.T) {
+	path := setupAdminDB(t)
+	batch4Exec(t, path, `INSERT INTO sects(sect_name,updated_at) VALUES('Azure Cloud Sect',0),('Crimson Furnace Sect',0)`)
+	batch4Exec(t, path, `INSERT INTO sect_membership(user_id,sect_name,rank_name,rank_level,joined_at) VALUES(42,'Azure Cloud Sect','Core Disciple',30,0)`)
+	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS npc_mentorships(disciple_user_id INTEGER PRIMARY KEY,master_npc_name TEXT NOT NULL,sect_name TEXT NOT NULL,accepted_game_minute INTEGER NOT NULL DEFAULT 0,attention INTEGER NOT NULL DEFAULT 0,created_at REAL NOT NULL,FOREIGN KEY(disciple_user_id) REFERENCES characters(user_id) ON DELETE CASCADE)`)
+	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS sect_lineage(disciple_user_id INTEGER PRIMARY KEY,master_user_id INTEGER NOT NULL,accepted_at REAL NOT NULL,FOREIGN KEY(disciple_user_id) REFERENCES characters(user_id) ON DELETE CASCADE,FOREIGN KEY(master_user_id) REFERENCES characters(user_id) ON DELETE CASCADE)`)
+	batch4Exec(t, path, `INSERT INTO npc_mentorships(disciple_user_id,master_npc_name,sect_name,created_at) VALUES(42,'Elder Test Qiu','Azure Cloud Sect',0)`)
+	// 42 is 43's master and 44's disciple: both directions are the sect's.
+	// The lineage table keeps production's foreign keys, so both people exist.
+	batch4Exec(t, path, `INSERT INTO characters VALUES(43,'Second Test','alive','Old Place',0,10,10,10,10,0,0,1,NULL,NULL,0,0,0,'',0,0,0)`)
+	batch4Exec(t, path, `INSERT INTO characters VALUES(44,'Third Test','alive','Old Place',0,10,10,10,10,0,0,1,NULL,NULL,0,0,0,'',0,0,0)`)
+	batch4Exec(t, path, `INSERT INTO sect_lineage(disciple_user_id,master_user_id,accepted_at) VALUES(43,42,0),(42,44,0)`)
+	bonds := func() (int64, int64) {
+		return i64(scalar(t, path, `SELECT COUNT(*) FROM npc_mentorships WHERE disciple_user_id=42`)),
+			i64(scalar(t, path, `SELECT COUNT(*) FROM sect_lineage WHERE disciple_user_id=42 OR master_user_id=42`))
+	}
+
+	applyAdmin(t, path, "admin.player.set_sect", map[string]any{"user_id": 42, "sect_name": "Azure Cloud Sect", "rank_name": "Outer Disciple", "rank_level": 10, "reason": "same sect, demoted"})
+	if master, lineage := bonds(); master != 1 || lineage != 2 {
+		t.Fatalf("a placement in the same sect ended the bonds (master rows %d, lineage rows %d; want 1 and 2)", master, lineage)
+	}
+	applyAdmin(t, path, "admin.player.set_sect", map[string]any{"user_id": 42, "sect_name": "Crimson Furnace Sect", "rank_name": "Outer Disciple", "rank_level": 10, "reason": "another sect"})
+	if master, lineage := bonds(); master != 0 || lineage != 0 {
+		t.Fatalf("a placement in another sect left the old sect's bonds (master rows %d, lineage rows %d)", master, lineage)
+	}
+	after := fmt.Sprint(scalar(t, path, "SELECT after_json FROM admin_audit_log WHERE action='admin.player.set_sect' ORDER BY audit_id DESC LIMIT 1"))
+	if !strings.Contains(after, `"npc_master_ended":"Elder Test Qiu"`) || !strings.Contains(after, `"lineage_rows_ended":2`) {
+		t.Fatalf("the audit row does not record the bonds the lever ended: %s", after)
+	}
+
+	batch4Exec(t, path, `INSERT INTO npc_mentorships(disciple_user_id,master_npc_name,sect_name,created_at) VALUES(42,'Elder Test Hong','Crimson Furnace Sect',0)`)
+	applyAdmin(t, path, "admin.player.set_sect", map[string]any{"user_id": 42, "remove": true, "reason": "left the sect"})
+	if master, _ := bonds(); master != 0 {
+		t.Fatalf("a removal left %d master bond(s)", master)
+	}
+}
+
 // A master among the old sect's people stays with the old sect (v1.33.0). The
 // bond is a row of its own, not a sect_lineage row, so the delete of the old
 // disciple bond never reached it and the Azure Cloud Elder went on paying a

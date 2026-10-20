@@ -239,7 +239,7 @@ func TestAdminUndoLastForceEndSceneRestoresPriorSceneTypeAndLabel(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = conn.Execute(`INSERT INTO player_scene_state(user_id,physical_location,scene_type,scene_key,scene_label,updated_at) VALUES(42,'Old Place','sect_trial','trial-1','Entrance Trial',0)`, nil); err != nil {
+	if _, err = conn.Execute(`INSERT INTO player_scene_state(user_id,physical_location,scene_type,scene_key,scene_label,channel_id,metadata_json,updated_at) VALUES(42,'Old Place','sect_trial','trial-1','Entrance Trial',777,'{"round":2}',0)`, nil); err != nil {
 		conn.Close()
 		t.Fatal(err)
 	}
@@ -249,13 +249,44 @@ func TestAdminUndoLastForceEndSceneRestoresPriorSceneTypeAndLabel(t *testing.T) 
 	}
 	conn.Close()
 
+	// The lever writes five columns and its undo puts all five back (v1.35.0);
+	// until then the snapshot held the type and the label, so an undone
+	// force-end left a scene with none of its key, channel or metadata.
+	const sceneConcat = `SELECT physical_location||'|'||scene_type||'|'||scene_key||'|'||scene_label||'|'||COALESCE(channel_id,'null')||'|'||metadata_json FROM player_scene_state WHERE user_id=42`
 	applyAdmin(t, path, "admin.player.force_end_scene", map[string]any{"user_id": 42, "reason": "stuck"})
-	undoLast(t, path)
-	if got := fmt.Sprint(scalar(t, path, "SELECT scene_type FROM player_scene_state WHERE user_id=42")); got != "sect_trial" {
-		t.Fatalf("scene_type=%q, want restored to sect_trial", got)
+	if got := fmt.Sprint(scalar(t, path, sceneConcat)); got != "Old Place|world|||null|{}" {
+		t.Fatalf("after the force-end the scene is %q", got)
 	}
-	if got := fmt.Sprint(scalar(t, path, "SELECT scene_label FROM player_scene_state WHERE user_id=42")); got != "Entrance Trial" {
-		t.Fatalf("scene_label=%q, want restored to Entrance Trial", got)
+	undoLast(t, path)
+	if got, want := fmt.Sprint(scalar(t, path, sceneConcat)), `Old Place|sect_trial|trial-1|Entrance Trial|777|{"round":2}`; got != want {
+		t.Fatalf("the undone force-end left the scene as %q, want %q", got, want)
+	}
+	// And the redo (undoing the undo) ends it again, every column.
+	undoLast(t, path)
+	if got := fmt.Sprint(scalar(t, path, sceneConcat)); got != "Old Place|world|||null|{}" {
+		t.Fatalf("the redo left the scene as %q", got)
+	}
+}
+
+// An audit row from before v1.35.0 carries no `scene` and keeps its older
+// reversal: the type and the label, written as they always were.
+func TestAnOlderForceEndSceneRowKeepsItsOldReversal(t *testing.T) {
+	path := setupAdminDB(t)
+	batch4Exec(t, path, `INSERT INTO player_scene_state(user_id,physical_location,scene_type,scene_key,scene_label,updated_at) VALUES(42,'Old Place','world','','',0)`)
+	batch4Exec(t, path, `INSERT INTO admin_audit_log(admin_user_id,action,target,before_json,after_json,reason,created_at) VALUES(7,'admin.player.force_end_scene','user:42','{"scene_type":"battle","scene_label":"A stuck fight"}','{"scene_type":"world","scene_label":""}','old row',0)`)
+	undoLast(t, path)
+	if got := fmt.Sprint(scalar(t, path, "SELECT scene_type||'|'||scene_label FROM player_scene_state WHERE user_id=42")); got != "battle|A stuck fight" {
+		t.Fatalf("an older row's undo restored %q", got)
+	}
+}
+
+// A player with no scene row is left alone by the lever and by its undo.
+func TestUndoingAForceEndWithNoSceneRowWritesNone(t *testing.T) {
+	path := setupAdminDB(t)
+	applyAdmin(t, path, "admin.player.force_end_scene", map[string]any{"user_id": 42, "reason": "nothing there"})
+	undoLast(t, path)
+	if got := i64(scalar(t, path, "SELECT COUNT(*) FROM player_scene_state WHERE user_id=42")); got != 0 {
+		t.Fatalf("the undo made %d scene row(s) for a player who had none", got)
 	}
 }
 

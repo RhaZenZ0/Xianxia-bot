@@ -101,6 +101,19 @@ var erasureAnonymise = map[string]string{
 		"eventually found, and the grave goes on saying so. Only which cultivator reached it first " +
 		"is personal, so that is the part that goes; the grave stays emptied, because it was - " +
 		"`claimed_game_minute` is what carries that, and nothing here touches it",
+	// The three columns the schema itself clears for a leaving character (ON
+	// DELETE SET NULL) and the sweep deleted anyway (v1.35.0): each is a shared
+	// record whose row outlives the person - a war's field, a sect's building
+	// work, a formation still standing at a place - and a column the schema
+	// says to clear is shared state with a link in it, never a reason to
+	// delete the row. The gate in test_privacy_erasure.py holds every SET NULL
+	// column to this map.
+	"territory_war_actions.user_id": "a war's record - the field was taken or held, and the war's " +
+		"scorers, its allies and its history read the row; who struck the blow is the personal part",
+	"sect_manor_projects.user_id": "a sect's building work, which the sect keeps; who laid the stone " +
+		"is the personal part",
+	"deployed_location_arrays.owner_user_id": "a formation still standing at a place and working on " +
+		"everybody there; who set it is the personal part",
 }
 
 type erasureDisposition int
@@ -210,6 +223,43 @@ type erasureSweep struct {
 // of a request, and its own record that it happened. It is an extra SQL
 // predicate per "table.column", ANDed onto the DELETE. Erasure passes nil,
 // because a data-protection request keeps nothing.
+// erasedOwnerKey is what caravans.owner_key becomes for an erased owner: the
+// column is TEXT NOT NULL and outside erasureSubjectColumns, so the schema walk
+// never sees it, and the settlement (payCaravanOwner) and the collect already
+// read an empty key as nobody's.
+const erasedOwnerKey = ""
+
+// eraseUnwalkedLinksTx anonymises the two places a person's id sits where no
+// column walk can find it (v1.35.0): caravans.owner_key, a TEXT copy of the id
+// on every caravan they ever sent (a death marks the travelling ones lost and
+// keeps the key), and `requested_by` inside the JSON of the update_request and
+// update_result rows, which only an administrator can have written. Each
+// answers the rows it changed under the key the receipt reports it by.
+func eraseUnwalkedLinksTx(conn *storage.Conn, userID int64, now float64) (map[string]int64, error) {
+	out := map[string]int64{}
+	if tableExistsTx(conn, "caravans") {
+		r, err := conn.Execute(`UPDATE caravans SET owner_key=?,updated_at=? WHERE owner_type='player' AND owner_key=?`,
+			[]any{erasedOwnerKey, now, fmt.Sprint(userID)})
+		if err != nil {
+			return nil, fmt.Errorf("erasing caravans.owner_key: %w", err)
+		}
+		if r.RowsAffected > 0 {
+			out["caravans.owner_key"] = r.RowsAffected
+		}
+	}
+	if tableExistsTx(conn, "world_state") {
+		r, err := conn.Execute(`UPDATE world_state SET value_json=json_set(value_json,'$.requested_by',?),updated_at=? WHERE key IN (?,?) AND json_extract(value_json,'$.requested_by')=?`,
+			[]any{erasedUserSentinel, now, updateRequestKey, updateResultKey, userID})
+		if err != nil {
+			return nil, fmt.Errorf("erasing world_state.requested_by: %w", err)
+		}
+		if r.RowsAffected > 0 {
+			out["world_state.requested_by"] = r.RowsAffected
+		}
+	}
+	return out, nil
+}
+
 func applyErasureTargets(conn *storage.Conn, userID int64, targets []erasureTarget, keep map[string]string) (erasureSweep, error) {
 	sweep := erasureSweep{Deleted: map[string]any{}, Anonymised: map[string]any{}}
 	for _, target := range targets {
@@ -333,6 +383,18 @@ func adminErasePlayer(conn *storage.Conn, catalog worlddata.Catalog, adminUserID
 	}
 	deleted, anonymised := sweep.Deleted, sweep.Anonymised
 	rowsDeleted, rowsAnonymised := sweep.RowsDeleted, sweep.RowsAnonymised
+	// The two links the schema walk cannot see (v1.35.0), swept here and not
+	// in applyErasureTargets: a reset shares that function and refuses any
+	// anonymised row it has not released, and these are an erasure's alone -
+	// a reset keeps the account, so its caravans and its requests stay its own.
+	unwalked, err := eraseUnwalkedLinksTx(conn, p.UserID, float64(time.Now().UnixNano())/1e9)
+	if err != nil {
+		return nil, err
+	}
+	for key, n := range unwalked {
+		anonymised[key] = n
+		rowsAnonymised += n
+	}
 	// The audit row records that the request was honoured and how much it
 	// moved. It deliberately carries no character name, no location and no
 	// content - a record of an erasure that quotes the erased data is not an

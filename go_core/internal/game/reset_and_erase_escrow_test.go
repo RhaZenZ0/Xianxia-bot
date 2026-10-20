@@ -179,8 +179,19 @@ INSERT INTO caravans(owner_type,owner_key,origin,destination,status,updated_at) 
 			if got := resetScalarI(t, path, "SELECT COUNT(*) FROM caravans WHERE owner_key='88' AND status='traveling'"); got != 0 {
 				t.Fatalf("%s left %d caravan(s) traveling for an owner who is gone; the tick that settles them pays a wallet that no longer exists", lever.name, got)
 			}
-			if got := resetScalarI(t, path, "SELECT COUNT(*) FROM caravans WHERE owner_key='88' AND status='lost'"); got != 1 {
-				t.Fatalf("%s did not mark the owner's caravan lost", lever.name)
+			// A reset keeps the account, so the lost caravan keeps its owner's
+			// key; an erasure takes the key with the person (v1.35.0), leaving
+			// the row with nobody's key, which is what the settlement reads an
+			// empty key as.
+			key := "88"
+			if lever.name == "admin.player.erase" {
+				key = erasedOwnerKey
+				if got := resetScalarI(t, path, "SELECT COUNT(*) FROM caravans WHERE owner_key='88'"); got != 0 {
+					t.Fatalf("an erasure left %d caravan(s) carrying the erased owner's Discord id", got)
+				}
+			}
+			if got := resetScalarI(t, path, "SELECT COUNT(*) FROM caravans WHERE owner_key=? AND status='lost'", key); got != 1 {
+				t.Fatalf("%s did not mark the owner's caravan lost (key %q)", lever.name, key)
 			}
 			if got := resetScalarI(t, path, "SELECT COUNT(*) FROM caravans WHERE owner_key='77' AND status='traveling'"); got != 1 {
 				t.Fatalf("%s lost somebody else's caravan", lever.name)

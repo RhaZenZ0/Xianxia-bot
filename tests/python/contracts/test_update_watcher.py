@@ -185,16 +185,20 @@ class TheWatcherRunsTheRequestAndReportsIt(unittest.TestCase):
         self.assertFalse(Path(f"{self.state_file}.pending").exists(), "a delivered report was left on disk")
         self.assertFalse(Path(f"{self.state_file}.closed").exists())
 
-    def test_an_update_that_found_nothing_newer_is_not_reported_as_an_install(self):
+    def test_an_update_that_found_nothing_newer_is_reported_unchanged(self):
         """update.sh answers "already the newest" with exit 0 and installs
         nothing. Reported `done`, the card reads "updated to v1.3.5" for an
-        update that never happened."""
+        update that never happened; reported `failed` (v1.34.0) it read as a
+        failure. It is its own outcome since v1.35.0, `unchanged`, with the
+        version still installed."""
         calls = self._run("current", self.REQUEST)
         self.assertNotIn("done", self._statuses(calls), "an update that installed nothing was reported done")
-        failed = [p for op, p in calls if op == "admin.server.update_status" and p["status"] == "failed"]
-        self.assertEqual(len(failed), 1, calls)
-        self.assertIn("nothing was changed", failed[0]["detail"])
-        self.assertIn("already the newest", failed[0]["detail"])
+        self.assertNotIn("failed", self._statuses(calls), "an update that installed nothing was reported failed")
+        unchanged = [p for op, p in calls if op == "admin.server.update_status" and p["status"] == "unchanged"]
+        self.assertEqual(len(unchanged), 1, calls)
+        self.assertIn("nothing to update", unchanged[0]["detail"])
+        self.assertIn("already the newest", unchanged[0]["detail"])
+        self.assertEqual(unchanged[0]["installed_version"], "1.3.5", "the result names the version still installed")
         self.assertFalse(self._world(calls)[-1]["enabled"], "the world stayed shut after an update that did nothing")
 
     def test_a_refused_preflight_reports_the_env_migration_and_nothing_changed(self):

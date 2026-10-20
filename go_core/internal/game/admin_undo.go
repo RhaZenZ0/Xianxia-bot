@@ -215,16 +215,8 @@ var reversibleAdminActions = map[string]reverseFunc{
 		args = append(args, uid, gateRealmIndex)
 		return []sqlStmt{{`UPDATE tribulation_state SET ` + strings.Join(sets, ",") + ` WHERE user_id=? AND gate_realm_index=?`, args, nil}}, nil
 	},
-	"admin.player.adjust_item": reverseAdjustItem,
-	"admin.player.force_end_scene": func(before, after map[string]any, target string, redo bool) ([]sqlStmt, error) {
-		uid, err := parseTargetUserID(target)
-		if err != nil {
-			return nil, err
-		}
-		snap := pickSnapshot(before, after, redo)
-		return []sqlStmt{{`UPDATE player_scene_state SET scene_type=?,scene_label=? WHERE user_id=?`,
-			[]any{fmt.Sprint(snap["scene_type"]), fmt.Sprint(snap["scene_label"]), uid}, nil}}, nil
-	},
+	"admin.player.adjust_item":     reverseAdjustItem,
+	"admin.player.force_end_scene": reverseForceEndScene,
 	"admin.npc.relocate": func(before, after map[string]any, target string, redo bool) ([]sqlStmt, error) {
 		name, err := parseNPCTarget(target)
 		if err != nil {

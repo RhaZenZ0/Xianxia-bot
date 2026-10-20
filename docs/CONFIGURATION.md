@@ -554,6 +554,12 @@ watcher itself died mid-install, look in `update_watch.log` first: once `update.
 starting `update_watch.sh` again reports the request failed, which closes it at once. Cancelling
 does not stop `update.sh`, and anything it installed stays installed.
 
+**Outcomes.** A request closes one of three ways and the card's *Last outcome* line names each:
+*updated to vX* when `update.sh` installed a release, *already up to date* (v1.35.0) when it found
+nothing newer on the channel - the world is reopened and nothing was changed - and *failed*, with
+the updater's own sentence, when it refused or rolled back. Until v1.35.0 an up-to-date run was
+reported as a failure for want of a third word.
+
 ## Daily route check (v0.27.0)
 
 Every `ROUTE_AUDIT_HOURS` the bot pings each configured narration route with

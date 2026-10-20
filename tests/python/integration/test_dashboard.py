@@ -558,6 +558,10 @@ class QuestsWorkbenchTests(unittest.IsolatedAsyncioTestCase):
         # browser, so a type the engine cannot complete cannot be chosen.
         self.assertEqual(set(vocab["objective_types"]), set(OBJECTIVE_TYPES))
         self.assertIn(self.location, vocab["locations"])
+        # One list per target kind (v1.35.0), so a realm or a Law is picked
+        # from what it may name and not from the scene-action list.
+        self.assertEqual(set(vocab["targets"]), {spec["target"] for spec in OBJECTIVE_TYPES.values() if spec["target"]})
+        self.assertTrue(all(vocab["targets"].values()), "a target kind's picker offers nothing")
         self.assertEqual(vocab["max_objectives"], MAX_OBJECTIVES)
         self.assertEqual(vocab["hold_policies"], ["keep", "migrate", "revoke"])
 

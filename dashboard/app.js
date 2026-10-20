@@ -757,7 +757,7 @@ async function loadAdmin(){
    :(upd.watcher_running?`${pill('watcher running','good')} <span class="muted">last seen ${esc(upd.watcher_seen_seconds_ago)}s ago</span>`
    :`${pill('watcher not running','bad')} <span class="muted">last seen ${esc(Math.round(upd.watcher_seen_seconds_ago/60))} min ago — restart <code>update_watch.sh</code> on the NAS</span>`);
  const updStatus=updReq&&upd.in_progress?`<div><b>In progress:</b> ${esc(updReq.status)}${updReq.detail?` — ${esc(updReq.detail)}`:''} <span class="muted">(requested ${new Date(Number(updReq.requested_at)*1000).toLocaleString()})</span></div>`:'';
- const updLast=updRes?`<div><b>Last outcome:</b> ${updRes.status==='done'?'✅ updated to v'+esc(updRes.installed_version||'?'):'❌ failed'}${updRes.detail?` — ${esc(updRes.detail)}`:''} <span class="muted">(${new Date(Number(updRes.finished_at)*1000).toLocaleString()})</span></div>`:'';
+ const updLast=updRes?`<div><b>Last outcome:</b> ${updRes.status==='done'?'✅ updated to v'+esc(updRes.installed_version||'?'):updRes.status==='unchanged'?'✔ already up to date (v'+esc(updRes.installed_version||'?')+')':'❌ failed'}${updRes.detail?` — ${esc(updRes.detail)}`:''} <span class="muted">(${new Date(Number(updRes.finished_at)*1000).toLocaleString()})</span></div>`:'';
  const updCancelled=updReq&&updReq.status==='cancelled'?`<div><b>Last request:</b> ⛔ cancelled${updReq.detail?` — ${esc(updReq.detail)}`:''}</div>`:'';
  const updCanAsk=!upd.in_progress&&upd.watcher_running;
  // An open request a GM may close: not yet picked up, or nothing is acting on it any more (the
@@ -966,8 +966,8 @@ async function loadPlayerEditor(){
  on('setPillToxicity',()=>run('player.set_pill_toxicity',{user_id:uid,pill_toxicity:Number(val('toxicityValue')),reason:reason('craftReason')},`Set pill toxicity to ${val('toxicityValue')}?`));
  const rankSel=el('sectRankName');
  if(rankSel&&rankSel.tagName==='SELECT'){rankSel.onchange=()=>{const rung=rankLadder.find(x=>x.name===rankSel.value);if(rung)el('sectRankLevel').value=rung.level};if(!r.sect_name)rankSel.onchange()}
- on('setSect',()=>{if(!val('sectName')){out.innerHTML=resultBox('Pick a sect first.',false);return}run('player.set_sect',{user_id:uid,sect_name:val('sectName'),rank_name:val('sectRankName'),rank_level:Number(val('sectRankLevel')),reason:reason('sectReason')},val('sectName')!==(r.sect_name||'')&&r.sect_name?`Move this player from ${r.sect_name} to ${val('sectName')}? Their contribution starts over.`:'')});
- on('removeSect',()=>run('player.set_sect',{user_id:uid,remove:true,reason:reason('sectReason')},'Remove this player\'s sect membership entirely?'));
+ on('setSect',()=>{if(!val('sectName')){out.innerHTML=resultBox('Pick a sect first.',false);return}run('player.set_sect',{user_id:uid,sect_name:val('sectName'),rank_name:val('sectRankName'),rank_level:Number(val('sectRankLevel')),reason:reason('sectReason')},val('sectName')!==(r.sect_name||'')&&r.sect_name?`Move this player from ${r.sect_name} to ${val('sectName')}? Their contribution starts over and any master or disciple bond in ${r.sect_name} ends.`:'')});
+ on('removeSect',()=>run('player.set_sect',{user_id:uid,remove:true,reason:reason('sectReason')},'Remove this player\'s sect membership entirely? Any master or disciple bond in the sect ends with it.'));
  on('setContribution',()=>{const payload={user_id:uid,contribution_points:Number(val('contribPoints')),reason:reason('contribReason')};if(val('contribEarned')!=='')payload.contribution_earned=Number(val('contribEarned'));run('player.set_sect_contribution',payload)});
  on('setMaster',()=>run('player.set_master',{disciple_user_id:uid,master_user_id:val('masterId'),reason:reason('masterReason')},'Make the chosen character this player\'s master?'));
  on('clearMaster',()=>run('player.set_master',{disciple_user_id:uid,clear:true,reason:reason('masterReason')},'Clear this player\'s master?'));
@@ -1194,7 +1194,7 @@ function renderQuestEditor(){
    <div class="card" style="margin-bottom:8px" data-obj="${i}">
     <div class="grid3">
      <label>Type<select data-otype="${i}">${types.map(([t])=>`<option value="${esc(t)}"${String(o.type)===t?' selected':''}>${esc(t)}</option>`).join('')}</select></label>
-     <label>Target${targetFor(o.type)?'':' (none for this type)'}<input data-otarget="${i}" value="${esc(o.target||'')}" ${targetFor(o.type)?`list="${targetFor(o.type)==='location'?'qeLocations':targetFor(o.type)==='npc'?'qeNpcs':'qeScene'}"`:'disabled'}></label>
+     <label>Target${targetFor(o.type)?'':' (none for this type)'}<input data-otarget="${i}" value="${esc(o.target||'')}" ${targetFor(o.type)?`list="qeTarget-${esc(targetFor(o.type))}"`:'disabled'}></label>
      <label>Count<input data-ocount="${i}" type="number" min="1" max="${n(v.max_objective_count)}" value="${Math.max(1,Number(o.count||1))}"></label>
     </div>
     <button class="btn danger" data-odel="${i}">Remove</button>
@@ -1226,10 +1226,9 @@ function renderQuestEditor(){
   ${d.quest_key?`<button class="btn danger" id="qeDiscard">Discard</button>`:''}
  </div>
  <div id="qeOut"></div>
- <datalist id="qeLocations">${(v.locations||[]).map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
  <datalist id="qeNpcs">${(v.npcs||[]).map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
- <datalist id="qeScene">${(v.scene_actions||[]).map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
- <datalist id="qeItemIds">${(v.items||[]).map(x=>`<option value="${esc(x)}">`).join('')}</datalist>`;
+ <datalist id="qeItemIds">${(v.items||[]).map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
+ ${Object.entries(v.targets||{}).map(([kind,opts])=>`<datalist id="qeTarget-${esc(kind)}">${(opts||[]).map(x=>`<option value="${esc(x.value)}">${esc(x.label)}</option>`).join('')}</datalist>`).join('')}`;
  bindQuestEditor();
 }
 

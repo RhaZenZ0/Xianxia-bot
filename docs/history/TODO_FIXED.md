@@ -9,6 +9,44 @@ section in it.
 
 ## Fixed
 
+- **fixed (v1.35.0)** — *A GM's set_sect left the NPC master bond.* `endSectBondsTx` is the one door
+  that ends a sect's bonds on a person - the `sect_lineage` rows in both directions and the NPC
+  master's row - and `sect.ascend` and `admin.player.set_sect` (a removal, or a move to another sect)
+  both call it; a placement in the same sect keeps them, and the audit row records the master ended
+  and the lineage rows. `TestAGMsPlacementOutOfASectEndsTheMasterBonds` drives the three cases.
+- **fixed (v1.35.0)** — *`admin.player.force_end_scene` wrote more than its undo restored.* The audit
+  row carries the whole scene row (`sceneSnapshot`, the teleport's shape) and `reverseForceEndScene`
+  puts all five columns back, nil-safe on the channel; an older row without `scene` keeps the
+  two-column reversal, and a player with no scene row is left alone both ways.
+- **fixed (v1.35.0)** — *The update card had no "nothing to update" outcome.* `unchanged` is the
+  third terminal report: the engine closes the request and writes the result with the version still
+  installed, the watcher sends it with "nothing to update" and the updater's sentence, the dashboard
+  closes on it and the card prints "already up to date (vX)".
+  `test_every_reader_of_a_closed_request_names_the_same_outcomes` holds the engine's three
+  statements, the watcher's case list and the card to one list.
+- **fixed (v1.35.0)** — *Other columns the schema clears on a character's leaving were still
+  deleted.* `territory_war_actions.user_id`, `sect_manor_projects.user_id` and
+  `deployed_location_arrays.owner_user_id` are anonymised and released (`erasureAnonymise`,
+  `characterResetReleased`), every reader of them already took NULL, and
+  `test_every_column_the_schema_clears_is_anonymised` holds every `ON DELETE SET NULL` column to
+  `characters` to the anonymise map.
+- **fixed (v1.35.0)** — *An erased owner's Discord id stayed in `caravans.owner_key`, and an erased
+  GM's in the update rows.* `eraseUnwalkedLinksTx` runs in the erase lever alone (a reset shares the
+  sweep and refuses an anonymised row it has not released): every caravan the person sent takes the
+  empty owner key the settlement already reads as nobody's, and `requested_by` inside
+  `update_request` and `update_result` takes the sentinel. The receipt reports both.
+- **fixed (v1.35.0)** — *`docs/PRIVACY.md` did not name the player-keyed `world_state` rows the
+  erasure deletes.* It names them in plain words, and the two anonymisations above beside them;
+  `test_the_privacy_notice_names_what_the_schema_walk_cannot_see` holds it to the code.
+- **fixed (v1.35.0)** — *The dashboard quest editor suggested scene actions for a target it had no
+  picker for.* `objective_target_choices` turns the validator's own lookups into one list per target
+  kind, the read carries them as `vocabulary.targets`, and the editor binds a `<datalist>` per kind;
+  `test_quest_target_pickers.py` drives every first choice through the validator.
+- **fixed (v1.35.0)** — *The journal had no owner check.* `QuestDashboardView.interaction_check`
+  refuses another member in the sentence its own items used.
+- **fixed (v1.35.0)** — *A picker for `/boss claim`.* `claim_hub_options` lists the raid rewards
+  waiting for the player (`get_unclaimed_boss_rewards`: boss, lair, reward), registered as the leaf's
+  provider, its autocomplete and its hint, and the pair is out of `STILL_TYPED`.
 - **fixed (v1.35.0)** — *The samsara wait was the caller's.* `combat.turn`, `combat.technique`,
   `combat.recovery_item` and `lifecycle.true_death` took `minutes_per_year`, `base_samsara_years` and
   `max_wait_seconds` off the payload behind `maxI64(1, ...)`, so a caller that omitted them gave a

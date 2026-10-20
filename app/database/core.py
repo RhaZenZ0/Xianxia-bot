@@ -8151,6 +8151,22 @@ class Database:
         return rows
 
 
+    async def get_unclaimed_boss_rewards(self, user_id: int) -> list[dict[str, Any]]:
+        """The raid rewards waiting for one raider (v1.35.0): every
+        `boss_reward_claims` row of theirs not yet claimed, with the encounter's
+        boss and lair, newest first. The `/boss claim` picker reads it; the
+        claim itself is the engine's (`boss.claim`)."""
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                "SELECT c.encounter_id,c.currency_amount,c.item_id,c.item_quantity,"
+                "e.boss_name,e.location,e.template_key,e.finished_game_minute "
+                "FROM boss_reward_claims c JOIN boss_encounters e ON e.encounter_id=c.encounter_id "
+                "WHERE c.user_id=? AND c.claimed=0 ORDER BY c.encounter_id DESC LIMIT 25",
+                (int(user_id),),
+            )
+            return [dict(r) for r in await cur.fetchall()]
+
     async def get_wild_beast_encounters(
         self, user_id: int, *, game_minute: int, location: str | None = None, include_resolved: bool = False,
     ) -> list[dict[str, Any]]:

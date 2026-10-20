@@ -269,6 +269,11 @@ var characterResetReleased = map[string][2]string{
 	"player_families.founder_user_id":      {"the family they founded", "families they founded"},
 	"auctions.current_bidder_user_id":      {"the winning bid on an auction lot that has closed", "winning bids on auction lots that have closed"},
 	"stall_sales.buyer_user_id":            {"a purchase at another cultivator's stall", "purchases at other cultivators' stalls"},
+	// The three columns the schema clears for a leaving character (v1.35.0),
+	// released the way the rest are: the record stays, the link goes.
+	"territory_war_actions.user_id":          {"a blow struck in a sect war", "blows struck in sect wars"},
+	"sect_manor_projects.user_id":            {"a sect building they worked on", "sect buildings they worked on"},
+	"deployed_location_arrays.owner_user_id": {"a formation they set", "formations they set"},
 }
 
 // characterResetUnknown is who a kept row says did it once the cultivator who

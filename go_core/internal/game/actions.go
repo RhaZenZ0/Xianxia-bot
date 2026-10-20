@@ -1892,19 +1892,27 @@ func adminForceEndScene(conn *storage.Conn, adminUserID int64, raw json.RawMessa
 	if row == nil {
 		return nil, errors.New("character not found")
 	}
-	beforeRes, err := conn.Execute(`SELECT scene_type,scene_label FROM player_scene_state WHERE user_id=?`, []any{uid})
+	// The snapshot is the whole scene row the lever overwrites (v1.35.0):
+	// type, key, label, channel and metadata, the shape the teleport's undo
+	// reads. Until then it held the type and the label alone, so an undone
+	// force-end left a scene with its old type and none of its key, channel
+	// or metadata. The flat two keys stay beside it for older readers; `scene`
+	// is nil for a player with no row, whom the UPDATE below leaves alone.
+	sceneBefore, err := sceneSnapshot(conn, uid)
 	if err != nil {
 		return nil, err
 	}
-	before := map[string]any{"scene_type": "world", "scene_label": ""}
-	if beforeRow := firstRowMap(beforeRes); beforeRow != nil {
-		before = map[string]any{"scene_type": beforeRow["scene_type"], "scene_label": beforeRow["scene_label"]}
+	before := map[string]any{"scene_type": "world", "scene_label": "", "scene": sceneBefore}
+	var sceneAfter map[string]any
+	if sceneBefore != nil {
+		before["scene_type"], before["scene_label"] = sceneBefore["scene_type"], sceneBefore["scene_label"]
+		sceneAfter = map[string]any{"physical_location": sceneBefore["physical_location"], "scene_type": "world", "scene_key": "", "scene_label": "", "channel_id": nil, "metadata_json": "{}"}
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
 	if _, err = conn.Execute(`UPDATE player_scene_state SET scene_type='world',scene_key='',scene_label='',channel_id=NULL,metadata_json='{}',updated_at=? WHERE user_id=?`, []any{now, uid}); err != nil {
 		return nil, err
 	}
-	after := map[string]any{"scene_type": "world", "scene_label": ""}
+	after := map[string]any{"scene_type": "world", "scene_label": "", "scene": sceneAfter}
 	if err := auditAdmin(conn, adminUserID, "admin.player.force_end_scene", fmt.Sprintf("user:%d", uid), before, after, fmt.Sprint(p["reason"])); err != nil {
 		return nil, err
 	}
@@ -2168,7 +2176,15 @@ func adminSetSect(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (a
 		if _, err = conn.Execute(`DELETE FROM sect_membership WHERE user_id=?`, []any{uid}); err != nil {
 			return nil, err
 		}
-		if err := auditAdmin(conn, adminUserID, "admin.player.set_sect", fmt.Sprintf("user:%d", uid), before, map[string]any{"sect_name": nil}, fmt.Sprint(p["reason"])); err != nil {
+		// Out of the sect is out of its bonds (v1.35.0), the way the ascent
+		// leaves them: a player a GM removed kept their master's terms until
+		// they pressed Leave.
+		master, lineage, err := endSectBondsTx(conn, uid)
+		if err != nil {
+			return nil, err
+		}
+		after := map[string]any{"sect_name": nil, "npc_master_ended": master, "lineage_rows_ended": lineage}
+		if err := auditAdmin(conn, adminUserID, "admin.player.set_sect", fmt.Sprintf("user:%d", uid), before, after, fmt.Sprint(p["reason"])); err != nil {
 			return nil, err
 		}
 		if err := conn.Commit(); err != nil {
@@ -2202,6 +2218,13 @@ func adminSetSect(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (a
 	// count along - the count the next credit then promoted on. The same sect
 	// keeps both. The snapshot above holds both columns as they were.
 	if beforeRow != nil && fmt.Sprint(beforeRow["sect_name"]) != sectName {
+		// And the old sect's bonds end with the move (v1.35.0): a master in
+		// the old sect, or disciples there, are the old sect's people.
+		master, lineage, err := endSectBondsTx(conn, uid)
+		if err != nil {
+			return nil, err
+		}
+		after["npc_master_ended"], after["lineage_rows_ended"] = master, lineage
 		if pointsColumn {
 			if _, err = conn.Execute(`UPDATE sect_membership SET contribution_points=0 WHERE user_id=?`, []any{uid}); err != nil {
 				return nil, err

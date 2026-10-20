@@ -15,7 +15,7 @@ from ...ops.game_engine import GameEngineError
 from ..channels import _report_game_ui_error
 from ..character_state import announce_quest_progress, record_quest_progress
 from .battle import MANUAL_TECHNIQUE_PREFIX
-from ..hubs import panel_timeout, register_hub_option_hint
+from ..hubs import HubDynamicOption, panel_timeout, register_hub_option_hint, register_hub_option_provider
 from ..registry import registered_group_command
 from ..runtime import (
     _explain_engine_error,
@@ -24,6 +24,7 @@ from ..runtime import (
     WORLD,
     _user_action_lock,
     current_world_time,
+    log,
     require_character,
     reply_long,
     serialized_user_action,
@@ -659,6 +660,51 @@ async def boss_claim(interaction: discord.Interaction, encounter_id: int) -> Non
     result, error = await _raid_claim(interaction.user.id, f"discord:{interaction.id}:boss.claim", encounter_id)
     await interaction.followup.send(error or _claim_line(result or {}), ephemeral=False)
     await announce_quest_progress(interaction, list((result or {}).get("quest_progress") or []))
+
+
+async def claim_hub_options(interaction: discord.Interaction, current: str) -> list[HubDynamicOption]:
+    """The raid rewards waiting for the player, newest first (v1.35.0): the
+    one leaf the Realm Road sends a player to before any raid exists asked for a
+    typed encounter id. An empty list draws the hint, never a form; the
+    provider answers nothing rather than raising, as the beast pickers do."""
+    try:
+        rows = list(await DB.get_unclaimed_boss_rewards(interaction.user.id))
+    except Exception:
+        log.warning("Could not load the raid rewards waiting for a picker", exc_info=True)
+        return []
+    options: list[HubDynamicOption] = []
+    for row in rows[:25]:
+        lair = str(row.get("location") or "")
+        world = str((WORLD.locations.get(lair) or {}).get("world") or "")
+        coin = WORLD.currency_name(WORLD.world_base_currency(world)) if world else "coin"
+        reward = f"{int(row.get('currency_amount') or 0)} {coin}"
+        if row.get("item_id") and int(row.get("item_quantity") or 0) > 0:
+            reward += f" + {WORLD.item_name(str(row['item_id']))} ×{int(row['item_quantity'])}"
+        options.append(HubDynamicOption(
+            label=f"{row.get('boss_name') or 'Boss'} — {lair or 'its lair'}"[:100],
+            value=int(row["encounter_id"]),
+            description=f"encounter #{int(row['encounter_id'])} • {reward}"[:100],
+            emoji="🏆",
+        ))
+    return options
+
+
+async def claim_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[int]]:
+    needle = current.casefold().strip()
+    return [
+        app_commands.Choice(name=option.label[:100], value=int(option.value))
+        for option in await claim_hub_options(interaction, current)
+        if not needle or needle in option.label.casefold() or needle == str(option.value)
+    ][:25]
+
+
+boss_claim.autocomplete("encounter_id")(claim_autocomplete)
+register_hub_option_provider(boss_claim, "encounter_id", claim_hub_options)
+register_hub_option_hint(
+    boss_claim,
+    "encounter_id",
+    "No raid reward is waiting for you. Win a boss raid under **/combat → Boss Raids → Start** first; the reward is claimed here afterwards.",
+)
 
 
 @registered_group_command(hunter_group, name="status", description="View the autonomous bounty hunter currently tracking this incarnation")

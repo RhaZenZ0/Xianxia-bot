@@ -525,6 +525,51 @@ def public_locations(world: Any) -> dict[str, dict[str, Any]]:
     return {name: loc for name, loc in dict(world.locations).items() if not loc.get("private")}
 
 
+def objective_target_choices(world: Any) -> dict[str, list[dict[str, str]]]:
+    """Every value a target of each kind may name, built the way
+    `validate_quest_definition` accepts it, one list per target kind (v1.35.0).
+
+    The dashboard's quest editor binds a picker per kind to these. It used to
+    bind a list only for `location` and `npc` and offer the scene-action list
+    for every other kind, so a `realm` or a `law` target was offered wrong
+    values rather than none. Each list is the validator's own lookup turned
+    into choices, so a value picked here is a value the validator passes;
+    test_quest_target_pickers.py drives every first choice through it.
+    """
+    data = dict(getattr(world, "data", {}) or {})
+    law_system = dict(data.get("law_system") or {})
+    flames = dict(dict(data.get("flame_system") or {}).get("flames") or {})
+    exams: list[dict[str, str]] = []
+    for trade, ladder in sorted(dict(data.get("profession_exams") or {}).items()):
+        for exam in list(ladder or []):
+            key = str(dict(exam).get("quest_key") or "").strip()
+            if key:
+                exams.append({"value": key, "label": f"{dict(exam).get('rank_name') or ''} examination in {trade}".strip()})
+    from .advanced_runtime import BOSS_TEMPLATES
+
+    def named(entries: dict[str, Any]) -> list[dict[str, str]]:
+        return [{"value": str(key), "label": str(dict(value or {}).get("name") or key)} for key, value in sorted(entries.items())]
+
+    return {
+        "location": [{"value": name, "label": name} for name, loc in sorted(dict(getattr(world, "locations", {}) or {}).items())
+                     if not dict(loc or {}).get("private")],
+        "npc": [{"value": name, "label": name} for name, npc in sorted(dict(getattr(world, "npcs", {}) or {}).items())
+                if not isinstance(dict(npc or {}).get("hidden_master"), dict)],
+        "scene_action": [{"value": key, "label": key} for key in SCENE_ACTION_KEYS],
+        "recipe": [{"value": key, "label": key} for key in sorted(dict(getattr(world, "recipes", {}) or {}))],
+        "item": named(dict(getattr(world, "items", {}) or {})),
+        "realm": [{"value": str(r.get("name")), "label": str(r.get("name"))}
+                  for r in list(getattr(world, "realms", []) or []) if isinstance(r, dict) and r.get("name")],
+        "flame": named(flames),
+        "boss": sorted(({"value": str(t.get("name")), "label": str(t.get("name"))} for t in BOSS_TEMPLATES.values() if t.get("name")),
+                       key=lambda x: x["value"]),
+        "secret_realm": named(dict(getattr(world, "secret_realms", {}) or {})),
+        "law": named(dict(law_system.get("laws") or {})),
+        "law_technique": named(dict(law_system.get("techniques") or {})),
+        "profession_exam": exams,
+    }
+
+
 def validate_quest_definition(draft: dict[str, Any], world: Any, budget: dict[str, int]) -> tuple[dict[str, Any] | None, list[str]]:
     """Normalise a draft into the catalog shape, or explain why it cannot be.
 

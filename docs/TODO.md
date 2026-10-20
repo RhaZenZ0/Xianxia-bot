@@ -30,16 +30,6 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
 - **deferred (design)** — *Black-market and fence prices are not read against the ladder.*
   `black_market.trade` sells and fences at its own prices in the post's coin; the arbitrage gate does
   not walk it.
-- **deferred (design)** — *Other columns the schema clears on a character's leaving are still
-  deleted.* `territory_war_actions.user_id`, `sect_manor_projects.user_id` and
-  `deployed_location_arrays.owner_user_id` say `ON DELETE SET NULL` and the sweep still deletes their
-  rows. Each is a shared record whose row outlives the person; what a reset does with each is a design
-  call per table, and a gate ("every SET NULL column is anonymised or named here") waits on it.
-- **deferred (privacy, low)** — *An erased owner's Discord id stays in `caravans.owner_key`.* The row is
-  marked lost but keeps the TEXT key, which no subject column covers; anonymising it means a sentinel
-  the settlement and the dashboard's caravan list already treat as "no owner".
-- **deferred (privacy, low)** — *`docs/PRIVACY.md` does not name the player-keyed `world_state` rows
-  the erasure now deletes.*
 - **deferred (design)** — *Permanent qi that a settle already took.* Every `qi_max_bonus` starts at 0:
   the qi a settle rebuilt over before v1.34.0 is in no column and cannot be told from the body's own
   figure. The honest repair is a GM `set_resource_caps` per player, or a one-off replay of completed
@@ -57,10 +47,6 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   shipped commissions and realm-road quests pay more than the default authoring budget, so they cannot
   be opened and saved without lowering the reward first; the refusal names the budget. Whether an
   unchanged reward should pass is a decision.
-- **deferred (design)** — *The update card has no "nothing to update" outcome.* An up-to-date
-  `--upgrade` is reported as `failed` with "nothing was changed: already the newest", because the
-  engine's terminal statuses are `done` and `failed` and the card prints `done` as "updated to vX". A
-  third status needs the engine's `updateStatuses`, the card and the watcher together.
 - **deferred (design)** — *The other capped walks over the roster.* `npcCrimes` (cap 5),
   `npcBeastHunts` (cap 5) and `npcChildbirth` (cap 6) read their people in name order to a cap; the
   first two rarely bind and childbirth consumes the state it walks. If a content change makes one bind,
@@ -87,12 +73,6 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
 - **deferred (design)** — *Event manifestations have no per-day reward cap.* A `combat.finalize`
   against an `event:` battle has no `target_key`, so insight and tempering are not limited per day;
   the site's finite beasts bound it. Decided (v1.35.0): left; the roster is the bound.
-- **deferred (design)** — *A GM's set_sect leaves the NPC master bond.* `admin.player.set_sect`
-  (remove or change) leaves `sect_lineage` and `npc_mentorships` in place, and `livingNPCMasterTx`
-  checks only that the master is alive, not that they are in the disciple's sect, so a player a GM
-  moves out of a sect keeps the master's terms until they press Leave. Either the lever ends the
-  bonds, as `sect.ascend` does since v1.33.0, or the readers require membership; the owner has not
-  chosen.
 - **deferred (design)** — *A table-level samsara gate.* v1.33.0's gate holds every column of
   `characters` to being reset or kept by a rebirth. The rows of other tables have no such gate: about
   fifty tables carry a `user_id` and are in neither wipe list (`soul_legacy`, `reincarnation_state` and
@@ -118,11 +98,6 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   wait was rc.56's class found one action at a time (v1.35.0 closed it); a gate that walks every
   payload struct the engine unmarshals and holds each field against a list of what a caller may
   state would find the next one before a release does. Not built yet: the list is the decision.
-- **deferred (design)** — *`admin.player.force_end_scene` writes more than its undo restores.* The
-  forward action writes `scene_key`, `channel_id` and `metadata_json` as well as the type and label,
-  and snapshots only the two its undo puts back, so an undone force-end leaves a scene with its old
-  type and label and none of its key, channel or metadata - the opposite shape to the undo fault
-  v1.33.0 closed, and putting it right widens what the audit row records.
 - **deferred (design)** — *A realm an old undo reopened stays open.* Undos run under v1.23.1 to
   v1.32.0 could put `active=1` back on a `completed=1` perfection row, which the quest and trial
   actions read as an open path. No migration writes it back, because nothing records whether a GM
@@ -169,11 +144,6 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   its type, so a descent through an array reports `world_cross` and completes a quest that asks to
   cross *up*; `abode.py` and `cultivation.py` report them without a target. The right target (the
   world crossed into, or the gate's key) is a content decision.
-- **deferred (design)** — *The dashboard quest editor suggests scene actions for a target it has no
-  picker for.* `loadQuestEditor` binds a `<datalist>` for `location` and `npc` targets and falls
-  back to the scene-action list for every other kind (`realm`, `flame`, `boss`, `secret_realm`,
-  `law`, `law_technique`, now `profession_exam`), which suggests wrong values rather than none. The
-  validator accepts the right ones, so nothing breaks; a picker per kind off `vocabulary` is the fix.
 - **deferred (design)** — *A watcher restarted after a SIGKILL mid-install reports it failed while
   `update.sh` is still working.* `interrupted()` and `reopen_world 1` in `update_watch.sh` do not
   consult `update.sh`'s own lock, so a watcher started again after the first was SIGKILLed (no EXIT
@@ -186,16 +156,9 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   the button sooner and let a GM cancel an install that is merely slow on a cold NAS build; the
   length is `updateInstallLeaseSeconds` (and the card's twin) if the owner wants it moved. Decided
   (v1.35.0): two hours stays.
-- **deferred (design)** — *A picker for `/boss claim`.* It is the one leaf the Realm Road sends a
-  player to before any raid exists, and it still asks for a typed encounter id; taking it out of
-  `STILL_TYPED` wants a provider that lists the player's open encounters, and the Next label could
-  then say where the encounter comes from.
 - **deferred (design)** — *The classic journal's door edit.* `open_hub_in_place` edits the classic
   (non-layout) journal message without `content=None, embed=None`; if Discord refuses that edit the
   door opens a new panel and never presses the leaf. Not verified live.
-- **deferred (design)** — *The journal has no owner check.* `QuestDashboardView` has no
-  `interaction_check` and `MenuNextButton` checks no owner, so another member can press a public
-  journal's door and turn it into their own hub. Needs a decision on whether the journal is public.
 - **deferred (design)** — *One engine query for the panel's gate state.* After v1.31.2 a refresh is one
   session, about sixteen SELECTs and seven engine actions in production. A single `panel.gates` query in
   Go, or the sixteen SELECTs through `/v1/db/batch`, would make it about ten round trips; not built,
@@ -231,10 +194,6 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   the lock's pid answers `kill -0`, and a rebooted NAS can hand that pid to another process. Rare,
   and the remedy is `rm -rf` on the lock directory; a lock that also records a boot id would tell
   the two apart.
-- **deferred (privacy, low)** — *An erased GM's id in the update rows.* `world_state['update_request']` and
-  `update_result` carry `requested_by` inside their JSON, and the erasure sweep walks columns, so an
-  erased GM's Discord id stays in those two blobs. A one-line anonymise beside the sweep; low
-  privacy weight, since only administrators can request an update.
 - **deferred (design)** — *A stranger's way to Underworld Contacts 15.* v1.11.1 let a broker buy
   from a stranger, +1 standing a sale, but a post stocks six rows drawn from ninety restricted,
   special or legendary items none of which any shelf sells, so each +1 costs a rare item and the

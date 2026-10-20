@@ -173,7 +173,7 @@ pending_holds_the_poll() {
     [ -f "$PENDING_FILE" ] || return 1
     read_pending
     case "$2" in
-        ""|done|failed|cancelled) open=0 ;;
+        ""|done|unchanged|failed|cancelled) open=0 ;;
         *) open=1 ;;
     esac
     if [ "$open" -eq 0 ] || [ "$1" != "$p_nonce" ]; then
@@ -236,7 +236,8 @@ finish() {
 
 run_update() {
     # $1 nonce, $2 channel. update.sh's own exit code and log say what happened:
-    # 0 is installed, unless it said "already the newest" (nothing to install);
+    # 0 is installed, unless it said "already the newest" (nothing to install,
+    # reported `unchanged`);
     # nonzero before it ever said "Stopping" means the .env preflight refused
     # and nothing was changed; nonzero after means its own rollback already ran.
     report "$1" acked "" || return 0
@@ -256,12 +257,14 @@ run_update() {
     cat "$run_log" >> "$LOG_FILE"
     if [ "$run_status" -eq 0 ] && grep -q 'is already the newest on the' "$run_log"; then
         # update.sh answers "already the newest" with exit 0 and installs
-        # nothing. `done` is what the card prints as "updated to vX", so a
-        # request that changed nothing is reported as one, with the updater's
-        # own sentence. (Keyed on that sentence, not on a missing "Stopping"
+        # nothing: its own outcome, `unchanged` (v1.35.0), with the updater's
+        # sentence and the version that is still installed. It used to be
+        # reported `failed`, because `done` is what the card prints as
+        # "updated to vX". (Keyed on that sentence, not on a missing "Stopping"
         # line: a tree without stop.sh installs without printing one.)
-        outcome=failed
-        detail="nothing was changed: $(grep 'is already the newest on the' "$run_log" | tail -n 1 | cut -c1-200)"
+        installed=$(tr -d '[:space:]' < "$PROJECT_DIR/VERSION" 2>/dev/null || true)
+        outcome=unchanged
+        detail="nothing to update: $(grep 'is already the newest on the' "$run_log" | tail -n 1 | cut -c1-200)"
     elif [ "$run_status" -eq 0 ]; then
         installed=$(tr -d '[:space:]' < "$PROJECT_DIR/VERSION" 2>/dev/null || true)
         outcome=done; detail="installed ${installed:-the new release}"

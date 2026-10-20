@@ -2773,6 +2773,20 @@ async def run(url: str, token: str, db_path: str) -> Report:
                  gm("admin.server.update_status", {"nonce": nonce, "status": "failed"}), "no update is in progress")
     await step(report, "a heartbeat with no request open",
                gm("admin.server.update_status", {"status": "heartbeat"}))
+    # v1.35.0: an update that found nothing newer closes as `unchanged`, a
+    # third outcome beside done and failed, with the version still installed.
+    asked_current = await audited("admin.server.request_update",
+                                  {"channel": "stable", "reason": "playtest {unchanged}"}, name="the GM asks while already current")
+    current = str((asked_current or {}).get("nonce") or "")
+    await audited("admin.server.update_status", {"nonce": current, "status": "acked", "detail": "playtest"},
+                  name="the watcher acks the current request")
+    await audited("admin.server.update_status",
+                  {"nonce": current, "status": "unchanged", "detail": "nothing to update: playtest", "installed_version": "0.0.0-playtest"},
+                  name="the watcher reports unchanged")
+    current_read = await step(report, "the result of an up-to-date run", query("admin.server.update_request", GM, {}))
+    current_result = dict((current_read or {}).get("result") or {})
+    report.add("PASS" if current_result.get("status") == "unchanged" and current_result.get("installed_version") == "0.0.0-playtest" else "FAIL",
+               "an up-to-date run closes as unchanged with the version still installed", str(current_result))
     # v1.12.3: a request nobody will ever finish can be closed by the GM, and
     # the read answers the nonce and status as flat values for the watcher.
     asked_again = await audited("admin.server.request_update",
