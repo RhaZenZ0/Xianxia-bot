@@ -9,6 +9,27 @@ section in it.
 
 ## Fixed
 
+- **fixed (v1.35.0)** — *A deployable array's numbers were not on the craft menu.* The nine
+  definitions `deployedArrayDefs` carried are each disk's own `array_effect` block in
+  `content/world.json` (name, duration, effect), read by the deploy (`worlddata.ArrayEffect`) and by
+  `describe_item_use`, which prints the modifiers and the duration at the disk's grade;
+  `TestEveryFormationDiskCarriesItsEffectInTheContent` and `DeployableArrayTests` hold every disk to
+  a whole block and the engine to keeping no table.
+- **fixed (v1.35.0)** — *`world_cross` and `ascension_gate` objectives were untargeted and fired on
+  any world change.* Both take a `world` target now, the world crossed into: the three ascension
+  quests name it, the array and the gate report `to_world`, the validator and the editor's pickers
+  know the kind. A quest held before v1.35.0 keeps its untargeted terms until it is finished.
+- **fixed (v1.35.0)** — *A raid with an absent raider settled only on the next press, and the card
+  did not mark them.* `SettleAbsentRaidsTx` runs on the maintenance tick (`raid_absence`) and asks
+  every active raid's round the question the actions ask; `boss.absent` answers whom a round has
+  stopped waiting on, every encounter read goes through `_with_absence`, and the card draws them
+  "💤 away". `TestTheTickSettlesARoundNobodyIsPressing` drives both.
+- **fixed (v1.35.0)** — *A watcher restarted after a SIGKILL mid-install reported it failed while
+  `update.sh` was still working, and a stale watcher lock survived a power loss.* `poll_once` waits
+  while the updater's own lock holds a live pid, touching neither the world nor the request; the
+  watcher's lock records the boot it was taken in, and a lock from another boot is stale whatever its
+  pid says. `test_a_running_updater_is_waited_for_not_reported_failed` and
+  `test_a_lock_from_before_a_reboot_is_taken_over` drive both under sh and bash.
 - **fixed (v1.35.0)** — *The spirit stat on gear reached no rule.* Removed from all three tables
   (`EQUIPMENT_DEFINITIONS`, `equipmentDefinitionsGo`, `equipDefs`) and the three sums that carried
   it; gear gives attack, defence and agility, and `test_equipment_stat_parity.py` holds the three

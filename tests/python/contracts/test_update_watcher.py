@@ -323,6 +323,43 @@ class TheWatcherRunsTheRequestAndReportsIt(unittest.TestCase):
         self.assertEqual(len(failed), 1, calls)
         self.assertIn("nothing was changed", failed[0]["detail"])
 
+    def test_a_running_updater_is_waited_for_not_reported_failed(self):
+        """A watcher started again after the first was killed mid-install
+        (v1.35.0): update.sh is still running, its lock beside ours holds a live
+        pid, and the request it is running is `fetching`. The poll neither
+        closes the request nor reopens the world over the install; it waits."""
+        lock = self.tmp / ".xianxia-update.lock"
+        lock.mkdir()
+        (lock / "pid").write_text(f"{os.getpid()}\n", encoding="utf-8")
+        calls = self._run("installed", {**self.REQUEST, "status": "fetching"}, state="abc123", world_closed=True)
+        self.assertNotIn("failed", self._statuses(calls), "a request update.sh is still running was reported failed")
+        self.assertEqual(self._world(calls), [], "the world was reopened over an install still running")
+        self.assertIn("heartbeat", self._statuses(calls), "a waiting watcher still says it is alive")
+        # The lock's pid dead, the updater is gone and the poll settles as before.
+        (lock / "pid").write_text("999999\n", encoding="utf-8")
+        calls = self._run("installed", {**self.REQUEST, "status": "fetching"}, state="abc123")
+        self.assertIn("failed", self._statuses(calls))
+
+    def test_a_lock_from_before_a_reboot_is_taken_over(self):
+        """`update_watch.sh` refused to start while the lock's pid answered
+        `kill -0`, and a rebooted NAS can hand that pid to another process. The
+        lock records the boot it was taken in (v1.35.0); one from another boot is
+        stale whatever its pid says, and one from this boot with a live pid
+        still refuses."""
+        lock = self.tmp / "lock"
+        lock.mkdir()
+        (lock / "pid").write_text(f"{os.getpid()}\n", encoding="utf-8")
+        (lock / "boot").write_text("before-the-reboot\n", encoding="utf-8")
+        calls = self._run("installed", None, extra_env={"XIANXIA_WATCH_BOOT_ID": "after-the-reboot"})
+        self.assertIn("heartbeat", self._statuses(calls), "a lock from before a reboot kept the watcher out")
+        # The one-shot run removed its own lock on exit, as a watcher does;
+        # the same pid under this boot's id is a live watcher and refuses.
+        lock.mkdir(exist_ok=True)
+        (lock / "pid").write_text(f"{os.getpid()}\n", encoding="utf-8")
+        (lock / "boot").write_text("this-boot\n", encoding="utf-8")
+        calls = self._run("installed", None, extra_env={"XIANXIA_WATCH_BOOT_ID": "this-boot"})
+        self.assertEqual(calls, [], "a live watcher's lock from this boot was taken over")
+
     def test_a_request_left_open_by_a_watcher_that_died_is_reported_failed(self):
         """Something past `requested`, remembered here, with nothing running
         and no report waiting: the process that ran it is gone. Left alone the

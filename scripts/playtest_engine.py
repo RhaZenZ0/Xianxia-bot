@@ -1572,6 +1572,9 @@ async def run(url: str, token: str, db_path: str) -> Report:
             await step(report, "party.join during a raid is refused", act("party.join", BUYER, {"party_id": party_id}), expect_error="in the middle of a boss raid")
         status = "active"
         if encounter_id:
+            # v1.35.0: whom the round has stopped waiting on, for the card's away
+            # tag; a raid of one that has just started waits on nobody.
+            await step(report, "boss.absent", query("boss.absent", PLAYER, {"encounter_id": encounter_id}))
             try:
                 for _ in range(30):
                     acted = await act("boss.act", PLAYER, {"encounter_id": encounter_id, "style": "attack"})

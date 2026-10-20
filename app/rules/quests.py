@@ -379,12 +379,16 @@ OBJECTIVE_TYPES: dict[str, dict[str, Any]] = {
     "family_lesson": {"target": None, "label": "", "untargeted": "Take the head of the house's last lesson and pass its test"},
     # The two halves of an ascension (v1.0.0-rc.44), reported by
     # `/ascend -> Tribulation / Ascension -> Gate` and by `/travel ->
-    # Teleportation Arrays -> Use` when the transit changed world. Both are
-    # untargeted, and for the same reason: a crossing is anchored wherever the
-    # cultivator was standing when the lightning found them, so there is no
-    # location a draft could name in advance and be right about.
-    "ascension_gate": {"target": None, "label": "", "untargeted": "Anchor a crossing where you survived your tribulation"},
-    "world_cross": {"target": None, "label": "", "untargeted": "Cross into the world above"},
+    # Teleportation Arrays -> Use` when the transit changed world. A crossing
+    # is anchored wherever the cultivator was standing when the lightning found
+    # them, so no location can be named in advance; the world crossed into can
+    # (v1.35.0), and both are targeted by it, because an untargeted objective
+    # took every event of its type and a descent through an array completed a
+    # quest that asked to cross up. A quest a player already held before then
+    # keeps its untargeted terms until it is finished.
+    "ascension_gate": {"target": "world", "label": "Anchor a crossing into the {target} where you survived your tribulation",
+                       "untargeted": "Anchor a crossing where you survived your tribulation"},
+    "world_cross": {"target": "world", "label": "Cross into the {target}", "untargeted": "Cross into the world above"},
     # Reported by `/craft -> Profession -> Exam` only on a pass (v1.0.0-rc.45),
     # under the quest key of the examination that was sat (v1.33.0). The
     # examiner is whichever hall's keeper the candidate walked in on, so there
@@ -525,6 +529,17 @@ def public_locations(world: Any) -> dict[str, dict[str, Any]]:
     return {name: loc for name, loc in dict(world.locations).items() if not loc.get("private")}
 
 
+def world_names(world: Any) -> list[str]:
+    """The worlds in the order the realms ladder climbs them: what a `world`
+    target may name (v1.35.0)."""
+    out: list[str] = []
+    for realm in list(getattr(world, "realms", []) or []):
+        name = str(dict(realm or {}).get("world") or "").strip()
+        if name and name not in out:
+            out.append(name)
+    return out
+
+
 def objective_target_choices(world: Any) -> dict[str, list[dict[str, str]]]:
     """Every value a target of each kind may name, built the way
     `validate_quest_definition` accepts it, one list per target kind (v1.35.0).
@@ -560,6 +575,7 @@ def objective_target_choices(world: Any) -> dict[str, list[dict[str, str]]]:
         "item": named(dict(getattr(world, "items", {}) or {})),
         "realm": [{"value": str(r.get("name")), "label": str(r.get("name"))}
                   for r in list(getattr(world, "realms", []) or []) if isinstance(r, dict) and r.get("name")],
+        "world": [{"value": name, "label": name} for name in world_names(world)],
         "flame": named(flames),
         "boss": sorted(({"value": str(t.get("name")), "label": str(t.get("name"))} for t in BOSS_TEMPLATES.values() if t.get("name")),
                        key=lambda x: x["value"]),
@@ -665,6 +681,14 @@ def validate_quest_definition(draft: dict[str, Any], world: Any, budget: dict[st
                     errors.append(f"objective {index + 1}: unknown item {target_text!r}")
                     continue
                 target_label = str(all_items[target].get("name") or target)
+            elif spec["target"] == "world":
+                # The world crossed into, as the realms ladder names it
+                # (v1.35.0): what `ascension_gate` and `world_cross` report.
+                worlds = world_names(world)
+                target = {w.lower(): w for w in worlds}.get(target_text.lower())
+                if target is None:
+                    errors.append(f"objective {index + 1}: unknown world {target_text!r} (one of: {', '.join(worlds)})")
+                    continue
             elif spec["target"] == "realm":
                 # The qi ladder's own names, so a stage asks for "Qi Refining"
                 # and never for a rung the ladder does not carry.

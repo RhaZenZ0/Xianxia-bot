@@ -24126,14 +24126,62 @@
       "description": "A single-use deployment disk that creates a temporary shared qi-gathering formation at the current location.",
       "sect_value": 18,
       "base_price": 45,
-      "array_deploy": "minor_qi_gathering_array_disk"
+      "array_deploy": "minor_qi_gathering_array_disk",
+      "array_effect": {
+        "name": "Minor Qi Gathering Array",
+        "duration_game_minutes": 360,
+        "effect": {
+          "description": "Formation flags draw ambient qi toward everyone cultivating at this location.",
+          "modifiers": [
+            {
+              "stat": "cultivation_gain",
+              "operation": "mul",
+              "value": 1.1
+            },
+            {
+              "stat": "spirit",
+              "operation": "add",
+              "value": 1
+            }
+          ],
+          "tags": [
+            "formation",
+            "location",
+            "qi"
+          ]
+        }
+      }
     },
     "minor_warding_array_disk": {
       "name": "Minor Warding Array Disk",
       "description": "A single-use deployment disk that creates a temporary shared defensive formation at the current location.",
       "sect_value": 20,
       "base_price": 50,
-      "array_deploy": "minor_warding_array_disk"
+      "array_deploy": "minor_warding_array_disk",
+      "array_effect": {
+        "name": "Minor Warding Array",
+        "duration_game_minutes": 360,
+        "effect": {
+          "description": "A compact defensive formation steadies cultivators and reinforces combat exchanges in this location.",
+          "modifiers": [
+            {
+              "stat": "will",
+              "operation": "add",
+              "value": 1
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 1
+            }
+          ],
+          "tags": [
+            "formation",
+            "location",
+            "defense"
+          ]
+        }
+      }
     },
     "advanced_demonic_001_sword_cultivator_manual": {
       "name": "Blood Moon Forbidden Scripture — Mortal Volume 1 — Jade Manual",
@@ -26179,28 +26227,125 @@
       "description": "A student's chalked circle on a portable disk: the first array a formation apprentice learns to close.",
       "sect_value": 9,
       "base_price": 22,
-      "array_deploy": "guiding_chalk_array"
+      "array_deploy": "guiding_chalk_array",
+      "array_effect": {
+        "name": "Guiding Chalk Array",
+        "duration_game_minutes": 180,
+        "effect": {
+          "description": "A student's chalk circle, closed well enough to hold. It gathers a little qi and steadies the hand.",
+          "modifiers": [
+            {
+              "stat": "insight",
+              "operation": "add",
+              "value": 1
+            }
+          ],
+          "tags": [
+            "formation",
+            "location",
+            "qi"
+          ]
+        }
+      }
     },
     "moonveil_concealment_array": {
       "name": "Moonveil Concealment Array",
       "description": "Veil-work drawn in crystal dust; footsteps and qi signatures blur inside its boundary.",
       "sect_value": 44,
       "base_price": 110,
-      "array_deploy": "moonveil_concealment_array"
+      "array_deploy": "moonveil_concealment_array",
+      "array_effect": {
+        "name": "Moonveil Concealment Array",
+        "duration_game_minutes": 360,
+        "effect": {
+          "description": "Veil-work in crystal dust: footsteps and qi signatures blur at the boundary, and leaving is easier than arriving.",
+          "modifiers": [
+            {
+              "stat": "agility",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "will",
+              "operation": "add",
+              "value": 1
+            }
+          ],
+          "tags": [
+            "formation",
+            "location",
+            "concealment"
+          ]
+        }
+      }
     },
     "golden_bastion_array": {
       "name": "Golden Bastion Array",
       "description": "An immortal-gold lattice that hardens the air itself into a standing rampart.",
       "sect_value": 88,
       "base_price": 220,
-      "array_deploy": "golden_bastion_array"
+      "array_deploy": "golden_bastion_array",
+      "array_effect": {
+        "name": "Golden Bastion Array",
+        "duration_game_minutes": 360,
+        "effect": {
+          "description": "An immortal-gold lattice that hardens the air into a standing rampart around everyone inside it.",
+          "modifiers": [
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "body",
+              "operation": "add",
+              "value": 2
+            }
+          ],
+          "tags": [
+            "formation",
+            "location",
+            "defense"
+          ]
+        }
+      }
     },
     "starfall_bulwark_array": {
       "name": "Starfall Bulwark Array",
       "description": "Starsteel graven with falling-star sigils: the bulwark a Celestial formation master signs their name to.",
       "sect_value": 176,
       "base_price": 440,
-      "array_deploy": "starfall_bulwark_array"
+      "array_deploy": "starfall_bulwark_array",
+      "array_effect": {
+        "name": "Starfall Bulwark Array",
+        "duration_game_minutes": 480,
+        "effect": {
+          "description": "Starsteel graven with falling-star sigils - the bulwark a Celestial formation master signs their name to.",
+          "modifiers": [
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 3
+            },
+            {
+              "stat": "will",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "cultivation_gain",
+              "operation": "mul",
+              "value": 1.15
+            }
+          ],
+          "tags": [
+            "formation",
+            "location",
+            "defense",
+            "qi"
+          ]
+        }
+      }
     },
     "heart_calming_pill_method": {
       "name": "Heart Calming Pill — Method Slip",
@@ -27859,7 +28004,31 @@
       "description": "Spirit-iron filings set in a chalked ring; the ground inside it holds the body as a root holds a tree.",
       "sect_value": 24,
       "base_price": 60,
-      "array_deploy": "iron_root_grounding_array"
+      "array_deploy": "iron_root_grounding_array",
+      "array_effect": {
+        "name": "Iron-Root Grounding Array",
+        "duration_game_minutes": 360,
+        "effect": {
+          "description": "Spirit-iron filings set in a chalked ring; the ground inside holds the body as a root holds a tree.",
+          "modifiers": [
+            {
+              "stat": "body",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "will",
+              "operation": "add",
+              "value": 1
+            }
+          ],
+          "tags": [
+            "formation",
+            "location",
+            "defense"
+          ]
+        }
+      }
     },
     "iron_root_grounding_array_method": {
       "name": "Iron-Root Grounding Array — Method Slip",
@@ -27873,7 +28042,31 @@
       "description": "Spirit crystal ground into the lines of a gathering circle; the qi of the place runs toward whoever sits in it.",
       "sect_value": 60,
       "base_price": 150,
-      "array_deploy": "crystal_spirit_gathering_array"
+      "array_deploy": "crystal_spirit_gathering_array",
+      "array_effect": {
+        "name": "Crystal Spirit-Gathering Array",
+        "duration_game_minutes": 360,
+        "effect": {
+          "description": "Spirit crystal ground into the lines of a gathering circle; the qi of the place runs toward whoever sits in it.",
+          "modifiers": [
+            {
+              "stat": "cultivation_gain",
+              "operation": "mul",
+              "value": 1.15
+            },
+            {
+              "stat": "insight",
+              "operation": "add",
+              "value": 1
+            }
+          ],
+          "tags": [
+            "formation",
+            "location",
+            "qi"
+          ]
+        }
+      }
     },
     "crystal_spirit_gathering_array_method": {
       "name": "Crystal Spirit-Gathering Array — Method Slip",
@@ -27887,7 +28080,42 @@
       "description": "Nine starsteel points in a heavenpetal ring: the array a Celestial grandmaster closes a battlefield with, and nothing inside it leaves unbidden.",
       "sect_value": 256,
       "base_price": 640,
-      "array_deploy": "nine_star_heaven_lock_array"
+      "array_deploy": "nine_star_heaven_lock_array",
+      "array_effect": {
+        "name": "Nine-Star Heaven-Lock Array",
+        "duration_game_minutes": 480,
+        "effect": {
+          "description": "Nine starsteel points in a heavenpetal ring: a closed battlefield, and nothing inside it leaves unbidden.",
+          "modifiers": [
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 4
+            },
+            {
+              "stat": "will",
+              "operation": "add",
+              "value": 3
+            },
+            {
+              "stat": "escape_bonus",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "cultivation_gain",
+              "operation": "mul",
+              "value": 1.2
+            }
+          ],
+          "tags": [
+            "formation",
+            "location",
+            "defense",
+            "qi"
+          ]
+        }
+      }
     },
     "nine_star_heaven_lock_array_method": {
       "name": "Nine-Star Heaven-Lock Array — Method Slip",
@@ -34608,12 +34836,14 @@
           {
             "id": "gate",
             "type": "ascension_gate",
+            "target": "Spiritual World",
             "count": 1,
             "label": "Anchor the seam where you survived it - **/ascend → Tribulation / Ascension → Gate**"
           },
           {
             "id": "cross",
             "type": "world_cross",
+            "target": "Spiritual World",
             "count": 1,
             "label": "Step through into the Spiritual World - **/travel → Teleportation Arrays → Use**"
           }
@@ -34630,12 +34860,14 @@
           {
             "id": "gate",
             "type": "ascension_gate",
+            "target": "Immortal World",
             "count": 1,
             "label": "Anchor the seam where you survived it - **/ascend → Tribulation / Ascension → Gate**"
           },
           {
             "id": "cross",
             "type": "world_cross",
+            "target": "Immortal World",
             "count": 1,
             "label": "Step through into the Immortal World - **/travel → Teleportation Arrays → Use**"
           }
@@ -34652,12 +34884,14 @@
           {
             "id": "gate",
             "type": "ascension_gate",
+            "target": "Celestial World",
             "count": 1,
             "label": "Anchor the seam where you survived it - **/ascend → Tribulation / Ascension → Gate**"
           },
           {
             "id": "cross",
             "type": "world_cross",
+            "target": "Celestial World",
             "count": 1,
             "label": "Step through into the Celestial World - **/travel → Teleportation Arrays → Use**"
           }

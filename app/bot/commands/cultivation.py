@@ -1105,7 +1105,8 @@ async def tribulation_gate(interaction: discord.Interaction) -> None:
     # told after (v1.0.5). The seam exists in the engine by here, so the record
     # is already earned and drawing the reply must not be able to lose it.
     progressed = await record_quest_progress(
-        interaction.user.id, "ascension_gate", game_minute=wt.total_minutes)
+        interaction.user.id, "ascension_gate", target=str(result.get("to_world") or ""),
+        game_minute=wt.total_minutes)
     await interaction.followup.send(
         f"🌀 The seam over **{result.get('location','here')}** holds. The **{result.get('name','Ascension Gate')}** stands there now: "
         f"a public crossing out of {result.get('from_world','this world')} into **{result.get('to_world','the world above')}**, "

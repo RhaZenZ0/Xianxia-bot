@@ -86,8 +86,8 @@ class TheSwordIsStillASword(unittest.TestCase):
         # The parity contract holds the three tables to each other; this only
         # asserts the flying sword is in the Go pair at all.
         group = (GO / "game" / "group_combat_actions.go").read_text(encoding="utf-8")
-        self.assertIn('"azure_flying_sword": {"weapon", 220, 7, 0, 3, 3, false},', group)
-        self.assertIn('"azure_flying_sword": {7, 0, 3, 3}', (GO / "game" / "combat_actions.go").read_text(encoding="utf-8"))
+        self.assertIn('"azure_flying_sword": {"weapon", 220, 7, 0, 3, false},', group)
+        self.assertIn('"azure_flying_sword": {7, 0, 3}', (GO / "game" / "combat_actions.go").read_text(encoding="utf-8"))
 
     def test_binding_the_sword_does_not_ground_it(self):
         # `equipment.bind` removes the item from `inventory`, so the mount

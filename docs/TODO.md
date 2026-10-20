@@ -60,13 +60,6 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   `character_item_appraisals`, `spirit_beasts`, `wild_beast_encounters`, `event_log`, `event_claims`
   and the exploration-event tables without their `REFERENCES`; extend `fixtureKeyedTables` and that
   DDL the same way and seed what the tests then miss.
-- **deferred (design)** — *A raid with an absent raider settles only on the next press.* The absence
-  gate is asked after every raid action and at a kick; no clock rings it, so a raid whose every
-  present raider has acted stays at "to act" until somebody presses. A raid ticker in the simulation
-  would settle it with nobody present.
-- **deferred (design)** — *The raid card does not mark an absent raider.* It still reads "to act" for
-  a raider the round will skip; an "away" tag wants the card to read the absence from the engine
-  rather than restating it.
 - **deferred (design)** — *Event manifestations have no per-day reward cap.* A `combat.finalize`
   against an `event:` battle has no `target_key`, so insight and tempering are not limited per day;
   the site's finite beasts bound it. Decided (v1.35.0): left; the roster is the bound.
@@ -130,18 +123,6 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   held several streets of a city loses the extra lots. The city pays its own tribute once folded,
   which is the rule; whether a fold should carry the sum is a balance decision nobody has asked for.
   Decided (v1.35.0): the rule stands.
-- **deferred (design)** — *`world_cross` and `ascension_gate` objectives are untargeted and fire on
-  any world change.* The leak the examinations had: an untargeted objective takes every event of
-  its type, so a descent through an array reports `world_cross` and completes a quest that asks to
-  cross *up*; `abode.py` and `cultivation.py` report them without a target. The right target (the
-  world crossed into, or the gate's key) is a content decision.
-- **deferred (design)** — *A watcher restarted after a SIGKILL mid-install reports it failed while
-  `update.sh` is still working.* `interrupted()` and `reopen_world 1` in `update_watch.sh` do not
-  consult `update.sh`'s own lock, so a watcher started again after the first was SIGKILLed (no EXIT
-  trap runs) closes the request `failed` and reopens the world over an install still running. The
-  v1.33.0 refusal tells a GM to restart the watcher only once `update.sh` has finished, which holds
-  the advice honest and not the script; the fix is for `interrupted()` to wait on, or report only
-  after, the updater's lock.
 - **deferred (rare)** — *A truly dead install holds the Request button for up to two hours.* The
   lease is the exit for a watcher that died mid-install (it was fifteen minutes). Shorter would free
   the button sooner and let a GM cancel an install that is merely slow on a cold NAS build; the
@@ -169,10 +150,6 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   5 `/npc` and 5 `/innerworld` in content and code - so it needs a migration of the quest terms
   players already hold, the way migration 61 did, and a re-authored curriculum roster. Decided
   (v1.35.0): waits on the Most-used commands card's data.
-- **deferred (rare)** — *A stale watcher lock after a power loss.* `update_watch.sh` refuses to start when
-  the lock's pid answers `kill -0`, and a rebooted NAS can hand that pid to another process. Rare,
-  and the remedy is `rm -rf` on the lock directory; a lock that also records a boot id would tell
-  the two apart.
 - **deferred (design)** — *A stranger's way to Underworld Contacts 15.* v1.11.1 let a broker buy
   from a stranger, +1 standing a sale, but a post stocks six rows drawn from ninety restricted,
   special or legendary items none of which any shelf sells, so each +1 costs a rare item and the
@@ -194,12 +171,6 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   is a roster and a decision, not a wiring, and inventing it unasked is what this file exists to
   refuse. What v1.0.12 does instead is raise the player past the curriculum before the sweep, which
   is what reached this one.
-- **deferred (content)** — *A deployable array's numbers are not on the craft menu.* The effect of an
-  array disk lives in the engine's `deployedArrayDefs` (`property_storage_actions.go`), a Go literal
-  Python cannot read, so `item_does` describes an array in the item's own words rather than copy the
-  numbers into a second table. Moving those six definitions into `content/world.json` (an
-  `array_effect` block on each disk, read by both sides) would let the menu print them; it is a
-  content move of its own, so it waits for the owner's word.
 - **deferred (decision)** — *Registry NPCs cannot sponsor a sect recommendation.* `resolveRecommenderTx`
   accepts catalogue NPCs and a running event's cast only, so a sect's generated Elders - who now stand
   at its gate - cannot vouch for an applicant. Whether they should is a decision about how open the

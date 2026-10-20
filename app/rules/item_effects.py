@@ -17,9 +17,10 @@ reads those Go bodies so the two cannot part company silently.
 Gear is described by ``advanced_runtime.describe_equipment``, handed in rather
 than imported, because the equipment table is that module's and a second
 describer here would be a second answer to "what does this sword give". A
-deployable array's effect lives in the engine's own table
-(``deployedArrayDefs``), which Python cannot read, so an array is described by
-the item's own words rather than by numbers this module would have to copy.
+deployable array's effect is the item's own ``array_effect`` block in the
+content file (v1.35.0; it was a Go literal Python could not read, so an array
+was described in the item's words and never its numbers), read here the way a
+pill's ``use.effect`` is.
 """
 
 from __future__ import annotations
@@ -36,6 +37,7 @@ STAT_LABELS: dict[str, str] = {
     "insight_gain": "insight gained",
     "breakthrough_bonus": "breakthrough rolls",
     "combat_bonus": "combat rolls",
+    "escape_bonus": "escape rolls",
     "heart_demon_resistance": "heart-demon resistance",
     "body": "body",
     "agility": "agility",
@@ -139,7 +141,22 @@ def describe_item_use(definition: Mapping[str, Any], *, mult: float = 1.0, equip
         parts.append("🏠 carries you home to your birth household from anywhere")
     if use.get("waymark"):
         parts.append("🧭 carries you from your household back to where the Hearth-Return found you")
-    if not parts and definition.get("array_deploy"):
+    array = dict(definition.get("array_effect") or {})
+    if not parts and array:
+        # The disk's numbers, from the same block the engine deploys (v1.35.0):
+        # every modifier and the duration, scaled by the grade as a pill's are.
+        effect = dict(array.get("effect") or {})
+        modifiers = [
+            text for text in (describe_modifier(m, mult) for m in list(effect.get("modifiers") or []) if isinstance(m, Mapping))
+            if text
+        ]
+        duration = int(array.get("duration_game_minutes") or 0)
+        name = str(array.get("name") or "an array").strip()
+        line = f"🧿 deploys the {name} where you stand"
+        if modifiers:
+            line += f": {', '.join(modifiers)} for everyone there {_duration(graded_amount(duration, mult) if duration > 0 else 0)}"
+        parts.append(line)
+    elif not parts and definition.get("array_deploy"):
         description = str(definition.get("description") or "").strip()
         parts.append(f"🧿 deploys an array where you stand{': ' + description if description else ''}")
     return " · ".join(parts)

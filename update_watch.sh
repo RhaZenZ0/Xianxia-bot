@@ -48,6 +48,10 @@ STATE_FILE=${XIANXIA_WATCH_STATE:-$PARENT_DIR/.xianxia-watcher-state}
 PENDING_FILE="$STATE_FILE.pending"
 CLOSED_FILE="$STATE_FILE.closed"
 LOCK_DIR=${XIANXIA_WATCH_LOCK:-$PARENT_DIR/.xianxia-watcher.lock}
+# update.sh's own lock, beside ours (v1.35.0): while its pid is alive an install
+# is still running, whatever this process remembers, so a poll neither reopens
+# the world over it nor reports its request failed.
+UPDATER_LOCK=${XIANXIA_UPDATER_LOCK:-$PARENT_DIR/.xianxia-update.lock}
 UPDATE_SH=${XIANXIA_UPDATE_SH:-$PROJECT_DIR/update.sh}
 HEARTBEAT_SECONDS=300
 REOPEN_TRIES=${XIANXIA_WATCH_REOPEN_TRIES:-20}
@@ -202,6 +206,21 @@ close_world_if_open() {
     esac
 }
 
+updater_running() {
+    # update.sh writes its pid into its lock and its EXIT trap removes the lock;
+    # a SIGKILL leaves the directory with a dead pid, which is no updater.
+    [ -d "$UPDATER_LOCK" ] || return 1
+    upid=$(cat "$UPDATER_LOCK/pid" 2>/dev/null || true)
+    [ -n "$upid" ] && kill -0 "$upid" 2>/dev/null
+}
+
+boot_id() {
+    # Which boot a lock was taken in: a pid outlives nothing across a reboot,
+    # and a rebooted NAS can hand the same number to another process.
+    if [ -n "${XIANXIA_WATCH_BOOT_ID:-}" ]; then printf '%s\n' "$XIANXIA_WATCH_BOOT_ID"; return 0; fi
+    cat /proc/sys/kernel/random/boot_id 2>/dev/null || true
+}
+
 reopen_world() {
     # $1 = how many tries. Only when this script closed it (the marker file).
     [ -f "$CLOSED_FILE" ] || return 0
@@ -285,6 +304,13 @@ run_update() {
 }
 
 poll_once() {
+    # An install still running - a watcher started again after the first was
+    # killed mid-install - is left to finish (v1.35.0): the world stays closed
+    # under it and its request stays open; the poll after it ends settles both.
+    if updater_running; then
+        log "update.sh is still running (pid $upid); waiting for it before touching the world or the request"
+        heartbeat; return 0
+    fi
     # A world this script closed and could not reopen is reopened first - one
     # try per poll; the engine may still be coming back.
     reopen_world 1
@@ -348,13 +374,20 @@ on_signal() {
 
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
     pid=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
-    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+    booted=$(cat "$LOCK_DIR/boot" 2>/dev/null || true)
+    # A lock from before a reboot is stale whatever its pid says (v1.35.0): the
+    # number may be alive again as some other process. A lock with no boot id
+    # (an older watcher's) is judged by its pid as before.
+    if [ -n "$booted" ] && [ "$booted" != "$(boot_id)" ]; then
+        :
+    elif [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
         echo "Another update watcher is running (pid $pid): $LOCK_DIR" >&2
         exit 0
     fi
     rm -rf "$LOCK_DIR"; mkdir "$LOCK_DIR"
 fi
 printf '%s\n' "$$" > "$LOCK_DIR/pid"
+boot_id > "$LOCK_DIR/boot"
 trap cleanup EXIT
 trap on_signal INT TERM HUP
 

@@ -689,39 +689,20 @@ func teleportArrayActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "travel", EventType: "array.use", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 
+// deployedArrayDef is a disk's effect as the deploy reads it off the content
+// (v1.35.0, `array_effect` on the item). It was a Go literal here, nine entries
+// Python could not read, so the craft menu described a disk in the item's own
+// words and never its numbers.
 type deployedArrayDef struct {
 	Name     string
 	Duration int64
 	Effect   map[string]any
 }
 
-var deployedArrayDefs = map[string]deployedArrayDef{
-	"minor_qi_gathering_array_disk": {"Minor Qi Gathering Array", 360, map[string]any{"description": "Formation flags draw ambient qi toward everyone cultivating at this location.", "modifiers": []any{map[string]any{"stat": "cultivation_gain", "operation": "mul", "value": 1.10}, map[string]any{"stat": "spirit", "operation": "add", "value": 1}}, "tags": []any{"formation", "location", "qi"}}},
-	"minor_warding_array_disk":      {"Minor Warding Array", 360, map[string]any{"description": "A compact defensive formation steadies cultivators and reinforces combat exchanges in this location.", "modifiers": []any{map[string]any{"stat": "will", "operation": "add", "value": 1}, map[string]any{"stat": "combat_bonus", "operation": "add", "value": 1}}, "tags": []any{"formation", "location", "defense"}}},
-	// The rest of the ladder (v1.0.0-rc.19). rc.15 moved six talisman recipes
-	// out of Formation and into Inscription, which was right, and left the
-	// profession with two disks at the same TN and nothing above the Mortal
-	// World - while eight array workshops stood in all four worlds with only
-	// Mortal goods to trade. Every one of these needs an entry here as well as
-	// a recipe: an item carrying `array_deploy` with no definition in this map
-	// is refused at deploy time, which would be the same fault one layer down.
-	"guiding_chalk_array":        {"Guiding Chalk Array", 180, map[string]any{"description": "A student's chalk circle, closed well enough to hold. It gathers a little qi and steadies the hand.", "modifiers": []any{map[string]any{"stat": "insight", "operation": "add", "value": 1}}, "tags": []any{"formation", "location", "qi"}}},
-	"moonveil_concealment_array": {"Moonveil Concealment Array", 360, map[string]any{"description": "Veil-work in crystal dust: footsteps and qi signatures blur at the boundary, and leaving is easier than arriving.", "modifiers": []any{map[string]any{"stat": "agility", "operation": "add", "value": 2}, map[string]any{"stat": "will", "operation": "add", "value": 1}}, "tags": []any{"formation", "location", "concealment"}}},
-	"golden_bastion_array":       {"Golden Bastion Array", 360, map[string]any{"description": "An immortal-gold lattice that hardens the air into a standing rampart around everyone inside it.", "modifiers": []any{map[string]any{"stat": "combat_bonus", "operation": "add", "value": 2}, map[string]any{"stat": "body", "operation": "add", "value": 2}}, "tags": []any{"formation", "location", "defense"}}},
-	"starfall_bulwark_array":     {"Starfall Bulwark Array", 480, map[string]any{"description": "Starsteel graven with falling-star sigils - the bulwark a Celestial formation master signs their name to.", "modifiers": []any{map[string]any{"stat": "combat_bonus", "operation": "add", "value": 3}, map[string]any{"stat": "will", "operation": "add", "value": 2}, map[string]any{"stat": "cultivation_gain", "operation": "mul", "value": 1.15}}, "tags": []any{"formation", "location", "defense", "qi"}}},
-	// Three more rungs (v1.32.0), so Formation has a method at every level a
-	// slip can teach. A disk's additive stats reach everybody standing in it
-	// through canonicalAdditiveEffectBonus; its cultivation_gain is qi-path
-	// weather (v1.2.3), so none of these claims to temper a body.
-	"iron_root_grounding_array":      {"Iron-Root Grounding Array", 360, map[string]any{"description": "Spirit-iron filings set in a chalked ring; the ground inside holds the body as a root holds a tree.", "modifiers": []any{map[string]any{"stat": "body", "operation": "add", "value": 2}, map[string]any{"stat": "will", "operation": "add", "value": 1}}, "tags": []any{"formation", "location", "defense"}}},
-	"crystal_spirit_gathering_array": {"Crystal Spirit-Gathering Array", 360, map[string]any{"description": "Spirit crystal ground into the lines of a gathering circle; the qi of the place runs toward whoever sits in it.", "modifiers": []any{map[string]any{"stat": "cultivation_gain", "operation": "mul", "value": 1.15}, map[string]any{"stat": "insight", "operation": "add", "value": 1}}, "tags": []any{"formation", "location", "qi"}}},
-	"nine_star_heaven_lock_array":    {"Nine-Star Heaven-Lock Array", 480, map[string]any{"description": "Nine starsteel points in a heavenpetal ring: a closed battlefield, and nothing inside it leaves unbidden.", "modifiers": []any{map[string]any{"stat": "combat_bonus", "operation": "add", "value": 4}, map[string]any{"stat": "will", "operation": "add", "value": 3}, map[string]any{"stat": "escape_bonus", "operation": "add", "value": 2}, map[string]any{"stat": "cultivation_gain", "operation": "mul", "value": 1.20}}, "tags": []any{"formation", "location", "defense", "qi"}}},
-}
-
 // gradedArrayEffect is a deployed array's effect at a disk's grade: a copy of
 // the definition's own effect with its modifiers run through
 // gradedEffectPayload, the one rule item use scales an effect by. The copy is
-// the point - deployedArrayDefs is a package variable, and scaling its maps in
+// the point - the catalogue's map is shared by every deploy, and scaling it in
 // place would make every later Low disk as strong as the first High one.
 func gradedArrayEffect(effect map[string]any, mult float64) map[string]any {
 	out := make(map[string]any, len(effect))
@@ -753,17 +734,17 @@ func deployArrayActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	if !ok || item.ArrayDeploy == "" {
 		return authoritativeMutation{}, errors.New("item is not a deployable formation disk")
 	}
-	def, ok := deployedArrayDefs[item.ArrayDeploy]
-	if !ok {
+	if item.ArrayEffect == nil || item.ArrayEffect.DurationGameMinutes <= 0 {
 		return authoritativeMutation{}, errors.New("formation disk has no valid deployment definition")
 	}
+	def := deployedArrayDef{Name: item.ArrayEffect.Name, Duration: item.ArrayEffect.DurationGameMinutes, Effect: item.ArrayEffect.Effect}
 	// A grade does something for a disk (v1.12.3). A disk is a Formation
 	// recipe's output, so it carries a grade, and the deployment wrote the
 	// definition's own effect and duration whatever the grade - a High disk
 	// was a Low one with a higher price. What a grade does is scaled where the
 	// item is used, by the rule item use applies: a modifier's value and the
-	// duration, both by the grade's effect multiplier. The definition in
-	// deployedArrayDefs is shared, so the effect is copied before it is scaled.
+	// duration, both by the grade's effect multiplier. The definition is the
+	// catalogue's and shared, so the effect is copied before it is scaled.
 	grade := itemEffectMult(catalog, p.ItemID)
 	def.Effect = gradedArrayEffect(def.Effect, grade)
 	def.Duration = gradedAmount(def.Duration, grade)

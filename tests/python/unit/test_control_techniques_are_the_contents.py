@@ -110,9 +110,10 @@ class TheControlSetIsReadOffTheContent(unittest.TestCase):
 
     def test_the_dead_python_copy_of_the_arrays_is_gone(self):
         """`app/rules/inscription.py` held `ARRAY_DEPLOYMENTS`, two of the six
-        entries `deployedArrayDefs` carries in Go, with modifier stats of its
-        own and not one caller anywhere. A release about numbers nothing reads
-        does not get to leave one behind."""
+        entries the engine's `deployedArrayDefs` carried in Go at the time (the
+        effects are the items' own `array_effect` blocks in the content since
+        v1.35.0), with modifier stats of its own and not one caller anywhere. A
+        release about numbers nothing reads does not get to leave one behind."""
         self.assertFalse((PROJECT_ROOT / "app" / "rules" / "inscription.py").exists())
         for path in sorted((PROJECT_ROOT / "app").rglob("*.py")):
             self.assertNotIn("ARRAY_DEPLOYMENTS", path.read_text(encoding="utf-8"),

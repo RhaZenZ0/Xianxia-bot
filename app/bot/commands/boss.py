@@ -158,6 +158,7 @@ def raid_card(encounter: dict[str, Any], *, events: list[str] | None = None, not
         card.fields.append(("Party", "\n".join(party_lines)))
 
     rows: list[str] = []
+    absent = {int(x) for x in list(encounter.get("absent_user_ids") or [])}
     for participant in participants:
         uid = int(participant.get("user_id") or 0)
         if status == "victory" and uid in claimed:
@@ -168,6 +169,10 @@ def raid_card(encounter: dict[str, Any], *, events: list[str] | None = None, not
             state = "standing"
         elif int(participant.get("acted_round") or 0) >= round_index:
             state = "🛡️ guarding" if int(participant.get("guard") or 0) else "✅ acted"
+        elif uid in absent:
+            # The engine's answer (boss.absent): the round no longer waits on
+            # them, and the boss answers without them when the rest have acted.
+            state = "💤 away"
         else:
             state = "⏳ to act"
         rows.append(
@@ -293,7 +298,7 @@ async def _raid_act(
         return None, [], f"❌ {_explain_engine_error(exc)}"
     # The card is drawn from the row the action just wrote, read by id
     # because a finished raid is no longer the party's active one.
-    after = await DB.get_boss_encounter(encounter_id=int(result.get("encounter_id") or encounter["encounter_id"]))
+    after = await _with_absence(await DB.get_boss_encounter(encounter_id=int(result.get("encounter_id") or encounter["encounter_id"])))
     card = {**encounter, **result, **(after or {})}
     card["status"] = str(result.get("status") or card.get("status") or "active")
     return card, [str(e) for e in list(result.get("events") or [])], ""
@@ -308,6 +313,21 @@ def _claim_line(result: dict[str, Any]) -> str:
         f"🏆 Claimed **{result.get('currency_amount', 0)} {coin}** and "
         f"**{WORLD.item_name(str(result.get('item_id', '')))} x{result.get('item_quantity', 0)}**."
     )
+
+
+async def _with_absence(encounter: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The raiders the round is no longer waiting on, read from the engine
+    (`boss.absent`, v1.35.0) and drawn as away by the card. The half hour is the
+    engine's (RAID_ABSENT_MINUTES) and is restated nowhere here; a read that
+    fails costs the tag, not the card."""
+    if not encounter or str(encounter.get("status") or "active") != "active":
+        return encounter
+    try:
+        answer = dict(await ENGINE.action("boss.absent", 0, {"encounter_id": int(encounter["encounter_id"])}) or {})
+        encounter["absent_user_ids"] = [int(x) for x in list(answer.get("absent_user_ids") or [])]
+    except Exception:
+        log.warning("Could not read who a raid is no longer waiting on", exc_info=True)
+    return encounter
 
 
 async def _raid_claim(user_id: int, action_id: str, encounter_id: int) -> tuple[dict[str, Any] | None, str]:
@@ -461,7 +481,7 @@ class RaidView(discord.ui.LayoutView):
             else:
                 await interaction.response.defer()
         async with _user_action_lock(uid):
-            encounter = await DB.get_boss_encounter(encounter_id=self.encounter_id)
+            encounter = await _with_absence(await DB.get_boss_encounter(encounter_id=self.encounter_id))
             if not encounter:
                 await interaction.followup.send("This raid no longer exists.", ephemeral=True)
                 return
@@ -475,7 +495,7 @@ class RaidView(discord.ui.LayoutView):
             if raid_style == "claim":
                 result, error = await _raid_claim(uid, f"discord:{interaction.id}:boss.claim", self.encounter_id)
                 await interaction.followup.send(error or _claim_line(result or {}), ephemeral=bool(error))
-                fresh = await DB.get_boss_encounter(encounter_id=self.encounter_id) or encounter
+                fresh = await _with_absence(await DB.get_boss_encounter(encounter_id=self.encounter_id)) or encounter
                 await self._redraw(interaction, fresh, card_message=card_message)
                 await announce_quest_progress(interaction, list((result or {}).get("quest_progress") or []))
                 return
@@ -580,7 +600,7 @@ async def boss_start(interaction: discord.Interaction, boss: str) -> None:
         "You face it alone: a party of one was formed for this raid and closes when the raid ends."
         if result.get("solo_party") else ""
     )
-    encounter = await DB.get_boss_encounter(encounter_id=int(result.get("encounter_id") or 0)) if result.get("encounter_id") else None
+    encounter = await _with_absence(await DB.get_boss_encounter(encounter_id=int(result.get("encounter_id") or 0))) if result.get("encounter_id") else None
     if not encounter:
         encounter = {**result, "boss_name": result.get("boss_name", "Boss"), "status": "active"}
     await _send_raid_card(interaction, encounter, note=alone)
@@ -618,7 +638,7 @@ async def boss_status(interaction: discord.Interaction) -> None:
     c = await require_character(interaction)
     if not c:
         return
-    encounter = await DB.get_boss_encounter(user_id=interaction.user.id)
+    encounter = await _with_absence(await DB.get_boss_encounter(user_id=interaction.user.id))
     if not encounter:
         await interaction.response.send_message("Your party has no active boss encounter.", ephemeral=False)
         return
@@ -632,7 +652,7 @@ async def boss_status(interaction: discord.Interaction) -> None:
 async def boss_act(interaction: discord.Interaction, style: app_commands.Choice[str], technique: str = "") -> None:
     if not await require_character(interaction):
         return
-    encounter = await DB.get_boss_encounter(user_id=interaction.user.id)
+    encounter = await _with_absence(await DB.get_boss_encounter(user_id=interaction.user.id))
     if not encounter:
         await interaction.response.send_message("Your party has no active boss encounter.", ephemeral=False)
         return

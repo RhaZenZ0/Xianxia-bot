@@ -239,6 +239,7 @@ var authoritativeQueries = map[string]bool{
 	// v1.24.0: the active wars a cultivator may fight in and on which side,
 	// so a picker offers only what war.act would take.
 	"war.fronts":          true,
+	"boss.absent":         true,
 	"spirit_sense.status": true,
 	// v1.8.0: what a sect member may redeem, at the engine's price.
 	"sect.exchange": true,
@@ -950,6 +951,20 @@ func applyAuthoritativeQuery(databasePath, worldPath string, req ActionRequest) 
 		}
 		v, _ := eventledger.CurrentActorVersion(conn, req.ActorID)
 		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
+	case "boss.absent":
+		var p struct {
+			EncounterID int64 `json:"encounter_id"`
+		}
+		if err := json.Unmarshal(req.Payload, &p); err != nil {
+			return ActionResponse{}, err
+		}
+		absent, qerr := absentRaidersTx(conn, p.EncounterID, float64(time.Now().UnixNano())/1e9)
+		if qerr != nil {
+			return ActionResponse{}, qerr
+		}
+		v, _ := eventledger.CurrentActorVersion(conn, req.ActorID)
+		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v,
+			Result: map[string]any{"encounter_id": p.EncounterID, "absent_user_ids": absent, "absent_after_seconds": raidAbsentSeconds()}}, nil
 	case "war.fronts":
 		if strings.TrimSpace(worldPath) == "" {
 			return ActionResponse{}, errors.New("world catalog path is required")

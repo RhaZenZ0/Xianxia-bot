@@ -1145,6 +1145,62 @@ type bossRoundResult struct {
 	Status   string
 }
 
+// SettleAbsentRaidsTx is the tick's door into the question resolveBossRoundTx
+// asks (v1.35.0). The question used to be asked only after a raid action and
+// at a kick, so a raid whose every present raider had acted stayed at "to act"
+// until somebody pressed something; the simulation asks it now for every
+// active raid, so a round nobody is pressing settles when the absent raider's
+// half hour runs out. It answers how many rounds it settled.
+func SettleAbsentRaidsTx(conn *storage.Conn, catalog worlddata.Catalog, gameMinute int64, now float64) (int64, error) {
+	if !tableExistsTx(conn, "boss_encounters") {
+		return 0, nil
+	}
+	rows, err := conn.Execute(`SELECT encounter_id FROM boss_encounters WHERE status='active' ORDER BY encounter_id`, nil)
+	if err != nil {
+		return 0, err
+	}
+	settled := int64(0)
+	for _, r := range rows.Rows {
+		res, err := resolveBossRoundTx(conn, catalog, i64(r[0]), gameMinute, now)
+		if err != nil {
+			return settled, err
+		}
+		if !res.Resolved {
+			continue
+		}
+		settled++
+		if res.Status != "active" {
+			closeFinishedRaidOnlyPartiesTx(conn, now)
+		}
+	}
+	return settled, nil
+}
+
+// absentRaidersTx names the raiders a round is no longer waiting on: active,
+// not yet acted this round, and not heard from within raidAbsentSeconds. The
+// card draws them as away off this answer (`boss.absent`, v1.35.0) rather than
+// restating the half hour.
+func absentRaidersTx(conn *storage.Conn, encounterID int64, now float64) ([]int64, error) {
+	er, err := conn.Execute(`SELECT round_index FROM boss_encounters WHERE encounter_id=? AND status='active'`, []any{encounterID})
+	if err != nil {
+		return nil, err
+	}
+	enc := firstRowMap(er)
+	if enc == nil {
+		return []int64{}, nil
+	}
+	rows, err := conn.Execute(`SELECT user_id FROM boss_participants WHERE encounter_id=? AND status='active' AND acted_round<? AND updated_at<=? ORDER BY user_id`,
+		[]any{encounterID, i64(enc["round_index"]), now - float64(raidAbsentSeconds())})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]int64, 0, len(rows.Rows))
+	for _, r := range rows.Rows {
+		out = append(out, i64(r[0]))
+	}
+	return out, nil
+}
+
 // raidAbsentSeconds is how long a raider may leave a round waiting on them
 // (v1.34.0): the real half hour a round of a raid is given before the boss
 // answers without them. It lives in the waits table with the rest, so the key

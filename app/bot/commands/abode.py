@@ -322,8 +322,11 @@ async def array_use(interaction:discord.Interaction,array:str)->None:
     # world is travel, not an ascension.
     progressed: list[dict] = []
     if exchange:
+        # Targeted by the world crossed into (v1.35.0): a descent through an
+        # array used to complete a quest that asked to cross up.
         progressed = await record_quest_progress(
-            interaction.user.id, "world_cross", game_minute=wt.total_minutes)
+            interaction.user.id, "world_cross", target=str(exchange.get("to_world") or ""),
+            game_minute=wt.total_minutes)
     await interaction.followup.send(text,ephemeral=False)
     await announce_quest_progress(interaction, progressed)
 

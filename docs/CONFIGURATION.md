@@ -550,8 +550,9 @@ died. The engine decides this itself (`updateInstallLeaseSeconds`, held equal to
 test) from the request's own last report, which the watcher writes just before it starts
 `update.sh`; the card shows *installing* with how long ago that was. Past two hours with the
 watcher also silent for fifteen minutes, Cancel appears and the Request button returns. If the
-watcher itself died mid-install, look in `update_watch.log` first: once `update.sh` has finished,
-starting `update_watch.sh` again reports the request failed, which closes it at once. Cancelling
+watcher itself died mid-install, look in `update_watch.log` first, then start `update_watch.sh`
+again: while `update.sh` is still running it waits (v1.35.0; it reads the updater's own lock), and
+once the updater has finished it reports the request failed, which closes it at once. Cancelling
 does not stop `update.sh`, and anything it installed stays installed.
 
 **Outcomes.** A request closes one of three ways and the card's *Last outcome* line names each:

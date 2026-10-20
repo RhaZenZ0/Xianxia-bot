@@ -269,6 +269,12 @@ func (r *Runner) advancedMaintenance(conn *storage.Conn, gm int64, automation ma
 	if err != nil {
 		return Run{}, false, err
 	}
+	// Raids (v1.35.0): a round waiting on a raider who has gone quiet settles
+	// when their half hour runs out, not when somebody next presses a button.
+	counts["raid_absence"], err = game.SettleAbsentRaidsTx(conn, r.World, gm, nowFloat())
+	if err != nil {
+		return Run{}, false, err
+	}
 	if err = conn.Commit(); err != nil {
 		return Run{}, false, err
 	}
@@ -282,7 +288,7 @@ func (r *Runner) advancedMaintenance(conn *storage.Conn, gm int64, automation ma
 	if !changed {
 		return Run{}, false, nil
 	}
-	summary := fmt.Sprintf("auctions=%d merchants=%d merchant_bids=%d secret_realms=%d hunters_spawned=%d hunters_updated=%d partial_holdings=%d wars=%d occupations=%d caravans_sent=%d caravans=%d seclusions=%d commissions_expired=%d moderations_expired=%d era_changed=%t", counts["auctions"], counts["merchants"], counts["merchant_bids"], counts["secret_realms"], counts["hunters_spawned"], counts["hunters_updated"], counts["partial_holdings"], counts["wars"], counts["occupations"], counts["caravans_sent"], counts["caravans"], counts["seclusions"], counts["commissions_expired"], counts["moderations_expired"], eraChanged)
+	summary := fmt.Sprintf("auctions=%d merchants=%d merchant_bids=%d secret_realms=%d hunters_spawned=%d hunters_updated=%d partial_holdings=%d wars=%d occupations=%d caravans_sent=%d caravans=%d seclusions=%d commissions_expired=%d moderations_expired=%d raid_absence=%d era_changed=%t", counts["auctions"], counts["merchants"], counts["merchant_bids"], counts["secret_realms"], counts["hunters_spawned"], counts["hunters_updated"], counts["partial_holdings"], counts["wars"], counts["occupations"], counts["caravans_sent"], counts["caravans"], counts["seclusions"], counts["commissions_expired"], counts["moderations_expired"], counts["raid_absence"], eraChanged)
 	return Run{System: "advanced_world", DueSteps: 1, AppliedSteps: 1, Summary: summary, Events: spawned}, true, nil
 }
 

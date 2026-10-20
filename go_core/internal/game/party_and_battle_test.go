@@ -618,3 +618,47 @@ func TestTheRaidsPatienceIsTheEnginesWithAKey(t *testing.T) {
 		t.Fatalf("a junk key moved the wait to %ds", got)
 	}
 }
+
+// A raid whose every present raider has acted used to stay at "to act" until
+// somebody pressed something: the question "is everybody who is coming in?"
+// was asked only after a raid action and at a kick. The tick asks it now
+// (v1.35.0), and the card is told whom the round has stopped waiting on.
+func TestTheTickSettlesARoundNobodyIsPressing(t *testing.T) {
+	path, _, encounter := raidParty(t)
+	if _, err := raidAct(t, path, 42, encounter, "attack"); err != nil {
+		t.Fatal(err)
+	}
+	before := roundOf(t, path, encounter)
+	catalog := crossingCatalog(t)
+	settle := func() int64 {
+		var n int64
+		if err := crossingApply(t, path, func(conn *storage.Conn) error {
+			var err error
+			n, err = SettleAbsentRaidsTx(conn, catalog, 100, nowSeconds())
+			return err
+		}); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	// Ten minutes quiet is still waited for: the tick settles nothing.
+	goneQuiet(t, path, encounter, 43, 10)
+	if n := settle(); n != 0 || roundOf(t, path, encounter) != before {
+		t.Fatalf("the tick settled %d round(s) while a raider was ten minutes quiet (round %d -> %d)", n, before, roundOf(t, path, encounter))
+	}
+	// Past the half hour the card names them away, and the tick settles the
+	// round with nobody pressing.
+	goneQuiet(t, path, encounter, 43, 31)
+	raw, _ := json.Marshal(map[string]any{"encounter_id": encounter})
+	out, err := ApplyWithWorld(path, batch4WorldPath(t), ActionRequest{APIVersion: authoritativeAPIVersion, Operation: "boss.absent", ActorID: 42, Payload: raw})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, _ := out.Result.(map[string]any)
+	if absent, _ := result["absent_user_ids"].([]int64); len(absent) != 1 || absent[0] != 43 {
+		t.Fatalf("boss.absent names %v, want [43]", result["absent_user_ids"])
+	}
+	if n := settle(); n != 1 || roundOf(t, path, encounter) != before+1 {
+		t.Fatalf("the tick settled %d round(s) and the round is %d, want 1 and %d", n, roundOf(t, path, encounter), before+1)
+	}
+}
