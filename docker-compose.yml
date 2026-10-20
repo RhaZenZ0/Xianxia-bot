@@ -52,6 +52,10 @@ services:
       # death; the engine reads them here now, so they have to be passed.
       REINCARNATION_BASE_SAMSARA_YEARS: "${REINCARNATION_BASE_SAMSARA_YEARS:-320}"
       REINCARNATION_MAX_WAIT_SECONDS: "${REINCARNATION_MAX_WAIT_SECONDS:-300}"
+      # The chance an explore rolls an unexpected event (v1.36.0): the bot
+      # used to send its own setting on every explore; the engine reads it
+      # here now, so it has to be passed.
+      UNEXPECTED_EVENT_CHANCE_PERCENT: "${UNEXPECTED_EVENT_CHANCE_PERCENT:-28}"
       # Backups (v0.32.0): retention, size cap and the optional key that
       # seals every backup. docs/CONFIGURATION.md, "Backups".
       XIANXIA_BACKUP_KEEP_DAILY: "${XIANXIA_BACKUP_KEEP_DAILY:-14}"

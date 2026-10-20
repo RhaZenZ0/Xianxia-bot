@@ -13,7 +13,7 @@ import discord
 from discord import app_commands
 
 from ...ops.game_engine import GameEngineError
-from ...rules.sense import approximate_realm, ground_reading_line, hidden_npc_names
+from ...rules.sense import approximate_realm, ground_reading_line
 from ...rules.worldtime import cultivation_cycle_summary, from_game_minutes
 from ..character_state import current_effect_modifiers
 from ..formatting import human_duration, roll_line
@@ -225,20 +225,16 @@ async def sense_command(
         await respond(interaction, "\n".join(lines), ephemeral=False)
         return
 
-    # Area sweep. Python supplies only which hidden NPCs are physically present;
-    # the still-unmigrated autonomous world simulation owns that movement. Go
-    # owns perception RNG, thresholds, detail, hints, and secret-safe signals.
-    present_hidden: list[str] = []
-    for hidden_name in hidden_npc_names(WORLD.hidden_masters):
-        if await current_npc_location(hidden_name, wt.period) == c["location"]:
-            present_hidden.append(hidden_name)
+    # Area sweep. Which hidden masters stand here is the engine's to say
+    # (v1.36.0, npcWhereaboutsTx): the bot used to walk the catalogue's hidden
+    # masters through its own whereabouts reader and send the names, which made
+    # the list a thing a caller could state. Go owns perception RNG,
+    # thresholds, detail, hints, and secret-safe signals, and now the roster.
     try:
         envelope = await ENGINE.authoritative_action(
             "sense.inspect", interaction.user.id,
             {
                 "mode": "area",
-                "present_hidden_npcs": present_hidden,
-                
             },
             action_id=f"discord:{interaction.id}:sense.inspect:area",
         )

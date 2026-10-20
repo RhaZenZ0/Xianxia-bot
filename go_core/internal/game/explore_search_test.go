@@ -93,10 +93,9 @@ func exploreSearchScalar(t *testing.T, path, sql string, args ...any) string {
 func exploreHere(t *testing.T, path, world string, seq int) map[string]any {
 	t.Helper()
 	clearCooldowns(t, path, 42)
+	unexpectedEventsOff(t, path)
 	return batch4Result(t, batch4Apply(t, path, world, "exploration.explore", seq, map[string]any{
-		"game_minute":                     20000 + int64(seq),
-		"unexpected_events_enabled":       false,
-		"unexpected_event_chance_percent": 0}))
+		"game_minute": 20000 + int64(seq)}))
 }
 
 func names(t *testing.T, v any) []string {

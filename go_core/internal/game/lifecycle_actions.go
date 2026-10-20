@@ -911,6 +911,30 @@ var incarnationScopedTables = []string{"inventory", "active_effects", "character
 // over a table a later schema owns.
 var incarnationScopedLaterTables = []string{"character_flames", "character_spirit_sense"}
 
+// incarnationScopedLinks are the life's rows in tables keyed on somebody other
+// than `user_id` alone - a challenge names both duellists, a lineage both
+// master and disciple, an abode's access its owner and its guest - and the
+// per-life tables whose column is `user_id` but which the wipe above does not
+// list because they were written beside it (v1.36.0: one list, read by
+// samsara_tables_test.go, where the rebirth used to carry ten statements).
+// Each is deleted where the column names the reborn soul; a missing table
+// (an older schema mid-migration) is tolerated as it always was.
+var incarnationScopedLinks = []struct{ Table, Column string }{
+	{"boss_participants", "user_id"},
+	{"party_members", "user_id"},
+	{"pvp_challenges", "challenger_user_id"},
+	{"pvp_challenges", "target_user_id"},
+	{"sect_lineage", "disciple_user_id"},
+	{"sect_lineage", "master_user_id"},
+	{"cave_abode_access", "owner_user_id"},
+	{"cave_abode_access", "guest_user_id"},
+	{"cave_abodes", "user_id"},
+	{"player_family_invites", "inviter_user_id"},
+	{"player_family_invites", "invitee_user_id"},
+	{"family_children", "parent_user_id"},
+	{"player_family_members", "user_id"},
+}
+
 // incarnationColumn is a column of the `characters` row that belongs to the
 // life, and what a new life starts it at.
 type incarnationColumn struct{ Column, Reset string }
@@ -938,6 +962,21 @@ var incarnationScopedLaterColumns = []incarnationColumn{
 	{"qi_max_bonus", "0"},
 }
 
+// soulTalentEchoTx is the echo of a past life's talent a soul carries into a
+// new body, 0 to 100, read off soul_legacy; a soul with no legacy, or a
+// database without the table yet, echoes nothing. character.create used to
+// take it off the payload (v1.36.0).
+func soulTalentEchoTx(conn *storage.Conn, userID int64) int {
+	if !tableExistsTx(conn, "soul_legacy") {
+		return 0
+	}
+	res, err := conn.Execute(`SELECT talent_echo FROM soul_legacy WHERE user_id=?`, []any{userID})
+	if err != nil || len(res.Rows) == 0 {
+		return 0
+	}
+	return int(minI64(100, maxI64(0, i64(res.Rows[0][0]))))
+}
+
 // clearIncarnationStateTx is what a rebirth wipes before the new body is
 // installed.
 func clearIncarnationStateTx(conn *storage.Conn, userID int64) error {
@@ -951,6 +990,19 @@ func clearIncarnationStateTx(conn *storage.Conn, userID int64) error {
 			continue
 		}
 		if _, err := conn.Execute(fmt.Sprintf(`DELETE FROM %s WHERE user_id=?`, t), []any{userID}); err != nil {
+			return err
+		}
+	}
+	// The life's links to other people, by the column each table files them
+	// under (v1.36.0): one list, read by the table gate
+	// (samsara_tables_test.go), where reincarnateAction used to carry ten
+	// statements of its own beside this wipe. A table or column an older
+	// schema does not have yet is skipped, as the later tables are.
+	for _, link := range incarnationScopedLinks {
+		if ok, err := tableHasColumns(conn, link.Table, link.Column); err != nil || !ok {
+			continue
+		}
+		if _, err := conn.Execute(fmt.Sprintf(`DELETE FROM %s WHERE %s=?`, link.Table, link.Column), []any{userID}); err != nil {
 			return err
 		}
 	}
@@ -1138,16 +1190,10 @@ func reincarnateAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if err = clearIncarnationStateTx(conn, userID); err != nil {
 		return authoritativeMutation{}, err
 	}
-	_, _ = conn.Execute(`DELETE FROM boss_participants WHERE user_id=?`, []any{userID})
-	_, _ = conn.Execute(`DELETE FROM party_members WHERE user_id=?`, []any{userID})
+	// The party the old body led is disbanded rather than deleted: its
+	// members are still standing there. Everything else the life linked to
+	// other people went with clearIncarnationStateTx above (incarnationScopedLinks).
 	_, _ = conn.Execute(`UPDATE parties SET status='disbanded',updated_at=? WHERE leader_user_id=? AND status='active'`, []any{now, userID})
-	_, _ = conn.Execute(`DELETE FROM pvp_challenges WHERE challenger_user_id=? OR target_user_id=?`, []any{userID, userID})
-	_, _ = conn.Execute(`DELETE FROM sect_lineage WHERE disciple_user_id=? OR master_user_id=?`, []any{userID, userID})
-	_, _ = conn.Execute(`DELETE FROM cave_abode_access WHERE owner_user_id=? OR guest_user_id=?`, []any{userID, userID})
-	_, _ = conn.Execute(`DELETE FROM cave_abodes WHERE user_id=?`, []any{userID})
-	_, _ = conn.Execute(`DELETE FROM player_family_invites WHERE inviter_user_id=? OR invitee_user_id=?`, []any{userID, userID})
-	_, _ = conn.Execute(`DELETE FROM family_children WHERE parent_user_id=?`, []any{userID})
-	_, _ = conn.Execute(`DELETE FROM player_family_members WHERE user_id=?`, []any{userID})
 	_, err = conn.Execute(`INSERT INTO character_birth_family(user_id,family_id,birth_order,generation,last_support_game_minute) VALUES(?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET family_id=excluded.family_id,birth_order=excluded.birth_order,generation=excluded.generation,last_support_game_minute=excluded.last_support_game_minute`, []any{userID, familyID, maxI64(1, family.BirthOrder), 1, -999999999})
 	if err != nil {
 		return authoritativeMutation{}, err

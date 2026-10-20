@@ -66,7 +66,7 @@ func TestCharacterCreateRefusesTheGhostRoadToEveryOtherHousehold(t *testing.T) {
 	path := setupCharacterCreationAuthorityDB(t)
 	world := batch4WorldPath(t)
 	zero := int64(0)
-	options := creationApply(t, path, world, "ghost-family-options", "character.family_options", 77, &zero, map[string]any{"world_name": "Mortal World", "game_minute": 500})
+	options := creationApply(t, path, world, "ghost-family-options", "character.family_options", 77, &zero, map[string]any{"game_minute": 500})
 	offers := batch4Result(t, options)["families"].([]familyOffer)
 	var ordinary, ghost familyOffer
 	for _, offer := range offers {
@@ -95,7 +95,7 @@ func TestCharacterCreateRefusesTheGhostRoadToEveryOtherHousehold(t *testing.T) {
 	// The tomb-watch clan can.
 	created := batch4Result(t, creationApply(t, path, world, "ghost-create-allowed", "character.create", 77, &expected, map[string]any{
 		"discord_name": "Tester", "name": "Xie Graveborn", "concept": "Keep the barrows", "gender": "female",
-		"path": "Ghost Cultivator", "family_choice_id": ghost.ChoiceID, "game_minute": 502, "age_at_creation_years": 18,
+		"path": "Ghost Cultivator", "family_choice_id": ghost.ChoiceID, "game_minute": 502,
 	}))
 	if created["created"] != true || created["path"] != "Ghost Cultivator" {
 		t.Fatalf("the ghost-born must be allowed: %v", created)

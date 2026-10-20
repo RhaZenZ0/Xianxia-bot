@@ -108,15 +108,18 @@ def build_engine(binary: Path) -> Path:
     return binary
 
 
-def launch_engine(tmp: Path) -> tuple[subprocess.Popen, str, str]:
+def launch_engine(tmp: Path, extra_env: dict[str, str] | None = None) -> tuple[subprocess.Popen, str, str]:
     # `PLAYTEST_ENGINE_BINARY` is an engine somebody already built - the runner
-    # builds once for every part rather than once per part.
+    # builds once for every part rather than once per part. `extra_env` is what
+    # one half wants the scratch engine to read that the other does not: the
+    # engine half makes a surprise certain (UNEXPECTED_EVENT_CHANCE_PERCENT,
+    # v1.36.0), the Discord half leaves the dice alone.
     prebuilt = os.environ.get("PLAYTEST_ENGINE_BINARY", "").strip()
     binary = Path(prebuilt) if prebuilt else build_engine(tmp / "xianxia-engine")
     token = "playtest-engine-token-" + str(int(time.time()))
     addr = f"127.0.0.1:{free_port()}"
     env = {**os.environ, "ENGINE_ADDR": addr, "DATABASE_PATH": str(tmp / "playtest.sqlite3"),
-           "WORLD_DATA_PATH": str(ROOT / "content" / "world.json"), "ENGINE_AUTH_TOKEN": token}
+           "WORLD_DATA_PATH": str(ROOT / "content" / "world.json"), "ENGINE_AUTH_TOKEN": token, **(extra_env or {})}
     proc = subprocess.Popen([str(binary)], env=env, stdout=(tmp / "engine.log").open("w"), stderr=subprocess.STDOUT)
     url = "http://" + addr
     for _ in range(60):

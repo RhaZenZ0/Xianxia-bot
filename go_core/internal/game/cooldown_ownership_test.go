@@ -42,6 +42,14 @@ var waitsTheCallerUsedToSend = []struct{ operation, field string }{
 	{"lifecycle.samsara_status", "minutes_per_year"},
 	{"family.simulate", "minutes_per_year"},
 	{"pvp.challenge", "ttl_seconds"},
+	// The payload sweep's seven (v1.36.0, payload_fields_test.go).
+	{"character.create", "age_at_creation_years"},
+	{"character.create", "talent_echo"},
+	{"character.family_options", "world_name"},
+	{"exploration.explore", "unexpected_event_chance_percent"},
+	{"exploration.explore", "unexpected_events_enabled"},
+	{"family.support", "cooldown_game_minutes"},
+	{"sense.inspect", "present_hidden_npcs"},
 }
 
 func TestAWaitIsNotTheCallersToSend(t *testing.T) {
@@ -224,6 +232,22 @@ func TestTheSlowClimbsNoLongerFollowTheCultivateWait(t *testing.T) {
 			t.Fatalf("%s served %ds with only CULTIVATE_COOLDOWN_MINUTES set, want its own %d minutes - "+
 				"it is following the cultivate key again, and no value of that key would restore what shipped",
 				action, got, slowProgressionWaitMinutes)
+		}
+	}
+}
+
+// The explore's event chance is the engine's (v1.36.0): read off
+// UNEXPECTED_EVENT_CHANCE_PERCENT inside 0..100, else the default the bot's
+// Settings used to carry, and never off the payload.
+func TestTheUnexpectedEventChanceIsTheEngines(t *testing.T) {
+	t.Setenv("UNEXPECTED_EVENT_CHANCE_PERCENT", "65")
+	if got := unexpectedEventChanceFromEnv(); got != 65 {
+		t.Fatalf("UNEXPECTED_EVENT_CHANCE_PERCENT=65 read as %d", got)
+	}
+	for _, junk := range []string{"", "  ", "x", "-1", "101"} {
+		t.Setenv("UNEXPECTED_EVENT_CHANCE_PERCENT", junk)
+		if got := unexpectedEventChanceFromEnv(); got != int(unexpectedEventChanceDefault) {
+			t.Fatalf("UNEXPECTED_EVENT_CHANCE_PERCENT=%q read as %d, want the default %d", junk, got, unexpectedEventChanceDefault)
 		}
 	}
 }

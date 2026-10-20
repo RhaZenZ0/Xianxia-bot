@@ -493,16 +493,16 @@ func addFateGo(conn *storage.Conn, userID int64, reason string, gameMinute int64
 	return points, e
 }
 
-// NPCRealmIndex, NPCStage, Severity and TargetKey are accepted for wire
-// compatibility and deliberately ignored: an older bot mid-upgrade still sends
-// them, and a request refused for carrying a field would turn a rolling deploy
-// into an outage (rc.48's rule for the minute). A challenge's opponent is read
-// off the world (`resolveChallengeTargetTx`); an event's off the event the
-// caller stands at and its roster (v1.35.0), named by EventKey and, when the
-// caller wants one beast in particular, NodeKey. Source is read for one thing
-// only: an older bot spelled the event and the node as `event:<key>|node:<n>`
-// in it, and those two keys are taken from there when EventKey is empty. Its
-// severity is never read.
+// A challenge's opponent is read off the world (`resolveChallengeTargetTx`);
+// an event's off the event the caller stands at and its roster (v1.35.0),
+// named by EventKey and, when the caller wants one beast in particular,
+// NodeKey. Source is read for one thing only: an older bot spelled the event
+// and the node as `event:<key>|node:<n>` in it, and those two keys are taken
+// from there when EventKey is empty. NPCRealmIndex, NPCStage, Severity and
+// TargetKey are the realm, stage, severity and lock an older bot sent: kept
+// on the wire so that bot is answered rather than refused (rc.48's rule for
+// the minute), and read by nothing - which the payload sweep proves
+// (payload_fields_test.go, callerIgnored) rather than this comment claiming.
 type combatStartPayload struct {
 	Kind          string `json:"kind"`
 	NPCName       string `json:"npc_name"`

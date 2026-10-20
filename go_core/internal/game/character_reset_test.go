@@ -63,13 +63,13 @@ CREATE TABLE soul_legacy(user_id INTEGER PRIMARY KEY,incarnation_count INTEGER N
 func makeCultivator(t *testing.T, path, world string, actor int64, name string, minute int64) map[string]any {
 	t.Helper()
 	optionsOut := creationApply(t, path, world, fmt.Sprintf("reset-options-%d-%s", actor, name),
-		"character.family_options", actor, nil, map[string]any{"world_name": "Mortal World", "game_minute": minute})
+		"character.family_options", actor, nil, map[string]any{"game_minute": minute})
 	offers := batch4Result(t, optionsOut)["families"].([]familyOffer)
 	createdOut := creationApply(t, path, world, fmt.Sprintf("reset-create-%d-%s", actor, name),
 		"character.create", actor, nil, map[string]any{
 			"discord_name": "Tester", "name": name, "concept": "Prove the Dao", "gender": "neutral",
 			"path": "Sword Cultivator", "family_choice_id": offers[0].ChoiceID,
-			"game_minute": minute + 1, "age_at_creation_years": 18,
+			"game_minute": minute + 1,
 		})
 	return batch4Result(t, createdOut)
 }

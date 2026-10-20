@@ -311,6 +311,27 @@ var callerOwnedNothing = []string{
 	"base_samsara_years",
 	"max_wait_seconds",
 	"ttl_seconds",
+	// What the payload sweep found (v1.36.0, payload_fields_test.go), the
+	// first time every field was read at once rather than one action at a
+	// time. A new life's age and the echo of its past talent were the
+	// caller's to state at character.create (the echo is soul_legacy's, the
+	// age is a new life's); which world a first life's family options came
+	// from was the caller's (a first life is Mortal); the chance of an
+	// unexpected event and whether events run at all rode every explore from
+	// the bot's own settings (the engine reads UNEXPECTED_EVENT_CHANCE_PERCENT
+	// and world_state.automation_settings itself); the household's support
+	// wait was accepted and overwritten (familySupportCooldownGameMinutes);
+	// and which hidden masters stood where the sensor stood was the bot's
+	// word (npcWhereaboutsTx answers it). combat.start's realm, stage,
+	// severity and lock are not here: an older bot still sends them, nothing
+	// reads them, and the sweep proves that (callerIgnored) instead.
+	"age_at_creation_years",
+	"talent_echo",
+	"world_name",
+	"unexpected_event_chance_percent",
+	"unexpected_events_enabled",
+	"cooldown_game_minutes",
+	"present_hidden_npcs",
 }
 
 func rejectCallerGameMinute(raw json.RawMessage) error {
@@ -1222,6 +1243,16 @@ func applyAuthoritativeQuery(databasePath, worldPath string, req ActionRequest) 
 	return ActionResponse{}, fmt.Errorf("unsupported authoritative query: %s", req.Operation)
 }
 
+// characterCreatePayload is what a new cultivator says about themselves. The
+// age a life starts at and the echo of a past life's talent used to ride here
+// too (v1.36.0): the age was read by nothing, and the echo was read straight
+// into the aptitude roll, so a forged request could open a first life with a
+// perfect echo. The echo is soul_legacy's (soulTalentEchoTx) and the age is
+// the schema's default.
+// newLifeStartingAge is the age, in years, every first life begins at; the
+// schema's own default for age_at_creation_years says the same.
+const newLifeStartingAge = int64(18)
+
 type characterCreatePayload struct {
 	DiscordName    string `json:"discord_name"`
 	Name           string `json:"name"`
@@ -1230,8 +1261,6 @@ type characterCreatePayload struct {
 	Path           string `json:"path"`
 	FamilyChoiceID string `json:"family_choice_id"`
 	GameMinute     int64  `json:"game_minute"`
-	AgeAtCreation  int64  `json:"age_at_creation_years"`
-	TalentEcho     int    `json:"talent_echo"`
 }
 
 func createCharacterAuthoritative(conn *storage.Conn, worldPath string, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
@@ -1297,7 +1326,7 @@ func createCharacterAuthoritative(conn *storage.Conn, worldPath string, userID i
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	aptitude, err := generateAptitudes(root, path, pFamily, catalog, p.TalentEcho)
+	aptitude, err := generateAptitudes(root, path, pFamily, catalog, soulTalentEchoTx(conn, userID))
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -1306,10 +1335,10 @@ func createCharacterAuthoritative(conn *storage.Conn, worldPath string, userID i
 		return authoritativeMutation{}, err
 	}
 	natural := int64(70 + naturalRoll)
-	age := p.AgeAtCreation
-	if age <= 0 {
-		age = 18
-	}
+	// A new life starts at eighteen. The age used to be the caller's to state
+	// (v1.36.0), floored at one and read into the lifespan the body counts
+	// from, so a caller could open a life a year old or a century.
+	age := newLifeStartingAge
 	pd := catalog.Paths[path]
 	attrs := map[string]int{"body": pd.Body, "agility": pd.Agility, "spirit": pd.Spirit, "insight": pd.Insight, "will": pd.Will, "presence": pd.Presence}
 	qiMax := int64(8 + pd.Spirit*2)

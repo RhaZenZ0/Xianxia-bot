@@ -209,10 +209,8 @@ func TestBatch5ExploreOwnsRewardsCooldownReceiptAndLocationDiscovery(t *testing.
 	}
 	defer func() { locationDiscoveryIntn = originalIntn }()
 
-	result := batch4Result(t, batch4Apply(t, path, world, "exploration.explore", 1, map[string]any{
-		"game_minute":                     600,
-		"unexpected_events_enabled":       false,
-		"unexpected_event_chance_percent": 0}))
+	unexpectedEventsOff(t, path)
+	result := batch4Result(t, batch4Apply(t, path, world, "exploration.explore", 1, map[string]any{"game_minute": 600}))
 	if result["location"] != "Greenriver Town" || storage.ParseInt(result["cultivation_awarded"]) <= 0 {
 		t.Fatalf("explore result=%v", result)
 	}
@@ -451,10 +449,10 @@ func TestBatch5ExploreStartsPersistentPersonalEventAndReopensIt(t *testing.T) {
 	world := batch4WorldPath(t)
 	forcePersonalUnexpectedEvent(t)
 
+	unexpectedEventsCertain(t, path)
 	started := batch4Result(t, batch4Apply(t, path, world, "exploration.explore", 90, map[string]any{
-		"game_minute":                     700,
-		"unexpected_event_chance_percent": 100,
-		"event_key":                       "evt:test:wounded:42"}))
+		"game_minute": 700,
+		"event_key":   "evt:test:wounded:42"}))
 	if started["kind"] != "event_started" {
 		t.Fatalf("kind=%v result=%v", started["kind"], started)
 	}
@@ -473,10 +471,8 @@ func TestBatch5ExploreStartsPersistentPersonalEventAndReopensIt(t *testing.T) {
 	}
 	before := storage.ParseInt(actionScalar(t, path, "SELECT cultivation FROM characters WHERE user_id=42"))
 
-	reopened := batch4Result(t, batch4Apply(t, path, world, "exploration.explore", 91, map[string]any{
-		"game_minute":                     701,
-		"unexpected_events_enabled":       false,
-		"unexpected_event_chance_percent": 0}))
+	unexpectedEventsOff(t, path)
+	reopened := batch4Result(t, batch4Apply(t, path, world, "exploration.explore", 91, map[string]any{"game_minute": 701}))
 	if reopened["kind"] != "event_active" {
 		t.Fatalf("reopened=%v", reopened)
 	}
@@ -522,10 +518,10 @@ func TestBatch5ExplorationEventLeaveEndsEventWithoutReward(t *testing.T) {
 	world := batch4WorldPath(t)
 	forcePersonalUnexpectedEvent(t)
 
+	unexpectedEventsCertain(t, path)
 	started := batch4Result(t, batch4Apply(t, path, world, "exploration.explore", 93, map[string]any{
-		"game_minute":                     710,
-		"unexpected_event_chance_percent": 100,
-		"event_key":                       "evt:test:leave:42"}))
+		"game_minute": 710,
+		"event_key":   "evt:test:leave:42"}))
 	if started["kind"] != "event_started" {
 		t.Fatalf("started=%v", started)
 	}
@@ -542,4 +538,20 @@ func TestBatch5ExplorationEventLeaveEndsEventWithoutReward(t *testing.T) {
 	if got := actionScalar(t, path, "SELECT state FROM exploration_events WHERE event_id='evt:test:leave:42'"); got != "left" {
 		t.Fatalf("event state=%v", got)
 	}
+}
+
+// Whether an explore can be surprised, and how likely, used to ride the
+// payload (v1.36.0): the switch is world_state.automation_settings, the GM's
+// lever (admin.automation.set), and the chance is the operator's
+// UNEXPECTED_EVENT_CHANCE_PERCENT. The tests set the two where the engine
+// reads them.
+func unexpectedEventsOff(t *testing.T, path string) {
+	t.Helper()
+	batch4Exec(t, path, `INSERT INTO world_state(key,value_json,updated_at) VALUES('automation_settings','{"unexpected_events": false}',0) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json`)
+}
+
+func unexpectedEventsCertain(t *testing.T, path string) {
+	t.Helper()
+	batch4Exec(t, path, `INSERT INTO world_state(key,value_json,updated_at) VALUES('automation_settings','{"unexpected_events": true}',0) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json`)
+	t.Setenv("UNEXPECTED_EVENT_CHANCE_PERCENT", "100")
 }

@@ -727,15 +727,17 @@ func ensureStarterBirthFamily(conn *storage.Conn, worldName string, f BirthFamil
 
 func birthFamilyOptionsAction(conn *storage.Conn, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p struct {
-		WorldName  string `json:"world_name"`
-		GameMinute int64  `json:"game_minute"`
+		GameMinute int64 `json:"game_minute"`
 	}
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
 	}
-	if strings.TrimSpace(p.WorldName) == "" {
-		p.WorldName = "Mortal World"
-	}
+	// A first life is born in the Mortal World. The world used to be the
+	// caller's to name (v1.36.0), and nothing below held the family offered
+	// to the soul's state, so a forged request opened a first life in the
+	// Celestial World; a rebirth installs its body through reincarnateAction
+	// and never comes here.
+	worldName := "Mortal World"
 	exists, err := conn.Execute(`SELECT 1 FROM characters WHERE user_id=?`, []any{userID})
 	if err != nil {
 		return authoritativeMutation{}, err
@@ -743,7 +745,7 @@ func birthFamilyOptionsAction(conn *storage.Conn, userID int64, raw json.RawMess
 	if len(exists.Rows) > 0 {
 		return authoritativeMutation{}, errors.New("character already exists")
 	}
-	candidates, err := generateBirthFamilyOptions(p.WorldName)
+	candidates, err := generateBirthFamilyOptions(worldName)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -754,7 +756,7 @@ func birthFamilyOptionsAction(conn *storage.Conn, userID int64, raw json.RawMess
 	}
 	offers := make([]familyOffer, 0, len(candidates))
 	for i, candidate := range candidates {
-		familyID, canonical, e := ensureStarterBirthFamily(conn, p.WorldName, candidate, p.GameMinute)
+		familyID, canonical, e := ensureStarterBirthFamily(conn, worldName, candidate, p.GameMinute)
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
@@ -769,8 +771,8 @@ func birthFamilyOptionsAction(conn *storage.Conn, userID int64, raw json.RawMess
 		}
 		offers = append(offers, familyOffer{ChoiceID: choiceID, FamilyID: familyID, BirthFamily: canonical})
 	}
-	result := map[string]any{"families": offers, "world_name": p.WorldName, "expires_at": expiresAt}
-	eventPayload := map[string]any{"count": len(offers), "world_name": p.WorldName, "expires_at": expiresAt}
+	result := map[string]any{"families": offers, "world_name": worldName, "expires_at": expiresAt}
+	eventPayload := map[string]any{"count": len(offers), "world_name": worldName, "expires_at": expiresAt}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "character", EventType: "birth_family_options_generated", EntityType: "character_creation", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: eventPayload}}, nil
 }
 

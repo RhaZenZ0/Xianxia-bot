@@ -283,7 +283,9 @@ into a calendar. At the default of **30 minutes** (180 until v1.0.13) a realm is
 roughly two real days of active cultivation, less with closed-door seclusion
 running beside it and less again in the higher worlds, whose qi density is content
 (`world_qi_density` in `content/world.json`). `UNEXPECTED_EVENT_CHANCE_PERCENT`
-is the chance an explore rolls an unexpected event. `WORLD_TIME_SCALE` is how
+is the chance an explore rolls an unexpected event, 0 to 100, default **28**; since v1.36.0 it is
+read by the **Go engine** (the bot used to send its own copy on every explore, which made the
+chance a thing a caller could state) and compose passes it in. `WORLD_TIME_SCALE` is how
 many game minutes pass per real minute, 0 to 60. Since v1.0.0-rc.39 it is read
 by the **Go engine**, which owns the clock, and compose passes it in: it seeds
 the clock of a **new** world and nothing else. On a world that already has a
