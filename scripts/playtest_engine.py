@@ -1590,7 +1590,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     # -- a duel, a partnership, a house
     for uid in (PLAYER, BUYER):
         await step(report, f"{uid} to the hills", gm("admin.player.teleport", {"user_id": uid, "location": "Cloudspine Foothills", "reason": "playtest"}))
-    challenge = await step(report, "pvp.challenge the buyer", act("pvp.challenge", PLAYER, {"target_user_id": BUYER, "stakes": "honour", "ttl_seconds": 600}))
+    challenge = await step(report, "pvp.challenge the buyer", act("pvp.challenge", PLAYER, {"target_user_id": BUYER, "stakes": "honour"}))
     challenge_id = int((challenge or {}).get("challenge_id") or 0)
     if challenge_id:
         match = await step(report, "pvp.respond accept", act("pvp.respond", BUYER, {"challenge_id": challenge_id, "accept": True}))
@@ -2894,7 +2894,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     # intent a Sword Cultivator banked was one. Read it on both sides.
     dying = dict(await db.get_character(PLAYER) or {})
     banked = present(dying.get("path_resource"), 0)
-    await step(report, "lifecycle.true_death", act("lifecycle.true_death", PLAYER, {"reason": "playtest", "max_wait_seconds": 1}))
+    await step(report, "lifecycle.true_death", act("lifecycle.true_death", PLAYER, {"reason": "playtest"}))
     cycle = await step(report, "lifecycle.samsara_status", query("lifecycle.samsara_status", PLAYER, {}))
     if cycle is not None:
         report.add("PASS", "the wheel is turning", f"ready={cycle.get('ready')} remaining={cycle.get('seconds_remaining')}")

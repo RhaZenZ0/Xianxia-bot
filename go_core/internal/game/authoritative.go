@@ -296,6 +296,19 @@ var callerOwnedNothing = []string{
 	// not; a unit of account is the same kind of number as a wait, so it is
 	// refused here for both and the caravan's own check is gone.
 	"minutes_per_day",
+	// How long a death keeps a soul in Samsara, and how long a duel's
+	// challenge stands (v1.35.0). The three combat doors, lifecycle.true_death,
+	// the samsara status and the family simulation all took the year's length,
+	// the base wait and its real-time cap off the payload, with no floor a
+	// caller could not pass: a caller that omitted them gave a true death a
+	// one-year wait and a thirty-second cap. The engine reads
+	// REINCARNATION_BASE_SAMSARA_YEARS and REINCARNATION_MAX_WAIT_SECONDS
+	// itself (lifecycle_actions.go), a year is lifespanmodel.MinutesPerYear,
+	// and a challenge stands pvpChallengeTTLSeconds.
+	"minutes_per_year",
+	"base_samsara_years",
+	"max_wait_seconds",
+	"ttl_seconds",
 }
 
 func rejectCallerGameMinute(raw json.RawMessage) error {
@@ -1102,13 +1115,7 @@ func applyAuthoritativeQuery(databasePath, worldPath string, req ActionRequest) 
 		result := map[string]any{"power": power, "precision": precision, "range_m": rng, "concealment_active": c.ConcealmentActive, "concealment_strength": concealmentPowerGo(c)}
 		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
 	case "lifecycle.samsara_status":
-		var p struct {
-			MinutesPerYear int64 `json:"minutes_per_year"`
-		}
-		if err := json.Unmarshal(req.Payload, &p); err != nil {
-			return ActionResponse{}, err
-		}
-		result, err := samsaraStatus(conn, req.ActorID, p.MinutesPerYear)
+		result, err := samsaraStatus(conn, req.ActorID)
 		if err != nil {
 			return ActionResponse{}, err
 		}

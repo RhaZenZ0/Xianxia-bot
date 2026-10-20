@@ -18,17 +18,11 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
 
 ## Open
 
-- **deferred (config)** — *The length of a combat death's Samsara wait is the caller's number.* `combatItemPayload` carries `base_samsara_years`, `minutes_per_year` and `max_wait_seconds` into `recordTrueDeathAuthoritative` on all three combat death doors, none of them in `callerOwnedNothing`, and `samsaraScale`'s 320-year default sits behind `maxI64(1, ...)` where an absent or zero value cannot reach it: a caller that omits them gives a true death a one-year wait and a thirty-second cap. The production bot sends `REINCARNATION_BASE_SAMSARA_YEARS` on every door, so play reads the setting today; the old-age sweep already uses an engine constant, the right shape. The fix is an engine `.env` key (Go table, `.env.example`, compose passthrough, `docs/CONFIGURATION.md`), the three keys added to `callerOwnedNothing`, and the bot ceasing to send them - a configuration move that reaches every running world, which waits for a release that is not closing (v1.34.0).
 - **deferred (design)** — *Upper-world keepers have thin boards.* 790 of the 1,154 keeper buy lines pay
   nothing now: a Mortal-made good is worth under a whole coin up there once the ladder is read, so the
   cheap half of an upper economy has no NPC buyer. That is the ceiling doing its job, and it is also a
   content gap: a pass authoring upper-world demand for upper-world goods, or shelves priced on the
   ladder, is the owner's call.
-- **deferred (design)** — *The market quote disagrees with the counter.* `market.rows` and
-  `market.quote` price a sale at 70 percent of the buy price with no floor, shelf ceiling or refusal
-  (`withMarketPrices`), while `market.trade` prices through `marketUnitPrice`; the quote can promise
-  more than the trade pays, or a sale the trade refuses. The quote needs the catalogue and the same
-  function.
 - **deferred (design)** — *Pickers that offer what the economy now refuses.* `/caravan dispatch`'s cargo
   picker is the whole bag, and `/shop sell`'s picker reads the bag rather than the board the engine
   trims, so a thing the counter will not pay for is still offered and then refused. Both want an engine
@@ -92,15 +86,6 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
 - **deferred (design)** — *Event manifestations have no per-day reward cap.* A `combat.finalize`
   against an `event:` battle has no `target_key`, so insight and tempering are not limited per day;
   the site's finite beasts bound it.
-- **deferred (design)** — *Quest rewards follow the player's feet, not the quest's world.*
-  `grantQuestRewardTx` (`actions.go`) and `payCommissionRewardTx` (`commission_actions.go`) pay a
-  quest's `spirit_stones` through `characterWalletDeltaTx`, the coin of wherever the player stands
-  when the last objective is reported. Six realm-road stages end in a `raid_win`, reported at the
-  claim, so a stage finished by a claim made outside the quest's own world pays in the wrong coin by
-  the same factor of a hundred v1.33.0 closed for the raid itself; every other quest has the same
-  exposure in principle and low reach in practice. A quest has no world of its own to name, so it
-  would have to take one from its giver, its stage or its last objective's place - a decision, not a
-  wiring. `SettleBountyTx` has the same shape and v1.28.0 states it as deliberate.
 - **deferred (design)** — *A GM's set_sect leaves the NPC master bond.* `admin.player.set_sect`
   (remove or change) leaves `sect_lineage` and `npc_mentorships` in place, and `livingNPCMasterTx`
   checks only that the master is alive, not that they are in the disciple's sect, so a player a GM
@@ -126,22 +111,10 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   realm for a character at a place the catalogue does not carry, and `/sense` reads
   `WORLD.realm_world(realm_index)`; a body cultivator in the Spiritual World at qi 3 reads as Mortal
   there. Left because each is "which world am I from" rather than "may I enter".
-- **deferred (design)** — *A world-event battle's severity and node are the caller's.* `combat.start
-  kind=event` takes `severity`, `source` and the node key off the payload; `severity` scales the
-  opponent and `source` (`event:<key>|node:<node>`) is what `combatFinalizeAction` branches on to
-  deplete the node and pay its reward, while `world_event.engage` checks three things here that
-  `combat.start` checks none of (the event is active, the caller is at it, the node is a beast with
-  something left). v1.33.0 made the challenge the engine's and left this, because the event scene's
-  Battle button also sends a hostile-manifestation battle with no node, so "which battle is this"
-  needs a decision of its own.
-- **deferred (design)** — *The samsara wait is the caller's.* `combat.turn`, `combat.technique` and
-  `lifecycle.true_death` take `minutes_per_year`, `base_samsara_years` and `max_wait_seconds` off the
-  payload, and `samsara.status` and `family.simulate` take `minutes_per_year` - rc.56's class
-  (`minutes_per_day` is already in `callerOwnedNothing`). Moving them to the engine means three more
-  compose passthroughs and a decision about whether the `REINCARNATION_*` keys stay the `.env`
-  baseline. `duel.challenge`'s `ttl_seconds` has no ceiling either, a bound the client owns. A sweep
-  the next release can build: every payload field an engine action reads from a caller, held against
-  a list of what a caller may state, so the class stops being found one action at a time.
+- **deferred (design)** — *A sweep of every payload field an engine action reads.* The samsara
+  wait was rc.56's class found one action at a time (v1.35.0 closed it); a gate that walks every
+  payload struct the engine unmarshals and holds each field against a list of what a caller may
+  state would find the next one before a release does. Not built yet: the list is the decision.
 - **deferred (design)** — *`admin.player.force_end_scene` writes more than its undo restores.* The
   forward action writes `scene_key`, `channel_id` and `metadata_json` as well as the type and label,
   and snapshots only the two its undo puts back, so an undone force-end leaves a scene with its old

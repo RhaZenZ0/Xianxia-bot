@@ -548,6 +548,11 @@ func blackMarketTradeAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "economy", EventType: "black_market.trade", EntityType: "black_market", EntityID: fmt.Sprint(post["world_name"]), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 
+// marketSellShare is what a regional market pays against its buy price,
+// before the shelf ceiling. One copy: the quote and the trade both read it
+// through marketUnitPrice.
+const marketSellShare = 0.70
+
 // marketUnitPrice is what one unit costs at a market counter, or what the
 // counter pays for one, and it is held inside the band the shops set (v1.2.3).
 // A market's base is the item's sect value times a world factor, which has
@@ -561,7 +566,9 @@ func blackMarketTradeAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 // as the cheapest shelf asks - the rank ceiling's rule (trade_rank_price.go),
 // stated once more for the counter it forgot. The shelf is the cheapest in any
 // world, carried into the counter's coin (v1.34.0), and a sale the counter
-// cannot price under it answers 0.
+// cannot price under it answers 0. The quote (market.rows, market.quote)
+// reads the same function (v1.35.0), so a card never promises what the
+// counter then refuses.
 func marketUnitPrice(catalog worlddata.Catalog, itemID, currency string, base int64, index float64, buy bool) int64 {
 	unit := max64(1, int64(math.Round(float64(base)*index)))
 	if buy {
@@ -570,7 +577,7 @@ func marketUnitPrice(catalog worlddata.Catalog, itemID, currency string, base in
 		}
 		return unit
 	}
-	unit = max64(1, int64(math.Round(float64(unit)*0.70)))
+	unit = max64(1, int64(math.Round(float64(unit)*marketSellShare)))
 	if shelf, ok := cheapestShelfPrice(catalog, itemID, currency); ok {
 		// The cheapest shelf anywhere asks less than one coin of this world's
 		// (cheapestShelfPrice reads it across the ladder): no whole-coin price

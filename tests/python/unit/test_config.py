@@ -221,12 +221,18 @@ class ConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "must be one of"):
                 Settings.from_env()
 
-    def test_legacy_reincarnation_env_alias_is_ignored(self):
+    def test_the_reincarnation_keys_are_not_settings(self):
+        # The samsara wait is the engine's (v1.35.0): REINCARNATION_BASE_SAMSARA_YEARS
+        # and REINCARNATION_MAX_WAIT_SECONDS are read by Go and passed through
+        # compose, and the bot keeps no copy to send. The retired alias stays
+        # ignored.
         env = self.base_env()
         env["REINCARNATION_FAMILY_YEARS_PER_WINDOW"] = "999"
+        env["REINCARNATION_BASE_SAMSARA_YEARS"] = "640"
         with patch.dict(os.environ, env, clear=True):
             settings = Settings.from_env()
-        self.assertEqual(settings.reincarnation_base_samsara_years, 320)
+        self.assertFalse(hasattr(settings, "reincarnation_base_samsara_years"))
+        self.assertFalse(hasattr(settings, "reincarnation_max_wait_seconds"))
 
     def test_removed_channel_fallback_envs_are_not_settings(self):
         env = self.base_env()

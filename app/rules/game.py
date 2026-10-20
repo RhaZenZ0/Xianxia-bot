@@ -319,6 +319,30 @@ class World:
                 return key
         return "low_spirit_stone"
 
+    def commission_giver_home(self, giver: str) -> str:
+        """Where a giver's work is posted: the giver's own `location` in the
+        commission roster, else the NPC's - the twin of Go's `commissionGiverHome`.
+        "" is a giver the content does not place."""
+        giver = str(giver or "").strip()
+        if not giver:
+            return ""
+        givers = self.data.get("commission_givers", {}) or {}
+        return str((givers.get(giver) or {}).get("location") or (self.npcs.get(giver) or {}).get("location") or "").strip()
+
+    def quest_giver_currency(self, giver: str) -> str | None:
+        """The coin a commission pays in (v1.35.0): the base currency of the
+        world its giver stands in, the display twin of the engine's
+        `questRewardCurrencyTx`. None for a giver the content does not place,
+        whose work pays where the player stands; a card then names no coin
+        rather than the Mortal stone."""
+        world = str((self.locations.get(self.commission_giver_home(giver)) or {}).get("world") or "")
+        if not world:
+            return None
+        coin = self.world_base_currency(world)
+        if str(self.currencies.get(coin, {}).get("world") or "") != world:
+            return None
+        return coin
+
     def location_safe_zone(self, name: str) -> bool:
         return bool(self.locations.get(name, {}).get("safe_zone", False))
 

@@ -119,30 +119,18 @@ func TestCombatStartChallengeComputesServerSideHPFromCanonicalCharacter(t *testi
 	}
 }
 
-func TestCombatStartEventKindDerivesOpponentFromCallersOwnCharacterNotPayload(t *testing.T) {
+func TestCombatStartEventKindNeedsItsEvent(t *testing.T) {
+	// An event battle is the event's (v1.35.0): with no event_key, and no
+	// older bot's `event:<key>` source to take one from, there is nothing to
+	// read the fight off, and the payload's own severity is not it. The
+	// derivation itself is driven in combat_event_start_test.go against a
+	// fixture that has an event.
 	path := setupCombatStartDB(t)
-	// user 101 is realm_index=3, phase=4. Pass deliberately wrong
-	// npc_realm_index/npc_stage in the payload to prove the "event" kind
-	// ignores them and derives the opponent from the caller's own
-	// canonical character plus severity instead of trusting the client.
-	mut, err := callCombatStart(t, path, 101, map[string]any{
-		"kind": "event", "npc_name": "Beast Tide Wraith", "npc_realm_index": 999, "npc_stage": 999,
-		"severity": 8, "source": "event:tide", "target_key": "event:tide:101", "game_minute": 100,
+	_, err := callCombatStart(t, path, 101, map[string]any{
+		"kind": "event", "npc_name": "Beast Tide Wraith", "severity": 8, "target_key": "event:tide:101", "game_minute": 100,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	out := mut.Result.(map[string]any)
-	// ri = max(0, 3 + max(0,8-5)/3) = 3+1 = 4; stage = max(1,min(9, 4 + max(0,8-4)/2)) = 4+2 = 6
-	// hp = max(12, 14 + 4*5 + 6*2 + 8*2) = 14+20+12+16 = 62
-	if storage.ParseInt(out["npc_realm_index"]) != 4 {
-		t.Fatalf("npc_realm_index=%v (payload's 999 must be ignored for event kind)", out["npc_realm_index"])
-	}
-	if storage.ParseInt(out["npc_stage"]) != 6 {
-		t.Fatalf("npc_stage=%v", out["npc_stage"])
-	}
-	if storage.ParseInt(out["npc_hp"]) != 62 {
-		t.Fatalf("npc_hp=%v", out["npc_hp"])
+	if err == nil || !strings.Contains(err.Error(), "event_key is required") {
+		t.Fatalf("an event battle with no event was started: %v", err)
 	}
 }
 

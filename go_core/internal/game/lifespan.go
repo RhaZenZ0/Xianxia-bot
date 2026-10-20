@@ -424,12 +424,6 @@ func playerLifespanStatus(
 	}, nil
 }
 
-// Defaults mirror REINCARNATION_BASE_SAMSARA_YEARS / REINCARNATION_MAX_WAIT_SECONDS
-// in app/config.py, since an automatic old-age death has no caller payload to
-// take these from.
-const oldAgeDeathBaseSamsaraYears int64 = 320
-const oldAgeDeathMaxWaitSeconds int64 = 300
-
 // checkPlayerOldAgeDeathTx evaluates whether a living player character has
 // exceeded their (activity-paused) natural lifespan and, if so, routes them
 // through the same true-death/samsara pipeline as a player-initiated death.
@@ -474,12 +468,11 @@ func checkPlayerOldAgeDeathTx(conn *storage.Conn, catalog worlddata.Catalog, use
 	if !lifespanmodel.OldAgeExpired(subject, clock.EffectiveGameMinute) {
 		return nil, nil
 	}
+	// The wait is scaled the way every other death's is: the setting the engine
+	// reads itself (v1.35.0), not a constant mirrored from the bot's config.
 	out, err := recordTrueDeathAuthoritative(conn, catalog, userID, trueDeathPayload{
-		GameMinute:       clock.EffectiveGameMinute,
-		Reason:           "old_age",
-		MinutesPerYear:   minutesPerYear,
-		BaseSamsaraYears: oldAgeDeathBaseSamsaraYears,
-		MaxWaitSeconds:   oldAgeDeathMaxWaitSeconds,
+		GameMinute: clock.EffectiveGameMinute,
+		Reason:     "old_age",
 	})
 	if err != nil {
 		if strings.Contains(err.Error(), "birth family") {

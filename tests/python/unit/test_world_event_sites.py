@@ -201,11 +201,17 @@ class EventPanelTests(unittest.TestCase):
         self.assertIn("_refresh_site_select", self.view)
         self.assertIn("world_event.engage", self.view)
 
-    def test_an_event_battle_names_a_real_beast_from_the_roster(self):
-        self.assertIn("_next_beast", self.view)
-        # The node key rides the combat source so the kill takes that beast off
-        # the site and pays what it carries.
-        self.assertIn("|node:", self.view)
+    def test_an_event_battle_names_the_event_and_the_engine_picks_the_beast(self):
+        # The roster is the engine's to read (v1.35.0): the button sends the
+        # event's key and the engine takes the next living beast off the site,
+        # spells the `event:<key>|node:<n>` source itself and scales the fight
+        # off the beast's rank, so the kill takes that beast off and pays what
+        # it carries. Nothing of that is built here any more.
+        self.assertIn("event_key=self.event_key", self.view)
+        self.assertNotIn("_next_beast", self.view, "the view reads the roster to choose the opponent; that is the engine's")
+        self.assertNotIn("|node:", self.view, "the view spells the battle's source; that is the engine's")
+        self.assertNotIn("severity=", self.view.split("async def battle", 1)[1].split("async def", 1)[0],
+                         "the Battle button states a severity; the engine reads the event's")
 
 
 class EventCastWiringTests(unittest.TestCase):

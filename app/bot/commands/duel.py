@@ -40,7 +40,7 @@ async def duel_challenge(interaction: discord.Interaction, member: discord.Membe
         envelope = await ENGINE.authoritative_action(
             "pvp.challenge",
             interaction.user.id,
-            {"target_user_id": member.id, "stakes": stakes, "ttl_seconds": 300},
+            {"target_user_id": member.id, "stakes": stakes},
             action_id=f"discord:{interaction.id}:pvp.challenge",
         )
     except GameEngineError as exc:
@@ -48,9 +48,13 @@ async def duel_challenge(interaction: discord.Interaction, member: discord.Membe
         return
     result = dict(envelope.get("result") or {})
     challenge_id = int(result.get("challenge_id", 0))
+    # How long the challenge stands is the engine's (v1.35.0): printed from its
+    # answer, never restated here.
+    ttl = int(result.get("expires_in_seconds") or 0)
+    window = f"**{ttl // 60} minutes**" if ttl >= 60 else f"**{ttl} seconds**"
     await interaction.response.send_message(
         f"⚔️ <@{member.id}> receives consent duel challenge `#{challenge_id}` from <@{interaction.user.id}>. "
-        f"Stakes: **{stakes[:200]}**. It expires in **5 minutes**; use **/combat → Duels → Respond**."
+        f"Stakes: **{stakes[:200]}**. It expires in {window}; use **/combat → Duels → Respond**."
     )
 
 

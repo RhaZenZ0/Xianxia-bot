@@ -48,25 +48,27 @@ def _calls(node: ast.AST) -> list[ast.Call]:
     return [n for n in ast.walk(node) if isinstance(n, ast.Call)]
 
 
-class ThePillCarriesTheDeathScale(unittest.TestCase):
-    def test_the_engine_is_told_how_a_life_that_ends_here_is_scaled(self):
+class ThePillStatesNothingAboutTheDeathScale(unittest.TestCase):
+    """Until v1.35.0 the pill carried `minutes_per_year`, `base_samsara_years`
+    and `max_wait_seconds` the way the attack and the technique did, so a life
+    that ended on its turn was scaled by the caller's numbers. The engine owns
+    the wait now and refuses the fields (callerOwnedNothing), so the service
+    sends the battle and the pill and nothing about time."""
+
+    def test_the_engine_is_not_told_how_a_life_that_ends_here_is_scaled(self):
         engine = _Engine()
         service = CombatService(None, engine=engine)
-        asyncio.run(service.recovery_item(
-            7, battle_id=3, item_id="recovery_pill", game_minute=10, action_id="a",
-            minutes_per_year=518400, base_samsara_years=320, max_wait_seconds=300))
+        asyncio.run(service.recovery_item(7, battle_id=3, item_id="recovery_pill", game_minute=10, action_id="a"))
         operation, _, payload = engine.calls[0]
         self.assertEqual(operation, "combat.recovery_item")
-        self.assertEqual(
-            (payload["minutes_per_year"], payload["base_samsara_years"], payload["max_wait_seconds"]),
-            (518400, 320, 300),
-            "the pill's turn can end a life and the engine was not told how to scale it")
+        self.assertEqual(set(payload), {"battle_id", "item_id"},
+                         "the pill's payload carries something the engine derives for itself")
 
-    def test_the_panel_hands_them_over(self):
+    def test_the_panel_hands_nothing_about_time_over(self):
         sends = {kw.arg for call in _calls(_function(BATTLE, "_use_battle_recovery_item"))
                  for kw in call.keywords}
-        self.assertTrue({"minutes_per_year", "base_samsara_years", "max_wait_seconds"} <= sends,
-                        "the battle panel's pill does not pass the death scale the attack and the technique pass")
+        self.assertFalse({"minutes_per_year", "base_samsara_years", "max_wait_seconds"} & sends,
+                         "the battle panel's pill states the death scale; the engine owns it")
 
     def test_the_pill_and_the_technique_read_the_answer_through_one_function(self):
         for name in ("_use_battle_recovery_item", "_execute_battle_law_technique"):

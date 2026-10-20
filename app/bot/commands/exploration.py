@@ -1646,10 +1646,10 @@ def _city_inn(city: str) -> str:
 
 
 def _commission_giver_home(giver: str) -> str:
-    """Where a giver's work is posted: the giver's own `location` in the
-    commission roster, else the NPC's - the twin of `commissionGiverHome`."""
-    givers = WORLD.data.get("commission_givers", {}) or {}
-    return str((givers.get(giver) or {}).get("location") or (WORLD.npcs.get(giver) or {}).get("location") or "").strip()
+    """Where a giver's work is posted - one door, `WORLD.commission_giver_home`,
+    the twin of `commissionGiverHome` (v1.35.0: the coin a commission pays in
+    reads it too)."""
+    return WORLD.commission_giver_home(giver)
 
 
 def _city_board(city: str, realm_index: int | None = None) -> list[dict[str, Any]]:
@@ -1846,7 +1846,11 @@ async def city_board(interaction: discord.Interaction) -> None:
         state = held.get(key)
         mark = {"active": "📌 held", "completed": "✅ done", "failed": "❌ failed", "abandoned": "↩️ abandoned"}.get(state or "", "open")
         reward = dict(q.get("rewards") or {})
-        lines.append(f"• **{q.get('title')}** (tier {int(q.get('tier') or 1)}) — from {q.get('giver_npc')}; {int(reward.get('spirit_stones') or 0)} stones, {int(reward.get('insight_xp') or 0)} insight — {mark}")
+        # A commission pays in its giver's world's coin (v1.35.0), which the
+        # board names rather than "stones".
+        coin_id = WORLD.quest_giver_currency(str(q.get("giver_npc") or ""))
+        coin = WORLD.currency_name(coin_id) if coin_id else "stones"
+        lines.append(f"• **{q.get('title')}** (tier {int(q.get('tier') or 1)}) — from {q.get('giver_npc')}; {int(reward.get('spirit_stones') or 0)} {coin}, {int(reward.get('insight_xp') or 0)} insight — {mark}")
     if capital:
         wanted = await DB.list_active_bounties(limit=8)
         if wanted:

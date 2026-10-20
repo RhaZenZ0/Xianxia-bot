@@ -23,7 +23,7 @@ from ...ops.game_engine import GameEngineError
 from ...rules import commissions as rules
 from ...rules import worldtime
 from ...rules.quests import labelled_objective
-from ..runtime import _explain_engine_error, current_world_time, log
+from ..runtime import WORLD, _explain_engine_error, current_world_time, log
 from ..services import COMMISSIONS
 
 # Long enough to read the offer and decide; short enough that a stale card in a
@@ -34,6 +34,16 @@ OFFER_TIMEOUT_SECONDS = 300
 def _deadline_stamp(deadline_game_minute: int) -> str:
     wt = worldtime.from_game_minutes(int(deadline_game_minute))
     return f"day {wt.day} of month {wt.month}, {wt.period}"
+
+
+def _giver_coin(giver: str) -> str:
+    """The name of the money a giver pays in (v1.35.0): the engine pays a
+    commission in the coin of its giver's world wherever it is finished
+    (`questRewardCurrencyTx`), so the card names that coin. A giver the content
+    does not place pays where the player stands, and the card says spirit
+    stones as it always did."""
+    coin = WORLD.quest_giver_currency(giver)
+    return WORLD.currency_name(coin) if coin else "spirit stones"
 
 
 def offer_card(offer: Any, *, item_names: dict[str, str] | None = None) -> str:
@@ -47,6 +57,7 @@ def offer_card(offer: Any, *, item_names: dict[str, str] | None = None) -> str:
     definition = dict(offer.definition or {})
     hidden = rules.rewards_are_hidden(definition)
     terms = rules.variant_terms(definition)
+    coin = _giver_coin(str(definition.get("giver_npc") or ""))
     objectives = [labelled_objective(o) for o in definition.get("objectives") or [] if isinstance(o, dict)]
     lines = [f"📜 **Commission: {definition.get('title', '')}**"]
     if str(definition.get("requires_sect") or ""):
@@ -68,7 +79,7 @@ def offer_card(offer: Any, *, item_names: dict[str, str] | None = None) -> str:
     else:
         lines.append(
             f"**Terms offered** — {terms[0]['label']}\n"
-            + rules.format_rewards(terms[0]["rewards"], item_names=item_names)
+            + rules.format_rewards(terms[0]["rewards"], item_names=item_names, coin=coin)
         )
     deadline = int(terms[0]["deadline_game_minutes"] or 0)
     due = rules.format_wait_days(deadline) + " from acceptance" if deadline else "no fixed deadline"
@@ -99,7 +110,8 @@ def accepted_card(accepted: dict[str, Any], *, item_names: dict[str, str] | None
     else:
         lines.append(
             f"**Terms locked:** {accepted.get('variant_label', 'standard')} — "
-            + rules.format_rewards(dict(accepted.get("rewards") or {}), item_names=item_names)
+            + rules.format_rewards(dict(accepted.get("rewards") or {}), item_names=item_names,
+                                   coin=_giver_coin(str(accepted.get("giver_npc") or "")))
         )
     lines.append(f"**Deadline:** {_deadline_stamp(int(deadline))}" if deadline else "**Deadline:** none")
     lines.append("-# Rewards move only on completion. Track it under **/quests**. "

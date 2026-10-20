@@ -9,6 +9,44 @@ section in it.
 
 ## Fixed
 
+- **fixed (v1.35.0)** — *The samsara wait was the caller's.* `combat.turn`, `combat.technique`,
+  `combat.recovery_item` and `lifecycle.true_death` took `minutes_per_year`, `base_samsara_years` and
+  `max_wait_seconds` off the payload behind `maxI64(1, ...)`, so a caller that omitted them gave a
+  true death a one-year wait and a thirty-second cap; `lifecycle.samsara_status` and `family.simulate`
+  took the year's length too (the family's default was 525,600 where everything else said 518,400,
+  and a caller sending 1 was handed twenty-five simulated years a call), and `pvp.challenge` took
+  `ttl_seconds` with no ceiling. The engine reads `REINCARNATION_BASE_SAMSARA_YEARS` and
+  `REINCARNATION_MAX_WAIT_SECONDS` itself (bounded, compose passes them), a year is
+  `lifespanmodel.MinutesPerYear`, a challenge stands `pvpChallengeTTLSeconds`, the four fields are in
+  `callerOwnedNothing`, the bot's `Settings` keep no copy and the duel reply prints the engine's
+  window. `TestAWaitIsNotTheCallersToSend` drives the seven refusals,
+  `TestTheSamsaraWaitIsTheEnginesKeyAndBounded` the keys, and `test_the_samsara_wait_is_the_engines_key`
+  holds the four places a key is stated.
+- **fixed (v1.35.0)** — *A world-event battle's severity and node were the caller's.* `combat.start
+  kind=event` took `severity`, `source` and the node off the payload and checked nothing about the
+  event. It names the event now (`event_key`, with an older bot's `event:<key>|node:<n>` source read
+  for its keys only): the engine reads the event through `loadOpenWorldEventTx` - the reader
+  `world_event.engage` and `world_event.act` share since - refuses one that is closed or that the caller
+  is not at, takes the next living beast off the roster (or the one named, if it is a beast with
+  something left), scales the fight off the beast's rank or the event's severity, and lets the event
+  itself take the field only when the roster is empty and the event is of a hostile kind
+  (`hostileEventWords`, which used to live in the Battle button). The scene's button sends the key and
+  prints the engine's answer. `combat_event_start_test.go` drives each refusal and the forged payload.
+- **fixed (v1.35.0)** — *Quest rewards followed the player's feet, not the quest's world.*
+  `grantQuestRewardTx` and `payCommissionRewardTx` pay through `questRewardCurrencyTx` now: the coin
+  of the giver's world (`commissionGiverHome`), else of the realm the stage is for
+  (`seed_json.realm_index`), else where the player stands, as before, for a quest with no world of
+  its own; `rewards_granted` carries `currency` and the completion line, the offer and accepted cards
+  and the city board name it (`WORLD.quest_giver_currency`, the display twin).
+  `TestEveryShippedQuestGiverStandsInAWorldWithItsOwnCoin` holds the content, and
+  `quest_reward_currency_test.go` pays from the wrong world. `SettleBountyTx` is left where the
+  fugitive stands: a fine collected in a coin they may hold none of collects nothing.
+- **fixed (v1.35.0)** — *The market quote disagreed with the counter.* `market.rows` and
+  `market.quote` priced at 70 percent of base times index with no catalogue; they read
+  `marketUnitPrice` now, floor, shelf ceiling and refusal included, a `sell_price` of 0 is the
+  counter's refusal and the two readers that recomputed the buy price in Python print the engine's.
+  One copy of the share (`marketSellShare`). `TestMarketQuoteAndRowsCarryTheEnginePrices` quotes in
+  a real coin and at a crystal counter that refuses a Mortal herb.
 - **fixed (v1.34.0)** — *Goods crossed a world untouched while every price ceiling was kept in one
   coin.* The purse converts 100:1 at a crossing and an item does not, so anything bought on a Mortal
   shelf sold to a Spiritual keeper for a hundred times its cost (9,475 profitable pairs measured).

@@ -13,10 +13,15 @@ import (
 	"xianxia/core/internal/worlddata"
 )
 
+// pvpChallengeTTLSeconds is how long a duel challenge stands before it lapses.
+// The caller used to send `ttl_seconds` with no ceiling (v1.35.0): the field is
+// in callerOwnedNothing now and the result carries the engine's number so the
+// reply can print it.
+const pvpChallengeTTLSeconds int64 = 300
+
 type pvpChallengePayload struct {
 	TargetUserID int64  `json:"target_user_id"`
 	Stakes       string `json:"stakes"`
-	TTLSeconds   int64  `json:"ttl_seconds"`
 }
 type pvpRespondPayload struct {
 	ChallengeID int64 `json:"challenge_id"`
@@ -72,9 +77,7 @@ func pvpChallengeAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		return authoritativeMutation{}, errors.New(breach.Reason)
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
-	if p.TTLSeconds <= 0 {
-		p.TTLSeconds = 300
-	}
+	expiresAt := now + float64(pvpChallengeTTLSeconds)
 	p.Stakes = strings.TrimSpace(p.Stakes)
 	if p.Stakes == "" {
 		p.Stakes = "honor"
@@ -82,11 +85,11 @@ func pvpChallengeAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	if len([]rune(p.Stakes)) > 200 {
 		p.Stakes = string([]rune(p.Stakes)[:200])
 	}
-	cur, e := conn.Execute(`INSERT INTO pvp_challenges(challenger_user_id,target_user_id,stakes,status,created_at,expires_at) VALUES(?,?,?,'pending',?,?)`, []any{userID, p.TargetUserID, p.Stakes, now, now + float64(p.TTLSeconds)})
+	cur, e := conn.Execute(`INSERT INTO pvp_challenges(challenger_user_id,target_user_id,stakes,status,created_at,expires_at) VALUES(?,?,?,'pending',?,?)`, []any{userID, p.TargetUserID, p.Stakes, now, expiresAt})
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	result := map[string]any{"challenge_id": cur.LastInsertID, "challenger_user_id": userID, "target_user_id": p.TargetUserID, "stakes": p.Stakes, "expires_at": now + float64(p.TTLSeconds)}
+	result := map[string]any{"challenge_id": cur.LastInsertID, "challenger_user_id": userID, "target_user_id": p.TargetUserID, "stakes": p.Stakes, "expires_at": expiresAt, "expires_in_seconds": pvpChallengeTTLSeconds}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "pvp", EventType: "pvp.challenge", EntityType: "pvp_challenge", EntityID: fmt.Sprint(cur.LastInsertID), Payload: result}}, nil
 }
 

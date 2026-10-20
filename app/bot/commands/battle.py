@@ -291,9 +291,6 @@ async def _use_battle_recovery_item(interaction: discord.Interaction, battle_id:
             battle_id=int(battle_id),
             item_id=item_id,
             game_minute=wt.total_minutes,
-            minutes_per_year=MINUTES_PER_YEAR,
-            base_samsara_years=SETTINGS.reincarnation_base_samsara_years,
-            max_wait_seconds=SETTINGS.reincarnation_max_wait_seconds,
             action_id=f"discord:{interaction.id}:combat.recovery_item:{int(battle_id)}:{item_id}",
         )
     except GameEngineError as exc:
@@ -359,9 +356,6 @@ async def _execute_battle_law_technique(interaction: discord.Interaction, battle
             battle_id=int(battle["battle_id"]),
             technique=technique,
             game_minute=wt.total_minutes,
-            minutes_per_year=MINUTES_PER_YEAR,
-            base_samsara_years=SETTINGS.reincarnation_base_samsara_years,
-            max_wait_seconds=SETTINGS.reincarnation_max_wait_seconds,
             action_id=f"discord:{interaction.id}:combat.technique:{int(battle['battle_id'])}:{technique}",
         )
     except GameEngineError as exc:
@@ -428,8 +422,10 @@ async def _answer_lines(result: dict[str, Any], game_minute: int, user_id: int) 
         elif result.get("true_death"):
             death = dict(result.get("true_death") or {})
             await _record_true_death_history(user_id, death, game_minute)
-            years = int(death.get("private_years", SETTINGS.reincarnation_base_samsara_years))
-            wait = max(1, int(death.get("real_wait_seconds", SETTINGS.reincarnation_max_wait_seconds)))
+            # The engine's numbers (v1.35.0): the wait is scaled there and
+            # printed here, with no copy of the setting to fall back on.
+            years = int(death.get("private_years") or 0)
+            wait = max(1, int(death.get("real_wait_seconds") or 0))
             lines.append(
                 f"☠️ **TRUE DEATH.** Your body and current incarnation are lost. Your soul enters **Samsara** for roughly **{years:,} private years**, "
                 f"compressed into at most **{human_duration(wait)}** of real time. The wheel selected **{str(death.get('target_world') or 'Mortal World')}** as your possible rebirth world. "
@@ -542,9 +538,7 @@ async def _resolve_battle_turn(interaction:discord.Interaction,style:str,action:
     try:
         envelope=await COMBAT.turn(
             interaction.user.id,battle_id=int(b["battle_id"]),style=style,action=action,
-            game_minute=wt.total_minutes,minutes_per_year=MINUTES_PER_YEAR,
-            base_samsara_years=SETTINGS.reincarnation_base_samsara_years,
-            max_wait_seconds=SETTINGS.reincarnation_max_wait_seconds,
+            game_minute=wt.total_minutes,
             action_id=f"discord:{interaction.id}:combat.turn:{int(b['battle_id'])}:{style}",
         )
     except GameEngineError as exc:
@@ -595,8 +589,8 @@ async def _resolve_battle_turn(interaction:discord.Interaction,style:str,action:
         elif result.get("true_death"):
             death=dict(result.get("true_death") or {})
             await _record_true_death_history(interaction.user.id,death,wt.total_minutes)
-            years=int(death.get("private_years",SETTINGS.reincarnation_base_samsara_years))
-            wait=max(1,int(death.get("real_wait_seconds",SETTINGS.reincarnation_max_wait_seconds)))
+            years=int(death.get("private_years") or 0)
+            wait=max(1,int(death.get("real_wait_seconds") or 0))
             lines.append(
                 f"☠️ **TRUE DEATH.** Your body and current incarnation are lost. Your soul enters **Samsara** for roughly **{years:,} private years**, "
                 f"compressed into at most **{human_duration(wait)}** of real time. The wheel selected **{str(death.get('target_world') or 'Mortal World')}** as your possible rebirth world. "

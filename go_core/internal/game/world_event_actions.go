@@ -120,27 +120,14 @@ func worldEventActAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 		return authoritativeMutation{}, errors.New("only a living character can act in a world event")
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
-	er, err := conn.Execute(`SELECT event_type,title,location,payload_json,active,ends_at FROM world_events WHERE event_key=? LIMIT 1`, []any{eventKey})
+	ev, err := loadOpenWorldEventTx(conn, eventKey, now)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	if len(er.Rows) == 0 {
-		return authoritativeMutation{}, errors.New("world event not found")
+	if err := ev.refuseAway(c); err != nil {
+		return authoritativeMutation{}, err
 	}
-	row := er.Rows[0]
-	title, location := fmt.Sprint(row[1]), fmt.Sprint(row[2])
-	if storage.ParseInt(row[4]) != 1 || parseFloat(row[5]) <= now {
-		return authoritativeMutation{}, errors.New("world event is closed")
-	}
-	if c.Location != location {
-		return authoritativeMutation{}, fmt.Errorf("travel to %s before acting in this event", location)
-	}
-	payload := map[string]any{}
-	_ = json.Unmarshal([]byte(fmt.Sprint(row[3])), &payload)
-	severity := clampI64(storage.ParseInt(payload["severity"]), 1, 10)
-	if severity == 0 {
-		severity = 1
-	}
+	title, severity, payload := ev.Title, ev.Severity, ev.Payload
 
 	out := map[string]any{"event_key": eventKey, "title": title, "action_key": actionKey, "label": rule.Label, "severity": severity}
 	if actionKey == "withdraw" {

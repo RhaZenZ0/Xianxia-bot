@@ -914,7 +914,7 @@ async def afterlife_status(interaction:discord.Interaction)->None:
         await interaction.response.send_message("You are alive; no Samsara cycle is active.",ephemeral=False);return
     try:
         state=dict(await ENGINE.action(
-            "lifecycle.samsara_status",interaction.user.id,{"minutes_per_year":MINUTES_PER_YEAR},
+            "lifecycle.samsara_status",interaction.user.id,{},
         ) or {})
     except GameEngineError as exc:
         await interaction.response.send_message(f"No reincarnation path is currently recorded for this soul. ({_explain_engine_error(exc)})",ephemeral=False);return
@@ -969,7 +969,7 @@ async def reincarnate(interaction:discord.Interaction,name:str,path:str,gender:a
         await interaction.response.send_message("Your current incarnation is still alive.",ephemeral=False);return
     try:
         state=dict(await ENGINE.action(
-            "lifecycle.samsara_status",interaction.user.id,{"minutes_per_year":MINUTES_PER_YEAR},
+            "lifecycle.samsara_status",interaction.user.id,{},
         ) or {})
     except GameEngineError as exc:
         await interaction.response.send_message(f"No Samsara cycle is recorded for this soul. ({_explain_engine_error(exc)})",ephemeral=False);return

@@ -168,19 +168,21 @@ def rewards_are_hidden(definition: dict[str, Any] | None) -> bool:
 
 
 def format_rewards(rewards: dict[str, Any] | None, *, item_names: dict[str, str] | None = None,
-                   hidden: bool = False) -> str:
+                   hidden: bool = False, coin: str = "spirit stones") -> str:
     """The terms as the giver states them. Items are named, never keyed.
 
     `hidden` returns the undisclosed line instead. It takes the real rewards as
     an argument and throws them away rather than being handed nothing, so a
     caller cannot accidentally print them by forgetting to pass the flag - the
-    flag is at the point where the string is made."""
+    flag is at the point where the string is made. `coin` is the name of the
+    money the giver pays in (v1.35.0, the giver's world's): a caller that knows
+    the giver names it, and one that does not says spirit stones."""
     if hidden:
         return UNDISCLOSED
     parts: list[str] = []
     data = dict(rewards or {})
     if int(data.get("spirit_stones", 0) or 0):
-        parts.append(f"{int(data['spirit_stones'])} spirit stones")
+        parts.append(f"{int(data['spirit_stones'])} {coin}")
     if int(data.get("insight_xp", 0) or 0):
         parts.append(f"{int(data['insight_xp'])} insight")
     names = dict(item_names or {})

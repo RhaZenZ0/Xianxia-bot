@@ -623,13 +623,7 @@ async def require_character(interaction: discord.Interaction, *, allow_deceased:
                 envelope = await ENGINE.authoritative_action(
                     "lifecycle.true_death",
                     interaction.user.id,
-                    {
-
-                        "reason": "old_age",
-                        "minutes_per_year": MINUTES_PER_YEAR,
-                        "base_samsara_years": SETTINGS.reincarnation_base_samsara_years,
-                        "max_wait_seconds": SETTINGS.reincarnation_max_wait_seconds,
-                    },
+                    {"reason": "old_age"},
                     action_id=f"lifecycle:old-age:{interaction.user.id}:{wt.total_minutes}",
                 )
             except GameEngineError as exc:

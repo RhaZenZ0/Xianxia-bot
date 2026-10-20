@@ -49,8 +49,14 @@ GO = PROJECT_ROOT / "go_core" / "internal" / "game"
 RULES = (GO / "cooldown_rules.go").read_text(encoding="utf-8")
 AUTHORITATIVE = (GO / "authoritative.go").read_text(encoding="utf-8")
 
-# The fields the engine derives and a caller may not state.
-FORBIDDEN_FIELDS = ("cooldown_seconds", "quest_cooldown_seconds", "trial_cooldown_seconds")
+# The fields the engine derives and a caller may not state: the waits (rc.56),
+# and since v1.35.0 the samsara wait's three numbers and a duel challenge's
+# window, which the combat doors, lifecycle.true_death, the samsara status, the
+# family simulation and pvp.challenge used to take off the payload.
+FORBIDDEN_FIELDS = (
+    "cooldown_seconds", "quest_cooldown_seconds", "trial_cooldown_seconds",
+    "minutes_per_year", "base_samsara_years", "max_wait_seconds", "ttl_seconds",
+)
 
 # Two files keep a wait of their own, and it is genuinely somebody else's: the
 # router's per-route failure backoff and the monitor's alert throttle meter
@@ -177,9 +183,31 @@ class TheEngineHoldsTheOneStatement(unittest.TestCase):
             if path.name.endswith("_test.go"):
                 continue
             for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-                if re.search(r"\bp\.(Cooldown|QuestCooldown|TrialCooldown)Seconds\b", line):
+                if re.search(r"\bp\.((Cooldown|QuestCooldown|TrialCooldown|MaxWait|TTL)Seconds|MinutesPerYear|BaseSamsaraYears)\b", line):
                     offenders.append(f"{path.name}:{number}")
         self.assertEqual(offenders, [], "a wait read off the payload is a wait the caller chose")
+
+    def test_the_samsara_wait_is_the_engines_key(self):
+        """The two REINCARNATION keys are stated in the four places an engine key
+        is stated (the rc.39 shape, held by test_world_clock_read_through for the
+        clock): read by Go as a literal `os.Getenv` so test_engine_boundary's
+        compose gate can see it, passed in the engine's own compose block, in
+        `.env.example`, and explained in docs/CONFIGURATION.md. And the bot's
+        config no longer reads them: a copy here would be free to drift."""
+        lifecycle = (GO / "lifecycle_actions.go").read_text(encoding="utf-8")
+        compose = (PROJECT_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        env = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
+        docs = (PROJECT_ROOT / "docs" / "CONFIGURATION.md").read_text(encoding="utf-8")
+        config = (PROJECT_ROOT / "app" / "ops" / "config.py").read_text(encoding="utf-8")
+        engine_block = compose[compose.index("xianxia-engine:"): compose.index("xianxia-db-init:")]
+        for key in ("REINCARNATION_BASE_SAMSARA_YEARS", "REINCARNATION_MAX_WAIT_SECONDS"):
+            self.assertIn(f'os.Getenv("{key}")', lifecycle, key)
+            self.assertIn(f"{key}:", engine_block, f"{key} is not passed to the engine service")
+            self.assertTrue(re.search(rf"^{key}=\d+$", env, re.M), f"{key} is not in .env.example")
+            self.assertIn(f"`{key}`", docs, key)
+            self.assertNotIn(key, config, f"{key} is the engine's now; a second copy here is free to drift")
+        self.assertNotIn("reincarnation_base_samsara_years", config)
+        self.assertNotIn("reincarnation_max_wait_seconds", config)
 
     def test_every_wait_has_one_entry_and_a_sane_default(self):
         entries = cooldown_defaults()

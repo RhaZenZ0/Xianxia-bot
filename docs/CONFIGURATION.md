@@ -302,7 +302,11 @@ compose passes it in. Since v1.7.9 it is the baseline rather than the last word:
 the GM dashboard's Admin Console → Travel Time card stores a pace in the engine
 (audited), and a stored pace wins until it is changed there. `REINCARNATION_BASE_SAMSARA_YEARS` and
 `REINCARNATION_MAX_WAIT_SECONDS` shape how long a dead character waits in
-samsara before rebirth.
+samsara before rebirth: the base wait in private years (1 to 5000, default
+**320**) and the cap on its real-time length in seconds (30 to 3600, default
+**300**). Since v1.35.0 both are read by the **Go engine**, which scales every
+death with them - a defeat, old age, a GM's - and compose passes them in; the
+bot sends nothing, and a value outside its range leaves the default standing.
 
 ### Quest Forge (v0.20.6)
 

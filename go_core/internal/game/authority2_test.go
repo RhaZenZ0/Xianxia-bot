@@ -250,33 +250,78 @@ func TestMultiplicativeEffectJSONStat(t *testing.T) {
 
 // --- market ------------------------------------------------------------------
 
+// The quote is the counter's own number (v1.35.0): market.rows and
+// market.quote price through marketUnitPrice, so a card never promises a sell
+// the trade refuses or a buy under the NPC floor. Until then the quote took a
+// flat 70 percent of base times index with no catalogue. The rows carry a real
+// coin, because with the fixture's placeholder coin no shelf or keeper is
+// found and the floor, ceiling and refusal are never exercised.
 func TestMarketQuoteAndRowsCarryTheEnginePrices(t *testing.T) {
 	path := setupAuthority2DB(t)
 	world := batch4WorldPath(t)
-	batch4Exec(t, path, `INSERT INTO economy_markets(location,item_id,base_price,supply,demand,price_index) VALUES('Greenriver Town','qi_pill',10,5,40,1.37)`)
-	batch4Exec(t, path, `INSERT INTO economy_markets(location,item_id,base_price,supply,demand,price_index) VALUES('Greenriver Town','spirit_herb',3,50,20,0.9)`)
+	catalog := shippedCatalog(t)
+	crystal := ""
+	for id, cur := range catalog.Currencies {
+		if cur.World == "Spiritual World" && cur.Tier == 1 {
+			crystal = id
+			break
+		}
+	}
+	if crystal == "" {
+		t.Fatal("no tier-1 Spiritual coin in the shipped content")
+	}
+	// A market base far under what any NPC pays, so the floor binds the buy
+	// side, and a sale the shelf ceiling has to trim.
+	batch4Exec(t, path, `INSERT INTO economy_markets(location,item_id,currency_id,base_price,supply,demand,price_index) VALUES('Greenriver Town','qi_pill','low_spirit_stone',1,5,40,1.0)`)
+	batch4Exec(t, path, `INSERT INTO economy_markets(location,item_id,currency_id,base_price,supply,demand,price_index) VALUES('Greenriver Town','spirit_herb','low_spirit_stone',3,50,20,0.9)`)
+	// A Mortal herb at a crystal counter: the cheapest shelf anywhere asks under one crystal, so the counter refuses.
+	batch4Exec(t, path, `INSERT INTO economy_markets(location,item_id,currency_id,base_price,supply,demand,price_index) VALUES('Starroad City','spirit_herb',?,3,50,20,1.0)`, crystal)
 
 	quote := authority2Query(t, path, world, "market.quote", 0, map[string]any{"location": "Greenriver Town", "item_id": "qi_pill"})
 	if quote["traded"] != true {
 		t.Fatalf("traded=%v", quote["traded"])
 	}
-	// 10 * 1.37 = 13.7 -> 14; 14 * 0.70 = 9.8 -> 10: the same share market.trade pays.
-	if got := storage.ParseInt(quote["buy_price"]); got != 14 {
-		t.Fatalf("buy_price=%d want 14", got)
+	floor, ok := highestNPCPays(catalog, "qi_pill", "low_spirit_stone")
+	if !ok || floor <= 1 {
+		t.Fatalf("the shipped content gives qi_pill no NPC floor above 1 (%d, %v); pick an item that has one", floor, ok)
 	}
-	if got := storage.ParseInt(quote["sell_price"]); got != 10 {
-		t.Fatalf("sell_price=%d want 10", got)
+	if got := storage.ParseInt(quote["buy_price"]); got != floor {
+		t.Fatalf("buy_price=%d: base 1 at index 1.0 must be floored on the most any NPC pays, %d", got, floor)
+	}
+	shelf, ok := cheapestShelfPrice(catalog, "qi_pill", "low_spirit_stone")
+	if !ok {
+		t.Fatal("no shelf sells qi_pill")
+	}
+	if got := storage.ParseInt(quote["sell_price"]); got < 1 || got >= shelf {
+		t.Fatalf("sell_price=%d must sit under the cheapest shelf (%d) and above the refusal", got, shelf)
+	}
+	if want := marketUnitPrice(catalog, "qi_pill", "low_spirit_stone", 1, 1.0, false); storage.ParseInt(quote["sell_price"]) != want {
+		t.Fatalf("sell_price=%d, the trade would pay %d: one door", storage.ParseInt(quote["sell_price"]), want)
+	}
+	refused := authority2Query(t, path, world, "market.quote", 0, map[string]any{"location": "Starroad City", "item_id": "spirit_herb"})
+	if got := storage.ParseInt(refused["sell_price"]); got != 0 {
+		t.Fatalf("a crystal counter quotes %d for a Mortal herb; the trade refuses it, so the quote says 0", got)
+	}
+	if got := storage.ParseInt(refused["buy_price"]); got < 1 {
+		t.Fatalf("the buy side is never refused, got %d", got)
 	}
 	missing := authority2Query(t, path, world, "market.quote", 0, map[string]any{"location": "Greenriver Town", "item_id": "bugslayer_sword"})
 	if missing["traded"] != false {
 		t.Fatalf("untraded quote=%#v", missing)
 	}
 	rows := authority2Rows(t, authority2Query(t, path, world, "market.rows", 0, map[string]any{"location": "Greenriver Town", "limit": 10}), "rows")
-	if len(rows) != 2 || rows[0]["item_id"] != "qi_pill" {
+	if len(rows) != 2 {
 		t.Fatalf("rows=%#v", rows)
 	}
-	if got := storage.ParseInt(rows[1]["sell_price"]); got != 2 {
-		t.Fatalf("spirit_herb sell_price=%d want 2", got)
+	for _, row := range rows {
+		item := fmt.Sprint(row["item_id"])
+		base, index := storage.ParseInt(row["base_price"]), parseFloat(row["price_index"])
+		if got, want := storage.ParseInt(row["sell_price"]), marketUnitPrice(catalog, item, "low_spirit_stone", base, index, false); got != want {
+			t.Fatalf("%s: rows sell_price=%d, the trade pays %d", item, got, want)
+		}
+		if got, want := storage.ParseInt(row["buy_price"]), marketUnitPrice(catalog, item, "low_spirit_stone", base, index, true); got != want {
+			t.Fatalf("%s: rows buy_price=%d, the trade charges %d", item, got, want)
+		}
 	}
 }
 

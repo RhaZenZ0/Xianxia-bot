@@ -47,6 +47,11 @@ services:
       # How long a boss raid waits on a raider who has not acted before the boss
       # answers the round without them (v1.34.0).
       RAID_ABSENT_MINUTES: "${RAID_ABSENT_MINUTES:-30}"
+      # How long a dead cultivator waits in Samsara (v1.35.0): the base wait in
+      # private years and its real-time cap. The bot used to send both on every
+      # death; the engine reads them here now, so they have to be passed.
+      REINCARNATION_BASE_SAMSARA_YEARS: "${REINCARNATION_BASE_SAMSARA_YEARS:-320}"
+      REINCARNATION_MAX_WAIT_SECONDS: "${REINCARNATION_MAX_WAIT_SECONDS:-300}"
       # Backups (v0.32.0): retention, size cap and the optional key that
       # seals every backup. docs/CONFIGURATION.md, "Backups".
       XIANXIA_BACKUP_KEEP_DAILY: "${XIANXIA_BACKUP_KEEP_DAILY:-14}"

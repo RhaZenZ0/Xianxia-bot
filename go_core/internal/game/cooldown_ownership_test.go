@@ -32,6 +32,16 @@ var waitsTheCallerUsedToSend = []struct{ operation, field string }{
 	{"manual.study", "cooldown_seconds"},
 	{"qi.refine", "cooldown_seconds"},
 	{"dao.dual_cultivate", "cooldown_seconds"},
+	// The samsara wait and the duel's challenge window (v1.35.0): the three
+	// combat doors that can end a life, the death itself, the status read,
+	// the family simulation and the challenge.
+	{"combat.turn", "base_samsara_years"},
+	{"combat.technique", "max_wait_seconds"},
+	{"combat.recovery_item", "minutes_per_year"},
+	{"lifecycle.true_death", "base_samsara_years"},
+	{"lifecycle.samsara_status", "minutes_per_year"},
+	{"family.simulate", "minutes_per_year"},
+	{"pvp.challenge", "ttl_seconds"},
 }
 
 func TestAWaitIsNotTheCallersToSend(t *testing.T) {
@@ -122,6 +132,32 @@ func TestEveryNamedWaitHasAnEntry(t *testing.T) {
 	} {
 		if _, known := actionCooldowns[action]; !known {
 			t.Errorf("%q is a named wait with no entry, so it silently costs an hour", action)
+		}
+	}
+}
+
+// The samsara wait is read from the engine's own keys (v1.35.0), bounded the
+// way the bot's config used to bound them, and a value that is not a number of
+// years or seconds leaves the engine's own standing.
+func TestTheSamsaraWaitIsTheEnginesKeyAndBounded(t *testing.T) {
+	t.Setenv("REINCARNATION_BASE_SAMSARA_YEARS", "640")
+	if got := samsaraBaseYearsFromEnv(); got != 640 {
+		t.Fatalf("an operator's 640 years read as %d", got)
+	}
+	for _, junk := range []string{"", "soon", "0", "-1", "5001"} {
+		t.Setenv("REINCARNATION_BASE_SAMSARA_YEARS", junk)
+		if got := samsaraBaseYearsFromEnv(); got != samsaraBaseYearsDefault {
+			t.Fatalf("%q read as %d years, want the engine's own %d", junk, got, samsaraBaseYearsDefault)
+		}
+	}
+	t.Setenv("REINCARNATION_MAX_WAIT_SECONDS", "900")
+	if got := samsaraMaxWaitFromEnv(); got != 900 {
+		t.Fatalf("an operator's 900 seconds read as %d", got)
+	}
+	for _, junk := range []string{"", "soon", "29", "3601"} {
+		t.Setenv("REINCARNATION_MAX_WAIT_SECONDS", junk)
+		if got := samsaraMaxWaitFromEnv(); got != samsaraMaxWaitDefault {
+			t.Fatalf("%q read as %d seconds, want the engine's own %d", junk, got, samsaraMaxWaitDefault)
 		}
 	}
 }

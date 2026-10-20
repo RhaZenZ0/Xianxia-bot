@@ -13,10 +13,14 @@ import (
 	"xianxia/core/internal/worlddata"
 )
 
+// familySimPayload names the family and nothing about time: a year is
+// lifespanmodel.MinutesPerYear (v1.35.0). The caller used to send
+// `minutes_per_year`, defaulted here to 525,600 when the rest of the engine
+// said 518,400, and a caller sending 1 was handed twenty-five simulated years a
+// call.
 type familySimPayload struct {
-	FamilyID       int64 `json:"family_id"`
-	GameMinute     int64 `json:"game_minute"`
-	MinutesPerYear int64 `json:"minutes_per_year"`
+	FamilyID   int64 `json:"family_id"`
+	GameMinute int64 `json:"game_minute"`
 }
 type familySupportPayload struct {
 	GameMinute          int64 `json:"game_minute"`
@@ -68,9 +72,6 @@ func simulateBirthFamilyGo(conn *storage.Conn, userID int64, raw json.RawMessage
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
 	}
-	if p.MinutesPerYear <= 0 {
-		p.MinutesPerYear = 525600
-	}
 	familyID := p.FamilyID
 	if familyID <= 0 {
 		f, e := birthFamilyForUserGo(conn, userID)
@@ -105,7 +106,7 @@ func simulateBirthFamilyGo(conn *storage.Conn, userID int64, raw json.RawMessage
 		return authoritativeMutation{}, errors.New("birth family not found")
 	}
 	elapsed := max64(0, p.GameMinute-i64(f["last_simulated_game_minute"]))
-	years := min64(25, elapsed/max64(1, p.MinutesPerYear))
+	years := min64(25, elapsed/minutesPerYear)
 	history := []string{}
 	_ = json.Unmarshal([]byte(fmt.Sprint(f["history_json"])), &history)
 	wealth := i64(f["wealth"])
@@ -201,7 +202,7 @@ func simulateBirthFamilyGo(conn *storage.Conn, userID int64, raw json.RawMessage
 		history = history[len(history)-50:]
 	}
 	hj, _ := json.Marshal(history)
-	anchor := i64(f["last_simulated_game_minute"]) + years*p.MinutesPerYear
+	anchor := i64(f["last_simulated_game_minute"]) + years*minutesPerYear
 	now := nowSeconds()
 	if years > 0 {
 		_, e = conn.Execute(`UPDATE birth_families SET wealth=?,influence=?,stability=?,tier=?,bloodline_purity=?,branch_count=?,retainer_count=?,last_simulated_game_minute=?,history_json=?,updated_at=? WHERE family_id=?`, []any{wealth, influence, stability, tier, purity, branches, retainers, anchor, string(hj), now, familyID})
