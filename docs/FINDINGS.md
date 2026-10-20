@@ -8605,3 +8605,122 @@ strength floors stay on the qi ladder, no migration for old undo rows or reopene
 settled qi, the menu fold and more slash groups wait on the Most-used commands card, the GM quest
 lever stays on the dashboard, the territory lever waits for a world that shows the state, and the
 install lease, the manifestation cap, the street tribute rule and the panel's read count stand.
+
+### Seven fields the caller still held (v1.36.0)
+
+rc.56 found fourteen actions reading their own wait off the payload, and v1.35.0 found the samsara
+wait and a duel's window the same way: one action at a time, by somebody noticing. The punch list
+asked for the sweep - a gate that walks every payload struct the engine unmarshals and holds each
+field against a list of what a caller may state - and `payload_fields_test.go` is it. By AST it
+finds every function with a `json.RawMessage` parameter, every `json.Unmarshal(raw, &p)` in it, the
+`var p T` nearest above (a handler serving two operations declares `p` twice, and the first draft
+resolved both to the last one), and `T`'s json tags, inline structs included. Each tag is held to
+one of three lists: `callerStates` (which thing, a choice, what they offer, text, the die a player
+calls, the quest content a GM authors, the Python-era levers), `callerIgnored` (kept on the wire for
+an older bot, keyed by struct, and the gate proves no handler reads the field), or
+`callerOwnedNothing`. A field in none fails naming its struct; a list entry no struct carries is
+stale and fails too; a handler that reads its payload as a map is named in `rawMapReaders` with why.
+
+Read all at once, 147 fields across 128 structs, it named seven the one-at-a-time reading had not.
+`character.create` read `age_at_creation_years` into the lifespan the body counts from (floored at
+one, so a life could open a year old) and `talent_echo` straight into the aptitude roll, so a forged
+first life could open with a perfect echo; the age is `newLifeStartingAge` and the echo is
+`soulTalentEchoTx` off `soul_legacy`. `character.family_options` took `world_name`, and nothing
+below held the family offered to the soul's state, so a first life could be born in the Celestial
+World; a first life is Mortal. `exploration.explore` took `unexpected_event_chance_percent` from the
+bot's own Settings on every explore and `unexpected_events_enabled` as an override of the GM's
+switch; the engine reads `UNEXPECTED_EVENT_CHANCE_PERCENT` itself (compose passes it, the rc.39
+shape) and `world_state.automation_settings` alone. `family.support` accepted `cooldown_game_minutes`
+and overwrote it - harmless and dead, and a dead field is what the next reader trusts. And
+`sense.inspect`'s area sweep took `present_hidden_npcs`: the bot walked the catalogue's hidden masters
+through its own whereabouts reader and sent the names, so a request naming any hidden master got a
+reading of them wherever they stood; `hiddenMastersAtTx` asks `npcWhereaboutsTx`, the reader the
+challenge and the recommender use. All seven join `callerOwnedNothing`; the bot and its Settings
+stop carrying them. combat.start's realm, stage, severity and lock are not refused: an older bot
+still sends them, nothing reads them, and the gate's `callerIgnored` proves the second half rather
+than a comment claiming it.
+
+Two more things the sweep taught. The Python sweep (`test_cooldowns_are_the_engines.py`) is a
+quoted-substring read over every line of `app/`, which cannot tell a payload from a row: four of the
+seven are ordinary result keys the bot reads in dozens of places, so only the three with no other
+use joined its list and the Go refusal holds the rest - and the first playtest run of the release
+showed the cost of that: `/begin` still named the birth world on `character.family_options` and the
+playtest's own `character.create` still sent the age, both refused by the engine, 79 engine steps
+and the whole Discord creation leg down with them. The playtest is the sweep for the four the
+substring read cannot hold, which is one more reason it runs before every release. The second run
+found the quieter cousin: the Discord sweep had held the 28% explore surprise off its capital-road
+step by setting `UNEXPECTED_EVENT_CHANCE_PERCENT=0` in the *bot's* environment, which stopped
+meaning anything the moment the chance became the engine's, and one part in three met the surprise
+and failed the road on the dice; the guard moved onto the scratch engine (`ENGINE_ENV`), where the
+engine playtest's own `100` already lived. A setting that moves house takes its harness with it. And the sweep is
+a shape detector with a
+decision in it: `check.resolve`'s attribute and difficulty are the player's own call on a roleplay
+die, `quest.save`'s fields are what a GM authors, and `relationship.update`, `cultivation.reward` and
+`combat.apply_damage` are Python-era levers the bot's own code writes through - allowlisted with
+`statesLegacy` and put to the owner in `docs/TODO.md`, not quietly kept.
+
+The drills: `familySupportPayload` given a `cooldown_seconds` field prints *"carries
+"cooldown_seconds", a field callerOwnedNothing refuses"* and given a `mood` field *"which no list
+says a caller may state"*; `TestAWaitIsNotTheCallersToSend` sends each of the seven with 0 and reads
+the refusal; the create reading 0 for the echo prints *"a soul echoing 100 talent rolled purity 38
+and a fresh soul 38; the echo's eighth (12) is missing from the roll"*; and the hidden-master reader
+without its guard still senses nobody dead, because the whereabouts reader answers no place for the
+dead - the guard is belt to that brace, and the test says so.
+
+### The posts on the ladder (v1.36.0)
+
+The punch list said the arbitrage gate did not walk `black_market.trade`. Walking it meant giving the
+posts to the gate as both buyer and shelf, and the gate found two mints before the new row it was
+written for could be tested. A post's ask was the Mortal base price written raw into every world's
+coin: a manual asking 133 stones at the Mortal post asked 133 crystals at the Celestial one, and the
+Celestial broker paid 0.55 of that - a million times the Mortal shelf - to buy it back. And a floor
+merchant valued a manual no shop sells at 2,200 stones' worth of crystal, because `merchantValuation`
+is capped under `cheapestShelfPrice` and an item no shop sells has no shelf, so nothing capped it;
+the v1.34.0 gate that holds merchants under shelves could not see an item with none.
+
+Both close through one door each. `UnderworldBase` carries the base along the ladder
+(`shelfPriceAcross`, as a shelf price is) into the post's coin and answers false under a whole coin,
+so an upper post stocks only what is worth a coin there - the keepers' boards' rule since v1.34.0;
+`BlackMarketStockAsk` and `BlackMarketSmuggledAsk` are the two asks, moved out of the simulation so
+the gate reads the number the rotation writes; `UnderworldGood` is the one statement of what a post
+stocks; and a post is a shelf in `cheapestShelfPrice`, in each world's own coin at the coolest
+rotation's ask, so every ceiling that reads the one shelf reader - keepers, counters, merchants,
+stalls, the ordinary fence - is held under it in one place. A broker's pay for its own stock goes
+through `blackMarketStockPay`: the share of the row, the row bounded by `blackMarketDearestAsk` so a
+row written before this release in an upper world cannot pay more than a real one, and never a whole
+shelf's worth. Two tests had to move with the rule: the counter ceiling the mint gate tried applied
+to items no market lists (`MarketTradeable`), and the stall test's "item no shelf sells" was the
+peach, which the posts stock - a formation disk no shop, merchant or post carries is that item now.
+
+Drills: the pay's cap removed prints *"a broker paid 20 for a pill the cheapest shelf sells for 11"*;
+the post-as-shelf removed from `cheapestShelfPrice` prints the merchant pair above, 1,136 times.
+
+### What a rebirth leaves, and the rest of the half (v1.36.0)
+
+v1.33.0's gate holds every column of `characters` to being reset or kept by a rebirth; the rows of
+the other tables had none, and v1.12.3's flame and spirit sense had each passed into the next life
+for want of a line in a list. `samsara_tables_test.go` reads production's DDL (`app/database/core.py`,
+as the foreign-key gate does - comments stripped first, or `auctions.seller_user_id`, written under
+three lines about NULL, reads as a column named `--`) for every column in `erasureSubjectColumns`,
+the erasure's own vocabulary so `disciple_user_id` is not missed, and holds each table.column to
+wiped, kept, settled at death, or `samsaraOpen` with the question. The ten `DELETE` statements
+`reincarnateAction` carried beside the one wipe became `incarnationScopedLinks`, read by the gate and
+executed inside `clearIncarnationStateTx` - `TestReincarnationClearsThroughTheOneWipe` refused the
+loop anywhere else, which is what it is for. Twenty-three columns are open and the owner's, listed in
+`docs/TODO.md`; the drill, `inventory` struck from the wipe list, prints *"inventory.user_id: a
+rebirth neither wipes nor keeps it on purpose"*.
+
+The rest of the half. The three capped NPC walks still read from the top of the alphabet
+(`npcCrimes`, `npcBeastHunts`, `npcChildbirth`); `rosterTurn` is generic and they turn with it, and
+because a hashed start is a fair draw and not a round robin, five of a hundred a tick needs a few
+hundred ticks before every name has been inside the window - the finds took 700 in v1.34.0, these
+take 400; the childbirth test, whose state consumption makes "who never got a turn" vacuous, asks
+which six bore first and prints *"it bore for [Chen000 A .. Chen005 A] - the walk is not turning"*.
+A shipped quest above the GM budget saves unchanged because the stored rewards are the baseline and
+only a raise is held to the budget (the forge test's drill prints *"reward insight_xp=120 exceeds
+the GM budget"* against an unchanged 120). `open_hub_in_place` edited the classic journal's embed
+message with the view alone, Discord refused the conversion, the fallback sent a new panel and
+returned None, and the daily door that was going to press a leaf on the returned view pressed
+nothing; it clears `content` and `embed` now and the AST gate prints *"cleared: []"* without it. And
+the engine playtest claims the imperial city from its north gate, naming the gate, and reads the
+city's row for the banner and the gate's for none.

@@ -9,6 +9,36 @@ section in it.
 
 ## Fixed
 
+- **fixed (v1.36.0)** — *A sweep of every payload field an engine action reads.*
+  `payload_fields_test.go` walks every struct the engine unmarshals a request into and holds each
+  json field to `callerStates`, `callerIgnored` (kept for an older bot and proven unread) or
+  `callerOwnedNothing`. Read all at once it found seven fields rc.56's one-at-a-time reading had not
+  - a new life's age and talent echo, a first life's birth world, the explore's event chance and
+  switch, the household's wait, the sensor's roster of hidden masters - and each is the engine's
+  (docs/FINDINGS.md, "Seven fields the caller still held").
+- **fixed (v1.36.0)** — *A table-level samsara gate.* `samsara_tables_test.go` reads production's DDL
+  for every column that carries a person and holds each table to wiped (`incarnationScopedTables`
+  and the new `incarnationScopedLinks`, inside the one wipe), kept, settled at death, or named in
+  `samsaraOpen` with the question; the twenty-three open columns are the new deferred entry
+  ("What a rebirth leaves of the last life").
+- **fixed (v1.36.0)** — *Black-market and fence prices are not read against the ladder.* A post's
+  ask is the Mortal base carried along the ladder into the post's coin (`UnderworldBase`), a good
+  worth less than a coin up there is not stocked, a post is a shelf in `cheapestShelfPrice` so every
+  ceiling is held under the coolest rotation's ask, and a broker's pay for its own stock goes through
+  `blackMarketStockPay`. The gate found two mints on the way (docs/FINDINGS.md, "The posts on the
+  ladder").
+- **fixed (v1.36.0)** — *The other capped walks over the roster.* `rosterTurn` is generic and
+  `npcCrimes`, `npcBeastHunts` and `npcChildbirth` turn with it; the tests ask who never got a turn,
+  and the childbirth one asks which six bore first.
+- **fixed (v1.36.0)** — *Saving a shipped quest whose reward is above the GM budget is refused.* The
+  stored rewards are the baseline (`validate_quest_definition(..., baseline=)`, read off the row by
+  `_validated_quest`); a reward left as it was passes above the budget and a raise is held to it.
+- **fixed (v1.36.0)** — *The playtests claim from a whole place only.* The engine playtest stands at
+  the imperial city's north gate, claims naming the gate, and reads the city's row for the banner and
+  the gate's row for none.
+- **fixed (v1.36.0)** — *The classic journal's door edit.* `open_hub_in_place` clears `content` and
+  `embed` when it turns an embed message into a layout panel; `test_hub_layout_rollout.py` reads the
+  call by AST.
 - **fixed (v1.35.0)** — *Registry NPCs could not sponsor a sect recommendation.* `resolveRecommenderTx`
   takes a sect's own people at the ranks the content stands at its gate
   (`sect_system.population.at_gate`, read by `sectGateRanks` and its twin `WORLD.sect_gate_ranks`),

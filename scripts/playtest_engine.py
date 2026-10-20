@@ -221,7 +221,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
             continue
         created = await step(report, f"character.create {uid}", act("character.create", uid, {
             "discord_name": name, "name": name, "concept": "a playtest cultivator", "gender": "female",
-            "path": "Sword Cultivator", "family_choice_id": str(families[0].get("choice_id") or ""), "age_at_creation_years": 18,
+            "path": "Sword Cultivator", "family_choice_id": str(families[0].get("choice_id") or ""),
         }))
         if created is not None and not created.get("created"):
             report.add("FAIL", f"character.create {uid}", f"created=false: {created.get('reason')}")
@@ -423,7 +423,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     if families:
         await step(report, "an applicant is created", act("character.create", APPLICANT, {
             "discord_name": "Playtest Applicant", "name": "Playtest Wen", "concept": "wants a sect", "gender": "female",
-            "path": "Sword Cultivator", "family_choice_id": str(families[0].get("choice_id") or ""), "age_at_creation_years": 18}))
+            "path": "Sword Cultivator", "family_choice_id": str(families[0].get("choice_id") or "")}))
     mortal_capital = next(name for name, loc in world["locations"].items() if loc.get("realm_hub") and loc.get("world") == "Mortal World")
     hall = next(name for name, loc in world["locations"].items() if loc.get("district") == "temple" and loc.get("outside_location") == mortal_capital)
     public_gates = {name: str(s["recruitment"]["location"]) for name, s in world["sects"].items()
@@ -1199,13 +1199,13 @@ async def run(url: str, token: str, db_path: str) -> Report:
         await step(report, "a martial household cannot raise a ghost cultivator",
                    act("character.create", GHOST, {"discord_name": "Playtest Ghost", "name": "Playtest Wrongborn",
                                                    "concept": "a playtest cultivator", "gender": "male", "path": "Ghost Cultivator",
-                                                   "family_choice_id": str(ordinary.get("choice_id") or ""), "age_at_creation_years": 18}),
+                                                   "family_choice_id": str(ordinary.get("choice_id") or "")}),
                    expect_error="born among the dead")
     tomb = by_id.get("tomb_watch_clan")
     if tomb:
         born = await step(report, "the tomb-watch clan can", act("character.create", GHOST, {
             "discord_name": "Playtest Ghost", "name": "Xie Graveborn", "concept": "keep the barrows", "gender": "female",
-            "path": "Ghost Cultivator", "family_choice_id": str(tomb.get("choice_id") or ""), "age_at_creation_years": 18}))
+            "path": "Ghost Cultivator", "family_choice_id": str(tomb.get("choice_id") or "")}))
         if born is not None and not born.get("created"):
             report.add("FAIL", "the tomb-watch clan can", f"created=false: {born.get('reason')}")
     ruin = next((n for n, l in locations.items() if l.get("road_site") == "ruin" and l.get("world") == "Mortal World"), "")
@@ -3034,7 +3034,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         await step(report, "a fourth cultivator is created", act("character.create", QUITTER, {
             "discord_name": "Playtest Quitter", "name": "Mo Secondthoughts", "concept": "reconsider everything",
             "gender": "neutral", "path": "Sword Cultivator",
-            "family_choice_id": str(first[0].get("choice_id") or ""), "age_at_creation_years": 18}))
+            "family_choice_id": str(first[0].get("choice_id") or "")}))
         reset = await step(report, "character.reset takes the life back", act("character.reset", QUITTER, {}))
         if reset is not None:
             gone = await db.get_character(QUITTER)
@@ -3072,7 +3072,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
             await step(report, "and /begin works again", act("character.create", QUITTER, {
                 "discord_name": "Playtest Quitter", "name": "Mo Resolved", "concept": "this time for certain",
                 "gender": "neutral", "path": "Body Refiner",
-                "family_choice_id": str(second[0].get("choice_id") or ""), "age_at_creation_years": 18}))
+                "family_choice_id": str(second[0].get("choice_id") or "")}))
     # By this point PLAYER has died and come back, so the incarnation rule
     # answers. The world-mark refusal is kept as an alternative only for an
     # anonymise column a reset has not been told how to release; since v1.0.14

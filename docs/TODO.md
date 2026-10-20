@@ -18,14 +18,29 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
 
 ## Open
 
+- **deferred (design)** — *What a rebirth leaves of the last life.* `samsara_tables_test.go` (v1.36.0)
+  holds every table that carries a person to wiped, kept, settled at death or open, and `samsaraOpen`
+  names twenty-three columns a reborn cultivator still finds of the old body: its qi body and alchemy
+  residue (`character_qi_body`, `alchemy_state`, `alchemy_batches`), a beast encounter and an
+  expedition thread it was in, its sect residence, recommendations and recruitment attempts, its
+  stall with its listings, sales and card, trades and Dao partnerships still open, a duel in
+  progress, and the bond with a master among the sect's people (`npc_mentorships`, which
+  `sect.ascend` and the GM lever end and the rebirth does not). Each is one line in
+  `incarnationScopedLinks` once the owner says it goes, or a reason in `samsaraKept` once they say
+  it stays; the gate fails on a column in neither.
+- **deferred (design)** — *Three Python-era levers the bot's own code still writes through.*
+  `relationship.update` takes the trust, respect, fear, affection, debt and grudge deltas off the
+  payload and `/talk` sends `trust: 1` from `scene.py`; `cultivation.reward` takes cultivation,
+  stones, insight and items and `combat.apply_damage` a damage figure, and nothing under `app/`
+  calls either - the engine playtest uses them to fill a stage. All three are allowlisted in the
+  payload sweep (`statesLegacy`, `payload_fields_test.go`, v1.36.0) because the bot is the only
+  caller and it is trusted; what they should become is the owner's: admin-only levers (audited, so
+  the playtest keeps its door), removed, or an engine rule for what a talk is worth.
 - **deferred (design)** — *Upper-world keepers have thin boards.* 790 of the 1,154 keeper buy lines pay
   nothing now: a Mortal-made good is worth under a whole coin up there once the ladder is read, so the
   cheap half of an upper economy has no NPC buyer. That is the ceiling doing its job, and it is also a
   content gap: a pass authoring upper-world demand for upper-world goods, or shelves priced on the
   ladder, is the owner's call. Decided (v1.35.0): a content pass, later, not with this release.
-- **deferred (design)** — *Black-market and fence prices are not read against the ladder.*
-  `black_market.trade` sells and fences at its own prices in the post's coin; the arbitrage gate does
-  not walk it.
 - **deferred (design)** — *Permanent qi that a settle already took.* Every `qi_max_bonus` starts at 0:
   the qi a settle rebuilt over before v1.34.0 is in no column and cannot be told from the body's own
   figure. The honest repair is a GM `set_resource_caps` per player, or a one-off replay of completed
@@ -36,30 +51,18 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   and teleport rows written before v1.34.0 carry no `moved` / `scene` and are undone as they always
   were; they age out of the audit log's useful window, and a migration that rewrites them is not worth
   a schema change. Decided (v1.35.0): no migration.
-- **deferred (design)** — *Saving a shipped quest whose reward is above the GM budget is refused.* 35
-  shipped commissions and realm-road quests pay more than the default authoring budget, so they cannot
-  be opened and saved without lowering the reward first; the refusal names the budget. Whether an
-  unchanged reward should pass is a decision.
-- **deferred (design)** — *The other capped walks over the roster.* `npcCrimes` (cap 5),
-  `npcBeastHunts` (cap 5) and `npcChildbirth` (cap 6) read their people in name order to a cap; the
-  first two rarely bind and childbirth consumes the state it walks. If a content change makes one bind,
-  call `rosterTurn` on its rows.
 - **deferred (design)** — *Households for people the catalogue adds later.* Seeding runs once per
   world, so an NPC a content update adds afterwards is never offered a seeded marriage; the courtship
-  tick is how they marry. A per-NPC marker would be the shape if that matters.
+  tick is how they marry. A per-NPC marker would be the shape if that matters. Decided (v1.36.0): the
+  courtship tick is how they marry; no marker.
 - **deferred (design)** — *A scene sweep for events other than the tick's.* The sweep covers the two
   key shapes the tick mints (`auto:`, `secret_realm_rotation:`); a player's or a GM's event gets its
   scene from the command that made it, and telling "no thread yet" from "never had one" for those keys
-  needs a marker in the payload.
+  needs a marker in the payload. Decided (v1.36.0): waits for a live
+  case; no marker until one shows.
 - **deferred (design)** — *Event manifestations have no per-day reward cap.* A `combat.finalize`
   against an `event:` battle has no `target_key`, so insight and tempering are not limited per day;
   the site's finite beasts bound it. Decided (v1.35.0): left; the roster is the bound.
-- **deferred (design)** — *A table-level samsara gate.* v1.33.0's gate holds every column of
-  `characters` to being reset or kept by a rebirth. The rows of other tables have no such gate: about
-  fifty tables carry a `user_id` and are in neither wipe list (`soul_legacy`, `reincarnation_state` and
-  `event_log` are meant to survive; `character_qi_body`, `alchemy_state` and `character_fate` are
-  per-body and are neither wiped nor rewritten). `npc_mentorships` is keyed `disciple_user_id`, so a
-  gate that looked for `user_id` would have missed it; the key columns need naming first.
 - **deferred (design)** — *Which strength floors should read the higher ladder.* v1.33.0 moved the
   floors of a *place* (the sect ascent's gate, the transit arrays, the caravan's road, and the panels
   that anticipate them) onto `accessRealmIndex`, the higher of the qi and body ladders. The floors of
@@ -75,10 +78,6 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   `WORLD.realm_world(realm_index)`; a body cultivator in the Spiritual World at qi 3 reads as Mortal
   there. Left because each is "which world am I from" rather than "may I enter". Decided (v1.35.0):
   stays on the qi ladder with the strength floors.
-- **deferred (design)** — *A sweep of every payload field an engine action reads.* The samsara
-  wait was rc.56's class found one action at a time (v1.35.0 closed it); a gate that walks every
-  payload struct the engine unmarshals and holds each field against a list of what a caller may
-  state would find the next one before a release does. Not built yet: the list is the decision.
 - **deferred (design)** — *A realm an old undo reopened stays open.* Undos run under v1.23.1 to
   v1.32.0 could put `active=1` back on a `completed=1` perfection row, which the quest and trial
   actions read as an open path. No migration writes it back, because nothing records whether a GM
@@ -95,7 +94,8 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   accepts any event of its type for an objective with no target, so a GM reporting `talk -> Elder
   Pine` moves an untargeted `talk` objective of the same quest as well. No shipped quest has such a
   pair (`TestEveryShippedObjectiveIsMetByItsOwnTarget` would name it), and an engine `objective_id`
-  path would be a second matching rule. Revisit only if a quest is authored with both.
+  path would be a second matching rule. Revisit only if a quest is authored with both. Decided again (v1.36.0): no change until
+  a quest carries the pair.
 - **deferred (design)** — *A rival that held the gate when migration 74 ran was given the seat city.*
   The migration's first statement copies the gate's banner onto a neutral seat whoever held the gate,
   so a sect whose gate had been taken in a v1.12-v1.18 war lost its home city to the rival. The repair
@@ -104,11 +104,6 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   `admin.territory.set_controller` lever (a new operation, with playtest coverage and a dashboard
   card) is how a GM would hand the city back, and is not built until a world shows the state.
   Decided (v1.35.0): not built until one does.
-- **deferred (harness)** — *The playtests claim from a whole place only.* `playtest_engine.py` claims
-  the hills and `playtest_discord.py` presses `/territory claim` wherever the sweep's player stands;
-  neither claims from a gate or a street, so the redirect is held by the Go tests and the Python
-  commands test and not by a real server. A leg that stands at a city's gate, claims, and holds that
-  the city's row (not the gate's) carries the banner would drive it end to end.
 - **deferred (design)** — *A repaired street forgets what it paid.* Releasing a held part ends the
   tribute it paid (a lot a week, v1.29.0) and folds a sole holder into the whole city; a sect that
   held several streets of a city loses the extra lots. The city pays its own tribute once folded,
@@ -119,9 +114,6 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   the button sooner and let a GM cancel an install that is merely slow on a cold NAS build; the
   length is `updateInstallLeaseSeconds` (and the card's twin) if the owner wants it moved. Decided
   (v1.35.0): two hours stays.
-- **deferred (design)** — *The classic journal's door edit.* `open_hub_in_place` edits the classic
-  (non-layout) journal message without `content=None, embed=None`; if Discord refuses that edit the
-  door opens a new panel and never presses the leaf. Not verified live.
 - **deferred (design)** — *One engine query for the panel's gate state.* After v1.31.2 a refresh is one
   session, about sixteen SELECTs and seven engine actions in production. A single `panel.gates` query in
   Go, or the sixteen SELECTs through `/v1/db/batch`, would make it about ten round trips; not built,
@@ -131,7 +123,8 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   keeps only a game-minute deadline, so the four real hours are converted at the scale the focus was
   taken at; a GM changing the rate during one stretches or shortens it, and at a stopped clock it lasts
   until the clock moves. A real-time column would fix it for this one effect at a schema change; it is
-  left until a second effect wants a real-time end.
+  left until a second effect wants a real-time end. Decided (v1.36.0): left until a second
+  effect wants a real-time end.
 - **deferred (design)** — *The rest of the menu layout.* Two steps of the same research wait on the
   owner, and on the dashboard's new Most-used commands card for what players actually press:
   folding the seven one-action pages (Inventory, Use Item and Provenance into one Bag
@@ -157,3 +150,4 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   is a roster and a decision, not a wiring, and inventing it unasked is what this file exists to
   refuse. What v1.0.12 does instead is raise the player past the curriculum before the sweep, which
   is what reached this one.
+  Decided again (v1.36.0): the per-leaf must-resolve roster stays unbuilt.

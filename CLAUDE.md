@@ -234,6 +234,7 @@ wire missing, so before calling a change done, ask which door still does not rea
 - **A Python twin is held to the Go (rc.55, v1.0.9).** Python cannot call Go, so a display twin is one authored number with two readers and a test that reads the Go expression; compute it a third time off the raw content so two wrong halves cannot agree.
 - **A helper's own test does not prove anything calls it.** Every-door gates read the call sites by AST (v1.9.1, v1.13.0).
 - **Playtests are scripts, not CI (rc.33).** Run them here before a release; "driven" means resolved, not called into a refusal (rc.58), and a step that can succeed at doing nothing is not a step (v1.7.1).
+- **A gate reads the class, not the instance (v1.36.0).** rc.56's fourteen waits and v1.35.0's four were found one action at a time; one walk over every payload struct (`payload_fields_test.go`) found seven more at once, and one over every table that carries a person (`samsara_tables_test.go`) found twenty-three rows a rebirth leaves. When a fault has a class, write the gate over the class before fixing the instance.
 
 ## Findings and subsystem history
 
