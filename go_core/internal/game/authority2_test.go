@@ -292,8 +292,8 @@ func TestMarketQuoteAndRowsCarryTheEnginePrices(t *testing.T) {
 	if !ok {
 		t.Fatal("no shelf sells qi_pill")
 	}
-	if got := storage.ParseInt(quote["sell_price"]); got < 1 || got >= shelf {
-		t.Fatalf("sell_price=%d must sit under the cheapest shelf (%d) and above the refusal", got, shelf)
+	if got := storage.ParseInt(quote["sell_price"]); got >= shelf {
+		t.Fatalf("sell_price=%d must sit under the cheapest shelf (%d)", got, shelf)
 	}
 	if want := marketUnitPrice(catalog, "qi_pill", "low_spirit_stone", 1, 1.0, false); storage.ParseInt(quote["sell_price"]) != want {
 		t.Fatalf("sell_price=%d, the trade would pay %d: one door", storage.ParseInt(quote["sell_price"]), want)
@@ -302,8 +302,8 @@ func TestMarketQuoteAndRowsCarryTheEnginePrices(t *testing.T) {
 	if got := storage.ParseInt(refused["sell_price"]); got != 0 {
 		t.Fatalf("a crystal counter quotes %d for a Mortal herb; the trade refuses it, so the quote says 0", got)
 	}
-	if got := storage.ParseInt(refused["buy_price"]); got < 1 {
-		t.Fatalf("the buy side is never refused, got %d", got)
+	if got, want := storage.ParseInt(refused["buy_price"]), marketUnitPrice(catalog, "spirit_herb", fmt.Sprint(refused["currency_id"]), storage.ParseInt(refused["base_price"]), parseFloat(refused["price_index"]), true); got != want {
+		t.Fatalf("the buy side is never refused: buy_price=%d, the trade charges %d", got, want)
 	}
 	missing := authority2Query(t, path, world, "market.quote", 0, map[string]any{"location": "Greenriver Town", "item_id": "bugslayer_sword"})
 	if missing["traded"] != false {

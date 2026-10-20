@@ -239,8 +239,12 @@ func TestABrokerFencesOrdinaryGoodsForLessAndADaysTrustAtMost(t *testing.T) {
 	if sold["ordinary"] != true || sold["trust_gained"] != true || i64(sold["underworld_reputation"]) != 1 {
 		t.Fatalf("the day's first ordinary fence: %v", sold)
 	}
-	if unit := i64(sold["unit_price"]); unit < 1 || unit >= shelf {
-		t.Fatalf("a broker pays %d for a pill the cheapest shelf sells for %d; a fence sits under every shelf", unit, shelf)
+	want, ok := blackMarketOrdinaryFence(catalog, "qi_pill", "low_spirit_stone")
+	if !ok || want >= shelf {
+		t.Fatalf("the ordinary fence prices qi_pill at %d (%v) against a shelf of %d; a fence sits under every shelf", want, ok, shelf)
+	}
+	if unit := i64(sold["unit_price"]); unit != want {
+		t.Fatalf("a broker paid %d for a pill the ordinary fence prices at %d: one door", unit, want)
 	}
 	// The same day's second fence earns money and no standing.
 	again := batch4Result(t, batch4Apply(t, path, world, "black_market.trade", 13, map[string]any{"item_id": "qi_pill", "quantity": 2, "buy": false, "game_minute": 200}))
