@@ -9,6 +9,24 @@ section in it.
 
 ## Fixed
 
+- **fixed (v1.35.0)** — *Registry NPCs could not sponsor a sect recommendation.* `resolveRecommenderTx`
+  takes a sect's own people at the ranks the content stands at its gate
+  (`sect_system.population.at_gate`, read by `sectGateRanks` and its twin `WORLD.sect_gate_ranks`),
+  alive and in person; the picker offers them and the command lets them through off one read
+  (`list_sect_people_at`). `TestASectsOwnElderAtTheGateVouches` drives the Elder, the disciple, the
+  absent and the dead.
+- **fixed (v1.35.0)** — *A stranger's way to Underworld Contacts 15.* A broker buys ordinary goods
+  too (`blackMarketFenceOrdinaryTx`): what a shelf sells, at `blackMarketOrdinaryShare` of the cheapest
+  shelf anywhere and always under it, for one point of standing a world day however much is fenced
+  where the post's own stock pays one a sale; the arbitrage gate walks the fence as an NPC buy price
+  and the sell picker offers carried ordinary goods by the engine's tradeable rule.
+- **fixed (v1.35.0)** — *Pickers that offered what the economy refused.* `/caravan dispatch`'s cargo
+  picker asks `caravan.payable`, the engine's answer to what a caravan pays for from here, in the
+  origin's coin; `/shop sell`'s picker had read the keeper's trimmed board since v1.34.0.
+- **fixed (v1.35.0)** — *The batch-5 fixture lacked production's foreign keys.* Its DDL is the constant
+  `batch5AuthoritySchema`, carrying every `REFERENCES` production declares for its ten keyed tables
+  (`event_log` and `exploration_events` carry none), and `TestTheFixtureKeepsProductionsForeignKeys`
+  reads both constants; no test in the package inserted an orphan.
 - **fixed (v1.35.0)** — *A deployable array's numbers were not on the craft menu.* The nine
   definitions `deployedArrayDefs` carried are each disk's own `array_effect` block in
   `content/world.json` (name, duration, effect), read by the deploy (`worlddata.ArrayEffect`) and by

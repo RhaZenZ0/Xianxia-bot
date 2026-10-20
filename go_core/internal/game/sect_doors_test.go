@@ -290,6 +290,46 @@ func TestTheVisitingElderRecommendsForHisSect(t *testing.T) {
 	}
 }
 
+// A sect's own people at its gate may vouch (v1.35.0): the Elders and the Sect
+// Master the registry stands there, alive and in person. A disciple of the
+// hall may not, as a delegation's disciple may not; a catalogue NPC with no
+// `can_recommend` still may not (Gate Elder Jian Mu, below).
+func TestASectsOwnElderAtTheGateVouches(t *testing.T) {
+	path := setupBatch5AuthorityDB(t)
+	world := batch4WorldPath(t)
+	sectDoorTables(t, path)
+	installChallengeWorld(t, path)
+	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS npc_life_state(npc_name TEXT PRIMARY KEY,health INTEGER NOT NULL DEFAULT 100,sect_rank TEXT NOT NULL DEFAULT '')`)
+	person := func(name, rank, where, status string) {
+		batch4Exec(t, path, `INSERT INTO npc_civilization_state(npc_name,home_location,current_location,world_name,profession,faction,realm_index,phase,status,updated_at) VALUES(?,?,?,'Mortal World',?,'Azure Cloud Sect',6,5,?,0)`, name, where, where, rank, status)
+		batch4Exec(t, path, `INSERT INTO npc_life_state(npc_name,sect_rank) VALUES(?,?)`, name, rank)
+	}
+	person("Elder Test Qiu", "Elder", "Greenriver Town", "alive")
+	person("Core Disciple Test Han", "Core Disciple", "Greenriver Town", "alive")
+	person("Elder Test Far", "Elder", "Riverguard City", "alive")
+	person("Elder Test Gone", "Elder", "Greenriver Town", "dead")
+	if !sectGateRanks(shippedSectCatalog(t))["Elder"] {
+		t.Fatal("the content no longer stands Elders at the gate; the test is broken, not the tree")
+	}
+
+	if _, err := batch4ApplyErr(path, world, "sect.recruitment.recommendation", 42, 1, map[string]any{"npc_name": "Core Disciple Test Han"}); err == nil || !strings.Contains(err.Error(), "cannot sponsor") {
+		t.Fatalf("a hall disciple sponsored an applicant: %v", err)
+	}
+	if _, err := batch4ApplyErr(path, world, "sect.recruitment.recommendation", 42, 2, map[string]any{"npc_name": "Elder Test Far"}); err == nil || !strings.Contains(err.Error(), "is not here") {
+		t.Fatalf("an Elder standing in another city sponsored somebody here: %v", err)
+	}
+	if _, err := batch4ApplyErr(path, world, "sect.recruitment.recommendation", 42, 3, map[string]any{"npc_name": "Elder Test Gone"}); err == nil || !strings.Contains(err.Error(), "dead") {
+		t.Fatalf("a dead Elder sponsored somebody: %v", err)
+	}
+	out, err := batch4ApplyErr(path, world, "sect.recruitment.recommendation", 42, 4, map[string]any{"npc_name": "Elder Test Qiu"})
+	if err != nil {
+		t.Fatalf("the sect's own Elder at the gate could not vouch for a candidate standing before him: %v", err)
+	}
+	if result := batch4Result(t, out); result["sect_name"] != "Azure Cloud Sect" {
+		t.Fatalf("the Elder's recommendation=%v, want the Azure Cloud Sect", result)
+	}
+}
+
 func TestACatalogueSponsorOnlySpeaksForTheirOwnSect(t *testing.T) {
 	path := setupBatch5AuthorityDB(t)
 	world := batch4WorldPath(t)

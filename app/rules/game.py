@@ -319,6 +319,14 @@ class World:
                 return key
         return "low_spirit_stone"
 
+    def sect_gate_ranks(self) -> list[str]:
+        """The ranks the content stands at a sect's gate
+        (`sect_system.population.at_gate`), the twin of Go's `sectGateRanks`:
+        since v1.35.0 the sect's own people of these ranks may vouch for a
+        stranger's entry."""
+        population = dict((self.data.get("sect_system") or {}).get("population") or {})
+        return [str(r).strip() for r in list(population.get("at_gate") or []) if str(r).strip()]
+
     def commission_giver_home(self, giver: str) -> str:
         """Where a giver's work is posted: the giver's own `location` in the
         commission roster, else the NPC's - the twin of Go's `commissionGiverHome`.

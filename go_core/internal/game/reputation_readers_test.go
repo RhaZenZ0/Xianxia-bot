@@ -216,6 +216,48 @@ func underworldStanding(t *testing.T, path string) int64 {
 	return i64(actionScalar(t, path, `SELECT COALESCE((SELECT score FROM faction_reputation WHERE user_id=42 AND faction_key='Underworld Contacts'),0)`))
 }
 
+// A broker buys ordinary goods too (v1.35.0): under the cheapest shelf, and the
+// standing it earns is one point a world day however much is fenced, where the
+// post's own stock pays one a sale. A stranger's way to Underworld Contacts 15
+// used to cost fifteen rare items no shelf sells.
+func TestABrokerFencesOrdinaryGoodsForLessAndADaysTrustAtMost(t *testing.T) {
+	path := underworldPostDB(t)
+	world := batch4WorldPath(t)
+	catalog := crossingCatalog(t)
+	shelf, ok := cheapestShelfPrice(catalog, "qi_pill", "low_spirit_stone")
+	if !ok || shelf < 2 {
+		t.Fatalf("the shipped content gives qi_pill a shelf of %d (%v); pick an item a shelf sells for two or more", shelf, ok)
+	}
+	batch4Exec(t, path, `INSERT INTO inventory(user_id,item_id,quantity) VALUES(42,'qi_pill',6) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=6`)
+	// The day's point is keyed in event_log, as a battle's daily reward is.
+	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS event_log(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,event_type TEXT NOT NULL,payload_json TEXT NOT NULL DEFAULT '{}',created_at REAL NOT NULL DEFAULT 0)`)
+	// A stranger cannot buy a pill the post does not stock.
+	if _, err := batch4ApplyErr(path, world, "black_market.trade", 42, 11, map[string]any{"item_id": "qi_pill", "quantity": 1, "buy": true}); err == nil {
+		t.Fatal("a broker sold a pill the post does not stock")
+	}
+	sold := batch4Result(t, batch4Apply(t, path, world, "black_market.trade", 12, map[string]any{"item_id": "qi_pill", "quantity": 2, "buy": false, "game_minute": 100}))
+	if sold["ordinary"] != true || sold["trust_gained"] != true || i64(sold["underworld_reputation"]) != 1 {
+		t.Fatalf("the day's first ordinary fence: %v", sold)
+	}
+	if unit := i64(sold["unit_price"]); unit < 1 || unit >= shelf {
+		t.Fatalf("a broker pays %d for a pill the cheapest shelf sells for %d; a fence sits under every shelf", unit, shelf)
+	}
+	// The same day's second fence earns money and no standing.
+	again := batch4Result(t, batch4Apply(t, path, world, "black_market.trade", 13, map[string]any{"item_id": "qi_pill", "quantity": 2, "buy": false, "game_minute": 200}))
+	if again["trust_gained"] != false || i64(again["underworld_reputation"]) != 1 || underworldStanding(t, path) != 1 {
+		t.Fatalf("a second ordinary fence the same day moved the standing: %v (standing %d)", again, underworldStanding(t, path))
+	}
+	// The next world day earns the next point.
+	tomorrow := batch4Result(t, batch4Apply(t, path, world, "black_market.trade", 14, map[string]any{"item_id": "qi_pill", "quantity": 1, "buy": false, "game_minute": 100 + gameMinutesPerDay}))
+	if tomorrow["trust_gained"] != true || underworldStanding(t, path) != 2 {
+		t.Fatalf("the next day's fence earned nothing: %v (standing %d)", tomorrow, underworldStanding(t, path))
+	}
+	// And an item no shelf sells is still refused.
+	if _, err := batch4ApplyErr(path, world, "black_market.trade", 42, 15, map[string]any{"item_id": "no_such_item", "quantity": 1, "buy": false}); err == nil {
+		t.Fatal("a broker bought something that is not an item")
+	}
+}
+
 func TestABrokerBuysFromAStrangerAndThatBuildsTrust(t *testing.T) {
 	path := underworldPostDB(t)
 	world := batch4WorldPath(t)

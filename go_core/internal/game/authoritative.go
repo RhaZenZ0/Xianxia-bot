@@ -240,6 +240,7 @@ var authoritativeQueries = map[string]bool{
 	// so a picker offers only what war.act would take.
 	"war.fronts":          true,
 	"boss.absent":         true,
+	"caravan.payable":     true,
 	"spirit_sense.status": true,
 	// v1.8.0: what a sect member may redeem, at the engine's price.
 	"sect.exchange": true,
@@ -965,6 +966,28 @@ func applyAuthoritativeQuery(databasePath, worldPath string, req ActionRequest) 
 		v, _ := eventledger.CurrentActorVersion(conn, req.ActorID)
 		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v,
 			Result: map[string]any{"encounter_id": p.EncounterID, "absent_user_ids": absent, "absent_after_seconds": raidAbsentSeconds()}}, nil
+	case "caravan.payable":
+		if strings.TrimSpace(worldPath) == "" {
+			return ActionResponse{}, errors.New("world catalog path is required")
+		}
+		catalog, loadErr := worlddata.Load(worldPath)
+		if loadErr != nil {
+			return ActionResponse{}, loadErr
+		}
+		var p struct {
+			Smuggle bool `json:"smuggle"`
+		}
+		if len(req.Payload) > 0 && string(req.Payload) != "null" {
+			if err := json.Unmarshal(req.Payload, &p); err != nil {
+				return ActionResponse{}, err
+			}
+		}
+		result, qerr := caravanPayableQuery(conn, catalog, req.ActorID, p.Smuggle)
+		if qerr != nil {
+			return ActionResponse{}, qerr
+		}
+		v, _ := eventledger.CurrentActorVersion(conn, req.ActorID)
+		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
 	case "war.fronts":
 		if strings.TrimSpace(worldPath) == "" {
 			return ActionResponse{}, errors.New("world catalog path is required")

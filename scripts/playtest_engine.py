@@ -1668,6 +1668,10 @@ async def run(url: str, token: str, db_path: str) -> Report:
     await audited("admin.player.karma", {"user_id": PLAYER, "delta": 60, "reason": "playtest"}, name="admin.player.karma back up")
 
     # -- a caravan and a seclusion, each waited out on the world clock
+    # v1.35.0: the cargo picker asks the engine what a caravan pays for from here.
+    payable = await step(report, "caravan.payable", query("caravan.payable", PLAYER, {}))
+    report.add("PASS" if any(str(i.get("item_id")) == "spirit_herb" for i in list((payable or {}).get("items") or [])) else "FAIL",
+               "the herbs the next step sends are on the payable list", str((payable or {}).get("items"))[:300])
     caravan = await step(report, "caravan.dispatch five herbs to Riverguard City", act("caravan.dispatch", PLAYER, {"destination": "Riverguard City", "item_id": "spirit_herb", "quantity": 5, "escort": 2}))
     if caravan is not None:
         await step(report, "the road is walked", gm("admin.world.advance_time", {"minutes": int(caravan.get("travel_minutes") or 0) + 30, "reason": "playtest"}))

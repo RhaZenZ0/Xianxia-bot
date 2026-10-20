@@ -122,6 +122,23 @@ func revealSectRouteTx(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	}, nil
 }
 
+// sectGateRanks are the ranks the content stands at a sect's gate
+// (`sect_system.population.at_gate`): the people a stranger meets first, and
+// since v1.35.0 the ones who may vouch for them. Read off the same block the
+// simulation seeds the halls from, so the picker, the engine and the roster
+// cannot disagree about who stands there.
+func sectGateRanks(catalog worlddata.Catalog) map[string]bool {
+	out := map[string]bool{}
+	population, _ := catalog.SectSystem["population"].(map[string]any)
+	gate, _ := population["at_gate"].([]any)
+	for _, rank := range gate {
+		if name := strings.TrimSpace(fmt.Sprint(rank)); name != "" {
+			out[name] = true
+		}
+	}
+	return out
+}
+
 // resolveRecommenderTx says which sect an NPC may sponsor a cultivator into,
 // or refuses. A catalogue NPC answers from the content file; anybody else is
 // looked for in the cast of a running world event, where only a cast member
@@ -149,6 +166,25 @@ func resolveRecommenderTx(conn *storage.Conn, catalog worlddata.Catalog, npcName
 			return "", fmt.Errorf("%s is at %s; you are at %s", npcName, where.Location, c.Location)
 		}
 		return strings.TrimSpace(npc.SectAffiliation), nil
+	}
+	// A sect's own people (the registry, v1.25.0) may vouch since v1.35.0: the
+	// ranks the content stands at the gate (`sect_system.population.at_gate`,
+	// the Sect Master and the Elders), alive, and in person. A disciple of the
+	// hall is of the sect and may not sponsor anybody, as a delegation's
+	// disciple may not.
+	if person, found, err := sectNPCTx(conn, catalog, npcName); err != nil {
+		return "", err
+	} else if found && strings.TrimSpace(person.Sect) != "" {
+		if !person.Alive {
+			return "", fmt.Errorf("%s is dead and recommends nobody", npcName)
+		}
+		if !sectGateRanks(catalog)[person.Rank] {
+			return "", fmt.Errorf("%s cannot sponsor anybody's entry into a sect", npcName)
+		}
+		if err := standingWithTx(conn, catalog, npcName, c.Location, gameMinute); err != nil {
+			return "", err
+		}
+		return strings.TrimSpace(person.Sect), nil
 	}
 	if !tableExistsTx(conn, "world_event_npcs") {
 		return "", fmt.Errorf("%s cannot sponsor anybody's entry into a sect", npcName)

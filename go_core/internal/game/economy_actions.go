@@ -419,6 +419,85 @@ func blackMarketAuthorized(conn *storage.Conn, catalog worlddata.Catalog, userID
 	return "", rep, nil
 }
 
+// blackMarketOrdinaryShare is what a broker pays for an ordinary good against
+// the cheapest shelf anywhere, in the post's coin: less than the 0.55 of the
+// post's own stock, and always under the shelf, so nothing bought on a shelf
+// sells to a broker for more.
+const blackMarketOrdinaryShare = 0.40
+
+// underworldFenceEventType keys the one point of standing a day an ordinary
+// fence earns, in event_log the way a battle's daily reward is keyed.
+const underworldFenceEventType = "underworld_fence"
+
+// blackMarketOrdinaryFence is what a broker pays per unit for an ordinary good -
+// one a shelf sells (MarketTradeable) - in a currency, and whether it pays at
+// all: a share of the cheapest shelf anywhere, read across the ladder, and 0
+// when no whole coin of this currency sits under that shelf. It is one of the
+// NPC buy prices the arbitrage gate walks.
+func blackMarketOrdinaryFence(catalog worlddata.Catalog, itemID, currency string) (int64, bool) {
+	item, _, ok := itemDef(catalog, itemID)
+	if !ok || !item.MarketTradeable() {
+		return 0, false
+	}
+	shelf, ok := cheapestShelfPrice(catalog, itemID, currency)
+	if !ok || shelf < 2 {
+		return 0, false
+	}
+	unit := max64(1, int64(math.Round(float64(shelf)*blackMarketOrdinaryShare)))
+	return min64(unit, shelf-1), true
+}
+
+// blackMarketFenceOrdinaryTx is a broker buying ordinary goods (v1.35.0). A
+// post stocks six rows drawn from the ninety rare items no shelf sells, so a
+// stranger's way to Underworld Contacts 15 was fifteen rare items; a broker
+// takes ordinary contraband too now, at blackMarketOrdinaryShare of the
+// cheapest shelf, and the standing it earns is smaller: one point a world day,
+// however much is fenced, where the post's own stock pays one a sale. The goods
+// are moved on, not stocked.
+func blackMarketFenceOrdinaryTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, post map[string]any, p marketTradePayload, reason string) (authoritativeMutation, error) {
+	currency := worldBaseCurrency(catalog, fmt.Sprint(post["world_name"]))
+	unit, ok := blackMarketOrdinaryFence(catalog, p.ItemID, currency)
+	if !ok {
+		return authoritativeMutation{}, fmt.Errorf("no broker here will pay a whole %s for %s", coinName(catalog, currency), itemDisplayName(catalog, p.ItemID))
+	}
+	owned, err := inventoryQuantityTx(conn, userID, p.ItemID)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	if owned < p.Quantity {
+		return authoritativeMutation{}, errors.New("not enough carried item")
+	}
+	now := nowSeconds()
+	total := unit * p.Quantity
+	if _, err = conn.Execute(`UPDATE inventory SET quantity=quantity-? WHERE user_id=? AND item_id=?`, []any{p.Quantity, userID, p.ItemID}); err != nil {
+		return authoritativeMutation{}, err
+	}
+	balance, err := walletDeltaTx(conn, catalog, userID, currency, total, now)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	// One point of standing a world day for ordinary goods, keyed in the
+	// event log so the day's first fence earns it and the rest earn money.
+	dayKey := fmt.Sprintf("%s:day:%d", underworldFenceEventType, p.GameMinute/gameMinutesPerDay)
+	paid, err := conn.Execute(`SELECT COUNT(*) FROM event_log WHERE user_id=? AND event_type=? AND json_extract(payload_json,'$.key')=?`, []any{userID, underworldFenceEventType, dayKey})
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	rep := standingTx(conn, userID, "Underworld Contacts")
+	trustGained := storage.ParseInt(paid.Rows[0][0]) == 0
+	if trustGained {
+		payload, _ := json.Marshal(map[string]any{"key": dayKey, "item": p.ItemID})
+		if _, err = conn.Execute(`INSERT INTO event_log(user_id,event_type,payload_json,created_at) VALUES(?,?,?,?)`, []any{userID, underworldFenceEventType, string(payload), now}); err != nil {
+			return authoritativeMutation{}, err
+		}
+		if rep, err = adjustReputationTx(conn, userID, "Underworld Contacts", 1, "black market fencing (ordinary goods)", now); err != nil {
+			return authoritativeMutation{}, err
+		}
+	}
+	out := map[string]any{"buy": false, "item_id": p.ItemID, "quantity": p.Quantity, "currency_id": currency, "unit_price": unit, "total": total, "balance": balance, "heat": i64(post["heat"]), "access": reason, "underworld_reputation": rep, "trust_reputation": blackMarketTrustReputation, "detected": false, "crime": nil, "ordinary": true, "trust_gained": trustGained}
+	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "economy", EventType: "black_market.trade", EntityType: "black_market", EntityID: fmt.Sprint(post["world_name"]), GameMinute: p.GameMinute, Payload: out}}, nil
+}
+
 func blackMarketTradeAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p marketTradePayload
 	if err := json.Unmarshal(raw, &p); err != nil {
@@ -465,7 +544,10 @@ func blackMarketTradeAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 	}
 	stock := firstRowMap(stockRes)
 	if stock == nil {
-		return authoritativeMutation{}, errors.New("that item is not traded by this underworld post")
+		if p.Buy {
+			return authoritativeMutation{}, errors.New("that item is not traded by this underworld post")
+		}
+		return blackMarketFenceOrdinaryTx(conn, catalog, userID, post, p, reason)
 	}
 	currency := fmt.Sprint(stock["currency_id"])
 	unit := max64(1, i64(stock["unit_price"]))

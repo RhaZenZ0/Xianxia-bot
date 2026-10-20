@@ -438,6 +438,38 @@ func caravanUnitPayout(catalog worlddata.Catalog, item worlddata.Item, itemID, c
 	return unit, true
 }
 
+// caravanPayableQuery is the engine's answer to "what in my bag will a caravan
+// pay for from here" (`caravan.payable`, v1.35.0): every carried item the
+// dispatch would price, with the unit it would pay in the origin city's coin.
+// The `/caravan dispatch` cargo picker was the whole bag, so it offered goods
+// the dispatch then refused; a picker asks the engine's own question now.
+func caravanPayableQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int64, smuggle bool) (map[string]any, error) {
+	c, err := loadMechanicsCharacter(conn, catalog, userID)
+	if err != nil {
+		return nil, err
+	}
+	origin := cityOf(catalog, c.Location)
+	currency := worldBaseCurrency(catalog, catalog.Locations[origin].World)
+	rows, err := conn.Execute(`SELECT item_id,quantity FROM inventory WHERE user_id=? AND quantity>0 ORDER BY item_id`, []any{userID})
+	if err != nil {
+		return nil, err
+	}
+	items := make([]map[string]any, 0, len(rows.Rows))
+	for _, r := range rows.Rows {
+		itemID := fmt.Sprint(r[0])
+		item, _, ok := itemDef(catalog, itemID)
+		if !ok {
+			continue
+		}
+		unit, payable := caravanUnitPayout(catalog, item, itemID, currency, smuggle)
+		if !payable {
+			continue
+		}
+		items = append(items, map[string]any{"item_id": itemID, "name": item.Name, "quantity": i64(r[1]), "unit_price": unit})
+	}
+	return map[string]any{"origin": origin, "currency_id": currency, "smuggle": smuggle, "items": items}, nil
+}
+
 func caravanDispatchActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p caravanDispatchPayload
 	if e := json.Unmarshal(raw, &p); e != nil {

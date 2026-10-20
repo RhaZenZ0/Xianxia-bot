@@ -23,10 +23,6 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   cheap half of an upper economy has no NPC buyer. That is the ceiling doing its job, and it is also a
   content gap: a pass authoring upper-world demand for upper-world goods, or shelves priced on the
   ladder, is the owner's call. Decided (v1.35.0): a content pass, later, not with this release.
-- **deferred (design)** — *Pickers that offer what the economy now refuses.* `/caravan dispatch`'s cargo
-  picker is the whole bag, and `/shop sell`'s picker reads the bag rather than the board the engine
-  trims, so a thing the counter will not pay for is still offered and then refused. Both want an engine
-  question ("what will this pay here").
 - **deferred (design)** — *Black-market and fence prices are not read against the ladder.*
   `black_market.trade` sells and fences at its own prices in the post's coin; the arbitrage gate does
   not walk it.
@@ -55,11 +51,6 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   key shapes the tick mints (`auto:`, `secret_realm_rotation:`); a player's or a GM's event gets its
   scene from the command that made it, and telling "no thread yet" from "never had one" for those keys
   needs a marker in the payload.
-- **deferred (design)** — *The batch-5 fixture still lacks production's foreign keys.*
-  `setupBatch5AuthorityDB` (and `setupShopDB` on top of it) declares `equipment_instances`,
-  `character_item_appraisals`, `spirit_beasts`, `wild_beast_encounters`, `event_log`, `event_claims`
-  and the exploration-event tables without their `REFERENCES`; extend `fixtureKeyedTables` and that
-  DDL the same way and seed what the tests then miss.
 - **deferred (design)** — *Event manifestations have no per-day reward cap.* A `combat.finalize`
   against an `event:` battle has no `target_key`, so insight and tempering are not limited per day;
   the site's finite beasts bound it. Decided (v1.35.0): left; the roster is the bound.
@@ -150,11 +141,6 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   5 `/npc` and 5 `/innerworld` in content and code - so it needs a migration of the quest terms
   players already hold, the way migration 61 did, and a re-authored curriculum roster. Decided
   (v1.35.0): waits on the Most-used commands card's data.
-- **deferred (design)** — *A stranger's way to Underworld Contacts 15.* v1.11.1 let a broker buy
-  from a stranger, +1 standing a sale, but a post stocks six rows drawn from ninety restricted,
-  special or legendary items none of which any shelf sells, so each +1 costs a rare item and the
-  threshold is effectively reachable only through the five underworld households. Whether a
-  broker should also buy ordinary contraband is a content decision.
 - **deferred (design)** — *The other hub-only groups.* `_GROUP_ACTION_ROOTS` holds some fifty groups
   and only `stall`, `boss` and `party` are slash commands; each more is one more entry in Discord's
   command list, so which of them earn a typed name is the owner's call, not a wiring. Decided
@@ -171,7 +157,3 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   is a roster and a decision, not a wiring, and inventing it unasked is what this file exists to
   refuse. What v1.0.12 does instead is raise the player past the curriculum before the sweep, which
   is what reached this one.
-- **deferred (decision)** — *Registry NPCs cannot sponsor a sect recommendation.* `resolveRecommenderTx`
-  accepts catalogue NPCs and a running event's cast only, so a sect's generated Elders - who now stand
-  at its gate - cannot vouch for an applicant. Whether they should is a decision about how open the
-  door into a sect is, not a wiring.

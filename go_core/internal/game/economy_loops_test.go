@@ -104,6 +104,10 @@ func arbitrageCeilings(t *testing.T, catalog worlddata.Catalog, itemID string, v
 		if ceiling, ok := NPCStallCeiling(catalog, itemID, coin); ok {
 			add("the town at a stall", coin, ceiling)
 		}
+		// An underworld broker buying ordinary goods (v1.35.0), per unit.
+		if fence, ok := blackMarketOrdinaryFence(catalog, itemID, coin); ok {
+			add("an underworld broker", coin, fence)
+		}
 	}
 	if cap, ok := sectDonationCap(catalog, itemID); ok {
 		add("a sect's donation points", "low_spirit_stone", cap)

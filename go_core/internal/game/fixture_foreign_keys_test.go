@@ -25,6 +25,11 @@ import (
 var fixtureKeyedTables = []string{
 	"inventory", "currency_wallets", "profession_progress", "character_recipes",
 	"cave_abodes", "cave_abode_access", "character_birth_family", "item_provenance",
+	// The batch-5 fixture's keyed tables (v1.35.0). event_log and
+	// exploration_events carry no key in production, so they are not here.
+	"equipment_instances", "character_item_appraisals", "character_location_discoveries",
+	"event_claims", "exploration_event_participants", "exploration_event_actions",
+	"spirit_beasts", "wild_beast_encounters", "secret_realm_runs", "inheritances",
 }
 
 var (
@@ -94,12 +99,13 @@ func TestTheFixtureKeepsProductionsForeignKeys(t *testing.T) {
 		}
 		total += len(want)
 		have := map[string]bool{}
-		for _, key := range referencesOf(batch4AuthoritySchema, table) {
+		// Batch 5 is batch 4 plus its own tables, so both constants are read.
+		for _, key := range referencesOf(batch4AuthoritySchema+"\n"+batch5AuthoritySchema, table) {
 			have[key] = true
 		}
 		for _, key := range want {
 			if !have[key] {
-				t.Errorf("%s: production keys %q and the batch-4 fixture does not - a test can insert a row production refuses; copy the REFERENCES clause from app/database/core.py and seed the parent rows the tests then miss", table, key)
+				t.Errorf("%s: production keys %q and the fixture does not - a test can insert a row production refuses; copy the REFERENCES clause from app/database/core.py and seed the parent rows the tests then miss", table, key)
 			}
 		}
 	}

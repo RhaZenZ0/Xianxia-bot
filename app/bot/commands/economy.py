@@ -1321,12 +1321,26 @@ async def _black_market_item_autocomplete(interaction:discord.Interaction,curren
     if not post:return []
     carried=await DB.get_inventory(interaction.user.id) if selling else {}
     q=current.casefold().strip(); out=[]
+    stocked=set()
     for row in post.get('stock',[]):
-        iid=str(row['item_id']); name=WORLD.item_name(iid)
+        iid=str(row['item_id']); name=WORLD.item_name(iid); stocked.add(iid)
         if selling and int(carried.get(iid,0) or 0)<=0:continue
         if q and q not in iid.casefold() and q not in name.casefold():continue
         note=f"{int(carried[iid])} carried" if selling else f"{row['quantity']} left"
         out.append(app_commands.Choice(name=f"{name} ({note})"[:100],value=iid[:100]))
+    if selling:
+        # A broker takes ordinary goods too (v1.35.0): what a shelf sells, by
+        # the engine's own tradeable rule (market.catalog), carried and not
+        # already on the post's board. The engine prices and refuses them.
+        try:
+            ordinary=set(await SIM.market_item_ids())
+        except Exception:
+            log.exception("Could not read the tradeable catalogue for the fence picker"); ordinary=set()
+        for iid in sorted(ordinary-stocked):
+            if int(carried.get(iid,0) or 0)<=0:continue
+            name=WORLD.item_name(iid)
+            if q and q not in iid.casefold() and q not in name.casefold():continue
+            out.append(app_commands.Choice(name=f"{name} ({int(carried[iid])} carried, ordinary)"[:100],value=iid[:100]))
     return out[:25]
 
 
