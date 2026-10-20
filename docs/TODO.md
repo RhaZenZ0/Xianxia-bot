@@ -22,7 +22,7 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   nothing now: a Mortal-made good is worth under a whole coin up there once the ladder is read, so the
   cheap half of an upper economy has no NPC buyer. That is the ceiling doing its job, and it is also a
   content gap: a pass authoring upper-world demand for upper-world goods, or shelves priced on the
-  ladder, is the owner's call.
+  ladder, is the owner's call. Decided (v1.35.0): a content pass, later, not with this release.
 - **deferred (design)** — *Pickers that offer what the economy now refuses.* `/caravan dispatch`'s cargo
   picker is the whole bag, and `/shop sell`'s picker reads the bag rather than the board the engine
   trims, so a thing the counter will not pay for is still offered and then refused. Both want an engine
@@ -44,14 +44,15 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   the qi a settle rebuilt over before v1.34.0 is in no column and cannot be told from the body's own
   figure. The honest repair is a GM `set_resource_caps` per player, or a one-off replay of completed
   `realm_perfection` / `body_realm_perfection` and `inheritances` rows into a bonus, which is an
-  estimate because the percentage compounded on the then-current pool.
+  estimate because the percentage compounded on the then-current pool. Decided (v1.35.0): no replay;
+  a GM sets the cap per player.
 - **deferred (design)** — *A session on a capped Perfection path gains nothing.* The reply says so and
   points at the path; refusing the session or turning a full stage into a different action is a pacing
   call.
 - **deferred (design)** — *An old audit row's undo is still the absolute snapshot.* Grant, adjust-item
   and teleport rows written before v1.34.0 carry no `moved` / `scene` and are undone as they always
   were; they age out of the audit log's useful window, and a migration that rewrites them is not worth
-  a schema change.
+  a schema change. Decided (v1.35.0): no migration.
 - **deferred (design)** — *Saving a shipped quest whose reward is above the GM budget is refused.* 35
   shipped commissions and realm-road quests pay more than the default authoring budget, so they cannot
   be opened and saved without lowering the reward first; the refusal names the budget. Whether an
@@ -85,7 +86,7 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   rather than restating it.
 - **deferred (design)** — *Event manifestations have no per-day reward cap.* A `combat.finalize`
   against an `event:` battle has no `target_key`, so insight and tempering are not limited per day;
-  the site's finite beasts bound it.
+  the site's finite beasts bound it. Decided (v1.35.0): left; the roster is the bound.
 - **deferred (design)** — *A GM's set_sect leaves the NPC master bond.* `admin.player.set_sect`
   (remove or change) leaves `sect_lineage` and `npc_mentorships` in place, and `livingNPCMasterTx`
   checks only that the master is alive, not that they are in the disciple's sect, so a player a GM
@@ -106,11 +107,13 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   the residence facility floor, the personal world, and the curriculum and commission bands. A body
   cultivator ahead of their qi stage can be walked into a world they cannot yet fight in, which is
   the point of the split; whether any of these should follow the higher ladder is a decision for each.
+  Decided (v1.35.0): the strength floors stay on the qi ladder.
 - **deferred (design)** — *Which world a cultivator's strength puts them in is read off the qi ladder.*
   `realmWorldGo(realm_index)` chooses the hidden sect's branch, `currentWorld` falls back to the qi
   realm for a character at a place the catalogue does not carry, and `/sense` reads
   `WORLD.realm_world(realm_index)`; a body cultivator in the Spiritual World at qi 3 reads as Mortal
-  there. Left because each is "which world am I from" rather than "may I enter".
+  there. Left because each is "which world am I from" rather than "may I enter". Decided (v1.35.0):
+  stays on the qi ladder with the strength floors.
 - **deferred (design)** — *A sweep of every payload field an engine action reads.* The samsara
   wait was rc.56's class found one action at a time (v1.35.0 closed it); a gate that walks every
   payload struct the engine unmarshals and holds each field against a list of what a caller may
@@ -125,7 +128,7 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   actions read as an open path. No migration writes it back, because nothing records whether a GM
   meant a realm to be reopened; `SELECT user_id, realm_index FROM realm_perfection WHERE active=1
   AND completed=1` (and the same on `body_realm_perfection`) finds any, and the Player Editor sets
-  one right.
+  one right. Decided (v1.35.0): no migration; the query above is the remedy.
 - **deferred (design)** — *Python's map skips a city part's own roads; the engine's does not.*
   `_known_locations` walks only the city's `roads`, while `knownLocationsTx` adds the road neighbours
   of both the part and the city. On the shipped content the two agree (none of the 375 city parts (484 locations in all) carries
@@ -137,6 +140,7 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   dashboard cannot unstick a quest. Decided no for v1.33.0: the lever stays a replay of a player's
   report and the dashboard is where a GM works one character's quests. If a Discord door is wanted it
   should be the same picker over `quest_journal`'s objectives, not a typed type-and-target pair.
+  Decided again (v1.35.0): dashboard only.
 - **deferred (design)** — *The report lever matches like a player's report.* `progressQuest`
   accepts any event of its type for an objective with no target, so a GM reporting `talk -> Elder
   Pine` moves an untargeted `talk` objective of the same quest as well. No shipped quest has such a
@@ -149,6 +153,7 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   across those releases are affected, and it cannot be found from here; an audited
   `admin.territory.set_controller` lever (a new operation, with playtest coverage and a dashboard
   card) is how a GM would hand the city back, and is not built until a world shows the state.
+  Decided (v1.35.0): not built until one does.
 - **deferred (harness)** — *The playtests claim from a whole place only.* `playtest_engine.py` claims
   the hills and `playtest_discord.py` presses `/territory claim` wherever the sweep's player stands;
   neither claims from a gate or a street, so the redirect is held by the Go tests and the Python
@@ -158,6 +163,7 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   tribute it paid (a lot a week, v1.29.0) and folds a sole holder into the whole city; a sect that
   held several streets of a city loses the extra lots. The city pays its own tribute once folded,
   which is the rule; whether a fold should carry the sum is a balance decision nobody has asked for.
+  Decided (v1.35.0): the rule stands.
 - **deferred (design)** — *`world_cross` and `ascension_gate` objectives are untargeted and fire on
   any world change.* The leak the examinations had: an untargeted objective takes every event of
   its type, so a descent through an array reports `world_cross` and completes a quest that asks to
@@ -178,7 +184,8 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
 - **deferred (rare)** — *A truly dead install holds the Request button for up to two hours.* The
   lease is the exit for a watcher that died mid-install (it was fifteen minutes). Shorter would free
   the button sooner and let a GM cancel an install that is merely slow on a cold NAS build; the
-  length is `updateInstallLeaseSeconds` (and the card's twin) if the owner wants it moved.
+  length is `updateInstallLeaseSeconds` (and the card's twin) if the owner wants it moved. Decided
+  (v1.35.0): two hours stays.
 - **deferred (design)** — *A picker for `/boss claim`.* It is the one leaf the Realm Road sends a
   player to before any raid exists, and it still asks for a typed encounter id; taking it out of
   `STILL_TYPED` wants a provider that lists the player's open encounters, and the Next label could
@@ -193,7 +200,7 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   session, about sixteen SELECTs and seven engine actions in production. A single `panel.gates` query in
   Go, or the sixteen SELECTs through `/v1/db/batch`, would make it about ten round trips; not built,
   because each `get_x` is its own repository method and a batched read changes that shape for a saving
-  that no longer dominates a press.
+  that no longer dominates a press. Decided (v1.35.0): not built.
 - **deferred (design)** — *A focus's end moves if the world's rate changes mid-focus.* `active_effects`
   keeps only a game-minute deadline, so the four real hours are converted at the scale the focus was
   taken at; a GM changing the rate during one stretches or shortens it, and at a stopped clock it lasts
@@ -206,7 +213,8 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   (Ascension into Cultivation, NPCs into World, Combat and Secret Realms into Adventure, Abode and
   Inner World into Home). The last renames printed hub paths - about 38 `/ascend`, 19 `/realm`,
   5 `/npc` and 5 `/innerworld` in content and code - so it needs a migration of the quest terms
-  players already hold, the way migration 61 did, and a re-authored curriculum roster.
+  players already hold, the way migration 61 did, and a re-authored curriculum roster. Decided
+  (v1.35.0): waits on the Most-used commands card's data.
 - **deferred (design)** — *`world_rules.faction_attitudes` is read by nothing.* Per-alignment
   numbers (Orthodox -35 for a forbidden art, +15 for mercy; Demonic +20 and -5) that look like
   reputation deltas and move nothing. `forbiddenPolicy` reads `forbidden_arts`, and mercy pays fate.
@@ -234,7 +242,8 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   broker should also buy ordinary contraband is a content decision.
 - **deferred (design)** — *The other hub-only groups.* `_GROUP_ACTION_ROOTS` holds some fifty groups
   and only `stall`, `boss` and `party` are slash commands; each more is one more entry in Discord's
-  command list, so which of them earn a typed name is the owner's call, not a wiring.
+  command list, so which of them earn a typed name is the owner's call, not a wiring. Decided
+  (v1.35.0): none more until the Most-used commands card shows demand.
 - **deferred (design)** — *The spirit stat on gear reaches no rule.* Every piece in
   `EQUIPMENT_DEFINITIONS` carries `spirit`, the engine sums it in `combatEquipment` and
   `equipmentPowerRows`, and nothing reads the sum. Since v1.7.5 no surface shows it, on the owner's
