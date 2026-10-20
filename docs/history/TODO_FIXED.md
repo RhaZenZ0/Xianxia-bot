@@ -9,6 +9,22 @@ section in it.
 
 ## Fixed
 
+- **fixed (v1.35.0)** — *The spirit stat on gear reached no rule.* Removed from all three tables
+  (`EQUIPMENT_DEFINITIONS`, `equipmentDefinitionsGo`, `equipDefs`) and the three sums that carried
+  it; gear gives attack, defence and agility, and `test_equipment_stat_parity.py` holds the three
+  tables to three stats.
+- **fixed (v1.35.0)** — *`world_rules.faction_attitudes` was read by nothing.* Removed from the
+  content with `forbidden_arts.concealed_use_reduces_exposure` beside it; `UNREAD_RULES` is empty and
+  `test_the_removed_rules_stay_out_of_the_content` keeps them out.
+- **fixed (v1.35.0)** — *A session on a capped Perfection path gained nothing.* `perfectionCapped`
+  refuses the session at a full stage whose open path is trained to its cap, before the essence
+  write and the cooldown, and the refusal names the path; the reply's branch for that result is gone.
+- **fixed (v1.35.0)** — *Grandfathering a beast lowered its rank and left its evolution stage.* The
+  settle writes `evolution_stage = rank - tamed`, the levels the beast kept, so a stage never stands
+  above the rank it was paid for; `settledStage` drives the three cases.
+- **fixed (v1.35.0)** — *Python's map skipped a city part's own roads; the engine's did not.* The
+  content is held to the shape both halves assume: `NoPartOfACityHasRoadsOfItsOwn` in
+  `test_a_gate_is_its_city.py` holds every city part to carrying no `roads`.
 - **fixed (v1.35.0)** — *A GM's set_sect left the NPC master bond.* `endSectBondsTx` is the one door
   that ends a sect's bonds on a person - the `sect_lineage` rows in both directions and the NPC
   master's row - and `sect.ascend` and `admin.player.set_sect` (a removal, or a move to another sect)

@@ -31,20 +31,22 @@ GO_GAME = PROJECT_ROOT / "go_core" / "internal" / "game"
 GROUP_COMBAT = GO_GAME / "group_combat_actions.go"
 COMBAT = GO_GAME / "combat_actions.go"
 
-STATS = ("attack", "defense", "spirit", "agility")
+# Three stats since v1.35.0: `spirit` was carried by every piece, summed by the
+# engine and read by no rule, and is gone from all three tables.
+STATS = ("attack", "defense", "agility")
 
 _CONST_RE = re.compile(r'^\s*(\w+ItemID)\s*=\s*"([a-z0-9_]+)"', re.MULTILINE)
 _KEY = r'(?:"(?P<lit>[a-z0-9_]+)"|(?P<const>\w+ItemID))'
-# {"weapon", 120, 4, 0, 1, 0, false}
+# {"weapon", 120, 4, 0, 0, false}
 _DEF_ROW_RE = re.compile(
     _KEY + r'\s*:\s*\{\s*"(?P<slot>\w+)"\s*,\s*(?P<maxdur>-?\d+)\s*,\s*'
-    r"(?P<attack>-?\d+)\s*,\s*(?P<defense>-?\d+)\s*,\s*(?P<spirit>-?\d+)\s*,\s*"
+    r"(?P<attack>-?\d+)\s*,\s*(?P<defense>-?\d+)\s*,\s*"
     r"(?P<agility>-?\d+)\s*,\s*(?P<indestructible>true|false)\s*\}"
 )
-# "spirit_iron_sword": {4, 0, 1, 0}
+# "spirit_iron_sword": {4, 0, 0}
 _TUPLE_RE = re.compile(
     _KEY + r"\s*:\s*\{\s*(?P<attack>-?\d+)\s*,\s*(?P<defense>-?\d+)\s*,\s*"
-    r"(?P<spirit>-?\d+)\s*,\s*(?P<agility>-?\d+)\s*\}"
+    r"(?P<agility>-?\d+)\s*\}"
 )
 
 
@@ -90,7 +92,7 @@ def _group_combat_defs() -> dict[str, dict]:
 def _combat_equip_defs() -> dict[str, dict]:
     constants = _go_item_constants()
     source = COMBAT.read_text(encoding="utf-8")
-    start = source.index("var equipDefs = map[string][4]int64{")
+    start = source.index("var equipDefs = map[string][3]int64{")
     end = source.index("\n", start)
     return {
         _resolve(m, constants): {s: int(m.group(s)) for s in STATS}

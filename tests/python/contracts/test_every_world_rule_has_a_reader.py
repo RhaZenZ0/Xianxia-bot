@@ -33,12 +33,11 @@ from tests.support import code_only
 ROOT = Path(__file__).resolve().parents[3]
 CONTENT = ROOT / "content" / "world.json"
 
-# A key left unread on purpose, each with why. Not empty on the day it was
-# written: `faction_attitudes` carries numbers per alignment that no rule reads,
-# and whether a rule should is the owner's decision (docs/TODO.md).
-UNREAD_RULES: dict[str, str] = {
-    "faction_attitudes": "per-alignment reactions read by no rule; deferred to the owner (docs/TODO.md)",
-}
+# A key left unread on purpose, each with why. Empty since v1.35.0: the one
+# entry, `faction_attitudes` (numbers per alignment no rule read), was removed
+# from the content on the owner's call, with `forbidden_arts.concealed_use_reduces_exposure`,
+# a nested boolean stating a rule the engine hardcodes, beside it.
+UNREAD_RULES: dict[str, str] = {}
 
 GO_INDEX = re.compile(r'WorldRules\[\s*"([A-Za-z0-9_]+)"\s*\]')
 
@@ -112,8 +111,15 @@ class EveryWorldRuleHasAReader(unittest.TestCase):
 
     def test_the_defaults_do_not_put_them_back(self):
         source = code_only((ROOT / "app" / "rules" / "advanced_catalog.py").read_text(encoding="utf-8"))
-        for key in ("physical_laws", "social_laws", "local_time_flow"):
+        for key in ("physical_laws", "social_laws", "local_time_flow", "faction_attitudes", "concealed_use_reduces_exposure"):
             self.assertFalse(f'"{key}"' in source, f"advanced_catalog.py still defaults {key}")
+
+    def test_the_removed_rules_stay_out_of_the_content(self):
+        # Removed in v1.35.0 because nothing read them; a content edit that puts
+        # either back needs a reader first (the gate above) or an entry here.
+        rules = shipped_rules()
+        self.assertNotIn("faction_attitudes", rules)
+        self.assertNotIn("concealed_use_reduces_exposure", dict(rules.get("forbidden_arts") or {}))
 
 
 if __name__ == "__main__":

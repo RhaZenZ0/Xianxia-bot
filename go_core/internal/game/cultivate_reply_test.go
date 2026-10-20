@@ -1,6 +1,7 @@
 package game
 
 import (
+	"strings"
 	"testing"
 	"xianxia/core/internal/gamerng"
 )
@@ -33,6 +34,30 @@ func trainAtAFullStageNine(t *testing.T, op string, body bool, perfection func(p
 	return batch4Result(t, batch4Apply(t, path, world, op, 1, map[string]any{"game_minute": 600}))
 }
 
+// trainAtAFullStageNineErr is the same session, answered with the engine's
+// refusal rather than fatal on it (v1.35.0: a capped Perfection path refuses).
+func trainAtAFullStageNineErr(t *testing.T, op string, body bool, perfection func(path string)) (ActionResponse, error) {
+	t.Helper()
+	defer gamerng.UseRoller(func(n int) int { return n - 1 })()
+	path := setupCultivationDB(t)
+	world := batch4WorldPath(t)
+	catalog := crossingCatalog(t)
+	phaseColumn, essenceColumn, realmColumn := "phase", "cultivation", "realm_index"
+	realms := catalog.Realms
+	if body {
+		phaseColumn, essenceColumn, realmColumn = "body_phase", "body_cultivation", "body_realm_index"
+		realms = catalog.BodyRealms
+	}
+	cost, err := phaseCost(realms, 1, 9)
+	if err != nil {
+		t.Fatal(err)
+	}
+	batch4Exec(t, path, "UPDATE characters SET "+realmColumn+"=1,"+phaseColumn+"=9,"+essenceColumn+"=? WHERE user_id=42", cost)
+	perfection(path)
+	batch4SetCanonicalGameMinute(t, path, 600)
+	return batch4ApplyErr(path, world, op, 42, 2, map[string]any{})
+}
+
 func TestTheCultivateReplyKnowsWhetherAPerfectionPathIsOpen(t *testing.T) {
 	for _, tc := range []struct {
 		name, op, table string
@@ -55,11 +80,13 @@ func TestTheCultivateReplyKnowsWhetherAPerfectionPathIsOpen(t *testing.T) {
 			if training["stage_full"] != true || training["perfection_active"] != true || i64(training["perfection_gain"]) < 1 {
 				t.Fatalf("an open path on a full stage: stage_full=%v perfection_active=%v perfection_gain=%v; the session should have refined it", training["stage_full"], training["perfection_active"], training["perfection_gain"])
 			}
-			// A path whose training is as deep as a session takes it gains nothing
-			// and is still open: "continue the path" is still the right word.
-			deep := trainAtAFullStageNine(t, tc.op, tc.body, open(1000000))
-			if deep["perfection_active"] != true || i64(deep["perfection_gain"]) != 0 {
-				t.Fatalf("a path trained to its cap: perfection_active=%v perfection_gain=%v", deep["perfection_active"], deep["perfection_gain"])
+			// A path whose training is as deep as a session takes it has nothing
+			// for a session to do: the session is refused and the refusal names
+			// the path (v1.35.0). It used to gather nothing, bank nothing and
+			// spend the cooldown, and the reply said so afterwards.
+			_, err := trainAtAFullStageNineErr(t, tc.op, tc.body, open(1000000))
+			if err == nil || !strings.Contains(err.Error(), "as deep as meditation takes it") || !strings.Contains(err.Error(), "/ascend → Perfection") {
+				t.Fatalf("a path trained to its cap: err=%v, want the session refused and pointed at the path", err)
 			}
 		})
 	}

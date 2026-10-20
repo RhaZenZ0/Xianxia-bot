@@ -36,9 +36,6 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   `realm_perfection` / `body_realm_perfection` and `inheritances` rows into a bonus, which is an
   estimate because the percentage compounded on the then-current pool. Decided (v1.35.0): no replay;
   a GM sets the cap per player.
-- **deferred (design)** — *A session on a capped Perfection path gains nothing.* The reply says so and
-  points at the path; refusing the session or turning a full stage into a different action is a pacing
-  call.
 - **deferred (design)** — *An old audit row's undo is still the absolute snapshot.* Grant, adjust-item
   and teleport rows written before v1.34.0 carry no `moved` / `scene` and are undone as they always
   were; they age out of the audit log's useful window, and a migration that rewrites them is not worth
@@ -104,12 +101,6 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   meant a realm to be reopened; `SELECT user_id, realm_index FROM realm_perfection WHERE active=1
   AND completed=1` (and the same on `body_realm_perfection`) finds any, and the Player Editor sets
   one right. Decided (v1.35.0): no migration; the query above is the remedy.
-- **deferred (design)** — *Python's map skips a city part's own roads; the engine's does not.*
-  `_known_locations` walks only the city's `roads`, while `knownLocationsTx` adds the road neighbours
-  of both the part and the city. On the shipped content the two agree (none of the 375 city parts (484 locations in all) carries
-  `roads`), but a district authored with its own roads would put a neighbour on the engine's map and
-  not the picker's. A content gate that no part carries `roads`, or the twin walking both, is the
-  fix, and which is the owner's call.
 - **deferred (design)** — *A Discord GM quest-report lever.* The Player Editor is the only door to
   `admin.player.quest_progress`; there is no `/admin player` counterpart, so a GM away from the
   dashboard cannot unstick a quest. Decided no for v1.33.0: the lever stays a replay of a player's
@@ -178,18 +169,6 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   5 `/npc` and 5 `/innerworld` in content and code - so it needs a migration of the quest terms
   players already hold, the way migration 61 did, and a re-authored curriculum roster. Decided
   (v1.35.0): waits on the Most-used commands card's data.
-- **deferred (design)** — *`world_rules.faction_attitudes` is read by nothing.* Per-alignment
-  numbers (Orthodox -35 for a forbidden art, +15 for mercy; Demonic +20 and -5) that look like
-  reputation deltas and move nothing. `forbiddenPolicy` reads `forbidden_arts`, and mercy pays fate.
-  Either a rule reads them (a sect's standing moved by a deed, by the deed-doer's alignment) or they
-  go; named in `UNREAD_RULES` until decided. Found by the v1.19.3 gate. So is
-  `forbidden_arts.concealed_use_reduces_exposure`, a boolean stating a rule the engine already
-  hardcodes (an unwitnessed use is a third as severe) - the gate looks at top-level keys only.
-- **deferred (design)** — *Grandfathering a beast lowers its rank and leaves its evolution stage.*
-  `beast_grandfather.go` settles an old beast to the rank its owner's cores can pay for and keeps
-  `evolution_stage` where it was, so a stage can stand above the rank and the stage's combat term
-  is still paid in full. Whether a stage should be taken back from a beast that already climbed it
-  is the owner's call; the shipped test asserts rank 0 with stage 16 left in place.
 - **deferred (rare)** — *A stale watcher lock after a power loss.* `update_watch.sh` refuses to start when
   the lock's pid answers `kill -0`, and a rebooted NAS can hand that pid to another process. Rare,
   and the remedy is `rm -rf` on the lock directory; a lock that also records a boot id would tell
@@ -203,11 +182,6 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   and only `stall`, `boss` and `party` are slash commands; each more is one more entry in Discord's
   command list, so which of them earn a typed name is the owner's call, not a wiring. Decided
   (v1.35.0): none more until the Most-used commands card shows demand.
-- **deferred (design)** — *The spirit stat on gear reaches no rule.* Every piece in
-  `EQUIPMENT_DEFINITIONS` carries `spirit`, the engine sums it in `combatEquipment` and
-  `equipmentPowerRows`, and nothing reads the sum. Since v1.7.5 no surface shows it, on the owner's
-  call, so the descriptions promise only what a fight does. Whether to wire it (a technique's power, a
-  sense check) or remove it is a mechanic, not a wiring.
 - **deferred (known limit)** — *The leaf sweep counts a leaf pressed into a designed refusal as covered.*
   Left open as a known limit on the owner's call (v1.3.4).
   This is rc.58's finding on the Discord side, and it is the reason `/battle challenge` was green for

@@ -35150,25 +35150,7 @@
         "family_stability_loss": 1,
         "sect_cohesion_loss": 0
       },
-      "concealed_use_reduces_exposure": true,
       "description": "Blood, soul-devouring, corpse, sacrificial and predatory cultivation arts are forbidden by most orthodox jurisdictions. Public use creates evidence and political consequences; demonic factions may approve of the same act."
-    },
-    "faction_attitudes": {
-      "Orthodox": {
-        "forbidden_arts": -35,
-        "murder": -30,
-        "mercy": 15
-      },
-      "Neutral": {
-        "forbidden_arts": -5,
-        "murder": -10,
-        "mercy": 5
-      },
-      "Demonic": {
-        "forbidden_arts": 20,
-        "murder": 5,
-        "mercy": -5
-      }
     },
     "family_principles": [
       "Families protect bloodline survival and reputation before abstract ideology.",

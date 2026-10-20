@@ -151,26 +151,58 @@ func grandfatherBeastAt(t *testing.T, cores int64, rank int64, realm int64) (int
 	return i64(r.Rows[0][0]), i64(r.Rows[0][1]), i64(r.Rows[0][2])
 }
 
+// settledStage is the evolution stage the last grandfathered beast was left
+// with: the levels it kept, since v1.35.0, and not the sixteen it climbed.
+func settledStage(t *testing.T, cores, rank, realm int64) (int64, int64) {
+	t.Helper()
+	path := setupBatch4AuthorityDB(t)
+	setupStage4CompanionTables(t, path)
+	batch4Exec(t, path, `ALTER TABLE spirit_beasts ADD COLUMN grandfathered INTEGER NOT NULL DEFAULT 1`)
+	batch4Exec(t, path, `INSERT INTO spirit_beasts(user_id,name,species,rank,element,intelligence,temperament,bloodline,evolution_stage,loyalty,contract_type,active,techniques_json,created_at,updated_at,grandfathered) VALUES(42,'Mistclaw','Mistclaw Wolf',?,'Wind',10,'bonded','Common',16,80,'equality',1,'[]',0,0,0)`, rank)
+	if realm >= 0 {
+		batch4Exec(t, path, `UPDATE characters SET realm_index=? WHERE user_id=42`, realm)
+	}
+	if cores > 0 {
+		batch4Exec(t, path, `INSERT INTO inventory(user_id,item_id,quantity) VALUES(42,'beast_core',?)`, cores)
+	}
+	catalog, err := worlddata.Load(batch4WorldPath(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := crossingApply(t, path, func(conn *storage.Conn) error { return settleGrandfatheredBeastsTx(conn, catalog, 42) }); err != nil {
+		t.Fatal(err)
+	}
+	return storage.ParseInt(actionScalar(t, path, `SELECT rank FROM spirit_beasts WHERE user_id=42`)),
+		storage.ParseInt(actionScalar(t, path, `SELECT evolution_stage FROM spirit_beasts WHERE user_id=42`))
+}
+
 func TestAnOldBeastPaysForItsLevels(t *testing.T) {
 	// Rank 16, stage 16: 0..9 at 1 each, then 10..15 at 8 each = 10 + 48.
 	if rank, mark, left := grandfatherBeast(t, 60, 16); rank != 16 || mark != 1 || left != 2 {
 		t.Fatalf("rank=%d mark=%d cores left=%d, want 16/1/2", rank, mark, left)
 	}
-	// 30 cores pays 0..9 and two levels past 10, and stops at 12.
+	// 30 cores pays 0..9 and two levels past 10, and stops at 12 - and so does
+	// the stage: twelve levels kept, not sixteen (v1.35.0).
 	if rank, mark, left := grandfatherBeast(t, 30, 16); rank != 12 || mark != 1 || left != 4 {
 		t.Fatalf("rank=%d mark=%d left=%d, want 12/1/4", rank, mark, left)
 	}
-	// No cores: back to where it was tamed.
-	if rank, _, _ := grandfatherBeast(t, 0, 16); rank != 0 {
-		t.Fatalf("rank=%d, want 0", rank)
+	if rank, stage := settledStage(t, 30, 16, -1); rank != 12 || stage != 12 {
+		t.Fatalf("rank=%d stage=%d after paying for twelve levels, want 12/12; the stage's combat term is paid for levels the settle took back", rank, stage)
+	}
+	// No cores: back to where it was tamed, with no stage left to pay.
+	if rank, stage := settledStage(t, 0, 16, -1); rank != 0 || stage != 0 {
+		t.Fatalf("rank=%d stage=%d, want 0/0", rank, stage)
 	}
 }
 
 func TestAnOldBeastIsLoweredToItsWorldsLimit(t *testing.T) {
 	// Rank 35, stage 16 (tamed at 19) in the Mortal World: lowered to 25,
-	// then 19 -> 25 is owed: 8 + 5x16 = 88.
+	// then 19 -> 25 is owed: 8 + 5x16 = 88. Six levels kept of the sixteen.
 	if rank, _, left := grandfatherBeast(t, 88, 35); rank != 25 || left != 0 {
 		t.Fatalf("rank=%d cores left=%d, want 25/0", rank, left)
+	}
+	if rank, stage := settledStage(t, 88, 35, -1); rank != 25 || stage != 6 {
+		t.Fatalf("rank=%d stage=%d, want 25/6", rank, stage)
 	}
 }
 

@@ -514,7 +514,7 @@ func TestEquipmentPowerQueryIsTheEngineFigure(t *testing.T) {
 	batch4Exec(t, path, `INSERT INTO equipment_instances(user_id,item_id,slot,durability,max_durability,quality,equipped) VALUES(42,'spirit_iron_armor','armor',160,160,100,0)`)
 	batch4Exec(t, path, `INSERT INTO equipment_instances(user_id,item_id,slot,durability,max_durability,quality,equipped) VALUES(42,'cloud_stepping_boots','boots',0,100,100,1)`)
 	power := authority2Query(t, path, world, "equipment.power", 42, map[string]any{})
-	// Sword at half durability: attack 4 * 0.5 = 2, spirit 1 * 0.5 -> 1 (round half up).
+	// Sword at half durability: attack 4 * 0.5 = 2.
 	// Unequipped armour and broken boots add nothing.
 	if got := storage.ParseInt(power["attack"]); got != 2 {
 		t.Fatalf("attack=%d want 2", got)

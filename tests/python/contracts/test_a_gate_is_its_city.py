@@ -65,6 +65,20 @@ def _city_of_by_content(location: str) -> str:
     return location
 
 
+class NoPartOfACityHasRoadsOfItsOwn(unittest.TestCase):
+    def test_every_city_part_leaves_the_roads_to_its_city(self):
+        """Python's map (`_known_locations`) walks only the city's roads from a
+        part, and the engine's (`knownLocationsTx`) walks the part's own roads
+        too. On the shipped content the two agree only because no part carries
+        `roads`; a district authored with its own would put a neighbour on the
+        engine's map and not the picker's. This gate holds the content to the
+        shape both halves assume (v1.35.0)."""
+        parts = sorted(n for n in LOCATIONS if _city_of_by_content(n) != n)
+        self.assertGreaterEqual(len(parts), 300, "the reader found too few city parts to be trusted")
+        with_roads = [n for n in parts if (LOCATIONS[n] or {}).get("roads")]
+        self.assertEqual(with_roads, [], "a city part carries roads of its own; the bot's map and the engine's would disagree there")
+
+
 class TheDoorAsksWhichCityYouAreIn(unittest.TestCase):
     def test_the_catalogue_really_has_parts_of_household_towns(self):
         """Asserted before it is trusted (rc.57). A catalogue with no city

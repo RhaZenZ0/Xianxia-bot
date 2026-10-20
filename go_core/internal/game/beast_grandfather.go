@@ -68,7 +68,13 @@ func settleGrandfatheredBeastsTx(conn *storage.Conn, catalog worlddata.Catalog, 
 				break
 			}
 		}
-		if _, err := conn.Execute(`UPDATE spirit_beasts SET rank=?,grandfathered=1,updated_at=? WHERE user_id=? AND beast_id=?`, []any{rank, now, userID, beastID}); err != nil {
+		// The stage follows the rank down (v1.35.0): a stage is the levels a
+		// beast climbed from where it was tamed, and every evolve keeps
+		// rank = tamed + stage, so a beast settled to a lower rank keeps only
+		// the levels it paid for. The stage's combat term was paid in full
+		// for levels the settle had just taken back.
+		stage := maxI64(0, rank-start)
+		if _, err := conn.Execute(`UPDATE spirit_beasts SET rank=?,evolution_stage=?,grandfathered=1,updated_at=? WHERE user_id=? AND beast_id=?`, []any{rank, stage, now, userID, beastID}); err != nil {
 			return err
 		}
 	}

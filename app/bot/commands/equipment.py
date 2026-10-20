@@ -59,7 +59,6 @@ async def equipment_status(interaction: discord.Interaction) -> None:
         return
     bonus = dict(await ENGINE.action("equipment.power", interaction.user.id, {}) or {})
     # The totals are the engine's own answer; the line only says what they do.
-    # Spirit is carried by every piece and read by no rule, so it is not shown.
     totals = equipment_totals_line(bonus) or "No bonuses from what you have equipped."
     lines = [f"🛡️ **Equipment — {c['name']}**", f"**In a fight** (equipped gear):\n{totals}"]
     for row in rows:

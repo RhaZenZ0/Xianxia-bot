@@ -46,15 +46,12 @@ def _full_stage_line(result: dict[str, Any]) -> str:
     (rc.37), so "gathered nothing, banked nothing" is only true of a session
     that refined nothing either: one that did is told it refined the path, and
     is not told to stop meditating. A path whose training is as deep as a
-    session takes it is told so, rather than that nothing happened. What is
-    said comes off the result - `perfection_gain` and `perfection_active` are
-    the engine's - and the reply decides nothing.
+    session takes it never reaches here since v1.35.0: the engine refuses that
+    session and its refusal names the path. What is said comes off the result -
+    `perfection_gain` is the engine's - and the reply decides nothing.
     """
     if int(result.get("perfection_gain", 0) or 0):
         return "\n🪷 This stage is already full, so the session went into refining your Perfection path instead: no essence banked, nothing risked."
-    if result.get("perfection_active") is True:
-        return ("\n🪷 This stage is already full and your Perfection path is as deep as meditation takes it: the session gathered nothing, "
-                "banked nothing and risked nothing. Work the path under **/ascend → Perfection**.")
     return "\n🪷 This stage is already full: the session gathered nothing, banked nothing and risked nothing. Break through before meditating again."
 
 

@@ -251,14 +251,14 @@ func artifactStillHeldTx(conn *storage.Conn, userID int64, itemID string) (bool,
 	return len(r.Rows) > 0, nil
 }
 
-// equipDefs is a second copy of the same four combat stats as
-// equipmentDefinitionsGo (group_combat_actions.go), used only by 1v1 combat.
-// Keep bugslayer_sword's tuple here in sync with both that map and
+// equipDefs is a second copy of the same three combat stats (attack, defence,
+// agility) as equipmentDefinitionsGo (group_combat_actions.go), used only by
+// 1v1 combat. Keep bugslayer_sword's tuple here in sync with both that map and
 // app/advanced_runtime.py's EQUIPMENT_DEFINITIONS - see
 // tests/python/contracts/test_equipment_stat_parity.py.
-var equipDefs = map[string][4]int64{"spirit_iron_sword": {4, 0, 1, 0}, "spirit_iron_armor": {0, 5, 1, -1}, "cloud_stepping_boots": {0, 1, 0, 4}, "lesser_stygian_seal": {1, 1, 4, 0}, "bone_comb": {0, 0, 5, 1}, "cracked_nether_mirror": {0, 2, 3, 0}, bugslayerSwordItemID: {5, 1, 1, 1}, "spirit_crystal_sword": {6, 0, 2, 0}, "spirit_crystal_mail": {0, 8, 2, -1}, "immortal_gold_sabre": {9, 1, 3, 0}, "immortal_gold_plate": {1, 12, 3, -1}, "starsteel_glaive": {13, 1, 4, 1}, "starsteel_aegis": {1, 17, 4, 0}, "spirit_iron_greaves": {0, 1, 0, 2}, "starsteel_sky_treader_boots": {0, 3, 3, 7}, "azure_flying_sword": {7, 0, 3, 3}, "cracked_ancestral_blade": {2, 0, 1, 1}, "hall_practice_sword": {3, 0, 1, 1}, "forge_proof_sword": {3, 1, 1, 0}, "qin_ancestral_sword": {5, 0, 2, 2}}
+var equipDefs = map[string][3]int64{"spirit_iron_sword": {4, 0, 0}, "spirit_iron_armor": {0, 5, -1}, "cloud_stepping_boots": {0, 1, 4}, "lesser_stygian_seal": {1, 1, 0}, "bone_comb": {0, 0, 1}, "cracked_nether_mirror": {0, 2, 0}, bugslayerSwordItemID: {5, 1, 1}, "spirit_crystal_sword": {6, 0, 0}, "spirit_crystal_mail": {0, 8, -1}, "immortal_gold_sabre": {9, 1, 0}, "immortal_gold_plate": {1, 12, -1}, "starsteel_glaive": {13, 1, 1}, "starsteel_aegis": {1, 17, 0}, "spirit_iron_greaves": {0, 1, 2}, "starsteel_sky_treader_boots": {0, 3, 7}, "azure_flying_sword": {7, 0, 3}, "cracked_ancestral_blade": {2, 0, 1}, "hall_practice_sword": {3, 0, 1}, "forge_proof_sword": {3, 1, 0}, "qin_ancestral_sword": {5, 0, 2}}
 
-func combatEquipment(conn *storage.Conn, userID int64) (attack, defense, spirit, agility int64, err error) {
+func combatEquipment(conn *storage.Conn, userID int64) (attack, defense, agility int64, err error) {
 	r, e := conn.Execute(`SELECT item_id,durability,max_durability,quality FROM equipment_instances WHERE user_id=? AND equipped=1 AND durability>0`, []any{userID})
 	if e != nil {
 		err = e
@@ -279,8 +279,7 @@ func combatEquipment(conn *storage.Conn, userID int64) (attack, defense, spirit,
 		quality := equipmentQualityMult(i64(x[3]))
 		attack += int64(math.Round(float64(d[0]) * condition * quality))
 		defense += int64(math.Round(float64(d[1]) * condition * quality))
-		spirit += int64(math.Round(float64(d[2]) * condition * quality))
-		agility += int64(math.Round(float64(d[3]) * condition * quality))
+		agility += int64(math.Round(float64(d[2]) * condition * quality))
 	}
 	return
 }
@@ -894,7 +893,7 @@ func counterStanceTx(conn *storage.Conn, catalog worlddata.Catalog, uid int64, c
 	if companion, err = combatCompanionBonus(conn, uid); err != nil {
 		return
 	}
-	_, defence, _, _, err = combatEquipment(conn, uid)
+	_, defence, _, err = combatEquipment(conn, uid)
 	return
 }
 
@@ -941,7 +940,7 @@ func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	atk, def, _, eag, e := combatEquipment(conn, userID)
+	atk, def, eag, e := combatEquipment(conn, userID)
 	if e != nil {
 		return authoritativeMutation{}, e
 	}

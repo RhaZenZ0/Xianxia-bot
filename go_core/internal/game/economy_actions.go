@@ -688,7 +688,7 @@ func marketTradeAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 }
 
 func equipmentPowerGo(conn *storage.Conn, userID int64) (map[string]int64, error) {
-	out := map[string]int64{"attack": 0, "defense": 0, "spirit": 0, "agility": 0}
+	out := map[string]int64{"attack": 0, "defense": 0, "agility": 0}
 	r, err := conn.Execute(`SELECT item_id,durability,max_durability,quality,equipped FROM equipment_instances WHERE user_id=? AND equipped=1`, []any{userID})
 	if err != nil {
 		return out, err
@@ -704,8 +704,8 @@ func equipmentPowerGo(conn *storage.Conn, userID int64) (map[string]int64, error
 		}
 		condition := math.Max(.25, math.Min(1, float64(i64(row["durability"]))/float64(max64(1, i64(row["max_durability"])))))
 		quality := equipmentQualityMult(i64(row["quality"]))
-		vals := map[string]int64{"attack": d.Attack, "defense": d.Defense, "spirit": d.Spirit, "agility": d.Agility}
-		for _, k := range []string{"attack", "defense", "spirit", "agility"} {
+		vals := map[string]int64{"attack": d.Attack, "defense": d.Defense, "agility": d.Agility}
+		for _, k := range []string{"attack", "defense", "agility"} {
 			out[k] += int64(math.Round(float64(vals[k]) * condition * quality))
 		}
 	}
