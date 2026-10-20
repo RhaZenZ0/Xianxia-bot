@@ -14,34 +14,26 @@ import (
 	"xianxia/core/internal/worlddata"
 )
 
+// A turn, a technique and a pill (a pill drunk in a battle is a turn spent,
+// v1.34.0) can each end a life, and how long that life waits in Samsara used
+// to ride on the payload of all three. It is the engine's now (v1.35.0): the
+// fields are in callerOwnedNothing and recordTrueDeathAuthoritative reads the
+// setting itself.
 type combatTurnPayload struct {
-	BattleID         int64  `json:"battle_id"`
-	Style            string `json:"style"`
-	GameMinute       int64  `json:"game_minute"`
-	MinutesPerYear   int64  `json:"minutes_per_year"`
-	BaseSamsaraYears int64  `json:"base_samsara_years"`
-	MaxWaitSeconds   int64  `json:"max_wait_seconds"`
-	Action           string `json:"action"`
+	BattleID   int64  `json:"battle_id"`
+	Style      string `json:"style"`
+	GameMinute int64  `json:"game_minute"`
+	Action     string `json:"action"`
 }
 type combatTechniquePayload struct {
-	BattleID         int64  `json:"battle_id"`
-	Technique        string `json:"technique"`
-	GameMinute       int64  `json:"game_minute"`
-	MinutesPerYear   int64  `json:"minutes_per_year"`
-	BaseSamsaraYears int64  `json:"base_samsara_years"`
-	MaxWaitSeconds   int64  `json:"max_wait_seconds"`
+	BattleID   int64  `json:"battle_id"`
+	Technique  string `json:"technique"`
+	GameMinute int64  `json:"game_minute"`
 }
 type combatItemPayload struct {
 	BattleID   int64  `json:"battle_id"`
 	ItemID     string `json:"item_id"`
 	GameMinute int64  `json:"game_minute"`
-	// A pill drunk in a battle is a turn spent (v1.34.0), so the opponent's
-	// answer can end a life, and a life that ends here is scaled the way the
-	// attack's and the technique's are. An older bot sends none of these and
-	// the engine's own defaults stand.
-	MinutesPerYear   int64 `json:"minutes_per_year"`
-	BaseSamsaraYears int64 `json:"base_samsara_years"`
-	MaxWaitSeconds   int64 `json:"max_wait_seconds"`
 }
 type combatFinalizePayload struct {
 	BattleID   int64  `json:"battle_id"`
@@ -259,14 +251,14 @@ func artifactStillHeldTx(conn *storage.Conn, userID int64, itemID string) (bool,
 	return len(r.Rows) > 0, nil
 }
 
-// equipDefs is a second copy of the same four combat stats as
-// equipmentDefinitionsGo (group_combat_actions.go), used only by 1v1 combat.
-// Keep bugslayer_sword's tuple here in sync with both that map and
+// equipDefs is a second copy of the same three combat stats (attack, defence,
+// agility) as equipmentDefinitionsGo (group_combat_actions.go), used only by
+// 1v1 combat. Keep bugslayer_sword's tuple here in sync with both that map and
 // app/advanced_runtime.py's EQUIPMENT_DEFINITIONS - see
 // tests/python/contracts/test_equipment_stat_parity.py.
-var equipDefs = map[string][4]int64{"spirit_iron_sword": {4, 0, 1, 0}, "spirit_iron_armor": {0, 5, 1, -1}, "cloud_stepping_boots": {0, 1, 0, 4}, "lesser_stygian_seal": {1, 1, 4, 0}, "bone_comb": {0, 0, 5, 1}, "cracked_nether_mirror": {0, 2, 3, 0}, bugslayerSwordItemID: {5, 1, 1, 1}, "spirit_crystal_sword": {6, 0, 2, 0}, "spirit_crystal_mail": {0, 8, 2, -1}, "immortal_gold_sabre": {9, 1, 3, 0}, "immortal_gold_plate": {1, 12, 3, -1}, "starsteel_glaive": {13, 1, 4, 1}, "starsteel_aegis": {1, 17, 4, 0}, "spirit_iron_greaves": {0, 1, 0, 2}, "starsteel_sky_treader_boots": {0, 3, 3, 7}, "azure_flying_sword": {7, 0, 3, 3}, "cracked_ancestral_blade": {2, 0, 1, 1}, "hall_practice_sword": {3, 0, 1, 1}, "forge_proof_sword": {3, 1, 1, 0}, "qin_ancestral_sword": {5, 0, 2, 2}}
+var equipDefs = map[string][3]int64{"spirit_iron_sword": {4, 0, 0}, "spirit_iron_armor": {0, 5, -1}, "cloud_stepping_boots": {0, 1, 4}, "lesser_stygian_seal": {1, 1, 0}, "bone_comb": {0, 0, 1}, "cracked_nether_mirror": {0, 2, 0}, bugslayerSwordItemID: {5, 1, 1}, "spirit_crystal_sword": {6, 0, 0}, "spirit_crystal_mail": {0, 8, -1}, "immortal_gold_sabre": {9, 1, 0}, "immortal_gold_plate": {1, 12, -1}, "starsteel_glaive": {13, 1, 1}, "starsteel_aegis": {1, 17, 0}, "spirit_iron_greaves": {0, 1, 2}, "starsteel_sky_treader_boots": {0, 3, 7}, "azure_flying_sword": {7, 0, 3}, "cracked_ancestral_blade": {2, 0, 1}, "hall_practice_sword": {3, 0, 1}, "forge_proof_sword": {3, 1, 0}, "qin_ancestral_sword": {5, 0, 2}}
 
-func combatEquipment(conn *storage.Conn, userID int64) (attack, defense, spirit, agility int64, err error) {
+func combatEquipment(conn *storage.Conn, userID int64) (attack, defense, agility int64, err error) {
 	r, e := conn.Execute(`SELECT item_id,durability,max_durability,quality FROM equipment_instances WHERE user_id=? AND equipped=1 AND durability>0`, []any{userID})
 	if e != nil {
 		err = e
@@ -287,8 +279,7 @@ func combatEquipment(conn *storage.Conn, userID int64) (attack, defense, spirit,
 		quality := equipmentQualityMult(i64(x[3]))
 		attack += int64(math.Round(float64(d[0]) * condition * quality))
 		defense += int64(math.Round(float64(d[1]) * condition * quality))
-		spirit += int64(math.Round(float64(d[2]) * condition * quality))
-		agility += int64(math.Round(float64(d[3]) * condition * quality))
+		agility += int64(math.Round(float64(d[2]) * condition * quality))
 	}
 	return
 }
@@ -502,12 +493,16 @@ func addFateGo(conn *storage.Conn, userID int64, reason string, gameMinute int64
 	return points, e
 }
 
-// NPCRealmIndex and NPCStage are accepted for wire compatibility and
-// deliberately ignored: an older bot mid-upgrade still sends them, and a
-// request refused for carrying a field would turn a rolling deploy into an
-// outage (rc.48's rule for the minute). A challenge's opponent is read off the
-// world (`resolveChallengeTargetTx`) and an event's off the caller's own
-// character, so nothing a payload says about either is read.
+// NPCRealmIndex, NPCStage, Severity and TargetKey are accepted for wire
+// compatibility and deliberately ignored: an older bot mid-upgrade still sends
+// them, and a request refused for carrying a field would turn a rolling deploy
+// into an outage (rc.48's rule for the minute). A challenge's opponent is read
+// off the world (`resolveChallengeTargetTx`); an event's off the event the
+// caller stands at and its roster (v1.35.0), named by EventKey and, when the
+// caller wants one beast in particular, NodeKey. Source is read for one thing
+// only: an older bot spelled the event and the node as `event:<key>|node:<n>`
+// in it, and those two keys are taken from there when EventKey is empty. Its
+// severity is never read.
 type combatStartPayload struct {
 	Kind          string `json:"kind"`
 	NPCName       string `json:"npc_name"`
@@ -516,7 +511,22 @@ type combatStartPayload struct {
 	Severity      int64  `json:"severity"`
 	Source        string `json:"source"`
 	TargetKey     string `json:"target_key"`
+	EventKey      string `json:"event_key"`
+	NodeKey       string `json:"node_key"`
 	GameMinute    int64  `json:"game_minute"`
+}
+
+// eventKeysFromSource reads the event and node an older bot spelled into the
+// battle's source, `event:<key>` or `event:<key>|node:<node>`.
+func eventKeysFromSource(source string) (eventKey, nodeKey string) {
+	if !strings.HasPrefix(source, "event:") {
+		return "", ""
+	}
+	eventKey = strings.TrimPrefix(source, "event:")
+	if i := strings.Index(eventKey, "|node:"); i >= 0 {
+		nodeKey, eventKey = eventKey[i+len("|node:"):], eventKey[:i]
+	}
+	return strings.TrimSpace(eventKey), strings.TrimSpace(nodeKey)
 }
 
 // counterDefenceTN is what an opponent's counter-attack must beat, stated once
@@ -591,11 +601,14 @@ func resolveChallengeTargetTx(conn *storage.Conn, catalog worlddata.Catalog, loc
 //     and nothing else: a bound that lives in the client is not a bound
 //     (rc.48), and the opponent's realm is worth a stage-lead on every roll
 //     of the fight, the severity of the kill and the region it marks.
-//   - "event": the opponent is an ad-hoc "hostile manifestation" scaled off
-//     the player's own realm/phase and an event severity - Go derives the
-//     opponent's realm/stage itself from the caller's own canonical
-//     character row rather than trusting client-supplied npc_realm_index/
-//     npc_stage for this kind. Its severity and source are still the caller's.
+//   - "event": a fight the event the caller stands at forces on them. The
+//     engine reads the event (it exists, it is open, the caller is at it: the
+//     three checks world_event.engage makes, through the same reader), takes
+//     the next living beast off its roster - or the one the caller named -
+//     and scales the opponent off the caller's own realm/phase and the
+//     beast's rank, else the event's own severity for an anonymous "hostile
+//     manifestation", which only an event of a hostile kind has. Until
+//     v1.35.0 the severity, the source and the node were the caller's.
 //
 // Player HP/HP-max are always read from the caller's own canonical
 // characters row, never from the payload, closing the trust gap the old
@@ -610,16 +623,20 @@ func combatStartAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		return authoritativeMutation{}, errors.New("kind must be challenge or event")
 	}
 	npcName := strings.TrimSpace(p.NPCName)
-	if npcName == "" {
+	// A challenge names whom it means; an event's opponent is the engine's to
+	// name, so an event needs its key and nothing else.
+	if kind == "challenge" && npcName == "" {
 		return authoritativeMutation{}, errors.New("npc_name is required")
 	}
-	source := strings.TrimSpace(p.Source)
-	// A challenge's source is derived from whom it names, so only an event has
-	// one to be missing.
-	if kind == "event" && source == "" {
-		return authoritativeMutation{}, errors.New("source is required")
+	eventKey, nodeKey := strings.TrimSpace(p.EventKey), strings.TrimSpace(p.NodeKey)
+	if kind == "event" && eventKey == "" {
+		eventKey, nodeKey = eventKeysFromSource(strings.TrimSpace(p.Source))
 	}
-	targetKey := strings.TrimSpace(p.TargetKey)
+	if kind == "event" && eventKey == "" {
+		return authoritativeMutation{}, errors.New("event_key is required")
+	}
+	source, targetKey := "", ""
+	now := float64(time.Now().UnixNano()) / 1e9
 
 	c, e := loadMechanicsCharacter(conn, catalog, userID)
 	if e != nil {
@@ -650,6 +667,7 @@ func combatStartAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	playerMax := maxI64(playerHP, i64(r.Rows[0][1]))
 
 	var npcRealm, npcStage, npcHP int64
+	out := map[string]any{}
 	switch kind {
 	case "challenge":
 		// Whom the caller names is the only thing the caller says. The safe
@@ -669,7 +687,52 @@ func combatStartAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		npcStage = maxI64(1, minI64(9, target.Phase))
 		npcHP = maxI64(10, 12+npcRealm*4+npcStage*2)
 	case "event":
-		sev := maxI64(0, p.Severity)
+		ev, e := loadOpenWorldEventTx(conn, eventKey, now)
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		if e := ev.refuseAway(c); e != nil {
+			return authoritativeMutation{}, e
+		}
+		// The roster decides whom you fight: the beast the caller named, else
+		// the next one standing. Only when the roster has nobody left (or never
+		// had anybody) does the event itself take the field, and only an event
+		// of a hostile kind does that.
+		var node worldEventSiteNode
+		found := false
+		if nodeKey != "" {
+			node, e = loadWorldEventNodeTx(conn, eventKey, nodeKey)
+			if e != nil {
+				return authoritativeMutation{}, e
+			}
+			if node.NodeType != "beast" {
+				return authoritativeMutation{}, errors.New(node.Name + " is not something to fight")
+			}
+			if node.Remaining <= 0 {
+				return authoritativeMutation{}, errors.New(node.Name + " is already cleared out")
+			}
+			found = true
+		} else if node, found, e = nextWorldEventBeastTx(conn, eventKey); e != nil {
+			return authoritativeMutation{}, e
+		}
+		sev := ev.Severity
+		source = "event:" + eventKey
+		out["event_key"], out["manifestation"] = eventKey, !found
+		if found {
+			// A named beast is scaled by its own rank, which is what the
+			// event scene sent as the severity before the engine chose.
+			npcName, sev = node.Name, clampI64(node.Rank, 1, 10)
+			source += "|node:" + node.NodeKey
+			out["node_key"], out["node_remaining"], out["node_descriptor"] = node.NodeKey, node.Remaining, node.Descriptor
+		} else {
+			if !ev.hostile() {
+				return authoritativeMutation{}, errors.New("nothing in this event is forcing a battle here")
+			}
+			npcName = ev.Title + " — hostile manifestation"
+		}
+		// One fight per cultivator against this source: the lock the scene
+		// used to spell for itself.
+		targetKey = fmt.Sprintf("%s:%d", source, userID)
 		npcRealm = maxI64(0, c.RealmIndex+maxI64(0, sev-5)/3)
 		npcStage = maxI64(1, minI64(9, c.Phase+maxI64(0, sev-4)/2))
 		npcHP = maxI64(12, 14+npcRealm*5+npcStage*2+sev*2)
@@ -685,7 +748,6 @@ func combatStartAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		}
 	}
 
-	now := float64(time.Now().UnixNano()) / 1e9
 	if _, e = conn.Execute(`UPDATE battles SET status='abandoned',version=version+1,updated_at=? WHERE user_id=? AND status='active'`, []any{now, userID}); e != nil {
 		return authoritativeMutation{}, e
 	}
@@ -698,10 +760,12 @@ func combatStartAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		return authoritativeMutation{}, e
 	}
 	battleID := ins.LastInsertID
-	out := map[string]any{
+	for k, v := range map[string]any{
 		"battle_id": battleID, "npc_name": npcName, "npc_realm_index": npcRealm, "npc_stage": npcStage,
 		"player_hp": playerHP, "player_hp_max": playerMax, "npc_hp": npcHP, "npc_hp_max": npcHP,
 		"location": c.Location, "source": source, "target_key": targetKey, "status": "active",
+	} {
+		out[k] = v
 	}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "combat", EventType: "battle_started", EntityType: "battle", EntityID: fmt.Sprint(battleID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
@@ -829,7 +893,7 @@ func counterStanceTx(conn *storage.Conn, catalog worlddata.Catalog, uid int64, c
 	if companion, err = combatCompanionBonus(conn, uid); err != nil {
 		return
 	}
-	_, defence, _, _, err = combatEquipment(conn, uid)
+	_, defence, _, err = combatEquipment(conn, uid)
 	return
 }
 
@@ -876,7 +940,7 @@ func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	atk, def, _, eag, e := combatEquipment(conn, userID)
+	atk, def, eag, e := combatEquipment(conn, userID)
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
@@ -995,7 +1059,7 @@ func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	out["npc_hp"] = nhp
 	out["player_hp"] = php
 	if php <= 0 {
-		if e = battleLostTx(conn, catalog, userID, c, b, nhp, trueDeathPayload{GameMinute: p.GameMinute, MinutesPerYear: p.MinutesPerYear, BaseSamsaraYears: p.BaseSamsaraYears, MaxWaitSeconds: p.MaxWaitSeconds}, out); e != nil {
+		if e = battleLostTx(conn, catalog, userID, c, b, nhp, trueDeathPayload{GameMinute: p.GameMinute}, out); e != nil {
 			return authoritativeMutation{}, e
 		}
 		return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "combat", EventType: "battle_lost", EntityType: "battle", EntityID: fmt.Sprint(b.BattleID), GameMinute: p.GameMinute, Payload: out}}, nil
@@ -1176,7 +1240,7 @@ func combatTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	out["npc_hp"] = b.NPCHP
 	out["player_hp"] = php
 	if php <= 0 {
-		if e = battleLostTx(conn, catalog, userID, c, b, b.NPCHP, trueDeathPayload{GameMinute: p.GameMinute, MinutesPerYear: p.MinutesPerYear, BaseSamsaraYears: p.BaseSamsaraYears, MaxWaitSeconds: p.MaxWaitSeconds}, out); e != nil {
+		if e = battleLostTx(conn, catalog, userID, c, b, b.NPCHP, trueDeathPayload{GameMinute: p.GameMinute}, out); e != nil {
 			return authoritativeMutation{}, e
 		}
 		return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "combat", EventType: "battle_lost", EntityType: "battle", EntityID: fmt.Sprint(b.BattleID), GameMinute: p.GameMinute, Payload: out}}, nil
@@ -1282,7 +1346,7 @@ func combatRecoveryItemAction(conn *storage.Conn, catalog worlddata.Catalog, use
 		}
 		out["vitality"] = maxI64(0, newVitality-i64(out["damage_taken"]))
 		if php <= 0 {
-			if e = battleLostTx(conn, catalog, userID, c, b, b.NPCHP, trueDeathPayload{GameMinute: p.GameMinute, MinutesPerYear: p.MinutesPerYear, BaseSamsaraYears: p.BaseSamsaraYears, MaxWaitSeconds: p.MaxWaitSeconds}, out); e != nil {
+			if e = battleLostTx(conn, catalog, userID, c, b, b.NPCHP, trueDeathPayload{GameMinute: p.GameMinute}, out); e != nil {
 				return authoritativeMutation{}, e
 			}
 			return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "combat", EventType: "battle_lost", EntityType: "battle", EntityID: fmt.Sprint(p.BattleID), GameMinute: p.GameMinute, Payload: out}}, nil

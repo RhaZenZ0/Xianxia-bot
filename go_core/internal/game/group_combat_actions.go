@@ -13,52 +13,55 @@ import (
 	"xianxia/core/internal/worlddata"
 )
 
+// The three combat stats a piece of gear gives (v1.35.0: `spirit` is gone -
+// every piece carried it, the engine summed it and no rule read the sum, so it
+// was a promise nothing kept).
 type equipmentDefinitionGo struct {
-	Slot                                            string
-	MaxDurability, Attack, Defense, Spirit, Agility int64
-	Indestructible                                  bool
+	Slot                                    string
+	MaxDurability, Attack, Defense, Agility int64
+	Indestructible                          bool
 }
 
 func equipmentDefinitionsGo() map[string]equipmentDefinitionGo {
 	return map[string]equipmentDefinitionGo{
-		"spirit_iron_sword":     {"weapon", 120, 4, 0, 1, 0, false},
-		"spirit_iron_armor":     {"armor", 160, 0, 5, 1, -1, false},
-		"cloud_stepping_boots":  {"boots", 100, 0, 1, 0, 4, false},
-		"lesser_stygian_seal":   {"accessory", 90, 1, 1, 4, 0, false},
-		"bone_comb":             {"accessory", 80, 0, 0, 5, 1, false},
-		"cracked_nether_mirror": {"accessory", 75, 0, 2, 3, 0, false},
+		"spirit_iron_sword":     {"weapon", 120, 4, 0, 0, false},
+		"spirit_iron_armor":     {"armor", 160, 0, 5, -1, false},
+		"cloud_stepping_boots":  {"boots", 100, 0, 1, 4, false},
+		"lesser_stygian_seal":   {"accessory", 90, 1, 1, 0, false},
+		"bone_comb":             {"accessory", 80, 0, 0, 1, false},
+		"cracked_nether_mirror": {"accessory", 75, 0, 2, 0, false},
 		// The higher worlds' arms and armour (v0.39.0), forged there and sold there.
-		"spirit_crystal_sword": {"weapon", 200, 6, 0, 2, 0, false},
-		"spirit_crystal_mail":  {"armor", 240, 0, 8, 2, -1, false},
-		"immortal_gold_sabre":  {"weapon", 320, 9, 1, 3, 0, false},
-		"immortal_gold_plate":  {"armor", 380, 1, 12, 3, -1, false},
-		"starsteel_glaive":     {"weapon", 480, 13, 1, 4, 1, false},
-		"starsteel_aegis":      {"armor", 560, 1, 17, 4, 0, false},
+		"spirit_crystal_sword": {"weapon", 200, 6, 0, 0, false},
+		"spirit_crystal_mail":  {"armor", 240, 0, 8, -1, false},
+		"immortal_gold_sabre":  {"weapon", 320, 9, 1, 0, false},
+		"immortal_gold_plate":  {"armor", 380, 1, 12, -1, false},
+		"starsteel_glaive":     {"weapon", 480, 13, 1, 1, false},
+		"starsteel_aegis":      {"armor", 560, 1, 17, 0, false},
 		// The boots a smith makes (v1.32.0): the first Forging method that is
 		// not a blade or a cuirass, and the top of the boots ladder above it.
-		"spirit_iron_greaves":         {"boots", 130, 0, 1, 0, 2, false},
-		"starsteel_sky_treader_boots": {"boots", 520, 0, 3, 3, 7, false},
+		"spirit_iron_greaves":         {"boots", 130, 0, 1, 2, false},
+		"starsteel_sky_treader_boots": {"boots", 520, 0, 3, 7, false},
 		// A flying sword is still a sword when you land (v1.0.0-rc.15). It is
 		// the one artifact in `content/world.json` that both carries a rider
 		// (`flight`) and takes a weapon slot, which is exactly why the genre
 		// makes it the default: you do not choose between going and fighting.
-		"azure_flying_sword": {"weapon", 220, 7, 0, 3, 3, false},
+		"azure_flying_sword": {"weapon", 220, 7, 0, 3, false},
 		// The birth family's send-off (v1.0.0-rc.15): a household that can
 		// afford to does not send a child out to walk. These are deliberately
 		// under the shop ladder - the cracked heirloom and the two training
 		// blades below spirit_iron_sword, the clan sword under
 		// spirit_crystal_sword - because the gift is the flight, not the edge.
-		"cracked_ancestral_blade": {"weapon", 90, 2, 0, 1, 1, false},
-		"hall_practice_sword":     {"weapon", 110, 3, 0, 1, 1, false},
-		"forge_proof_sword":       {"weapon", 130, 3, 1, 1, 0, false},
-		"qin_ancestral_sword":     {"weapon", 240, 5, 0, 2, 2, false},
+		"cracked_ancestral_blade": {"weapon", 90, 2, 0, 1, false},
+		"hall_practice_sword":     {"weapon", 110, 3, 0, 1, false},
+		"forge_proof_sword":       {"weapon", 130, 3, 1, 0, false},
+		"qin_ancestral_sword":     {"weapon", 240, 5, 0, 2, false},
 		// A one-of-a-kind GM reward (granted via /admin player grant, never
 		// crafted or bought) - Indestructible=true is what actually protects
 		// it from durability decay; see indestructibleEquipmentIDsGo below.
 		// Keep the four combat stats in sync with combat_actions.go's
 		// equipDefs and app/advanced_runtime.py's EQUIPMENT_DEFINITIONS (see
 		// tests/python/contracts/test_equipment_stat_parity.py).
-		bugslayerSwordItemID: {"weapon", 100, 5, 1, 1, 1, true},
+		bugslayerSwordItemID: {"weapon", 100, 5, 1, 1, true},
 	}
 }
 
@@ -230,7 +233,7 @@ func equipmentRows(conn *storage.Conn, userID int64, equippedOnly bool) ([]map[s
 	return rowsToMaps(r), nil
 }
 func equipmentPowerRows(rows []map[string]any) map[string]int64 {
-	out := map[string]int64{"attack": 0, "defense": 0, "spirit": 0, "agility": 0}
+	out := map[string]int64{"attack": 0, "defense": 0, "agility": 0}
 	defs := equipmentDefinitionsGo()
 	for _, r := range rows {
 		if i64(r["durability"]) <= 0 {
@@ -243,7 +246,6 @@ func equipmentPowerRows(rows []map[string]any) map[string]int64 {
 		q := equipmentQualityMult(i64(r["quality"]))
 		out["attack"] += int64(math.Round(float64(d.Attack) * q))
 		out["defense"] += int64(math.Round(float64(d.Defense) * q))
-		out["spirit"] += int64(math.Round(float64(d.Spirit) * q))
 		out["agility"] += int64(math.Round(float64(d.Agility) * q))
 	}
 	return out
@@ -1141,6 +1143,62 @@ type bossRoundResult struct {
 	Resolved bool
 	Events   []string
 	Status   string
+}
+
+// SettleAbsentRaidsTx is the tick's door into the question resolveBossRoundTx
+// asks (v1.35.0). The question used to be asked only after a raid action and
+// at a kick, so a raid whose every present raider had acted stayed at "to act"
+// until somebody pressed something; the simulation asks it now for every
+// active raid, so a round nobody is pressing settles when the absent raider's
+// half hour runs out. It answers how many rounds it settled.
+func SettleAbsentRaidsTx(conn *storage.Conn, catalog worlddata.Catalog, gameMinute int64, now float64) (int64, error) {
+	if !tableExistsTx(conn, "boss_encounters") {
+		return 0, nil
+	}
+	rows, err := conn.Execute(`SELECT encounter_id FROM boss_encounters WHERE status='active' ORDER BY encounter_id`, nil)
+	if err != nil {
+		return 0, err
+	}
+	settled := int64(0)
+	for _, r := range rows.Rows {
+		res, err := resolveBossRoundTx(conn, catalog, i64(r[0]), gameMinute, now)
+		if err != nil {
+			return settled, err
+		}
+		if !res.Resolved {
+			continue
+		}
+		settled++
+		if res.Status != "active" {
+			closeFinishedRaidOnlyPartiesTx(conn, now)
+		}
+	}
+	return settled, nil
+}
+
+// absentRaidersTx names the raiders a round is no longer waiting on: active,
+// not yet acted this round, and not heard from within raidAbsentSeconds. The
+// card draws them as away off this answer (`boss.absent`, v1.35.0) rather than
+// restating the half hour.
+func absentRaidersTx(conn *storage.Conn, encounterID int64, now float64) ([]int64, error) {
+	er, err := conn.Execute(`SELECT round_index FROM boss_encounters WHERE encounter_id=? AND status='active'`, []any{encounterID})
+	if err != nil {
+		return nil, err
+	}
+	enc := firstRowMap(er)
+	if enc == nil {
+		return []int64{}, nil
+	}
+	rows, err := conn.Execute(`SELECT user_id FROM boss_participants WHERE encounter_id=? AND status='active' AND acted_round<? AND updated_at<=? ORDER BY user_id`,
+		[]any{encounterID, i64(enc["round_index"]), now - float64(raidAbsentSeconds())})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]int64, 0, len(rows.Rows))
+	for _, r := range rows.Rows {
+		out = append(out, i64(r[0]))
+	}
+	return out, nil
 }
 
 // raidAbsentSeconds is how long a raider may leave a round waiting on them

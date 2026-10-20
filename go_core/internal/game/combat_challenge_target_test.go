@@ -303,14 +303,13 @@ func TestTwoSpellingsOfOneNameShareOneLock(t *testing.T) {
 	}
 }
 
-func TestAnEventStillNeedsItsSource(t *testing.T) {
-	// `source is required` belongs to the kind that has no row to derive it
-	// from. The sibling gap in that branch (its severity and its node) is a
-	// separate finding.
+func TestAnEventStillNeedsItsEvent(t *testing.T) {
+	// An event names the event it is part of; everything else about the fight
+	// is read off that row (v1.35.0, combat_event_start_test.go).
 	path, world := setupChallengeWorld(t)
 	_, err := challengeStart(t, path, world, map[string]any{"kind": "event", "npc_name": "Beast Tide Wraith", "severity": 3})
-	if err == nil || !strings.Contains(err.Error(), "source is required") {
-		t.Fatalf("an event with no source was not refused for it: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "event_key is required") {
+		t.Fatalf("an event with no event was not refused for it: %v", err)
 	}
 }
 

@@ -8465,3 +8465,143 @@ tracked sources and resolves it against the hubs: the objective-label cap's comm
 ASCII arrows, and the resolver splits on `→` alone, so the quoted path resolved to nothing. The gate
 reads comments on purpose (a hint is a string, and a string in a comment is one copy away from a
 reply), so the comment now spells the arrow the way a reply must. Nothing a player sees changed.
+
+### Four bounds the caller still held (v1.35.0)
+
+The release began as a reading of the punch list: thirty-five of its fifty-five entries waited on a
+decision rather than a wiring, and the owner took them all in one sitting. Four were rc.48's class,
+a bound living in the client, each found and deferred one action at a time by earlier releases.
+`combat.turn`, `combat.technique`, `combat.recovery_item` and `lifecycle.true_death` took
+`minutes_per_year`, `base_samsara_years` and `max_wait_seconds` off the payload behind
+`maxI64(1, ...)`, so the engine's own 320-year default was unreachable and a caller that omitted
+them gave a true death a one-year wait and a thirty-second cap; `lifecycle.samsara_status` and
+`family.simulate` took the year's length too, and the family's default was 525,600 where the rest of
+the engine said 518,400, so a caller sending 1 was handed twenty-five simulated years a call;
+`pvp.challenge` took `ttl_seconds` with no ceiling. The engine reads
+`REINCARNATION_BASE_SAMSARA_YEARS` and `REINCARNATION_MAX_WAIT_SECONDS` itself now, bounded the way
+the bot's config used to bound them, compose passes them, a year is `lifespanmodel.MinutesPerYear`,
+a challenge stands `pvpChallengeTTLSeconds`, the four fields are in `callerOwnedNothing` and the
+bot's `Settings` keep no copy. The first gate written for it caught its own author: the keys were
+read through a helper that took the key as a parameter, and `test_engine_boundary`'s compose gate
+finds engine keys by the literal `os.Getenv("...")`, so a key passed through a parameter is a key
+it cannot see - the readers call `os.Getenv` with the literal. **Drill** (a field off the refusal
+list): `combat.turn carrying base_samsara_years: err=style must be attack, defend, flee, or intent,
+want "client-supplied base_samsara_years is forbidden"`.
+
+`combat.start kind=event` took `severity`, `source` and the node off the payload and checked
+nothing about the event, while `world_event.engage` checked that it existed, was open and that the
+caller stood at it. The battle names its event now (`event_key`, with an older bot's
+`event:<key>|node:<n>` source read for its two keys and nothing else), the three doors read the
+event through one `loadOpenWorldEventTx`, the engine takes the next living beast off the roster or
+the one named, scales the fight off the beast's rank or the event's severity, and lets the event
+itself take the field only when the roster is empty and the event is of a hostile kind - the list
+of hostile words used to live in the Battle button. **Drill** (the severity read off the payload
+again): `the opponent is realm 1 stage 4 with 47 vitality; the event's severity 2 gives realm 0,
+stage 1, 20 (the caller's 10 would give 47)`.
+
+A quest paid in the coin of wherever the player stood when its last objective was reported, the
+raid's fault of v1.33.0 one door over: six realm-road stages end in a `raid_win` reported at the
+claim. A quest has no world of its own, so `questRewardCurrencyTx` takes one from its giver
+(`commissionGiverHome`), else from the realm its stage is for (`seed_json.realm_index`), else pays
+where the player stands as every quest did; `rewards_granted` carries the currency and the
+completion line, the offer and accepted cards and the city board name it off the display twin
+`WORLD.quest_giver_currency`. `SettleBountyTx` is left where the fugitive stands on purpose: a fine
+debited from a coin they may hold none of collects nothing. **Drill** (the player's feet again): `a
+Spiritual realm's stage finished in the Mortal World paid low_spirit_stone (purse 0
+low_spirit_crystal)`.
+
+The market's quote (`market.rows`, `market.quote`) priced at a flat 70 percent of base times index
+with no catalogue, while `market.trade` priced through `marketUnitPrice`, so a card could promise a
+sale the counter refused or a buy under the NPC floor; both read `marketUnitPrice` now, a
+`sell_price` of 0 is the counter's refusal, and the two Python readers that recomputed the buy price
+print the engine's. The test that held the quote inserted rows in a placeholder coin the catalogue
+does not carry, so no shelf and no keeper were ever found and the floor, the ceiling and the
+refusal were never exercised; it quotes in a real coin now and at a crystal counter that refuses a
+Mortal herb. **Drill**: `a crystal counter quotes 2 for a Mortal herb; the trade refuses it, so the
+quote says 0`.
+
+### Nine quick yeses (v1.35.0)
+
+`admin.player.set_sect` left `sect_lineage` and `npc_mentorships` in place, so a player a GM moved
+out of a sect kept the master's terms until they pressed Leave; `endSectBondsTx` is the one door
+the ascent and the lever share, and a placement in the same sect keeps the bonds.
+`admin.player.force_end_scene` wrote five scene columns and snapshotted two, so an undone force-end
+left a scene with its old type and label and none of its key, channel or metadata; the row carries
+the whole scene (`sceneSnapshot`, the teleport's shape) and `reverseForceEndScene` puts all five
+back, with an older row keeping its two-column reversal. **Drill**: `the undone force-end left the
+scene as "Old Place|sect_trial||Entrance Trial|null|{}", want
+"Old Place|sect_trial|trial-1|Entrance Trial|777|{"round":2}"`.
+
+An up-to-date `--upgrade` was reported `failed` for want of a third word; `unchanged` closes the
+request, writes the result with the version still installed, and the card prints *already up to
+date*. The closed list turned out to have six readers - the engine's `open()`, its `terminal` line
+and `updateStatuses`, the watcher's case list, the dashboard's `UPDATE_TERMINAL_STATUSES` and the
+card's *Last outcome* line - and `test_every_reader_of_a_closed_request_names_the_same_outcomes`
+holds them to one list. **Drill** (the watcher saying `failed` again): `'failed' unexpectedly found
+in ['acked', 'fetching', 'failed', 'heartbeat'] : an update that installed nothing was reported
+failed`.
+
+Three columns the schema clears for a leaving character (`ON DELETE SET NULL`) were deleted by the
+sweep: a war's blows, a sect's building work, a formation still standing. Each is shared state with
+a link in it, so each is anonymised and released, and `test_every_column_the_schema_clears_is_anonymised`
+holds every such column to the anonymise map. Two links no column walk can see - `caravans.owner_key`,
+a TEXT copy of the id, and `requested_by` inside the update rows' JSON - are cleared by
+`eraseUnwalkedLinksTx` in the erase lever alone, because a reset shares the sweep and refuses any
+anonymised row it has not released; `docs/PRIVACY.md` names all three places. **Drill** (a column
+off the map): `Lists differ: ['territory_war_actions.user_id'] != []`.
+
+The dashboard quest editor bound a list for `location` and `npc` targets and offered the
+scene-action list for every other kind; `objective_target_choices` turns the validator's own lookups
+into one list per kind and the editor binds a `<datalist>` per kind, with every first choice driven
+through the validator. The quest journal had no owner check; `QuestDashboardView.interaction_check`
+refuses another member in the sentence its own items used. `/boss claim` asked for a typed
+encounter id; `claim_hub_options` lists the rewards waiting, and the pair is out of `STILL_TYPED`.
+
+### Fourteen design calls (v1.35.0)
+
+The gear `spirit` stat: every piece carried it, three tables held it, three sums added it and no
+rule read the sum since the gear shipped; it is gone from all of them, and the parity gate holds
+three tables to three stats. `world_rules.faction_attitudes` and
+`forbidden_arts.concealed_use_reduces_exposure`, read by nothing, are gone from the content and
+`UNREAD_RULES` is empty. A session at a full stage whose Perfection path is trained to its cap
+gathered nothing, banked nothing, spent the cooldown and was told so afterwards; `perfectionCapped`
+refuses it first and the refusal names the path. **Drill**: `a path trained to its cap: err=<nil>,
+want the session refused and pointed at the path`. A grandfathered beast kept an evolution stage
+above the rank the settle had lowered it to, and the stage's combat term was paid in full for levels
+taken back; the settle writes `evolution_stage = rank - tamed`. **Drill**: `rank=12 stage=16 after
+paying for twelve levels, want 12/12`.
+
+A formation disk's effect was a Go literal of nine entries Python could not read, so the craft menu
+described a disk in the item's words and never its numbers; it is the item's own `array_effect`
+block now, read by the deploy and printed at the disk's grade, and the engine keeps no table.
+`world_cross` and `ascension_gate` objectives were untargeted, so a descent through an array completed
+a quest that asked to cross up; both take the world crossed into, the three ascension quests name it
+and both report sites send `to_world`. A raid round waiting on a raider who had gone quiet settled only
+when somebody next pressed a button; `SettleAbsentRaidsTx` runs on the maintenance tick, `boss.absent`
+answers whom a round has stopped waiting on and the card draws them away. **Drill** (the clock read
+the wrong way): `boss.absent names [], want [43]`. The update watcher, started again after the first
+was killed mid-install, reported the request failed and reopened the world over an install still
+running; it waits while `update.sh`'s own lock holds a live pid, and its lock records the boot it was
+taken in so a lock from before a reboot is stale whatever its pid says. **Drill**: `'failed'
+unexpectedly found in ['failed', 'heartbeat'] : a request update.sh is still running was reported
+failed`.
+
+A sect's registry Elders stood at its gate since v1.25.0 and could vouch for nobody;
+`resolveRecommenderTx` takes the ranks the content stands at the gate, alive and in person, and the
+picker and the command reach them off one read. **Drill** (the rank gate opened): `a hall disciple
+sponsored an applicant: <nil>`. A stranger's way to Underworld Contacts 15 was fifteen rare items no
+shelf sells; a broker buys ordinary goods too, under the cheapest shelf anywhere, for one point of
+standing a world day however much is fenced, and the arbitrage gate walks the fence as an NPC buy
+price. **Drill** (a share above the shelf): `718 (shelf, ceiling) pairs print money; e.g.
+azure_flying_sword sells at the Azure Crown Forge for 260 Low-Grade Spirit Stone and an underworld
+broker pays ...` - the loop gate of v1.34.0 catching a price it had never been shown. The caravan
+cargo picker was the whole bag; it asks `caravan.payable`. The batch-5 fixture declared ten tables
+without production's keys; its DDL is a constant the foreign-key gate reads beside batch 4's, and the
+whole package ran green on it, so no test had been inserting an orphan. And a content gate holds
+every city part to carrying no roads, the shape both halves of the map assume.
+
+Fourteen entries stay deferred with the decision written into their reason, so nobody re-asks: the
+strength floors stay on the qi ladder, no migration for old undo rows or reopened realms, no replay of
+settled qi, the menu fold and more slash groups wait on the Most-used commands card, the GM quest
+lever stays on the dashboard, the territory lever waits for a world that shows the state, and the
+install lease, the manifestation cap, the street tribute rule and the panel's read count stand.

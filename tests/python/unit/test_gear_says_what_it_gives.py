@@ -16,8 +16,9 @@ Three things are held here.
   carried id up in ``EQUIPMENT_DEFINITIONS`` with a bare ``.get``, and a graded
   id (``spirit_iron_sword@high``) is not a key there, so every High sword said
   "No stat modifiers" - the grade existed and the card could not see it.
-* **Spirit is never shown.** Every definition carries it and no rule reads it,
-  so a line advertising it would be a promise the engine does not keep.
+* **Spirit is gone.** Every definition carried it and no rule read it, so a
+  line advertising it would have been a promise the engine does not keep; it
+  was shown nowhere from v1.7.5 and removed from every table in v1.35.0.
   Agility is the one real percentage: each point is one point of boss-raid hit
   chance. Everything else is a modifier on a 2d10 roll and is shown as a number.
 """
@@ -118,8 +119,9 @@ class APieceIsDescribedAtItsGrade(unittest.TestCase):
         self.assertEqual(equipment_effective("spirit_iron_sword", quality=100, durability=1, max_durability=120)["attack"], 1)
         self.assertEqual(equipment_effective("spirit_iron_sword", quality=200, durability=120, max_durability=120)["attack"], 6)
 
-    def test_spirit_is_never_shown_and_a_penalty_is(self):
-        for item_id in EQUIPMENT_DEFINITIONS:
+    def test_no_piece_carries_a_spirit_stat_and_a_penalty_is_shown(self):
+        for item_id, definition in EQUIPMENT_DEFINITIONS.items():
+            self.assertNotIn("spirit", definition, f"{item_id} carries the spirit stat again; nothing reads it")
             self.assertNotIn("spirit", describe_equipment(item_id).lower(), item_id)
         self.assertIn("-1 agility (-1% raid hit)", describe_equipment("spirit_iron_armor"))
 

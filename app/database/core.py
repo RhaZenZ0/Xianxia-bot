@@ -7220,6 +7220,27 @@ class Database:
             ); return [dict(r) for r in await cur.fetchall()]
 
 
+    async def list_sect_people_at(self, location: str, ranks: list[str]) -> list[dict[str, Any]]:
+        """The sect's own people of the given ranks standing at a place, alive
+        (v1.35.0): what the recommendation picker offers beside the catalogue's
+        sponsors and a delegation's elder, and what the command checks before
+        it asks the engine. Rank is `npc_life_state.sect_rank`, the authority a
+        promotion moves; the sect is the civilisation row's faction."""
+        wanted = [str(r) for r in ranks if str(r).strip()]
+        if not wanted or not str(location or "").strip():
+            return []
+        marks = ",".join("?" for _ in wanted)
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                f"""SELECT c.npc_name AS name,c.faction AS sect,l.sect_rank AS rank,c.realm_index
+                    FROM npc_civilization_state c JOIN npc_life_state l ON l.npc_name=c.npc_name
+                    WHERE c.current_location=? AND c.status='alive' AND c.faction<>'' AND l.sect_rank IN ({marks})
+                    ORDER BY c.faction,c.npc_name""",
+                (str(location), *wanted),
+            )
+            return [dict(r) for r in await cur.fetchall()]
+
     async def get_sect_npc_roster(self, sect_name: str) -> list[dict[str, Any]]:
         """The sect's own people (v1.25.0): every living NPC of the sect, by
         rank and then realm. No place is read - where somebody stands is the
@@ -8150,6 +8171,22 @@ class Database:
             except Exception: row["techniques"] = []
         return rows
 
+
+    async def get_unclaimed_boss_rewards(self, user_id: int) -> list[dict[str, Any]]:
+        """The raid rewards waiting for one raider (v1.35.0): every
+        `boss_reward_claims` row of theirs not yet claimed, with the encounter's
+        boss and lair, newest first. The `/boss claim` picker reads it; the
+        claim itself is the engine's (`boss.claim`)."""
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                "SELECT c.encounter_id,c.currency_amount,c.item_id,c.item_quantity,"
+                "e.boss_name,e.location,e.template_key,e.finished_game_minute "
+                "FROM boss_reward_claims c JOIN boss_encounters e ON e.encounter_id=c.encounter_id "
+                "WHERE c.user_id=? AND c.claimed=0 ORDER BY c.encounter_id DESC LIMIT 25",
+                (int(user_id),),
+            )
+            return [dict(r) for r in await cur.fetchall()]
 
     async def get_wild_beast_encounters(
         self, user_id: int, *, game_minute: int, location: str | None = None, include_resolved: bool = False,

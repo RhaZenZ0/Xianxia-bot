@@ -10,26 +10,22 @@ import (
 	"xianxia/core/internal/worlddata"
 )
 
-func setupBatch5AuthorityDB(t *testing.T) string {
-	t.Helper()
-	path := setupBatch4AuthorityDB(t)
-	conn, err := storage.Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer conn.Close()
-
-	if err := conn.ExecScript(`
-CREATE TABLE IF NOT EXISTS character_item_appraisals(user_id INTEGER NOT NULL,item_id TEXT NOT NULL,appraisal_kind TEXT NOT NULL DEFAULT 'insight',authenticity INTEGER NOT NULL DEFAULT 100,appraised_game_minute INTEGER NOT NULL DEFAULT 0,created_at REAL NOT NULL DEFAULT 0,PRIMARY KEY(user_id,item_id));
-CREATE TABLE IF NOT EXISTS auctions(auction_id INTEGER PRIMARY KEY AUTOINCREMENT,house_id TEXT NOT NULL,seller_user_id INTEGER REFERENCES characters(user_id) ON DELETE CASCADE,seller_npc_name TEXT NOT NULL DEFAULT '',item_id TEXT NOT NULL,quantity INTEGER NOT NULL DEFAULT 1,currency_id TEXT NOT NULL,starting_bid INTEGER NOT NULL,current_bid INTEGER NOT NULL DEFAULT 0,current_bidder_user_id INTEGER,anonymous INTEGER NOT NULL DEFAULT 0,active INTEGER NOT NULL DEFAULT 1,appraised INTEGER NOT NULL DEFAULT 1,grade_band TEXT NOT NULL DEFAULT '',merchant_buyer TEXT NOT NULL DEFAULT '',merchant_bidder TEXT NOT NULL DEFAULT '',created_at REAL NOT NULL DEFAULT 0,ends_at REAL NOT NULL DEFAULT 0);
-CREATE TABLE equipment_instances(equipment_id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,item_id TEXT NOT NULL,slot TEXT NOT NULL DEFAULT 'weapon',durability INTEGER NOT NULL DEFAULT 100,max_durability INTEGER NOT NULL DEFAULT 100,quality INTEGER NOT NULL DEFAULT 100,equipped INTEGER NOT NULL DEFAULT 0,bound_at REAL NOT NULL DEFAULT 0,updated_at REAL NOT NULL DEFAULT 0);
+// batch5AuthoritySchema is the batch-5 fixture's DDL, a constant beside the
+// function for the same reason batch4AuthoritySchema is: the foreign-key
+// gate (fixture_foreign_keys_test.go) reads it. It carries production's
+// REFERENCES (v1.35.0), so a row production refuses is refused here too.
+const batch5AuthoritySchema = `
+CREATE TABLE IF NOT EXISTS character_item_appraisals(user_id INTEGER NOT NULL,item_id TEXT NOT NULL,appraisal_kind TEXT NOT NULL DEFAULT 'insight',authenticity INTEGER NOT NULL DEFAULT 100,appraised_game_minute INTEGER NOT NULL DEFAULT 0,created_at REAL NOT NULL DEFAULT 0,PRIMARY KEY(user_id,item_id),FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE);
+CREATE TABLE IF NOT EXISTS auctions(auction_id INTEGER PRIMARY KEY AUTOINCREMENT,house_id TEXT NOT NULL,seller_user_id INTEGER REFERENCES characters(user_id) ON DELETE CASCADE,seller_npc_name TEXT NOT NULL DEFAULT '',item_id TEXT NOT NULL,quantity INTEGER NOT NULL DEFAULT 1,currency_id TEXT NOT NULL,starting_bid INTEGER NOT NULL,current_bid INTEGER NOT NULL DEFAULT 0,current_bidder_user_id INTEGER REFERENCES characters(user_id) ON DELETE SET NULL,anonymous INTEGER NOT NULL DEFAULT 0,active INTEGER NOT NULL DEFAULT 1,appraised INTEGER NOT NULL DEFAULT 1,grade_band TEXT NOT NULL DEFAULT '',merchant_buyer TEXT NOT NULL DEFAULT '',merchant_bidder TEXT NOT NULL DEFAULT '',created_at REAL NOT NULL DEFAULT 0,ends_at REAL NOT NULL DEFAULT 0);
+CREATE TABLE equipment_instances(equipment_id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,item_id TEXT NOT NULL,slot TEXT NOT NULL DEFAULT 'weapon',durability INTEGER NOT NULL DEFAULT 100,max_durability INTEGER NOT NULL DEFAULT 100,quality INTEGER NOT NULL DEFAULT 100,equipped INTEGER NOT NULL DEFAULT 0,bound_at REAL NOT NULL DEFAULT 0,updated_at REAL NOT NULL DEFAULT 0,FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE);
 CREATE TABLE character_location_discoveries(
     user_id INTEGER NOT NULL,
     location TEXT NOT NULL,
     discovery_kind TEXT NOT NULL DEFAULT 'exploration',
     discovered_game_minute INTEGER NOT NULL DEFAULT 0,
     created_at REAL NOT NULL DEFAULT 0,
-    PRIMARY KEY(user_id,location)
+    PRIMARY KEY(user_id,location),
+    FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE
 );
 CREATE TABLE IF NOT EXISTS world_state(
     key TEXT PRIMARY KEY,
@@ -52,7 +48,9 @@ CREATE TABLE event_claims(
     user_id INTEGER NOT NULL,
     event_key TEXT NOT NULL,
     claimed_at REAL NOT NULL DEFAULT 0,
-    PRIMARY KEY(user_id,event_key)
+    PRIMARY KEY(user_id,event_key),
+    FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE,
+    FOREIGN KEY(event_key) REFERENCES world_events(event_key) ON DELETE CASCADE
 );
 CREATE TABLE exploration_events(
     event_id TEXT PRIMARY KEY,
@@ -78,7 +76,9 @@ CREATE TABLE exploration_event_participants(
     status TEXT NOT NULL DEFAULT 'active',
     joined_game_minute INTEGER NOT NULL DEFAULT 0,
     updated_at REAL NOT NULL DEFAULT 0,
-    PRIMARY KEY(event_id,user_id)
+    PRIMARY KEY(event_id,user_id),
+    FOREIGN KEY(event_id) REFERENCES exploration_events(event_id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE
 );
 CREATE TABLE exploration_event_actions(
     action_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -92,7 +92,9 @@ CREATE TABLE exploration_event_actions(
     detail TEXT NOT NULL DEFAULT '',
     game_minute INTEGER NOT NULL DEFAULT 0,
     created_at REAL NOT NULL DEFAULT 0,
-    UNIQUE(event_id,user_id,action_key)
+    UNIQUE(event_id,user_id,action_key),
+    FOREIGN KEY(event_id) REFERENCES exploration_events(event_id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE
 );
 CREATE TABLE event_log(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -117,7 +119,8 @@ CREATE TABLE spirit_beasts(
     active INTEGER NOT NULL DEFAULT 0,
     techniques_json TEXT NOT NULL DEFAULT '[]',
     created_at REAL NOT NULL DEFAULT 0,
-    updated_at REAL NOT NULL DEFAULT 0
+    updated_at REAL NOT NULL DEFAULT 0,
+    FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE
 );
 CREATE TABLE wild_beast_encounters(
     encounter_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -134,7 +137,8 @@ CREATE TABLE wild_beast_encounters(
     status TEXT NOT NULL DEFAULT 'available',
     created_game_minute INTEGER NOT NULL DEFAULT 0,
     created_at REAL NOT NULL DEFAULT 0,
-    updated_at REAL NOT NULL DEFAULT 0
+    updated_at REAL NOT NULL DEFAULT 0,
+    FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE
 );
 CREATE TABLE secret_realm_runs(
     user_id INTEGER PRIMARY KEY,
@@ -144,20 +148,33 @@ CREATE TABLE secret_realm_runs(
     danger INTEGER NOT NULL DEFAULT 0,
     active INTEGER NOT NULL DEFAULT 0,
     entered_at REAL NOT NULL DEFAULT 0,
-    expires_at REAL NOT NULL DEFAULT 0
+    expires_at REAL NOT NULL DEFAULT 0,
+    FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE
 );
 CREATE TABLE inheritances(
     user_id INTEGER NOT NULL,
     inheritance_id TEXT NOT NULL,
     source_realm_id TEXT NOT NULL,
     acquired_at REAL NOT NULL DEFAULT 0,
-    PRIMARY KEY(user_id,inheritance_id)
+    PRIMARY KEY(user_id,inheritance_id),
+    FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE
 );
 UPDATE characters
 SET realm_index=0,phase=1,cultivation=0,body_realm_index=0,body_phase=1,body_cultivation=0,
     location='Greenriver Town',spirit_stones=0,insight_xp=0,qi=100,qi_max=100,vitality=100,vitality_max=100
 WHERE user_id=42;
-`); err != nil {
+`
+
+func setupBatch5AuthorityDB(t *testing.T) string {
+	t.Helper()
+	path := setupBatch4AuthorityDB(t)
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	if err := conn.ExecScript(batch5AuthoritySchema); err != nil {
 		t.Fatal(err)
 	}
 	return path

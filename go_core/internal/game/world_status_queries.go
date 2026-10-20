@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"sort"
 	"strings"
 	"time"
@@ -39,23 +38,18 @@ var worldStatusQueries = map[string]bool{
 	"equipment.power":      true,
 }
 
-// marketSellShare is what a regional market pays against its buy price.
-// market.trade settles a sale at the same share; a quote must never promise
-// more than the trade pays.
-const marketSellShare = 0.70
-
-func marketBuyPrice(row map[string]any) int64 {
-	return max64(1, int64(math.Round(float64(i64(row["base_price"]))*parseFloat(row["price_index"]))))
-}
-
-func marketSellPrice(buy int64) int64 {
-	return max64(1, int64(math.Round(float64(buy)*marketSellShare)))
-}
-
-func withMarketPrices(row map[string]any) map[string]any {
-	buy := marketBuyPrice(row)
-	row["buy_price"] = buy
-	row["sell_price"] = marketSellPrice(buy)
+// withMarketPrices puts the counter's own two numbers on a market row: the
+// buy and sell price market.trade would settle at, through marketUnitPrice,
+// floors, shelf ceiling and refusal included (v1.35.0). Until then the quote
+// took a flat 70 percent of base times index with no catalogue, so it could
+// promise more than the trade paid, or a sale the trade refused, and the buy
+// side missed the NPC floor. A sell_price of 0 is the refusal the trade
+// answers with: the counter will not pay a whole coin for the item here.
+func withMarketPrices(catalog worlddata.Catalog, row map[string]any) map[string]any {
+	itemID, currency := fmt.Sprint(row["item_id"]), fmt.Sprint(row["currency_id"])
+	base, index := i64(row["base_price"]), parseFloat(row["price_index"])
+	row["buy_price"] = marketUnitPrice(catalog, itemID, currency, base, index, true)
+	row["sell_price"] = marketUnitPrice(catalog, itemID, currency, base, index, false)
 	return row
 }
 
@@ -105,19 +99,27 @@ func applyWorldStatusQuery(conn *storage.Conn, worldPath string, req ActionReque
 			return ActionResponse{}, errors.New("location is required")
 		}
 		limit := clamp(payload.integer("limit", 25), 1, 100)
+		cat, err := catalog()
+		if err != nil {
+			return ActionResponse{}, err
+		}
 		res, err := conn.Execute(`SELECT * FROM economy_markets WHERE location=? ORDER BY (base_price*price_index) DESC LIMIT ?`, []any{location, limit})
 		if err != nil {
 			return ActionResponse{}, err
 		}
 		rows := rowsToMaps(res)
 		for _, row := range rows {
-			withMarketPrices(row)
+			withMarketPrices(cat, row)
 		}
 		return queryResponse(conn, req, map[string]any{"location": location, "rows": rows}), nil
 	case "market.quote":
 		location, itemID := payload.text("location"), payload.text("item_id")
 		if location == "" || itemID == "" {
 			return ActionResponse{}, errors.New("location and item_id are required")
+		}
+		cat, err := catalog()
+		if err != nil {
+			return ActionResponse{}, err
 		}
 		res, err := conn.Execute(`SELECT * FROM economy_markets WHERE location=? AND item_id=?`, []any{location, itemID})
 		if err != nil {
@@ -127,7 +129,7 @@ func applyWorldStatusQuery(conn *storage.Conn, worldPath string, req ActionReque
 		if row == nil {
 			return queryResponse(conn, req, map[string]any{"traded": false, "location": location, "item_id": itemID}), nil
 		}
-		withMarketPrices(row)
+		withMarketPrices(cat, row)
 		row["traded"] = true
 		return queryResponse(conn, req, row), nil
 	case "market.catalog":

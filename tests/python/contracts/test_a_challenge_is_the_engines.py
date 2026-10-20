@@ -76,12 +76,12 @@ class TheServiceStatesNothingAboutTheOpponent(unittest.TestCase):
         self.assertIn("npc_name", params, "the reader did not find CombatService.start's parameters; the gate is broken, not the tree")
         for name in WORLDS_TO_SAY:
             self.assertNotIn(name, params, f"CombatService.start takes {name} again; the engine reads the opponent's realm and stage off the world")
-        defaults = dict(zip((a.arg for a in start.args.kwonlyargs), start.args.kw_defaults))
-        source = defaults.get("source")
-        self.assertTrue(
-            isinstance(source, ast.Constant) and source.value == "",
-            "`source` must default to empty: a challenge states none, and only an event names its own",
-        )
+        # Since v1.35.0 neither kind states a source, a severity or a lock: a
+        # challenge's follow from whom it names, an event's from the event it
+        # names (`event_key`), so the service has no parameter for any of them.
+        for name in DERIVED_FROM_THE_OPPONENT + ("severity",):
+            self.assertNotIn(name, params, f"CombatService.start takes {name} again; the engine spells it from the opponent or the event")
+        self.assertIn("event_key", params, "an event has to be able to name itself")
 
     def test_start_sends_no_realm_or_stage(self):
         start = _function(SERVICES, "start", cls="CombatService")
@@ -146,6 +146,27 @@ class NothingInTheTreeStatesIt(unittest.TestCase):
                         offenders.append(f"{path.relative_to(PROJECT_ROOT)}:{line} passes {name}")
         self.assertGreaterEqual(challenges, 1, "the walk found no challenge call; the gate is broken, not the tree")
         self.assertEqual(offenders, [], "a challenge states what the engine derives from whom it names: " + "; ".join(offenders))
+
+    def test_an_event_call_passes_no_severity_source_or_lock(self):
+        # The event scene's Battle button used to send the severity, the
+        # `event:<key>|node:<n>` source and the per-user lock (v1.35.0). The
+        # engine reads the event, picks the beast and spells both itself now;
+        # the call names the event and nothing more.
+        offenders, events = [], 0
+        for path in sorted(APP.rglob("*.py")):
+            if "__pycache__" in path.parts:
+                continue
+            for line, keywords, kind in _start_calls(path):
+                if kind != "event":
+                    continue
+                events += 1
+                for name in DERIVED_FROM_THE_OPPONENT + ("severity", "npc_name"):
+                    if name in keywords:
+                        offenders.append(f"{path.relative_to(PROJECT_ROOT)}:{line} passes {name}")
+                if "event_key" not in keywords:
+                    offenders.append(f"{path.relative_to(PROJECT_ROOT)}:{line} names no event")
+        self.assertGreaterEqual(events, 1, "the walk found no event call; the gate is broken, not the tree")
+        self.assertEqual(offenders, [], "an event battle states what the engine derives from the event: " + "; ".join(offenders))
 
     def test_the_command_does_not_resolve_the_opponent_itself(self):
         """`SIM.combat_target` was the bot's own copy of "who is here".

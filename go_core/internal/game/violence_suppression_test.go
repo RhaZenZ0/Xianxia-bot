@@ -105,10 +105,26 @@ func startCombatAt(t *testing.T, location, kind string) error {
 		t.Fatal(err)
 	}
 	defer conn.Close()
-	raw, err := json.Marshal(map[string]any{
+	payload := map[string]any{
 		"kind": kind, "npc_name": "Wandering Swordsman", "source": "test:" + kind,
 		"npc_realm_index": 2, "npc_stage": 3, "severity": 5,
-	})
+	}
+	if kind == "event" {
+		// An event battle is the event's (v1.35.0): the engine reads the
+		// event the caller stands at, so the fixture has one, of a hostile
+		// kind and with no roster, which is the manifestation the safe-zone
+		// rule used to be able to delete.
+		if err := conn.ExecScript(`
+CREATE TABLE IF NOT EXISTS world_events(event_key TEXT PRIMARY KEY,dedupe_key TEXT NOT NULL DEFAULT '',event_type TEXT NOT NULL,title TEXT NOT NULL,location TEXT NOT NULL,payload_json TEXT NOT NULL DEFAULT '{}',active INTEGER NOT NULL DEFAULT 1,starts_at REAL NOT NULL DEFAULT 0,ends_at REAL NOT NULL DEFAULT 0,thread_id INTEGER);
+CREATE TABLE IF NOT EXISTS world_event_nodes(node_id INTEGER PRIMARY KEY AUTOINCREMENT,event_key TEXT NOT NULL,node_key TEXT NOT NULL,node_type TEXT NOT NULL,name TEXT NOT NULL,descriptor TEXT NOT NULL DEFAULT '',rank INTEGER NOT NULL DEFAULT 1,total INTEGER NOT NULL DEFAULT 1,remaining INTEGER NOT NULL DEFAULT 0,cleared_by INTEGER NOT NULL DEFAULT 0,tn INTEGER NOT NULL DEFAULT 12,attribute TEXT NOT NULL DEFAULT 'insight',item_id TEXT NOT NULL DEFAULT '',item_qty INTEGER NOT NULL DEFAULT 0,cultivation INTEGER NOT NULL DEFAULT 0,spirit_stones INTEGER NOT NULL DEFAULT 0,contribution INTEGER NOT NULL DEFAULT 1,created_at REAL NOT NULL,updated_at REAL NOT NULL,reveals_sect TEXT NOT NULL DEFAULT '',UNIQUE(event_key,node_key));`); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := conn.Execute(`INSERT OR REPLACE INTO world_events(event_key,event_type,title,location,payload_json,active,starts_at,ends_at) VALUES('violence-test','beast_tide','Test Tide',?,'{"severity":5,"category":"Beast Tide"}',1,0,9e12)`, []any{location}); err != nil {
+			t.Fatal(err)
+		}
+		payload["event_key"] = "violence-test"
+	}
+	raw, err := json.Marshal(payload)
 	if err != nil {
 		t.Fatal(err)
 	}

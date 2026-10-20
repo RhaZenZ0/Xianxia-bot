@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,12 +15,52 @@ import (
 	"xianxia/core/internal/worlddata"
 )
 
+// trueDeathPayload is what a death says about itself: when, and why. How long
+// the soul then waits is the engine's (v1.35.0). Until then the payload carried
+// `minutes_per_year`, `base_samsara_years` and `max_wait_seconds`, read behind
+// `maxI64(1, ...)` so the engine's own 320-year default was unreachable: a
+// caller that omitted them gave a true death a one-year wait and a thirty-second
+// cap. The bot sent REINCARNATION_BASE_SAMSARA_YEARS on every door, so play read
+// the setting; the setting is read here now, and the fields are refused
+// (callerOwnedNothing).
 type trueDeathPayload struct {
-	GameMinute       int64  `json:"game_minute"`
-	Reason           string `json:"reason"`
-	MinutesPerYear   int64  `json:"minutes_per_year"`
-	BaseSamsaraYears int64  `json:"base_samsara_years"`
-	MaxWaitSeconds   int64  `json:"max_wait_seconds"`
+	GameMinute int64  `json:"game_minute"`
+	Reason     string `json:"reason"`
+}
+
+// The samsara wait's two operator keys, read by the engine (v1.35.0). The
+// bounds are the ones the bot's config used to raise on; here a value outside
+// them leaves the default standing, the rc.39 rule for an engine key.
+const (
+	samsaraBaseYearsDefault int64 = 320
+	samsaraMaxWaitDefault   int64 = 300
+)
+
+// boundedEnvValue reads one operator value inside its range, else the default.
+// The key is read by the caller as a literal `os.Getenv("...")`: the compose
+// passthrough gate (test_engine_boundary) finds engine keys by that spelling,
+// and a key passed through a parameter is a key it cannot see.
+func boundedEnvValue(raw string, fallback, low, high int64) int64 {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return fallback
+	}
+	v, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || v < low || v > high {
+		return fallback
+	}
+	return v
+}
+
+// samsaraBaseYearsFromEnv is the base wait in private years, 1 to 5000.
+func samsaraBaseYearsFromEnv() int64 {
+	return boundedEnvValue(os.Getenv("REINCARNATION_BASE_SAMSARA_YEARS"), samsaraBaseYearsDefault, 1, 5000)
+}
+
+// samsaraMaxWaitFromEnv is the cap on the wait's real-time length in seconds,
+// 30 to 3600.
+func samsaraMaxWaitFromEnv() int64 {
+	return boundedEnvValue(os.Getenv("REINCARNATION_MAX_WAIT_SECONDS"), samsaraMaxWaitDefault, 30, 3600)
 }
 
 type reincarnatePayload struct {
@@ -59,7 +101,7 @@ func samsaraScale(c lifeSnapshot, base, maxWait, maxLaw int64) (years, wait int6
 		phase = 1
 	}
 	if base < 1 {
-		base = 320
+		base = samsaraBaseYearsDefault
 	}
 	tier, local := realm/8, realm%8
 	if tier > 3 {
@@ -288,12 +330,8 @@ func recordTrueDeathAuthoritative(conn *storage.Conn, catalog worlddata.Catalog,
 			perfect++
 		}
 	}
-	years, wait := samsaraScale(c, maxI64(1, p.BaseSamsaraYears), p.MaxWaitSeconds, maxLaw)
-	minutes := p.MinutesPerYear
-	if minutes < 1 {
-		minutes = 518400
-	}
-	target := years * minutes
+	years, wait := samsaraScale(c, samsaraBaseYearsFromEnv(), samsaraMaxWaitFromEnv(), maxLaw)
+	target := years * minutesPerYear
 	now := float64(time.Now().UnixNano()) / 1e9
 	readyAt := now + float64(wait)
 	readyMinute := p.GameMinute + target
@@ -363,7 +401,7 @@ func trueDeathAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "lifecycle", EventType: "true_death", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 
-func samsaraStatus(conn *storage.Conn, userID int64, minutesPerYear int64) (map[string]any, error) {
+func samsaraStatus(conn *storage.Conn, userID int64) (map[string]any, error) {
 	r, err := conn.Execute(`SELECT family_target_minutes,family_simulated_minutes,afterlife_started_at,reincarnation_ready_at,target_world,samsara_lives_count,samsara_history_json,memory_retention,talent_retention,comprehension_retention,insight_retention,legacy_points,special_trait,karmic_fortune,partner_echo,partner_name,karma_at_death,previous_spiritual_root,active FROM reincarnation_state WHERE user_id=? AND active=1`, []any{userID})
 	if err != nil {
 		return nil, err
@@ -392,9 +430,6 @@ func samsaraStatus(conn *storage.Conn, userID int64, minutesPerYear int64) (map[
 		desired = target
 	}
 	mpy := minutesPerYear
-	if mpy < 1 {
-		mpy = 518400
-	}
 	hist := []string{}
 	_ = json.Unmarshal([]byte(fmt.Sprint(x[6])), &hist)
 	return map[string]any{"family_target_minutes": target, "family_simulated_minutes": desired, "reincarnation_ready_at": ready, "target_world": fmt.Sprint(x[4]), "samsara_lives_count": i64(x[5]), "samsara_history": hist, "memory_retention": i64(x[7]), "talent_retention": i64(x[8]), "comprehension_retention": i64(x[9]), "insight_retention": i64(x[10]), "legacy_points": i64(x[11]), "special_trait": fmt.Sprint(x[12]), "karmic_fortune": i64(x[13]), "partner_echo": i64(x[14]), "partner_name": fmt.Sprint(x[15]), "karma_at_death": i64(x[16]), "previous_spiritual_root": fmt.Sprint(x[17]), "seconds_remaining": maxI64(0, int64(ready-now)), "ready": now >= ready, "samsara_years_elapsed": float64(desired) / float64(mpy), "samsara_years_target": float64(target) / float64(mpy)}, nil

@@ -25,6 +25,8 @@ from unittest.mock import patch
 
 import pytest
 
+from tests.support import PROJECT_ROOT
+
 pytestmark = pytest.mark.unit
 
 BOSS = Path(__file__).resolve().parents[3] / "app" / "bot" / "commands" / "boss.py"
@@ -82,6 +84,27 @@ class TheRaidHasACard(unittest.TestCase):
         row = _encounter()
         row["participants"][0]["acted_round"] = 2
         self.assertIn("⏳ to act", _fields(raid_card(row))["Raid Party (2)"])
+
+    def test_a_raider_the_round_no_longer_waits_on_is_marked_away(self):
+        # Read off the engine's answer (`boss.absent`, v1.35.0), never off a
+        # clock the card keeps: the half hour is RAID_ABSENT_MINUTES, the
+        # engine's alone.
+        row = _encounter()
+        row["participants"][0]["acted_round"] = 2
+        row["absent_user_ids"] = [RAIDER]
+        party = _fields(raid_card(row))["Raid Party (2)"]
+        self.assertIn(f"<@{RAIDER}> • 💤 away", party)
+        self.assertNotIn("⏳ to act", party)
+
+    def test_the_tick_settles_a_round_nobody_is_pressing(self):
+        # The simulation asks the round's question (v1.35.0); the card's reads
+        # all go through the one wrapper that asks the engine who is away.
+        maintenance = (PROJECT_ROOT / "go_core" / "internal" / "simulation" / "advanced_maintenance.go").read_text(encoding="utf-8")
+        self.assertIn('counts["raid_absence"], err = game.SettleAbsentRaidsTx(', maintenance)
+        self.assertIn("raid_absence=%d", maintenance, "the tick's summary does not report the rounds it settled")
+        boss = (PROJECT_ROOT / "app" / "bot" / "commands" / "boss.py").read_text(encoding="utf-8")
+        bare = [line for line in boss.splitlines() if "await DB.get_boss_encounter(" in line and "_with_absence(" not in line]
+        self.assertEqual(bare, [], "a raid encounter is drawn without asking the engine who is away")
 
     def test_the_engines_user_ids_become_mentions(self):
         embed = raid_card(_encounter(), events=[f"Blood Frenzy hits {RAIDER} for 9 raid vitality."])

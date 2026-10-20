@@ -337,6 +337,27 @@ func npcMasterRequestAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "sect", EventType: "discipleship.npc_request", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 
+// endSectBondsTx ends every bond a sect holds on a person: the sect_lineage
+// rows in both directions (a master left below, or disciples left behind) and
+// the NPC master's row, which is a row of its own (v1.25.0) that a lineage
+// delete never reaches. sect.ascend did both inline since v1.33.0 and
+// admin.player.set_sect did neither, so a player a GM moved out of a sect kept
+// the master's terms until they pressed Leave (v1.35.0): one door now, for the
+// way up and for the GM's lever. It answers the NPC master's name ("" for
+// none) and the lineage rows ended, which the lever's audit row records.
+func endSectBondsTx(conn *storage.Conn, userID int64) (string, int64, error) {
+	lineage := int64(0)
+	if tableExistsTx(conn, "sect_lineage") {
+		r, err := conn.Execute(`DELETE FROM sect_lineage WHERE disciple_user_id=? OR master_user_id=?`, []any{userID, userID})
+		if err != nil {
+			return "", 0, err
+		}
+		lineage = r.RowsAffected
+	}
+	master, err := severNPCMasterTx(conn, userID)
+	return master, lineage, err
+}
+
 // severNPCMasterTx ends the player's bond with an NPC master; "" when there
 // was none. `discipleship.leave` asks it when the player has no player master.
 func severNPCMasterTx(conn *storage.Conn, userID int64) (string, error) {

@@ -9,6 +9,137 @@ section in it.
 
 ## Fixed
 
+- **fixed (v1.35.0)** — *Registry NPCs could not sponsor a sect recommendation.* `resolveRecommenderTx`
+  takes a sect's own people at the ranks the content stands at its gate
+  (`sect_system.population.at_gate`, read by `sectGateRanks` and its twin `WORLD.sect_gate_ranks`),
+  alive and in person; the picker offers them and the command lets them through off one read
+  (`list_sect_people_at`). `TestASectsOwnElderAtTheGateVouches` drives the Elder, the disciple, the
+  absent and the dead.
+- **fixed (v1.35.0)** — *A stranger's way to Underworld Contacts 15.* A broker buys ordinary goods
+  too (`blackMarketFenceOrdinaryTx`): what a shelf sells, at `blackMarketOrdinaryShare` of the cheapest
+  shelf anywhere and always under it, for one point of standing a world day however much is fenced
+  where the post's own stock pays one a sale; the arbitrage gate walks the fence as an NPC buy price
+  and the sell picker offers carried ordinary goods by the engine's tradeable rule.
+- **fixed (v1.35.0)** — *Pickers that offered what the economy refused.* `/caravan dispatch`'s cargo
+  picker asks `caravan.payable`, the engine's answer to what a caravan pays for from here, in the
+  origin's coin; `/shop sell`'s picker had read the keeper's trimmed board since v1.34.0.
+- **fixed (v1.35.0)** — *The batch-5 fixture lacked production's foreign keys.* Its DDL is the constant
+  `batch5AuthoritySchema`, carrying every `REFERENCES` production declares for its ten keyed tables
+  (`event_log` and `exploration_events` carry none), and `TestTheFixtureKeepsProductionsForeignKeys`
+  reads both constants; no test in the package inserted an orphan.
+- **fixed (v1.35.0)** — *A deployable array's numbers were not on the craft menu.* The nine
+  definitions `deployedArrayDefs` carried are each disk's own `array_effect` block in
+  `content/world.json` (name, duration, effect), read by the deploy (`worlddata.ArrayEffect`) and by
+  `describe_item_use`, which prints the modifiers and the duration at the disk's grade;
+  `TestEveryFormationDiskCarriesItsEffectInTheContent` and `DeployableArrayTests` hold every disk to
+  a whole block and the engine to keeping no table.
+- **fixed (v1.35.0)** — *`world_cross` and `ascension_gate` objectives were untargeted and fired on
+  any world change.* Both take a `world` target now, the world crossed into: the three ascension
+  quests name it, the array and the gate report `to_world`, the validator and the editor's pickers
+  know the kind. A quest held before v1.35.0 keeps its untargeted terms until it is finished.
+- **fixed (v1.35.0)** — *A raid with an absent raider settled only on the next press, and the card
+  did not mark them.* `SettleAbsentRaidsTx` runs on the maintenance tick (`raid_absence`) and asks
+  every active raid's round the question the actions ask; `boss.absent` answers whom a round has
+  stopped waiting on, every encounter read goes through `_with_absence`, and the card draws them
+  "💤 away". `TestTheTickSettlesARoundNobodyIsPressing` drives both.
+- **fixed (v1.35.0)** — *A watcher restarted after a SIGKILL mid-install reported it failed while
+  `update.sh` was still working, and a stale watcher lock survived a power loss.* `poll_once` waits
+  while the updater's own lock holds a live pid, touching neither the world nor the request; the
+  watcher's lock records the boot it was taken in, and a lock from another boot is stale whatever its
+  pid says. `test_a_running_updater_is_waited_for_not_reported_failed` and
+  `test_a_lock_from_before_a_reboot_is_taken_over` drive both under sh and bash.
+- **fixed (v1.35.0)** — *The spirit stat on gear reached no rule.* Removed from all three tables
+  (`EQUIPMENT_DEFINITIONS`, `equipmentDefinitionsGo`, `equipDefs`) and the three sums that carried
+  it; gear gives attack, defence and agility, and `test_equipment_stat_parity.py` holds the three
+  tables to three stats.
+- **fixed (v1.35.0)** — *`world_rules.faction_attitudes` was read by nothing.* Removed from the
+  content with `forbidden_arts.concealed_use_reduces_exposure` beside it; `UNREAD_RULES` is empty and
+  `test_the_removed_rules_stay_out_of_the_content` keeps them out.
+- **fixed (v1.35.0)** — *A session on a capped Perfection path gained nothing.* `perfectionCapped`
+  refuses the session at a full stage whose open path is trained to its cap, before the essence
+  write and the cooldown, and the refusal names the path; the reply's branch for that result is gone.
+- **fixed (v1.35.0)** — *Grandfathering a beast lowered its rank and left its evolution stage.* The
+  settle writes `evolution_stage = rank - tamed`, the levels the beast kept, so a stage never stands
+  above the rank it was paid for; `settledStage` drives the three cases.
+- **fixed (v1.35.0)** — *Python's map skipped a city part's own roads; the engine's did not.* The
+  content is held to the shape both halves assume: `NoPartOfACityHasRoadsOfItsOwn` in
+  `test_a_gate_is_its_city.py` holds every city part to carrying no `roads`.
+- **fixed (v1.35.0)** — *A GM's set_sect left the NPC master bond.* `endSectBondsTx` is the one door
+  that ends a sect's bonds on a person - the `sect_lineage` rows in both directions and the NPC
+  master's row - and `sect.ascend` and `admin.player.set_sect` (a removal, or a move to another sect)
+  both call it; a placement in the same sect keeps them, and the audit row records the master ended
+  and the lineage rows. `TestAGMsPlacementOutOfASectEndsTheMasterBonds` drives the three cases.
+- **fixed (v1.35.0)** — *`admin.player.force_end_scene` wrote more than its undo restored.* The audit
+  row carries the whole scene row (`sceneSnapshot`, the teleport's shape) and `reverseForceEndScene`
+  puts all five columns back, nil-safe on the channel; an older row without `scene` keeps the
+  two-column reversal, and a player with no scene row is left alone both ways.
+- **fixed (v1.35.0)** — *The update card had no "nothing to update" outcome.* `unchanged` is the
+  third terminal report: the engine closes the request and writes the result with the version still
+  installed, the watcher sends it with "nothing to update" and the updater's sentence, the dashboard
+  closes on it and the card prints "already up to date (vX)".
+  `test_every_reader_of_a_closed_request_names_the_same_outcomes` holds the engine's three
+  statements, the watcher's case list and the card to one list.
+- **fixed (v1.35.0)** — *Other columns the schema clears on a character's leaving were still
+  deleted.* `territory_war_actions.user_id`, `sect_manor_projects.user_id` and
+  `deployed_location_arrays.owner_user_id` are anonymised and released (`erasureAnonymise`,
+  `characterResetReleased`), every reader of them already took NULL, and
+  `test_every_column_the_schema_clears_is_anonymised` holds every `ON DELETE SET NULL` column to
+  `characters` to the anonymise map.
+- **fixed (v1.35.0)** — *An erased owner's Discord id stayed in `caravans.owner_key`, and an erased
+  GM's in the update rows.* `eraseUnwalkedLinksTx` runs in the erase lever alone (a reset shares the
+  sweep and refuses an anonymised row it has not released): every caravan the person sent takes the
+  empty owner key the settlement already reads as nobody's, and `requested_by` inside
+  `update_request` and `update_result` takes the sentinel. The receipt reports both.
+- **fixed (v1.35.0)** — *`docs/PRIVACY.md` did not name the player-keyed `world_state` rows the
+  erasure deletes.* It names them in plain words, and the two anonymisations above beside them;
+  `test_the_privacy_notice_names_what_the_schema_walk_cannot_see` holds it to the code.
+- **fixed (v1.35.0)** — *The dashboard quest editor suggested scene actions for a target it had no
+  picker for.* `objective_target_choices` turns the validator's own lookups into one list per target
+  kind, the read carries them as `vocabulary.targets`, and the editor binds a `<datalist>` per kind;
+  `test_quest_target_pickers.py` drives every first choice through the validator.
+- **fixed (v1.35.0)** — *The journal had no owner check.* `QuestDashboardView.interaction_check`
+  refuses another member in the sentence its own items used.
+- **fixed (v1.35.0)** — *A picker for `/boss claim`.* `claim_hub_options` lists the raid rewards
+  waiting for the player (`get_unclaimed_boss_rewards`: boss, lair, reward), registered as the leaf's
+  provider, its autocomplete and its hint, and the pair is out of `STILL_TYPED`.
+- **fixed (v1.35.0)** — *The samsara wait was the caller's.* `combat.turn`, `combat.technique`,
+  `combat.recovery_item` and `lifecycle.true_death` took `minutes_per_year`, `base_samsara_years` and
+  `max_wait_seconds` off the payload behind `maxI64(1, ...)`, so a caller that omitted them gave a
+  true death a one-year wait and a thirty-second cap; `lifecycle.samsara_status` and `family.simulate`
+  took the year's length too (the family's default was 525,600 where everything else said 518,400,
+  and a caller sending 1 was handed twenty-five simulated years a call), and `pvp.challenge` took
+  `ttl_seconds` with no ceiling. The engine reads `REINCARNATION_BASE_SAMSARA_YEARS` and
+  `REINCARNATION_MAX_WAIT_SECONDS` itself (bounded, compose passes them), a year is
+  `lifespanmodel.MinutesPerYear`, a challenge stands `pvpChallengeTTLSeconds`, the four fields are in
+  `callerOwnedNothing`, the bot's `Settings` keep no copy and the duel reply prints the engine's
+  window. `TestAWaitIsNotTheCallersToSend` drives the seven refusals,
+  `TestTheSamsaraWaitIsTheEnginesKeyAndBounded` the keys, and `test_the_samsara_wait_is_the_engines_key`
+  holds the four places a key is stated.
+- **fixed (v1.35.0)** — *A world-event battle's severity and node were the caller's.* `combat.start
+  kind=event` took `severity`, `source` and the node off the payload and checked nothing about the
+  event. It names the event now (`event_key`, with an older bot's `event:<key>|node:<n>` source read
+  for its keys only): the engine reads the event through `loadOpenWorldEventTx` - the reader
+  `world_event.engage` and `world_event.act` share since - refuses one that is closed or that the caller
+  is not at, takes the next living beast off the roster (or the one named, if it is a beast with
+  something left), scales the fight off the beast's rank or the event's severity, and lets the event
+  itself take the field only when the roster is empty and the event is of a hostile kind
+  (`hostileEventWords`, which used to live in the Battle button). The scene's button sends the key and
+  prints the engine's answer. `combat_event_start_test.go` drives each refusal and the forged payload.
+- **fixed (v1.35.0)** — *Quest rewards followed the player's feet, not the quest's world.*
+  `grantQuestRewardTx` and `payCommissionRewardTx` pay through `questRewardCurrencyTx` now: the coin
+  of the giver's world (`commissionGiverHome`), else of the realm the stage is for
+  (`seed_json.realm_index`), else where the player stands, as before, for a quest with no world of
+  its own; `rewards_granted` carries `currency` and the completion line, the offer and accepted cards
+  and the city board name it (`WORLD.quest_giver_currency`, the display twin).
+  `TestEveryShippedQuestGiverStandsInAWorldWithItsOwnCoin` holds the content, and
+  `quest_reward_currency_test.go` pays from the wrong world. `SettleBountyTx` is left where the
+  fugitive stands: a fine collected in a coin they may hold none of collects nothing.
+- **fixed (v1.35.0)** — *The market quote disagreed with the counter.* `market.rows` and
+  `market.quote` priced at 70 percent of base times index with no catalogue; they read
+  `marketUnitPrice` now, floor, shelf ceiling and refusal included, a `sell_price` of 0 is the
+  counter's refusal and the two readers that recomputed the buy price in Python print the engine's.
+  One copy of the share (`marketSellShare`). `TestMarketQuoteAndRowsCarryTheEnginePrices` quotes in
+  a real coin and at a crystal counter that refuses a Mortal herb.
 - **fixed (v1.34.0)** — *Goods crossed a world untouched while every price ceiling was kept in one
   coin.* The purse converts 100:1 at a crossing and an item does not, so anything bought on a Mortal
   shelf sold to a Spiritual keeper for a hundred times its cost (9,475 profitable pairs measured).

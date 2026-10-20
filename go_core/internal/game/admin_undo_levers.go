@@ -136,6 +136,41 @@ func sceneSnapshot(conn *storage.Conn, uid int64) (map[string]any, error) {
 	return snap, nil
 }
 
+// reverseForceEndScene undoes (or redoes) admin.player.force_end_scene: the
+// five scene columns the lever writes, from the `scene` snapshot the row has
+// carried since v1.35.0 (nil for a player who had no scene row, whom the lever
+// left alone and the undo leaves alone). A row without the key is an older
+// force-end and keeps its older reversal, the type and the label.
+func reverseForceEndScene(before, after map[string]any, target string, redo bool) ([]sqlStmt, error) {
+	uid, err := parseTargetUserID(target)
+	if err != nil {
+		return nil, err
+	}
+	snap := pickSnapshot(before, after, redo)
+	scene, hasScene := snap["scene"]
+	if !hasScene {
+		return []sqlStmt{{`UPDATE player_scene_state SET scene_type=?,scene_label=? WHERE user_id=?`,
+			[]any{fmt.Sprint(snap["scene_type"]), fmt.Sprint(snap["scene_label"]), uid}, nil}}, nil
+	}
+	sceneRow, _ := scene.(map[string]any)
+	return []sqlStmt{{run: func(conn *storage.Conn, catalog worlddata.Catalog) (int64, error) {
+		if sceneRow == nil {
+			return 0, nil
+		}
+		var channel any
+		if sceneRow["channel_id"] != nil {
+			channel = i64(sceneRow["channel_id"])
+		}
+		now := float64(time.Now().UnixNano()) / 1e9
+		r, err := conn.Execute(`UPDATE player_scene_state SET scene_type=?,scene_key=?,scene_label=?,channel_id=?,metadata_json=?,updated_at=? WHERE user_id=?`,
+			[]any{fmt.Sprint(sceneRow["scene_type"]), fmt.Sprint(sceneRow["scene_key"]), fmt.Sprint(sceneRow["scene_label"]), channel, fmt.Sprint(sceneRow["metadata_json"]), now, uid})
+		if err != nil {
+			return 0, err
+		}
+		return r.RowsAffected, nil
+	}}}, nil
+}
+
 // reverseTeleport undoes (or redoes) admin.player.teleport.
 //
 // A teleport is a journey: it went through moveCharacterTx, which converted the

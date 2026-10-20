@@ -294,6 +294,16 @@ async def sect_recommender_autocomplete(interaction: discord.Interaction, curren
     for row in cast:
         if int(row.get("can_recommend") or 0) and str(row.get("sect_name") or ""):
             sponsors.setdefault(str(row.get("name")), str(row.get("sect_name")))
+    # And the sect's own people at its gate (v1.35.0): the Elders and the Sect
+    # Master the registry stands there may vouch, so a sect whose catalogue
+    # names no sponsor is still a sect somebody can be recommended into.
+    try:
+        people = await DB.list_sect_people_at(here, WORLD.sect_gate_ranks())
+    except Exception:
+        log.exception("Could not read the sect people at %s", here)
+        people = []
+    for row in people:
+        sponsors.setdefault(str(row.get("name")), str(row.get("sect")))
     out: list[app_commands.Choice[str]] = []
     for name, sect_name in sorted(sponsors.items()):
         if needle and needle not in name.casefold() and needle not in sect_name.casefold():
@@ -399,19 +409,36 @@ async def sect_recruitment_recommendation(interaction: discord.Interaction, npc:
     c=await require_character(interaction)
     if not c:return
     npc_data=await DB.get_npc_definition(npc)
-    if not npc_data or not bool(npc_data.get('can_recommend')) or not npc_data.get('sect_affiliation'):
-        await interaction.response.send_message("That NPC cannot issue a sect recommendation.",ephemeral=False);return
-    sect_name=str(npc_data.get('sect_affiliation')); rec=recruitment_definition(WORLD.sects,sect_name)
+    here=str(c.get('location') or '')
+    if npc_data is None:
+        # Not in the catalogue: one of the sect's own people at its gate
+        # (v1.35.0), who stands here by the same read the picker offers them
+        # from; anybody else cannot issue a recommendation. The engine is the
+        # refusal either way; this only anticipates it (rc.46).
+        try:
+            people={str(p.get('name')):str(p.get('sect')) for p in await DB.list_sect_people_at(here,WORLD.sect_gate_ranks())}
+        except Exception:
+            log.exception("Could not read the sect people at %s",here); people={}
+        if npc not in people:
+            await interaction.response.send_message("That NPC cannot issue a sect recommendation.",ephemeral=False);return
+        sect_name=people[npc]
+    else:
+        if not bool(npc_data.get('can_recommend')) or not npc_data.get('sect_affiliation'):
+            await interaction.response.send_message("That NPC cannot issue a sect recommendation.",ephemeral=False);return
+        sect_name=str(npc_data.get('sect_affiliation'))
+    rec=recruitment_definition(WORLD.sects,sect_name)
     if not rec:
         await interaction.response.send_message("That NPC's sect has no public recruitment path configured.",ephemeral=False);return
-    wt=await current_world_time(); npc_location=await current_npc_location(npc,wt.period)
-    if npc_location==DEAD:
-        await interaction.response.send_message(f"**{npc}** is dead and recommends nobody.",ephemeral=False);return
-    if npc_location!=str(c.get('location') or ''):
-        # The one whereabouts rule (v1.20.2): never a missing sponsor's true
-        # position, never a place the player has not found.
-        where=await npc_whereabouts(interaction.user.id,c,npc) or "is not here"
-        await interaction.response.send_message(f"**{npc}** {where}, not at **{await character_location_display(c)}**.",ephemeral=False);return
+    wt=await current_world_time()
+    if npc_data is not None:
+        npc_location=await current_npc_location(npc,wt.period)
+        if npc_location==DEAD:
+            await interaction.response.send_message(f"**{npc}** is dead and recommends nobody.",ephemeral=False);return
+        if npc_location!=here:
+            # The one whereabouts rule (v1.20.2): never a missing sponsor's true
+            # position, never a place the player has not found.
+            where=await npc_whereabouts(interaction.user.id,c,npc) or "is not here"
+            await interaction.response.send_message(f"**{npc}** {where}, not at **{await character_location_display(c)}**.",ephemeral=False);return
     # v1.1.0: a "speak with them first" check stood here and never fired -
     # `get_npc_memory` answers a sentence, never "", for somebody you have not
     # met - and it is gone rather than fixed: asking is the conversation.

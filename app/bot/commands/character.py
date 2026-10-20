@@ -472,6 +472,7 @@ class AbandonCommissionOpenButton(discord.ui.Button):
 class QuestDashboardView(discord.ui.View):
     def __init__(self, user_id: int, available: list[dict], held: dict | None = None, next_text: str = "") -> None:
         super().__init__(timeout=300)
+        self.user_id = int(user_id)
         if available:
             self.add_item(QuestAcceptSelect(user_id, available))
         if held:
@@ -481,6 +482,16 @@ class QuestDashboardView(discord.ui.View):
         # reach, being a message of its own rather than a panel.
         for item in path_buttons(next_text):
             self.add_item(item)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        # The journal is its owner's, as every hub is (v1.35.0): its accept
+        # picker and abandon button refused another member on their own, and
+        # the quest doors (path_buttons) refused nobody, so another member
+        # could press a public journal's door and turn it into their own hub.
+        if int(interaction.user.id) != self.user_id:
+            await interaction.response.send_message("This quest panel belongs to another cultivator.", ephemeral=False)
+            return False
+        return True
 
 
 @registered_root_command(name="quests", description="View and accept objective-driven quests", guild=GUILD)
@@ -914,7 +925,7 @@ async def afterlife_status(interaction:discord.Interaction)->None:
         await interaction.response.send_message("You are alive; no Samsara cycle is active.",ephemeral=False);return
     try:
         state=dict(await ENGINE.action(
-            "lifecycle.samsara_status",interaction.user.id,{"minutes_per_year":MINUTES_PER_YEAR},
+            "lifecycle.samsara_status",interaction.user.id,{},
         ) or {})
     except GameEngineError as exc:
         await interaction.response.send_message(f"No reincarnation path is currently recorded for this soul. ({_explain_engine_error(exc)})",ephemeral=False);return
@@ -969,7 +980,7 @@ async def reincarnate(interaction:discord.Interaction,name:str,path:str,gender:a
         await interaction.response.send_message("Your current incarnation is still alive.",ephemeral=False);return
     try:
         state=dict(await ENGINE.action(
-            "lifecycle.samsara_status",interaction.user.id,{"minutes_per_year":MINUTES_PER_YEAR},
+            "lifecycle.samsara_status",interaction.user.id,{},
         ) or {})
     except GameEngineError as exc:
         await interaction.response.send_message(f"No Samsara cycle is recorded for this soul. ({_explain_engine_error(exc)})",ephemeral=False);return

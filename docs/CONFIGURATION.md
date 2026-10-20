@@ -302,7 +302,11 @@ compose passes it in. Since v1.7.9 it is the baseline rather than the last word:
 the GM dashboard's Admin Console → Travel Time card stores a pace in the engine
 (audited), and a stored pace wins until it is changed there. `REINCARNATION_BASE_SAMSARA_YEARS` and
 `REINCARNATION_MAX_WAIT_SECONDS` shape how long a dead character waits in
-samsara before rebirth.
+samsara before rebirth: the base wait in private years (1 to 5000, default
+**320**) and the cap on its real-time length in seconds (30 to 3600, default
+**300**). Since v1.35.0 both are read by the **Go engine**, which scales every
+death with them - a defeat, old age, a GM's - and compose passes them in; the
+bot sends nothing, and a value outside its range leaves the default standing.
 
 ### Quest Forge (v0.20.6)
 
@@ -546,9 +550,16 @@ died. The engine decides this itself (`updateInstallLeaseSeconds`, held equal to
 test) from the request's own last report, which the watcher writes just before it starts
 `update.sh`; the card shows *installing* with how long ago that was. Past two hours with the
 watcher also silent for fifteen minutes, Cancel appears and the Request button returns. If the
-watcher itself died mid-install, look in `update_watch.log` first: once `update.sh` has finished,
-starting `update_watch.sh` again reports the request failed, which closes it at once. Cancelling
+watcher itself died mid-install, look in `update_watch.log` first, then start `update_watch.sh`
+again: while `update.sh` is still running it waits (v1.35.0; it reads the updater's own lock), and
+once the updater has finished it reports the request failed, which closes it at once. Cancelling
 does not stop `update.sh`, and anything it installed stays installed.
+
+**Outcomes.** A request closes one of three ways and the card's *Last outcome* line names each:
+*updated to vX* when `update.sh` installed a release, *already up to date* (v1.35.0) when it found
+nothing newer on the channel - the world is reopened and nothing was changed - and *failed*, with
+the updater's own sentence, when it refused or rolled back. Until v1.35.0 an up-to-date run was
+reported as a failure for want of a third word.
 
 ## Daily route check (v0.27.0)
 

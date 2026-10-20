@@ -404,10 +404,14 @@ class TheCultivateReplyDoesNotTellATraineeToStop(unittest.TestCase):
                          "the cultivate reply tells a Perfection trainee to stop meditating")
         self.assertNotIn("gathered nothing", line)
 
-    def test_a_path_as_deep_as_meditation_takes_it_is_pointed_back_at_the_path(self):
-        line = self.module._full_stage_line({"stage_full": True, "perfection_gain": 0, "perfection_active": True})
-        self.assertIn("/ascend → Perfection", line)
-        self.assertNotIn("Break through before meditating again", line)
+    def test_a_path_as_deep_as_meditation_takes_it_is_refused_by_the_engine(self):
+        # Since v1.35.0 the engine refuses the session (perfectionCapped) and
+        # its refusal names the path; the reply keeps no branch for a result
+        # that can no longer arrive.
+        self.assertIn("func perfectionCapped(", GO_CULTIVATION)
+        self.assertIn("**/ascend → Perfection**", GO_CULTIVATION, "the refusal does not point at the path")
+        self.assertNotIn("as deep as meditation takes it", inspect.getsource(self.module._full_stage_line),
+                         "the reply still carries a branch for a session the engine now refuses")
 
     def test_a_full_stage_with_no_path_keeps_its_old_line(self):
         for result in ({"stage_full": True}, {"stage_full": True, "perfection_gain": 0, "perfection_active": False}):

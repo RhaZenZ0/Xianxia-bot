@@ -74,7 +74,7 @@ async def _current_birth_family(user_id:int, *, simulate:bool=True)->dict|None:
     if c and c.get("life_status")=="deceased":
         return fam
     try:
-        await ENGINE.authoritative_action("family.simulate",int(user_id),{"family_id":int(fam['family_id']),"minutes_per_year":MINUTES_PER_YEAR},action_id=f"family:auto:{int(user_id)}:{wt.total_minutes}")
+        await ENGINE.authoritative_action("family.simulate",int(user_id),{"family_id":int(fam['family_id'])},action_id=f"family:auto:{int(user_id)}:{wt.total_minutes}")
     except GameEngineError:
         log.exception("Go family simulation failed")
     return await DB.get_birth_family(user_id) or fam

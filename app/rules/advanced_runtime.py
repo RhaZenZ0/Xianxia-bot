@@ -12,69 +12,69 @@ from app.rules.item_grades import grade_rung, split_item_grade
 EQUIPMENT_DEFINITIONS: dict[str, dict[str, Any]] = {
     "spirit_iron_sword": {
         "name": "Spirit-Iron Sword", "slot": "weapon", "max_durability": 120,
-        "attack": 4, "defense": 0, "spirit": 1, "agility": 0,
+        "attack": 4, "defense": 0, "agility": 0,
     },
     "spirit_iron_armor": {
         "name": "Spirit-Iron Lamellar", "slot": "armor", "max_durability": 160,
-        "attack": 0, "defense": 5, "spirit": 1, "agility": -1,
+        "attack": 0, "defense": 5, "agility": -1,
     },
     "cloud_stepping_boots": {
         "name": "Cloud-Stepping Boots", "slot": "boots", "max_durability": 100,
-        "attack": 0, "defense": 1, "spirit": 0, "agility": 4,
+        "attack": 0, "defense": 1, "agility": 4,
     },
     "lesser_stygian_seal": {
         "name": "Lesser Stygian Seal", "slot": "accessory", "max_durability": 90,
-        "attack": 1, "defense": 1, "spirit": 4, "agility": 0,
+        "attack": 1, "defense": 1, "agility": 0,
     },
     "bone_comb": {
         "name": "The Bone Comb", "slot": "accessory", "max_durability": 80,
-        "attack": 0, "defense": 0, "spirit": 5, "agility": 1,
+        "attack": 0, "defense": 0, "agility": 1,
     },
     "cracked_nether_mirror": {
         "name": "Cracked Nether Mirror", "slot": "accessory", "max_durability": 75,
-        "attack": 0, "defense": 2, "spirit": 3, "agility": 0,
+        "attack": 0, "defense": 2, "agility": 0,
     },
     # The higher worlds' arms and armour (v0.39.0), forged there and sold there.
     "spirit_crystal_sword": {
         "name": "Spirit-Crystal Sword", "slot": "weapon", "max_durability": 200,
-        "attack": 6, "defense": 0, "spirit": 2, "agility": 0,
+        "attack": 6, "defense": 0, "agility": 0,
     },
     "spirit_crystal_mail": {
         "name": "Spirit-Crystal Mail", "slot": "armor", "max_durability": 240,
-        "attack": 0, "defense": 8, "spirit": 2, "agility": -1,
+        "attack": 0, "defense": 8, "agility": -1,
     },
     "immortal_gold_sabre": {
         "name": "Immortal-Gold Sabre", "slot": "weapon", "max_durability": 320,
-        "attack": 9, "defense": 1, "spirit": 3, "agility": 0,
+        "attack": 9, "defense": 1, "agility": 0,
     },
     "immortal_gold_plate": {
         "name": "Immortal-Gold Plate", "slot": "armor", "max_durability": 380,
-        "attack": 1, "defense": 12, "spirit": 3, "agility": -1,
+        "attack": 1, "defense": 12, "agility": -1,
     },
     "starsteel_glaive": {
         "name": "Starsteel Glaive", "slot": "weapon", "max_durability": 480,
-        "attack": 13, "defense": 1, "spirit": 4, "agility": 1,
+        "attack": 13, "defense": 1, "agility": 1,
     },
     "starsteel_aegis": {
         "name": "Starsteel Aegis", "slot": "armor", "max_durability": 560,
-        "attack": 1, "defense": 17, "spirit": 4, "agility": 0,
+        "attack": 1, "defense": 17, "agility": 0,
     },
     # The boots a smith makes (v1.32.0): the first Forging method that is not
     # a blade or a cuirass, and the top of the boots ladder above it.
     "spirit_iron_greaves": {
         "name": "Spirit-Iron Greaves", "slot": "boots", "max_durability": 130,
-        "attack": 0, "defense": 1, "spirit": 0, "agility": 2,
+        "attack": 0, "defense": 1, "agility": 2,
     },
     "starsteel_sky_treader_boots": {
         "name": "Starsteel Sky-Treader Boots", "slot": "boots", "max_durability": 520,
-        "attack": 0, "defense": 3, "spirit": 3, "agility": 7,
+        "attack": 0, "defense": 3, "agility": 7,
     },
     # The flying sword (v1.0.0-rc.15) is the one artifact that both carries a
     # rider and takes the weapon slot - which is why the genre makes it the
     # default way to travel: it is still a sword when you arrive.
     "azure_flying_sword": {
         "name": "Azure Flying Sword", "slot": "weapon", "max_durability": 220,
-        "attack": 7, "defense": 0, "spirit": 3, "agility": 3,
+        "attack": 7, "defense": 0, "agility": 3,
     },
     # The birth family's send-off (v1.0.0-rc.15): a household that can afford
     # to does not send a child out to walk. Deliberately under the shop ladder
@@ -83,19 +83,19 @@ EQUIPMENT_DEFINITIONS: dict[str, dict[str, Any]] = {
     # because the gift is the flight, not the edge.
     "cracked_ancestral_blade": {
         "name": "Cracked Ancestral Blade", "slot": "weapon", "max_durability": 90,
-        "attack": 2, "defense": 0, "spirit": 1, "agility": 1,
+        "attack": 2, "defense": 0, "agility": 1,
     },
     "hall_practice_sword": {
         "name": "Hall Practice Sword", "slot": "weapon", "max_durability": 110,
-        "attack": 3, "defense": 0, "spirit": 1, "agility": 1,
+        "attack": 3, "defense": 0, "agility": 1,
     },
     "forge_proof_sword": {
         "name": "Forge-Proof Sword", "slot": "weapon", "max_durability": 130,
-        "attack": 3, "defense": 1, "spirit": 1, "agility": 0,
+        "attack": 3, "defense": 1, "agility": 0,
     },
     "qin_ancestral_sword": {
         "name": "Qin Ancestral Sword", "slot": "weapon", "max_durability": 240,
-        "attack": 5, "defense": 0, "spirit": 2, "agility": 2,
+        "attack": 5, "defense": 0, "agility": 2,
     },
     # A one-of-a-kind GM reward granted via /admin player grant, never crafted
     # or bought (content/world.json marks it market_excluded). "indestructible"
@@ -107,7 +107,7 @@ EQUIPMENT_DEFINITIONS: dict[str, dict[str, Any]] = {
     "bugslayer_sword": {
         "name": "Bugslayer Sword", "slot": "weapon", "max_durability": 100,
         "indestructible": True, "unique": True,
-        "attack": 5, "defense": 1, "spirit": 1, "agility": 1,
+        "attack": 5, "defense": 1, "agility": 1,
         "passive_name": "Heavenly Flawfinder",
         "passive_description": (
             "A strong normal attack (Strong Success or better) exposes a flaw: "
@@ -121,8 +121,10 @@ EQUIPMENT_DEFINITIONS: dict[str, dict[str, Any]] = {
 # item_grade.go, the per-stat rounding in `combatEquipment` (1v1, which also
 # scales by condition) and `equipmentPowerRows` (raids, quality only), and
 # `combatCompanionBonus` for a beast. These are display twins, held to the Go
-# source by tests/python/unit/test_gear_says_what_it_gives.py. `spirit` is
-# carried by every definition and read by no rule, so nothing here shows it.
+# source by tests/python/unit/test_gear_says_what_it_gives.py. Gear gives three
+# stats: `spirit` was carried by every definition and read by no rule for
+# twenty-eight releases, and v1.35.0 removed it rather than keep a number
+# nothing kept a promise about.
 
 
 def _go_round(value: float) -> int:

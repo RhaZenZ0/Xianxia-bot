@@ -244,6 +244,21 @@ class TheDelegationIsReachable(unittest.TestCase):
         self.assertIn("DB.list_active_event_npcs(here)", body)
         self.assertIn('row.get("can_recommend")', body)
 
+    def test_the_picker_and_the_command_reach_the_sects_own_elders(self):
+        """A sect's registry Elders standing at its gate may vouch (v1.35.0):
+        the picker offers them and the command lets them through to the engine,
+        off the same read (`list_sect_people_at`, the ranks the content stands
+        at the gate), so neither offers what the other refuses. The engine's
+        own rule is `TestASectsOwnElderAtTheGateVouches`."""
+        source = (PROJECT_ROOT / "app" / "bot" / "commands" / "sect.py").read_text(encoding="utf-8")
+        picker = source.split("async def sect_recommender_autocomplete(")[1].split("\nasync def ")[0]
+        command = source.split("async def sect_recruitment_recommendation(")[1].split("\nasync def ")[0]
+        for body, name in ((picker, "the picker"), (command, "the command")):
+            self.assertIn("DB.list_sect_people_at(here", body, f"{name} does not reach the sect's own people")
+            self.assertIn("WORLD.sect_gate_ranks()", body, f"{name} does not read the gate ranks off the content")
+        game = (PROJECT_ROOT / "app" / "rules" / "game.py").read_text(encoding="utf-8")
+        self.assertIn('"at_gate"', game, "the twin does not read sect_system.population.at_gate")
+
 
 # --- from test_sect_entry_manual.py ---
 

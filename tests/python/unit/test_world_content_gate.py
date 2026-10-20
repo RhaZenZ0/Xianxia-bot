@@ -510,36 +510,37 @@ class CraftedGoodsHaveAMarketTests(unittest.TestCase):
 class DeployableArrayTests(unittest.TestCase):
     """A disk that deploys nothing is the same fault one layer down.
 
-    `array_deploy` on an item is resolved against `deployedArrayDefs`, a map in
-    `property_storage_actions.go`. An item carrying the field with no entry
-    there is refused at deploy time with "formation disk has no valid
-    deployment definition" - so it would craft, sell, and do nothing. rc.19
-    added four disks to refill the Formation ladder and this is what holds them
-    (and the next four) to being real.
+    `array_deploy` on an item used to be resolved against `deployedArrayDefs`,
+    a Go literal in `property_storage_actions.go` that Python could not read.
+    Since v1.35.0 the effect is the item's own `array_effect` block: the deploy
+    reads it (a disk without one is refused with "formation disk has no valid
+    deployment definition", so it would craft, sell and do nothing) and the
+    craft menu prints its numbers. This holds every disk to carrying a whole
+    one, and every block to belonging to a disk.
     """
 
-    def _deployment_definitions(self) -> set:
-        source = (PROJECT_ROOT / "go_core" / "internal" / "game" / "property_storage_actions.go").read_text(encoding="utf-8")
-        block = source[source.index("deployedArrayDefs = map[string]deployedArrayDef{"):]
-        block = block[: block.index("\n}\n")]
-        return set(re.findall(r'^\s*"([^"]+)":', block, re.MULTILINE))
+    def _disks(self) -> dict:
+        return {item_id: item for item_id, item in WORLD["items"].items() if item.get("array_deploy") or item.get("array_effect")}
 
-    def test_every_deployable_item_has_a_definition(self):
-        defined = self._deployment_definitions()
-        self.assertGreaterEqual(len(defined), 2, f"the definition scanner found only {defined}")
-        for item_id, item in WORLD["items"].items():
-            ref = str(item.get("array_deploy") or "")
-            if not ref:
-                continue
+    def test_every_deployable_item_carries_its_whole_effect(self):
+        disks = self._disks()
+        self.assertGreaterEqual(len(disks), 9, f"the content carries only {sorted(disks)} disks; the reader is broken or the ladder lost a rung")
+        for item_id, item in disks.items():
             with self.subTest(item=item_id):
-                self.assertIn(ref, defined, f"{item_id} deploys {ref}, which no definition covers")
+                self.assertTrue(item.get("array_deploy"), f"{item_id} carries an effect and no array_deploy")
+                effect = item.get("array_effect")
+                self.assertIsInstance(effect, dict, f"{item_id} deploys and carries no array_effect; the engine refuses it")
+                self.assertTrue(str(effect.get("name") or "").strip(), f"{item_id}'s array has no name")
+                self.assertGreater(int(effect.get("duration_game_minutes") or 0), 0, f"{item_id}'s array holds for no time")
+                modifiers = list(dict(effect.get("effect") or {}).get("modifiers") or [])
+                self.assertTrue(modifiers, f"{item_id}'s array does nothing")
+                for modifier in modifiers:
+                    self.assertEqual({"stat", "operation", "value"}, set(modifier), f"{item_id}: a modifier is missing a key: {modifier}")
 
-    def test_every_definition_belongs_to_a_real_item(self):
-        """And the other direction: a definition nothing can reach is dead code."""
-        deployable = {str(i.get("array_deploy")) for i in WORLD["items"].values() if i.get("array_deploy")}
-        for ref in self._deployment_definitions():
-            with self.subTest(ref=ref):
-                self.assertIn(ref, deployable, f"{ref} is defined and no item deploys it")
+    def test_the_engine_reads_the_content_and_keeps_no_table(self):
+        source = (PROJECT_ROOT / "go_core" / "internal" / "game" / "property_storage_actions.go").read_text(encoding="utf-8")
+        self.assertNotIn("deployedArrayDefs", source, "the engine keeps its own table of array effects again")
+        self.assertIn("item.ArrayEffect", source, "the deploy no longer reads the item's array_effect")
 
 
 class FormationLadderTests(unittest.TestCase):

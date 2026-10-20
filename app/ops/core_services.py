@@ -594,8 +594,8 @@ class CombatService:
         ))
 
     async def start(
-        self, user_id: int, *, kind: str, npc_name: str, action_id: str,
-        source: str = "", severity: int = 0, target_key: str = "",
+        self, user_id: int, *, kind: str, action_id: str, npc_name: str = "",
+        event_key: str = "", node_key: str = "",
     ) -> dict[str, Any]:
         """Open a new battle. Go owns the opponent's starting HP/realm/stage curve
         and the player's HP snapshot (read from the caller's own canonical
@@ -604,24 +604,28 @@ class CombatService:
         A challenge names whom it means and nothing else: the engine finds that
         person among those standing where the caller stands and takes their
         realm, stage and name, and the battle's source and lock, from the world.
-        There is no realm or stage to state and a challenge passes no source.
-        An event still states its own `source`, and `severity` scales it.
+        An event names the event and, if the caller wants one beast in
+        particular, its node (v1.35.0): the engine reads the event's severity,
+        picks the next living beast off its roster and spells the source and
+        the lock itself. Nothing here states a realm, a stage, a severity, a
+        source or a lock.
         """
+        payload: dict[str, Any] = {"kind": str(kind), "npc_name": str(npc_name)}
+        if event_key:
+            payload["event_key"] = str(event_key)
+        if node_key:
+            payload["node_key"] = str(node_key)
         return await self.engine.authoritative_action(
-            "combat.start", int(user_id),
-            {
-                "kind": str(kind),
-                "npc_name": str(npc_name),
-                "severity": int(severity),
-                "source": str(source),
-                "target_key": str(target_key),
-            },
-            action_id=str(action_id),
+            "combat.start", int(user_id), payload, action_id=str(action_id),
         )
 
+    # A turn, a technique and a pill drunk in a battle (a turn spent, v1.34.0)
+    # can each end a life. How long that life waits in Samsara is the engine's
+    # (v1.35.0): it reads REINCARNATION_BASE_SAMSARA_YEARS and
+    # REINCARNATION_MAX_WAIT_SECONDS itself and refuses a caller that sends
+    # them, so the three carry the battle, the move and nothing about time.
     async def turn(
         self, user_id: int, *, battle_id: int, style: str, game_minute: int,
-        minutes_per_year: int, base_samsara_years: int, max_wait_seconds: int,
         action_id: str, action: str = "",
     ) -> dict[str, Any]:
         return await self.engine.authoritative_action(
@@ -630,17 +634,12 @@ class CombatService:
                 "battle_id": int(battle_id),
                 "style": str(style),
                 "action": str(action),
-                
-                "minutes_per_year": int(minutes_per_year),
-                "base_samsara_years": int(base_samsara_years),
-                "max_wait_seconds": int(max_wait_seconds),
             },
             action_id=str(action_id),
         )
 
     async def technique(
         self, user_id: int, *, battle_id: int, technique: str, game_minute: int,
-        minutes_per_year: int, base_samsara_years: int, max_wait_seconds: int,
         action_id: str,
     ) -> dict[str, Any]:
         return await self.engine.authoritative_action(
@@ -648,28 +647,16 @@ class CombatService:
             {
                 "battle_id": int(battle_id),
                 "technique": str(technique),
-                "minutes_per_year": int(minutes_per_year),
-                "base_samsara_years": int(base_samsara_years),
-                "max_wait_seconds": int(max_wait_seconds),
             },
             action_id=str(action_id),
         )
 
     async def recovery_item(
         self, user_id: int, *, battle_id: int, item_id: str, game_minute: int, action_id: str,
-        minutes_per_year: int = 0, base_samsara_years: int = 0, max_wait_seconds: int = 0,
     ) -> dict[str, Any]:
-        """A pill drunk in a battle is a turn spent (v1.34.0): the opponent
-        answers it, and an answer that ends a life is scaled as the attack's
-        and the technique's are, so the three carry the same fields."""
         return await self.engine.authoritative_action(
             "combat.recovery_item", int(user_id),
-            {
-                "battle_id": int(battle_id), "item_id": str(item_id),
-                "minutes_per_year": int(minutes_per_year),
-                "base_samsara_years": int(base_samsara_years),
-                "max_wait_seconds": int(max_wait_seconds),
-            },
+            {"battle_id": int(battle_id), "item_id": str(item_id)},
             action_id=str(action_id),
         )
 

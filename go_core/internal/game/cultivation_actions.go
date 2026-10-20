@@ -172,11 +172,31 @@ func qiStormBonus(conn *storage.Conn, location string, now float64) (int64, erro
 	return 0, nil
 }
 
+// perfectionCapped is whether an open Perfection path at this stage has its
+// training as deep as a session takes it (v1.35.0): a session at a full stage
+// with such a path gathers nothing, banks nothing, risks nothing and refines
+// nothing, so cultivationTrain refuses it and points at the path, rather than
+// spend the cooldown on a session that did nothing and say so afterwards.
+func perfectionCapped(conn *storage.Conn, table string, userID, realmIndex, phase int64, cap int) (bool, error) {
+	if phase != 9 || cap <= 0 {
+		return false, nil
+	}
+	res, err := conn.Execute(fmt.Sprintf(`SELECT training_progress,active FROM %s WHERE user_id=? AND realm_index=?`, table), []any{userID, realmIndex})
+	if err != nil {
+		return false, err
+	}
+	if len(res.Rows) == 0 || storage.ParseInt(res.Rows[0][1]) == 0 {
+		return false, nil
+	}
+	return storage.ParseInt(res.Rows[0][0]) >= int64(cap), nil
+}
+
 // perfectionTraining is what a session does for an open Perfection path: a full
 // stage still refines it (rc.37), by design. It returns the gain and whether a
 // path is open at all, which the reply needs to tell "continue the path" from
-// "start one" - a path whose training is already as deep as a session takes it
-// gains nothing and is still open.
+// "start one". A path trained to its cap no longer reaches here on a full
+// stage (perfectionCapped refuses the session first); on a stage with room it
+// still gains nothing and is still open.
 func perfectionTraining(conn *storage.Conn, table string, userID, realmIndex int64, phase int64, cap int, bonus int64) (int64, bool, error) {
 	if phase != 9 || cap <= 0 {
 		return 0, false, nil
@@ -372,6 +392,19 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	room := cost - current
 	if room < 0 {
 		room = 0
+	}
+	if room == 0 {
+		// A full stage with a Perfection path trained to its cap has nothing
+		// a session can do (v1.35.0): refused, before the essence write and the
+		// cooldown, so the player is told where the next step is instead of
+		// being told afterwards that nothing happened.
+		capped, err := perfectionCapped(conn, perfectionTable, userID, realm, phase, cap)
+		if err != nil {
+			return authoritativeMutation{}, err
+		}
+		if capped {
+			return authoritativeMutation{}, errors.New("this stage is full and your Perfection path is as deep as meditation takes it; work the path under **/ascend → Perfection** - its quest or its trial - or abandon it, before meditating again")
+		}
 	}
 	gain := attempted
 	if gain < 0 {

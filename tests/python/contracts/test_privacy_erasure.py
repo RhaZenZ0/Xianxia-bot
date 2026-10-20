@@ -175,6 +175,30 @@ class TheRealSchemaIsFullyClassified(unittest.TestCase):
             "deletes the seller's lot with the item in escrow",
         )
 
+    def test_every_column_the_schema_clears_is_anonymised(self):
+        """A column the schema says to clear for a leaving character (a
+        foreign key to `characters` with ON DELETE SET NULL) is shared state
+        with a link in it: the row outlives the person. The sweep deleted
+        three of them anyway - a war's blows, a sect's building work, a
+        formation still standing (v1.35.0) - so every such column is held to
+        `erasureAnonymise`, and a new one needs its reason there or here."""
+        self.assertGreaterEqual(len(self.set_null), 5, "the schema reader found too few SET NULL columns to be trusted")
+        self.assertEqual(
+            sorted(self.set_null - go_map_keys("erasureAnonymise")), [],
+            "the schema clears these columns for a leaving character and the sweep deletes their rows",
+        )
+
+    def test_the_privacy_notice_names_what_the_schema_walk_cannot_see(self):
+        """The three places an id sits where no column walk finds it are
+        handled by name in `eraseUnwalkedLinksTx` and `clearPlayerWorldStateTx`,
+        and docs/PRIVACY.md says so (v1.35.0)."""
+        notice = (PROJECT_ROOT / "docs" / "PRIVACY.md").read_text(encoding="utf-8")
+        for word in ("`world_state`", "`caravans.owner_key`", "`requested_by`"):
+            self.assertIn(word, notice, f"the privacy notice does not say what happens to {word}")
+        self.assertIn("func eraseUnwalkedLinksTx(", PRIVACY_GO)
+        for key in ('"caravans.owner_key"', '"world_state.requested_by"'):
+            self.assertIn(key, PRIVACY_GO, f"the erasure no longer reports {key}")
+
     def test_the_audit_trail_is_the_only_thing_kept(self):
         self.assertEqual(
             go_map_keys("erasureKeep"), {"admin_audit_log.admin_user_id"},

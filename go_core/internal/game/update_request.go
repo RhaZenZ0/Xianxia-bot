@@ -11,7 +11,7 @@ package game
 //   - admin.server.request_update  - the GM's ask, audited, refused while one
 //     is already open. Writes `update_request`.
 //   - admin.server.update_status   - the watcher's reports (acked, fetching,
-//     done, failed), audited under actor 0 so the audit table shows who wrote
+//     installing, done, unchanged, failed), audited under actor 0 so the audit table shows who wrote
 //     them. Each must carry the open request's nonce, and a closed request
 //     takes no more reports: a watcher that restarted, or a second one, cannot
 //     re-report against a request already settled. A terminal report also
@@ -74,9 +74,14 @@ const (
 )
 
 // updateStatuses are the reports a watcher may make, in the order a run makes
-// them. `done` and `failed` are terminal.
+// them. `done`, `unchanged` and `failed` are terminal: installed, found
+// nothing newer (v1.35.0 - until then the watcher reported an up-to-date run as
+// `failed`, because `done` printed as "updated to vX"), and failed. The same
+// three are closed in open() below, in the watcher's own case list
+// (update_watch.sh), in the dashboard's UPDATE_TERMINAL_STATUSES and on its
+// card, and a Python gate holds the five readers to one list.
 var updateStatuses = map[string]bool{
-	"acked": true, "fetching": true, "installing": true, "done": true, "failed": true,
+	"acked": true, "fetching": true, "installing": true, "done": true, "unchanged": true, "failed": true,
 }
 
 var updateChannels = map[string]bool{"stable": true, "beta": true}
@@ -92,9 +97,9 @@ type updateRequestState struct {
 	Detail      string  `json:"detail"`
 }
 
-// open is "not terminal": done, failed and cancelled close a request.
+// open is "not terminal": done, unchanged, failed and cancelled close a request.
 func (s updateRequestState) open() bool {
-	return s.Nonce != "" && s.Status != "" && s.Status != "done" && s.Status != "failed" && s.Status != "cancelled"
+	return s.Nonce != "" && s.Status != "" && s.Status != "done" && s.Status != "unchanged" && s.Status != "failed" && s.Status != "cancelled"
 }
 
 // updateWatcherRunning is the card's own test: a heartbeat younger than the
@@ -251,7 +256,7 @@ func adminServerUpdateStatus(conn *storage.Conn, raw json.RawMessage) (any, erro
 		return map[string]any{"status": "heartbeat", "at": now}, nil
 	}
 	if !updateStatuses[status] {
-		return nil, errors.New("status must be one of acked, fetching, installing, done, failed, heartbeat")
+		return nil, errors.New("status must be one of acked, fetching, installing, done, unchanged, failed, heartbeat")
 	}
 	nonce := strings.TrimSpace(stringField(p, "nonce"))
 	detail := strings.TrimSpace(stringField(p, "detail"))
@@ -284,7 +289,7 @@ func adminServerUpdateStatus(conn *storage.Conn, raw json.RawMessage) (any, erro
 	if err := writeWorldStateTx(conn, updateRequestKey, next, now); err != nil {
 		return nil, err
 	}
-	terminal := status == "done" || status == "failed"
+	terminal := status == "done" || status == "unchanged" || status == "failed"
 	if terminal {
 		result := map[string]any{
 			"status": status, "detail": detail, "installed_version": installed,
@@ -307,7 +312,7 @@ func adminServerUpdateStatus(conn *storage.Conn, raw json.RawMessage) (any, erro
 }
 
 // adminServerCancelUpdate is the GM's way out: `admin.server.cancel_update`.
-// A request is open until the watcher reports done or failed, and a watcher
+// A request is open until the watcher reports done, unchanged or failed, and a watcher
 // that died, was stopped or never saw it leaves it open for ever - while
 // adminServerRequestUpdate refuses a second request beside an open one. So an
 // open request can be cancelled, but only when nothing is acting on it:

@@ -1572,6 +1572,9 @@ async def run(url: str, token: str, db_path: str) -> Report:
             await step(report, "party.join during a raid is refused", act("party.join", BUYER, {"party_id": party_id}), expect_error="in the middle of a boss raid")
         status = "active"
         if encounter_id:
+            # v1.35.0: whom the round has stopped waiting on, for the card's away
+            # tag; a raid of one that has just started waits on nobody.
+            await step(report, "boss.absent", query("boss.absent", PLAYER, {"encounter_id": encounter_id}))
             try:
                 for _ in range(30):
                     acted = await act("boss.act", PLAYER, {"encounter_id": encounter_id, "style": "attack"})
@@ -1590,7 +1593,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     # -- a duel, a partnership, a house
     for uid in (PLAYER, BUYER):
         await step(report, f"{uid} to the hills", gm("admin.player.teleport", {"user_id": uid, "location": "Cloudspine Foothills", "reason": "playtest"}))
-    challenge = await step(report, "pvp.challenge the buyer", act("pvp.challenge", PLAYER, {"target_user_id": BUYER, "stakes": "honour", "ttl_seconds": 600}))
+    challenge = await step(report, "pvp.challenge the buyer", act("pvp.challenge", PLAYER, {"target_user_id": BUYER, "stakes": "honour"}))
     challenge_id = int((challenge or {}).get("challenge_id") or 0)
     if challenge_id:
         match = await step(report, "pvp.respond accept", act("pvp.respond", BUYER, {"challenge_id": challenge_id, "accept": True}))
@@ -1665,6 +1668,10 @@ async def run(url: str, token: str, db_path: str) -> Report:
     await audited("admin.player.karma", {"user_id": PLAYER, "delta": 60, "reason": "playtest"}, name="admin.player.karma back up")
 
     # -- a caravan and a seclusion, each waited out on the world clock
+    # v1.35.0: the cargo picker asks the engine what a caravan pays for from here.
+    payable = await step(report, "caravan.payable", query("caravan.payable", PLAYER, {}))
+    report.add("PASS" if any(str(i.get("item_id")) == "spirit_herb" for i in list((payable or {}).get("items") or [])) else "FAIL",
+               "the herbs the next step sends are on the payable list", str((payable or {}).get("items"))[:300])
     caravan = await step(report, "caravan.dispatch five herbs to Riverguard City", act("caravan.dispatch", PLAYER, {"destination": "Riverguard City", "item_id": "spirit_herb", "quantity": 5, "escort": 2}))
     if caravan is not None:
         await step(report, "the road is walked", gm("admin.world.advance_time", {"minutes": int(caravan.get("travel_minutes") or 0) + 30, "reason": "playtest"}))
@@ -2773,6 +2780,20 @@ async def run(url: str, token: str, db_path: str) -> Report:
                  gm("admin.server.update_status", {"nonce": nonce, "status": "failed"}), "no update is in progress")
     await step(report, "a heartbeat with no request open",
                gm("admin.server.update_status", {"status": "heartbeat"}))
+    # v1.35.0: an update that found nothing newer closes as `unchanged`, a
+    # third outcome beside done and failed, with the version still installed.
+    asked_current = await audited("admin.server.request_update",
+                                  {"channel": "stable", "reason": "playtest {unchanged}"}, name="the GM asks while already current")
+    current = str((asked_current or {}).get("nonce") or "")
+    await audited("admin.server.update_status", {"nonce": current, "status": "acked", "detail": "playtest"},
+                  name="the watcher acks the current request")
+    await audited("admin.server.update_status",
+                  {"nonce": current, "status": "unchanged", "detail": "nothing to update: playtest", "installed_version": "0.0.0-playtest"},
+                  name="the watcher reports unchanged")
+    current_read = await step(report, "the result of an up-to-date run", query("admin.server.update_request", GM, {}))
+    current_result = dict((current_read or {}).get("result") or {})
+    report.add("PASS" if current_result.get("status") == "unchanged" and current_result.get("installed_version") == "0.0.0-playtest" else "FAIL",
+               "an up-to-date run closes as unchanged with the version still installed", str(current_result))
     # v1.12.3: a request nobody will ever finish can be closed by the GM, and
     # the read answers the nonce and status as flat values for the watcher.
     asked_again = await audited("admin.server.request_update",
@@ -2894,7 +2915,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     # intent a Sword Cultivator banked was one. Read it on both sides.
     dying = dict(await db.get_character(PLAYER) or {})
     banked = present(dying.get("path_resource"), 0)
-    await step(report, "lifecycle.true_death", act("lifecycle.true_death", PLAYER, {"reason": "playtest", "max_wait_seconds": 1}))
+    await step(report, "lifecycle.true_death", act("lifecycle.true_death", PLAYER, {"reason": "playtest"}))
     cycle = await step(report, "lifecycle.samsara_status", query("lifecycle.samsara_status", PLAYER, {}))
     if cycle is not None:
         report.add("PASS", "the wheel is turning", f"ready={cycle.get('ready')} remaining={cycle.get('seconds_remaining')}")

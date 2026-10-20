@@ -34,7 +34,7 @@ ENV = {"DISCORD_TOKEN": "test-token", "GUILD_ID": "123456789012345678",
 
 # Commands that still ask for a typed id, each a picker nobody has built yet.
 STILL_TYPED = {
-    ("boss_claim", "encounter_id"), ("hunter_act", "pursuit_id"), ("crime_atone", "crime_id"),
+    ("hunter_act", "pursuit_id"), ("crime_atone", "crime_id"),
     ("formation_assign", "formation_id"), ("formation_activate", "formation_id"),
     ("sect_discipleship_accept", "request_id"), ("sect_discipleship_reject", "request_id"),
     ("birth_family_investigate", "history_id"), ("birth_family_legacy", "history_id"),

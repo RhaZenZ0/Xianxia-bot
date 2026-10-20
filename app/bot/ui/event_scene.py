@@ -512,20 +512,6 @@ class EventSceneView(CardView):
             log.exception("Could not read the cast for %s", self.event_key)
             return []
 
-    async def _next_beast(self) -> dict[str, Any] | None:
-        """The next living member of the event's beast roster, so an event
-        battle is a named creature with its own loot rather than an anonymous
-        'hostile manifestation'."""
-        if not self.event_key:
-            return None
-        try:
-            for node in await DB.list_world_event_nodes(self.event_key):
-                if str(node.get("node_type"))=="beast" and int(node.get("remaining") or 0)>0:
-                    return node
-        except Exception:
-            log.exception("Could not read the beast roster for %s", self.event_key)
-        return None
-
     async def _open_scene_actions(self, interaction: discord.Interaction, *, default_action: str) -> None:
         character=await self._character_here(interaction)
         if character is None:return
@@ -631,32 +617,28 @@ class EventSceneView(CardView):
         if c is None:return
         if await DB.get_active_battle(interaction.user.id):
             await EVENT_HANDLERS.invoke("battle", interaction); return
-        # The roster decides who you fight. Only when an event has no beasts
-        # left (or never had any) does the old category sniff test apply.
-        beast=await self._next_beast()
-        if beast is None:
-            text=f"{self.category} {self.event_type}".casefold()
-            if not any(x in text for x in ("beast","demon","invasion","tide","attack","war","calamity")):
-                await interaction.response.send_message("No event-specific hostile manifestation is currently forcing a battle here. Use **Systems** to inspect other combat mechanics.",ephemeral=False);return
-            npc_name=f"{self.title} — hostile manifestation"; severity=int(self.severity); source=f"event:{self.event_key or self.title}"
-            tail="Defeating this manifestation contributes to the event; it is not a persistent NPC life."
-        else:
-            npc_name=str(beast.get("name") or "Hostile")
-            severity=max(1,min(10,int(beast.get("rank") or self.severity)))
-            source=f"event:{self.event_key or self.title}|node:{beast.get('node_key')}"
-            remaining=int(beast.get("remaining") or 0)
-            descriptor=str(beast.get("descriptor") or "").strip()
-            tail=((descriptor+"\n") if descriptor else "")+(
-                f"{remaining} still standing. Killing it takes one off the event and pays what it carries.")
+        # Whom you fight is the engine's to say (v1.35.0): it reads the event's
+        # roster for the next living beast, lets the event itself take the
+        # field only when the roster is empty and the event is of a hostile
+        # kind, and refuses the rest. This button names the event and nothing
+        # else - no severity, no node, no source, no lock.
+        if not self.event_key:
+            await interaction.response.send_message("This scene is not bound to a world event, so nothing here can be fought. Use **Systems** to inspect other combat mechanics.",ephemeral=False);return
         try:
             envelope=await COMBAT.start(
-                interaction.user.id,kind="event",npc_name=npc_name,
-                severity=severity,source=source,target_key=f"{source}:{interaction.user.id}",
-                action_id=f"discord:{interaction.id}:combat.start:{source}",
+                interaction.user.id,kind="event",event_key=self.event_key,
+                action_id=f"discord:{interaction.id}:combat.start:event:{self.event_key}",
             )
         except GameEngineError as exc:
             await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
         result=dict(envelope.get("result") or {}); bid=int(result.get("battle_id") or 0)
+        npc_name=str(result.get("npc_name") or "Hostile")
+        if result.get("node_key"):
+            descriptor=str(result.get("node_descriptor") or "").strip()
+            tail=((descriptor+"\n") if descriptor else "")+(
+                f"{int(result.get('node_remaining') or 0)} still standing. Killing it takes one off the event and pays what it carries.")
+        else:
+            tail="Defeating this manifestation contributes to the event; it is not a persistent NPC life."
         battle=await DB.get_active_battle(interaction.user.id); _card,view=await EVENT_HANDLERS.invoke("battle_panel", interaction.user.id,c,battle or result)
         fold_content(view,f"⚔️ **Event confrontation #{bid} — {npc_name}.**\n{tail}")
         await interaction.response.send_message(view=view)

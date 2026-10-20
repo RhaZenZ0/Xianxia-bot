@@ -498,19 +498,23 @@ func payCommissionRewardTx(conn *storage.Conn, catalog worlddata.Catalog, userID
 			return nil, err
 		}
 	}
+	granted := map[string]any{}
 	if stones != 0 {
-		if _, err := characterWalletDeltaTx(conn, catalog, userID, stones, now); err != nil {
+		// In the coin of the giver's world (v1.35.0): a commission is taken
+		// from its giver's city and may be finished anywhere.
+		currency, err := questRewardCurrencyTx(conn, catalog, userID, questKey)
+		if err != nil {
 			return nil, err
 		}
+		if _, err := walletDeltaTx(conn, catalog, userID, currency, stones, now); err != nil {
+			return nil, err
+		}
+		granted["spirit_stones"], granted["currency"] = stones, currency
 	}
 	if len(items) > 0 {
 		if err := addInventoryTx(conn, userID, items); err != nil {
 			return nil, err
 		}
-	}
-	granted := map[string]any{}
-	if stones != 0 {
-		granted["spirit_stones"] = stones
 	}
 	if insight != 0 {
 		granted["insight_xp"] = insight

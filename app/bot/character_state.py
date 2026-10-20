@@ -162,7 +162,10 @@ async def announce_quest_progress(interaction: Any, changed: list[dict[str, Any]
             if rewards.get("insight_xp"):
                 parts.append(f"✨ {int(rewards['insight_xp'])} Insight XP")
             if rewards.get("spirit_stones"):
-                parts.append(f"🪙 {int(rewards['spirit_stones'])} spirit stones")
+                # The coin is the engine's (v1.35.0): a quest pays in the money
+                # of its giver's world, wherever the player stood to finish it.
+                coin = WORLD.currency_name(str(rewards["currency"])) if rewards.get("currency") else "spirit stones"
+                parts.append(f"🪙 {int(rewards['spirit_stones'])} {coin}")
             for item_id, qty in dict(rewards.get("items") or {}).items():
                 parts.append(f"🎁 {_item_label(item_id)} ×{int(qty)}")
             commission = dict(row.get("commission") or {})

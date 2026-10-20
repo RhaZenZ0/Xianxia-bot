@@ -1321,12 +1321,26 @@ async def _black_market_item_autocomplete(interaction:discord.Interaction,curren
     if not post:return []
     carried=await DB.get_inventory(interaction.user.id) if selling else {}
     q=current.casefold().strip(); out=[]
+    stocked=set()
     for row in post.get('stock',[]):
-        iid=str(row['item_id']); name=WORLD.item_name(iid)
+        iid=str(row['item_id']); name=WORLD.item_name(iid); stocked.add(iid)
         if selling and int(carried.get(iid,0) or 0)<=0:continue
         if q and q not in iid.casefold() and q not in name.casefold():continue
         note=f"{int(carried[iid])} carried" if selling else f"{row['quantity']} left"
         out.append(app_commands.Choice(name=f"{name} ({note})"[:100],value=iid[:100]))
+    if selling:
+        # A broker takes ordinary goods too (v1.35.0): what a shelf sells, by
+        # the engine's own tradeable rule (market.catalog), carried and not
+        # already on the post's board. The engine prices and refuses them.
+        try:
+            ordinary=set(await SIM.market_item_ids())
+        except Exception:
+            log.exception("Could not read the tradeable catalogue for the fence picker"); ordinary=set()
+        for iid in sorted(ordinary-stocked):
+            if int(carried.get(iid,0) or 0)<=0:continue
+            name=WORLD.item_name(iid)
+            if q and q not in iid.casefold() and q not in name.casefold():continue
+            out.append(app_commands.Choice(name=f"{name} ({int(carried[iid])} carried, ordinary)"[:100],value=iid[:100]))
     return out[:25]
 
 
@@ -1386,9 +1400,13 @@ async def market_prices_command(interaction:discord.Interaction,item:str|None=No
         quote=await SIM.market_quote(location,item)
         if not quote:
             await interaction.response.send_message("That item is not traded in your current local market.",ephemeral=False);return
+        # Both numbers are the counter's (market.quote reads marketUnitPrice,
+        # v1.35.0); a sell price of 0 is its refusal to buy here at all.
+        sell=int(quote['sell_price'])
+        sell_text=f"**{sell:,}**" if sell>0 else "**not bought here**"
         await interaction.response.send_message(
             f"💹 **{WORLD.item_name(item)} — {location}**\n"
-            f"Buy: **{quote['buy_price']:,} {WORLD.currency_name(str(quote['currency_id']))}** • Sell: **{quote['sell_price']:,}**\n"
+            f"Buy: **{quote['buy_price']:,} {WORLD.currency_name(str(quote['currency_id']))}** • Sell: {sell_text}\n"
             f"Supply **{quote['supply']}** • Demand **{quote['demand']}** • Price index **x{float(quote['price_index']):.2f}**"
             f"{_gear_line(item,'')}",
             ephemeral=False,
@@ -1398,7 +1416,7 @@ async def market_prices_command(interaction:discord.Interaction,item:str|None=No
         await interaction.response.send_message("No public market is simulated at your current location.",ephemeral=False);return
     lines=[f"💹 **Dynamic Market — {location}**"]
     for row in rows:
-        price=max(1,int(round(int(row['base_price'])*float(row['price_index']))))
+        price=int(row['buy_price'])  # the engine's number, floors included; never recomputed here
         lines.append(f"• **{WORLD.item_name(str(row['item_id']))}** — {price:,} {WORLD.currency_name(str(row['currency_id']))} • supply {row['supply']} / demand {row['demand']} • x{float(row['price_index']):.2f}"
                      f"{_gear_line(row['item_id'])}")
     await reply_long(interaction,"\n".join(lines),ephemeral=False)

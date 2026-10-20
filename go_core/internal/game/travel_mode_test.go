@@ -146,7 +146,7 @@ func TestTheFlyingSwordIsAlsoASword(t *testing.T) {
 		t.Fatalf("a sword that cannot cut: %+v", def)
 	}
 	stats, ok := equipDefs["azure_flying_sword"]
-	if !ok || stats[0] != def.Attack || stats[1] != def.Defense || stats[2] != def.Spirit || stats[3] != def.Agility {
+	if !ok || stats[0] != def.Attack || stats[1] != def.Defense || stats[2] != def.Agility {
 		t.Fatalf("1v1 combat disagrees with party combat: %v vs %+v", stats, def)
 	}
 }

@@ -105,6 +105,50 @@ func TestATerminalReportWritesTheResultAndClosesTheRequest(t *testing.T) {
 	}
 }
 
+// An up-to-date run is its own outcome (v1.35.0): `unchanged` closes the
+// request and writes the result with the version still installed, so the card
+// says "already up to date" instead of the "failed" the watcher used to report
+// for want of a third word.
+func TestAnUpToDateRunClosesAsUnchanged(t *testing.T) {
+	path := setupAdminDB(t)
+	nonce := requestAnUpdate(t, path)
+	applyAdmin(t, path, "admin.server.update_status", map[string]any{
+		"nonce": nonce, "status": "unchanged", "installed_version": "1.3.5", "detail": "nothing to update: Installed 1.3.5 is already the newest on the stable channel (1.3.5).",
+	})
+	result := storedUpdateRow(t, path, "update_result")
+	if result["status"] != "unchanged" || result["installed_version"] != "1.3.5" {
+		t.Fatalf("result=%#v", result)
+	}
+	if _, err := applyAdminRaw(t, path, "admin.server.update_status", 0, map[string]any{"nonce": nonce, "status": "done"}); err == nil {
+		t.Fatal("a report against a request closed as unchanged was accepted")
+	}
+	// Closed means the next request can be made.
+	requestAnUpdate(t, path)
+}
+
+// An erased administrator's id leaves the two update rows (v1.35.0): the
+// schema walk reads columns and `requested_by` sits inside the JSON, so the
+// erasure names it. Another administrator does the erasing, because the lever
+// refuses to erase its own caller.
+func TestAnErasedGMsIdLeavesTheUpdateRows(t *testing.T) {
+	path := setupAdminDB(t)
+	nonce := requestAnUpdate(t, path) // requested by admin 7
+	applyAdmin(t, path, "admin.server.update_status", map[string]any{"nonce": nonce, "status": "done", "installed_version": "1.4.0"})
+	for _, key := range []string{"update_request", "update_result"} {
+		if got := storedUpdateRow(t, path, key)["requested_by"]; got != float64(7) {
+			t.Fatalf("%s.requested_by=%v before the erasure, want 7; the check is broken, not the tree", key, got)
+		}
+	}
+	if _, err := applyAdminRaw(t, path, "admin.player.erase", 1, map[string]any{"user_id": 7, "reason": "the GM asked"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"update_request", "update_result"} {
+		if got := storedUpdateRow(t, path, key)["requested_by"]; got != float64(0) {
+			t.Fatalf("%s still names the erased administrator: requested_by=%v", key, got)
+		}
+	}
+}
+
 func TestAHeartbeatIsNotAReportAndIsNotAudited(t *testing.T) {
 	path := setupAdminDB(t)
 	// No request open at all: a heartbeat still lands, because it is about
@@ -359,6 +403,7 @@ func TestTheCancelRuleIsOneStatement(t *testing.T) {
 	}{
 		{"not yet picked up", open("requested", 5), alive, false},
 		{"done", open("done", 5), alive, false},
+		{"unchanged", open("unchanged", 5), alive, false},
 		{"failed", open("failed", 5), alive, false},
 		{"cancelled", open("cancelled", 5), alive, false},
 		{"no request at all", updateRequestState{}, alive, false},

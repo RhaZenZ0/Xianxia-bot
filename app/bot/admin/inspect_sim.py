@@ -652,12 +652,13 @@ async def admin_simulation_market(interaction: discord.Interaction, location: st
         q=await SIM.market_quote(location,item)
         if not q:
             await interaction.response.send_message("That item has no market quote there.",ephemeral=False);return
-        await interaction.response.send_message(f"💹 **{WORLD.item_name(item)} — {location}**\nBase {q['base_price']} • index x{float(q['price_index']):.2f} • buy {q['buy_price']} • sell {q['sell_price']} {WORLD.currency_name(q['currency_id'])}\nSupply {q['supply']} • demand {q['demand']}",ephemeral=False);return
+        sell=f"sell {q['sell_price']}" if int(q['sell_price'])>0 else "not bought here"
+        await interaction.response.send_message(f"💹 **{WORLD.item_name(item)} — {location}**\nBase {q['base_price']} • index x{float(q['price_index']):.2f} • buy {q['buy_price']} • {sell} {WORLD.currency_name(q['currency_id'])}\nSupply {q['supply']} • demand {q['demand']}",ephemeral=False);return
     rows=await SIM.market_rows(location,15)
     if not rows:
         await interaction.response.send_message("No market is simulated at that location.",ephemeral=False);return
     lines=[f"💹 **Admin Market — {location}**"]
-    for q in rows: lines.append(f"• {WORLD.item_name(q['item_id'])} — {max(1,int(round(q['base_price']*q['price_index'])))} {WORLD.currency_name(q['currency_id'])} • S{q['supply']}/D{q['demand']} • x{float(q['price_index']):.2f}")
+    for q in rows: lines.append(f"• {WORLD.item_name(q['item_id'])} — {int(q['buy_price'])} {WORLD.currency_name(q['currency_id'])} • S{q['supply']}/D{q['demand']} • x{float(q['price_index']):.2f}")
     await reply_long(interaction,"\n".join(lines),ephemeral=False)
 
 

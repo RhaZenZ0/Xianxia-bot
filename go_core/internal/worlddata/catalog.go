@@ -209,6 +209,19 @@ type ItemUse struct {
 	VitalityMaxPercent int64 `json:"vitality_max_percent"`
 	VitalityMaxMin     int64 `json:"vitality_max_min"`
 }
+
+// ArrayEffect is what a formation disk does once deployed (v1.35.0): the name
+// the standing array goes by, how long it holds in game minutes, and the
+// effect everybody at the place is under. It lived in the engine as a Go
+// literal (`deployedArrayDefs`) that Python could not read, so the craft menu
+// described a disk in the item's own words and never its numbers; it is content
+// now, read by both sides.
+type ArrayEffect struct {
+	Name                string         `json:"name"`
+	DurationGameMinutes int64          `json:"duration_game_minutes"`
+	Effect              map[string]any `json:"effect"`
+}
+
 type Item struct {
 	Name string  `json:"name"`
 	Use  ItemUse `json:"use"`
@@ -229,6 +242,7 @@ type Item struct {
 	Flight         int64          `json:"flight"`
 	FlightName     string         `json:"flight_name"`
 	ArrayDeploy    string         `json:"array_deploy"`
+	ArrayEffect    *ArrayEffect   `json:"array_effect"`
 	SpatialKey     map[string]any `json:"spatial_key"`
 	MarketExcluded bool           `json:"market_excluded"`
 	// TeachesRecipe (v1.0.0-rc.20) is the method a jade slip carries. Reading

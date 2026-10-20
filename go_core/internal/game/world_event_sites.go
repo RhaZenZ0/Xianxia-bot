@@ -328,6 +328,81 @@ func worldEventSiteProgressTx(conn *storage.Conn, eventKey string) (map[string]a
 	}, nil
 }
 
+// openWorldEvent is a world event as every door into it reads it (v1.35.0):
+// world_event.engage, world_event.act and combat.start kind=event. One reader,
+// so that an event being closed, the caller not standing at it, and the
+// severity its payload carries are each stated once. Until then combat.start
+// read none of the three and took the severity off the caller's payload.
+type openWorldEvent struct {
+	Key       string
+	EventType string
+	Title     string
+	Location  string
+	Payload   map[string]any
+	Severity  int64
+}
+
+// loadOpenWorldEventTx is the event, if it exists and is still running.
+func loadOpenWorldEventTx(conn *storage.Conn, eventKey string, now float64) (openWorldEvent, error) {
+	er, err := conn.Execute(`SELECT event_type,title,location,payload_json,active,ends_at FROM world_events WHERE event_key=? LIMIT 1`, []any{eventKey})
+	if err != nil {
+		return openWorldEvent{}, err
+	}
+	if len(er.Rows) == 0 {
+		return openWorldEvent{}, errors.New("world event not found")
+	}
+	row := er.Rows[0]
+	if storage.ParseInt(row[4]) != 1 || parseFloat(row[5]) <= now {
+		return openWorldEvent{}, errors.New("world event is closed")
+	}
+	ev := openWorldEvent{Key: eventKey, EventType: fmt.Sprint(row[0]), Title: fmt.Sprint(row[1]), Location: fmt.Sprint(row[2]), Payload: map[string]any{}}
+	_ = json.Unmarshal([]byte(fmt.Sprint(row[3])), &ev.Payload)
+	ev.Severity = clampI64(storage.ParseInt(ev.Payload["severity"]), 1, 10)
+	return ev, nil
+}
+
+// refuseAway is the one sentence for a caller who is not at the event.
+func (e openWorldEvent) refuseAway(c mechanicsCharacter) error {
+	if c.Location != e.Location {
+		return fmt.Errorf("travel to %s before acting in this event", e.Location)
+	}
+	return nil
+}
+
+// hostileEventWords name the kinds of event that force a battle even once the
+// roster has no beast left: an anonymous "hostile manifestation" of the event
+// itself. A festival or a treasure has nothing to fight. The list used to live
+// in the event scene's Battle button (app/bot/ui/event_scene.py), a bound in
+// the client; it is the engine's since v1.35.0.
+var hostileEventWords = []string{"beast", "demon", "invasion", "tide", "attack", "war", "calamity"}
+
+func (e openWorldEvent) hostile() bool {
+	text := strings.ToLower(fmt.Sprint(e.Payload["category"]) + " " + e.EventType)
+	for _, word := range hostileEventWords {
+		if strings.Contains(text, word) {
+			return true
+		}
+	}
+	return false
+}
+
+// nextWorldEventBeastTx is the first beast on the event's roster with
+// something left, in the order the site was spawned.
+func nextWorldEventBeastTx(conn *storage.Conn, eventKey string) (worldEventSiteNode, bool, error) {
+	r, err := conn.Execute(`SELECT node_key FROM world_event_nodes WHERE event_key=? AND node_type='beast' AND remaining>0 ORDER BY node_id LIMIT 1`, []any{eventKey})
+	if err != nil {
+		return worldEventSiteNode{}, false, err
+	}
+	if len(r.Rows) == 0 {
+		return worldEventSiteNode{}, false, nil
+	}
+	node, err := loadWorldEventNodeTx(conn, eventKey, fmt.Sprint(r.Rows[0][0]))
+	if err != nil {
+		return worldEventSiteNode{}, false, err
+	}
+	return node, true, nil
+}
+
 type worldEventEngagePayload struct {
 	EventKey   string `json:"event_key"`
 	NodeKey    string `json:"node_key"`
@@ -358,24 +433,14 @@ func worldEventEngageAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 		return authoritativeMutation{}, errors.New("only a living character can act in a world event")
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
-	er, err := conn.Execute(`SELECT title,location,payload_json,active,ends_at FROM world_events WHERE event_key=? LIMIT 1`, []any{eventKey})
+	ev, err := loadOpenWorldEventTx(conn, eventKey, now)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	if len(er.Rows) == 0 {
-		return authoritativeMutation{}, errors.New("world event not found")
+	if err := ev.refuseAway(c); err != nil {
+		return authoritativeMutation{}, err
 	}
-	row := er.Rows[0]
-	title, location := fmt.Sprint(row[0]), fmt.Sprint(row[1])
-	if storage.ParseInt(row[3]) != 1 || parseFloat(row[4]) <= now {
-		return authoritativeMutation{}, errors.New("world event is closed")
-	}
-	if c.Location != location {
-		return authoritativeMutation{}, fmt.Errorf("travel to %s before acting in this event", location)
-	}
-	payload := map[string]any{}
-	_ = json.Unmarshal([]byte(fmt.Sprint(row[2])), &payload)
-	severity := clampI64(storage.ParseInt(payload["severity"]), 1, 10)
+	title, severity := ev.Title, ev.Severity
 
 	node, err := loadWorldEventNodeTx(conn, eventKey, nodeKey)
 	if err != nil {

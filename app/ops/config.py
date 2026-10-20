@@ -138,8 +138,6 @@ class Settings:
     auto_narrate_event_threads: bool
     event_thread_auto_archive_minutes: int
     unexpected_event_chance_percent: int
-    reincarnation_base_samsara_years: int
-    reincarnation_max_wait_seconds: int
     database_path: Path
     health_host: str
     http_max_request_line_bytes: int
@@ -363,20 +361,6 @@ class Settings:
         if not 0 <= chance <= 100:
             raise RuntimeError("UNEXPECTED_EVENT_CHANCE_PERCENT must be between 0 and 100")
 
-        reincarnation_base_samsara_years = _as_int(
-            os.getenv("REINCARNATION_BASE_SAMSARA_YEARS"),
-            320,
-            name="REINCARNATION_BASE_SAMSARA_YEARS",
-        )
-        if not 1 <= reincarnation_base_samsara_years <= 5000:
-            raise RuntimeError("REINCARNATION_BASE_SAMSARA_YEARS must be between 1 and 5000")
-        reincarnation_max_wait_seconds = _as_int(
-            os.getenv("REINCARNATION_MAX_WAIT_SECONDS"), 300,
-            name="REINCARNATION_MAX_WAIT_SECONDS",
-        )
-        if not 30 <= reincarnation_max_wait_seconds <= 3600:
-            raise RuntimeError("REINCARNATION_MAX_WAIT_SECONDS must be between 30 and 3600")
-
         # Bounds for the pre-auth HTTP request head on the health listener.
         # Shared names with the dashboard: one knob per limit, both servers.
         http_max_request_line_bytes = _as_int(
@@ -538,8 +522,6 @@ class Settings:
             auto_narrate_event_threads=_as_bool(os.getenv("AUTO_NARRATE_EVENT_THREADS"), False),
             event_thread_auto_archive_minutes=archive_minutes,
             unexpected_event_chance_percent=chance,
-            reincarnation_base_samsara_years=reincarnation_base_samsara_years,
-            reincarnation_max_wait_seconds=reincarnation_max_wait_seconds,
             database_path=Path(os.getenv("DATABASE_PATH", "data/xianxia.sqlite3")),
             health_host=health_host,
             http_max_request_line_bytes=http_max_request_line_bytes,

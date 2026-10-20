@@ -15,7 +15,7 @@ from ...rules.realm_hubs import city_of_place
 from ..hubs import HubDynamicOption, register_hub_option_hint, register_hub_option_provider
 from ..locations import location_autocomplete
 from ..registry import registered_group_command
-from ..runtime import carried_item_autocomplete, _explain_engine_error, DB, ENGINE, WORLD, current_world_time, log, reply_long, require_character, serialized_user_action
+from ..runtime import _explain_engine_error, DB, ENGINE, WORLD, current_world_time, log, reply_long, require_character, serialized_user_action
 from ..war_feed import refresh_war
 
 # ---------- Advanced branch forward-port: beasts, artifacts, territory, caravans, parties, PvP, social state ----------
@@ -247,9 +247,29 @@ register_hub_option_hint(
 )
 
 
+async def caravan_cargo_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    """What a caravan will pay for from here, the engine's own answer
+    (`caravan.payable`, v1.35.0): the picker used to be the whole bag, so it
+    offered goods the dispatch then refused as worth less than a coin. An
+    unreadable answer offers nothing rather than guessing."""
+    try:
+        answer = dict(await ENGINE.action("caravan.payable", interaction.user.id, {}) or {})
+    except Exception:
+        log.warning("Could not read what a caravan pays for", exc_info=True)
+        return []
+    coin = WORLD.currency_name(str(answer.get("currency_id") or ""))
+    needle = current.casefold().strip(); out = []
+    for row in list(answer.get("items") or []):
+        item_id = str(row.get("item_id") or ""); name = str(row.get("name") or WORLD.item_name(item_id))
+        if needle and needle not in name.casefold() and needle not in item_id.casefold():
+            continue
+        out.append(app_commands.Choice(name=f"{name} x{int(row.get('quantity') or 0)} — {int(row.get('unit_price') or 0)} {coin} each"[:100], value=item_id[:100]))
+    return out[:25]
+
+
 @registered_group_command(caravan_group, name="dispatch", description="Send goods with optional escorts, smuggling and destination tax exposure")
 @app_commands.autocomplete(destination=location_autocomplete)
-@app_commands.autocomplete(item=carried_item_autocomplete)
+@app_commands.autocomplete(item=caravan_cargo_autocomplete)
 @serialized_user_action
 async def caravan_dispatch(interaction: discord.Interaction, destination: str, item: str, quantity: app_commands.Range[int,1,50]=1, escort: app_commands.Range[int,0,20]=0, smuggle: bool=False) -> None:
     await interaction.response.defer(ephemeral=False)
