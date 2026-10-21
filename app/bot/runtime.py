@@ -551,8 +551,21 @@ async def _sync_realm_presence_roles(
 async def authoritative_lifespan(user_id: int) -> SimpleNamespace:
     result = await ENGINE.action("character.lifespan", int(user_id), {})
     return SimpleNamespace(**dict(result or {}))
-async def _record_true_death_history(user_id: int, death: dict[str, Any], game_minute: int) -> None:
-    """Persist descriptive world history after Go commits the lifecycle transition."""
+async def _record_true_death_history(user_id: int, death: dict[str, Any], game_minute: int, guild: discord.Guild | None) -> None:
+    """What the bot does after Go commits a true death: the descriptive world
+    history, and the stall card (v1.37.0).
+
+    The engine closes a dead keeper's stall in the same transaction as the
+    death (closeStallTx through the leaving door), and the card that names it
+    stays in the market channel until the bot takes it down - so every door a
+    death comes through (old age in require_character, a defeat in the two
+    battle handlers) ends here, with the guild, and refreshes the card after
+    the engine has committed (v1.0.8's order). `sync_stalls` after each tick
+    catches the deaths the engine's own sweep records with no bot door at all.
+    """
+    # stall_feed imports this module for DB and WORLD, so the import is here.
+    from .stall_feed import refresh_stall
+
     name = str(death.get("name") or "A cultivator")
     location = str(death.get("location") or "")
     reason = str(death.get("reason") or "unknown")
@@ -581,6 +594,7 @@ async def _record_true_death_history(user_id: int, death: dict[str, Any], game_m
         # History is descriptive; it must never roll back or counterfeit the already
         # committed authoritative life-state transition.
         log.exception("Could not mirror authoritative true death into world history")
+    await refresh_stall(guild, int(user_id))
 async def respond(interaction: discord.Interaction, content: str | None = None, **kwargs: Any) -> None:
     """Send an interaction reply whether or not it was already acked.
 
@@ -633,7 +647,7 @@ async def require_character(interaction: discord.Interaction, *, allow_deceased:
             # The descriptive history mirror is source-key idempotent, so replay it
             # too: this repairs a prior best-effort history write without duplicating
             # or changing the already-authoritative lifecycle transition.
-            await _record_true_death_history(interaction.user.id, death, wt.total_minutes)
+            await _record_true_death_history(interaction.user.id, death, wt.total_minutes, interaction.guild)
             character["life_status"] = "deceased"
     if character.get("life_status") == "deceased" and not allow_deceased:
         await respond(

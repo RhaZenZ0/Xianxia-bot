@@ -18,24 +18,12 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
 
 ## Open
 
-- **deferred (design)** — *What a rebirth leaves of the last life.* `samsara_tables_test.go` (v1.36.0)
-  holds every table that carries a person to wiped, kept, settled at death or open, and `samsaraOpen`
-  names twenty-three columns a reborn cultivator still finds of the old body: its qi body and alchemy
-  residue (`character_qi_body`, `alchemy_state`, `alchemy_batches`), a beast encounter and an
-  expedition thread it was in, its sect residence, recommendations and recruitment attempts, its
-  stall with its listings, sales and card, trades and Dao partnerships still open, a duel in
-  progress, and the bond with a master among the sect's people (`npc_mentorships`, which
-  `sect.ascend` and the GM lever end and the rebirth does not). Each is one line in
-  `incarnationScopedLinks` once the owner says it goes, or a reason in `samsaraKept` once they say
-  it stays; the gate fails on a column in neither.
-- **deferred (design)** — *Three Python-era levers the bot's own code still writes through.*
-  `relationship.update` takes the trust, respect, fear, affection, debt and grudge deltas off the
-  payload and `/talk` sends `trust: 1` from `scene.py`; `cultivation.reward` takes cultivation,
-  stones, insight and items and `combat.apply_damage` a damage figure, and nothing under `app/`
-  calls either - the engine playtest uses them to fill a stage. All three are allowlisted in the
-  payload sweep (`statesLegacy`, `payload_fields_test.go`, v1.36.0) because the bot is the only
-  caller and it is trusted; what they should become is the owner's: admin-only levers (audited, so
-  the playtest keeps its door), removed, or an engine rule for what a talk is worth.
+- **deferred (design)** — *Ladder rounding at the upper posts.* The Immortal post sells the peach for
+  one immortal stone (10,000 stones' worth) against the Mortal post's 17,712, because `UnderworldBase`
+  rounds the Mortal base down when it carries it up the ladder (v1.36.0). No mint - every ceiling sits
+  under the post as a shelf - but an inversion a rounding rule (up, or to nearest) or a content pass
+  pricing upper-world goods would settle. Decided (v1.37.0): left for the content pass that will
+  also author upper-world demand; a rounding rule alone would move every upper shelf for one peach.
 - **deferred (design)** — *Upper-world keepers have thin boards.* 790 of the 1,154 keeper buy lines pay
   nothing now: a Mortal-made good is worth under a whole coin up there once the ladder is read, so the
   cheap half of an upper economy has no NPC buyer. That is the ceiling doing its job, and it is also a

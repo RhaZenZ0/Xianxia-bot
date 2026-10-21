@@ -41,11 +41,6 @@ const (
 	statesWho    = "another cultivator the caller names; the engine checks they exist and are reachable"
 	statesWire   = "a protocol field: the version the caller saw, so a stale press is refused rather than replayed"
 	statesScene  = "presentation state the bot draws (the thread, the label, the scene type); the engine stores it for the panel and reads no mechanic off it"
-	// The Python-era levers (relationship.update, cultivation.reward,
-	// combat.apply_damage, quest.progress): the bot's own reporters and the
-	// engine playtest write through them, and what they say is believed. Each
-	// is named in docs/TODO.md as an owner's decision - admin-only, removed,
-	// or an engine-side rule - and until it is taken the fields stay stated.
 	// What a GM authors through the dashboard (admin.quest.save): content, not
 	// a player's state. The Forge's validator (app/rules/quests.py,
 	// validate_quest_definition) is the gate on it - the budget, the targets,
@@ -56,8 +51,7 @@ const (
 	// and what they are attempting. The engine rolls with the attribute it
 	// computes and writes nothing but the result; a scene's own checks
 	// (scene.action) take their TN from sceneActionProfiles and not from here.
-	statesDie    = "the /check die a player calls for a roleplay beat: attribute and difficulty are the player's own call, the engine rolls and records only the result"
-	statesLegacy = "a Python-era lever the bot's own code writes through (docs/TODO.md, v1.36.0); the owner decides whether it becomes admin-only, goes, or grows an engine rule"
+	statesDie = "the /check die a player calls for a roleplay beat: attribute and difficulty are the player's own call, the engine rolls and records only the result"
 )
 
 var callerStates = map[string]string{
@@ -100,7 +94,7 @@ var callerStates = map[string]string{
 	"attribute": statesDie, "tn": statesDie, "label": statesText,
 	"name": statesText, "concept": statesText, "discord_name": statesText, "child_name": statesText,
 	"summary": statesText, "detail": statesText, "details": statesText, "primary_details": statesText,
-	"secondary_details": statesText, "end_reason": statesText, "reason": statesText, "event_type": statesText,
+	"secondary_details": statesText, "end_reason": statesText, "reason": statesText,
 	// Who.
 	"target_user_id": statesWho, "to_user_id": statesWho, "partner_user_id": statesWho, "master_user_id": statesWho,
 	"guest_user_id": statesWho, "invitee_user_id": statesWho, "owner_user_id": statesWho, "user_id": statesWho,
@@ -114,10 +108,11 @@ var callerStates = map[string]string{
 	"variants": statesAuthored, "giver_npc": statesAuthored, "realm_band": statesAuthored, "tier": statesAuthored,
 	"deadline_game_minutes": statesAuthored, "requires_sect": statesAuthored, "reward_visibility": statesAuthored,
 	"boast": statesAuthored,
-	// The Python-era levers.
-	"trust": statesLegacy, "respect": statesLegacy, "fear": statesLegacy, "affection": statesLegacy,
-	"debt": statesLegacy, "grudge": statesLegacy, "cultivation": statesLegacy, "cultivation_cap": statesLegacy,
-	"spirit_stones": statesLegacy, "insight_xp": statesLegacy, "items": statesLegacy, "damage": statesLegacy,
+	// The Python-era levers (relationship.update, cultivation.reward,
+	// combat.apply_damage) stated trust, cultivation, stones and damage here
+	// until v1.37.0, when they became GM levers reading a decoded map like
+	// every other admin.player.* lever, and /talk's trust became the engine's
+	// rule (npc.talk, whose fields are a name and a text).
 }
 
 // Fields kept on the wire for an older bot and read by nothing, keyed

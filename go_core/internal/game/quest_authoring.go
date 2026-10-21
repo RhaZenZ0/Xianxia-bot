@@ -277,6 +277,17 @@ func adminQuestSave(conn *storage.Conn, adminUserID int64, raw json.RawMessage) 
 	if err != nil {
 		return nil, err
 	}
+	// The GM budget (v1.37.0): what the stored row already pays is the
+	// baseline; a raise above the budget is refused here, whoever is asking.
+	var baseline map[string]any
+	if before != nil {
+		if text, ok := before["rewards_json"].(string); ok && text != "" {
+			_ = json.Unmarshal([]byte(text), &baseline)
+		}
+	}
+	if err := checkQuestRewardBudget(p.Rewards, baseline, questRewardBudgetFromEnv()); err != nil {
+		return nil, err
+	}
 	// Read the holders BEFORE the definition changes: an unpinned holder is on
 	// the old definition, and once it is overwritten there is no way back to
 	// what they agreed to.

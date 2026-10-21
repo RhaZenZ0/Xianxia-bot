@@ -491,7 +491,7 @@ func TestInsightXPHasOneDoor(t *testing.T) {
 	// Each entry is a statement that writes `characters.insight_xp` without
 	// going through `grantInsightXPTx`, with the reason it may.
 	insightWritersAllowed := map[string]string{
-		"actions.go":             "admin.player.cultivation_reward is a GM lever: a grant is the number the GM typed, the same exemption purseWritersAllowed makes for admin.player.grant_currency",
+		"admin_player_levers.go": "admin.player.cultivation_reward is a GM lever (v1.37.0, cultivation.reward until then): a grant is the number the GM typed, the same exemption purseWritersAllowed makes for admin.player.grant_currency",
 		"cultivation_actions.go": "rewardMasterGo pays a *disciple's* breakthrough to a third party, and the reroll is a spend; reading the master's own effect rows inside a disciple's action is a different rule",
 		"law_actions.go":         "a spend - a multiplier must never touch a debit",
 		"cultivation_stance.go":  "the insight gate's spend, as above",

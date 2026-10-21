@@ -219,6 +219,40 @@ class TheEngineHoldsTheOneStatement(unittest.TestCase):
         self.assertNotIn("reincarnation_base_samsara_years", config)
         self.assertNotIn("reincarnation_max_wait_seconds", config)
 
+    def test_the_quest_budget_is_the_engines_key_too(self):
+        """The three QUEST_REWARD keys are read by the engine (v1.37.0), which
+        refuses a raise over the budget wherever the save comes from, and still
+        by the bot's config and the dashboard, which draft and anticipate the
+        refusal. Three statements of one default: the Go constants, config.py's
+        tuple and server.py's _cap calls must say the same numbers, and the key
+        is stated in the four places an engine key is stated."""
+        budget_go = (GO / "quest_budget.go").read_text(encoding="utf-8")
+        compose = (PROJECT_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        env = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
+        docs = (PROJECT_ROOT / "docs" / "CONFIGURATION.md").read_text(encoding="utf-8")
+        config = (PROJECT_ROOT / "app" / "ops" / "config.py").read_text(encoding="utf-8")
+        server = (PROJECT_ROOT / "app" / "dashboard" / "server.py").read_text(encoding="utf-8")
+        engine_block = compose[compose.index("xianxia-engine:"): compose.index("xianxia-db-init:")]
+        defaults = {
+            "QUEST_REWARD_MAX_XP": "questBudgetMaxXPDefault",
+            "QUEST_REWARD_MAX_STONES": "questBudgetMaxStonesDefault",
+            "QUEST_REWARD_MAX_ITEMS": "questBudgetMaxItemsDefault",
+        }
+        for key, const in defaults.items():
+            with self.subTest(key=key):
+                self.assertIn(f'os.Getenv("{key}")', budget_go, key)
+                self.assertIn(f"{key}:", engine_block, f"{key} is not passed to the engine service")
+                self.assertTrue(re.search(rf"^{key}=\d+$", env, re.M), f"{key} is not in .env.example")
+                self.assertIn(f"`{key}`", docs, key)
+                go_default = re.search(rf"{const}\s*=\s*int64\((\d+)\)", budget_go)
+                self.assertIsNotNone(go_default, f"{const} moved; the gate is broken, not the tree")
+                py_default = re.search(rf'\("{key}", (\d+)\)', config)
+                self.assertIsNotNone(py_default, f"config.py no longer states {key}'s default")
+                dash_default = re.search(rf'_cap\("{key}", (\d+)\)', server)
+                self.assertIsNotNone(dash_default, f"server.py no longer states {key}'s default")
+                self.assertEqual({go_default.group(1), py_default.group(1), dash_default.group(1)}, {go_default.group(1)},
+                                 f"{key}: the Go, the bot and the dashboard state different defaults")
+
     def test_every_wait_has_one_entry_and_a_sane_default(self):
         entries = cooldown_defaults()
         self.assertGreaterEqual(len(entries), 12, "every action that had a caller-supplied wait")

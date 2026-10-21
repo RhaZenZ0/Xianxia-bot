@@ -1320,8 +1320,20 @@ async def run(url: str, token: str, db_path: str) -> Report:
 
     # -- the bridge: the four operations the bot calls on the engine's behalf
     await step(report, "scene.transition to the street", engine.action("scene.transition", PLAYER, {"physical_location": town, "scene_type": "world", "scene_key": "", "scene_label": "the street", "metadata": {}}))
-    await step(report, "relationship.update", engine.action("relationship.update", PLAYER, {"npc_name": "Elder Su Yan", "trust": 1, "summary": "playtest"}))
-    await step(report, "cultivation.reward", engine.action("cultivation.reward", PLAYER, {"cultivation": 1, "spirit_stones": 1, "insight_xp": 1, "event_type": "playtest"}))
+    # A talk is worth one trust a day (v1.37.0): the first pays, the second
+    # in the same world day counts the encounter and pays nothing.
+    first_talk = await step(report, "npc.talk", act("npc.talk", PLAYER, {"npc_name": "Elder Su Yan", "summary": "playtest"}))
+    second_talk = await step(report, "npc.talk again the same day", act("npc.talk", PLAYER, {"npc_name": "Elder Su Yan", "summary": "playtest, again"}))
+    if first_talk is not None and second_talk is not None:
+        report.add("PASS" if first_talk.get("trust_gained") is True and second_talk.get("trust_gained") is False
+                   and int(second_talk.get("trust", 0)) == int(first_talk.get("trust", 0))
+                   and int(second_talk.get("encounter_count", 0)) == int(first_talk.get("encounter_count", 0)) + 1 else "FAIL",
+                   "a talk is worth one trust a day: the second counts the encounter and pays nothing",
+                   f"first trust={first_talk.get('trust')} gained={first_talk.get('trust_gained')}; "
+                   f"second trust={second_talk.get('trust')} gained={second_talk.get('trust_gained')} encounters={second_talk.get('encounter_count')}")
+    # The three Python-era levers are the GM's, audited (v1.37.0).
+    await audited("admin.player.relationship", {"user_id": PLAYER, "npc_name": "Elder Su Yan", "respect": 1, "summary": "playtest", "reason": "playtest"})
+    await audited("admin.player.cultivation_reward", {"user_id": PLAYER, "cultivation": 1, "spirit_stones": 1, "insight_xp": 1, "event_type": "playtest", "reason": "playtest"})
 
     # -- storage
     await step(report, "storage.deposit two herbs", act("storage.deposit", PLAYER, {"item_id": "spirit_herb", "quantity": 2}))
@@ -1517,7 +1529,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         if battle_id:
             await step(report, "combat.recovery_item", act("combat.recovery_item", PLAYER, {"battle_id": battle_id, "item_id": "recovery_pill"}))
             await step(report, "combat.technique refuses a technique nobody has", act("combat.technique", PLAYER, {"battle_id": battle_id, "technique": "no_such_technique"}), expect_error="unknown Law technique")
-            await step(report, "combat.apply_damage", engine.action("combat.apply_damage", PLAYER, {"battle_id": battle_id, "damage": 1}))
+            await audited("admin.player.apply_damage", {"user_id": PLAYER, "battle_id": battle_id, "damage": 1, "reason": "playtest"})
             struck = await step(report, "manual.technique Cloud-Step Draw", act("manual.technique", PLAYER, {"technique_id": "azure_cloud_foundation_sword_canon_cloud_step_draw"}))
             if struck is not None:
                 report.add("PASS", "the technique is a roll, reported", f"damage={struck.get('damage')} forbidden={struck.get('forbidden')}")
@@ -2078,7 +2090,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
 
     # -- progression (v1.0.0-rc.37)
     # Perfection is walked on both ladders. The qi stage is filled by a lever
-    # (`cultivation.reward`) and the body stage by training, because nothing
+    # (`admin.player.cultivation_reward`, the GM's since v1.37.0) and the body stage by training, because nothing
     # but `cultivation.body_train` writes `body_cultivation`; the body ladder
     # itself is set by the realm lever's new pair. A perfection quest is a
     # roll on an attribute no lever raises (attr+2 vs TN 13-18 on 2d10), so
@@ -2205,7 +2217,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
                    "the realm lever sets the body ladder when asked", f"body={both.get('body_realm_index')}/{both.get('body_phase')}")
     await step(report, "the lever refuses half a body ladder",
                gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 0, "phase": 9, "body_phase": 9, "reason": "playtest"}), expect_error="set together")
-    await step(report, "fill the qi stage", engine.action("cultivation.reward", PLAYER, {"cultivation": 400, "event_type": "playtest"}))
+    await step(report, "fill the qi stage", gm("admin.player.cultivation_reward", {"user_id": PLAYER, "cultivation": 400, "event_type": "playtest", "reason": "playtest"}))
     await walk_perfection(body=False)
     filled, sessions = 0, 0
     for _ in range(20):
@@ -2231,7 +2243,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
                    f"success={broke.get('success')} stage {broke.get('from_stage')}->{broke.get('to_stage')} total={roll.get('total')} tn={broke.get('tn')}")
 
     await step(report, "stand at the Mortal Ascension gate: realm 7 stage 9", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 7, "phase": 9, "reason": "playtest"}))
-    await step(report, "fill the gate's stage, with essence to spare for the aptitudes", engine.action("cultivation.reward", PLAYER, {"cultivation": 80000, "event_type": "playtest"}))
+    await step(report, "fill the gate's stage, with essence to spare for the aptitudes", gm("admin.player.cultivation_reward", {"user_id": PLAYER, "cultivation": 80000, "event_type": "playtest", "reason": "playtest"}))
     await step(report, "thirty stones for the preparation", gm("admin.player.grant_currency", {"user_id": PLAYER, "currency_id": "low_spirit_stone", "amount": 30, "reason": "playtest"}))
     for n in range(1, 6):
         banked = await step(report, f"tribulation.prepare {n} of 5", act("tribulation.prepare", PLAYER, {"path": "qi"}))

@@ -308,7 +308,7 @@ async def _use_battle_recovery_item(interaction: discord.Interaction, battle_id:
             f"⚗️ Medicinal residue **+{int(state['toxicity_gain'])}** → pill toxicity "
             f"**{int(state.get('pill_toxicity', 0))}/100 ({state.get('toxicity_band', '')})**."
         )
-    lines.extend(await _answer_lines(state, wt.total_minutes, interaction.user.id))
+    lines.extend(await _answer_lines(state, wt.total_minutes, interaction.user.id, interaction.guild))
     return "\n".join(lines)
 
 async def _execute_battle_manual_technique(interaction: discord.Interaction, battle: dict, technique: str) -> str:
@@ -397,11 +397,11 @@ async def _execute_battle_law_technique(interaction: discord.Interaction, battle
         lines.append("The opponent resists or tears free of your spatial authority.")
     if result.get("opponent_defeated"):
         return "\n".join(lines)
-    lines.extend(await _answer_lines(result, wt.total_minutes, interaction.user.id))
+    lines.extend(await _answer_lines(result, wt.total_minutes, interaction.user.id, interaction.guild))
     return "\n".join(lines)
 
 
-async def _answer_lines(result: dict[str, Any], game_minute: int, user_id: int) -> list[str]:
+async def _answer_lines(result: dict[str, Any], game_minute: int, user_id: int, guild: discord.Guild | None) -> list[str]:
     """The opponent's answer to a turn the cultivator spent, and how a defeat
     in it reads: one statement for the Law technique and the pill (v1.34.0),
     both of which are answered by the engine's one counter-attack."""
@@ -421,7 +421,7 @@ async def _answer_lines(result: dict[str, Any], game_minute: int, user_id: int) 
             )
         elif result.get("true_death"):
             death = dict(result.get("true_death") or {})
-            await _record_true_death_history(user_id, death, game_minute)
+            await _record_true_death_history(user_id, death, game_minute, guild)
             # The engine's numbers (v1.35.0): the wait is scaled there and
             # printed here, with no copy of the setting to fall back on.
             years = int(death.get("private_years") or 0)
@@ -588,7 +588,7 @@ async def _resolve_battle_turn(interaction:discord.Interaction,style:str,action:
             )
         elif result.get("true_death"):
             death=dict(result.get("true_death") or {})
-            await _record_true_death_history(interaction.user.id,death,wt.total_minutes)
+            await _record_true_death_history(interaction.user.id,death,wt.total_minutes,interaction.guild)
             years=int(death.get("private_years") or 0)
             wait=max(1,int(death.get("real_wait_seconds") or 0))
             lines.append(

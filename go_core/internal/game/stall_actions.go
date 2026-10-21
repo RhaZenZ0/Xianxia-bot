@@ -557,9 +557,34 @@ func stallCloseAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	rows, err := stallListingRows(conn, catalog, userID)
+	returned, listings, err := closeStallTx(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
+	}
+	out := map[string]any{"city": stall["city"], "name": stall["name"], "returned": returned, "listings_returned": listings}
+	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "economy", EventType: "stall.close", EntityType: "stall", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: out}}, nil
+}
+
+// closeStallTx is the one way a stall closes: every listing's goods go back to
+// the keeper's inventory and the listing and stall rows go. The keeper's own
+// `stall.close` reaches it after the here-check, and the leaving door every way
+// out of a body shares (resolveLeavingEscrowTx, v1.37.0) reaches it with no
+// check at all, because a dead keeper's stall used to trade on - the town
+// bought from it and paid a purse nobody held, and a reborn soul found the
+// old body's goods still laid out in a city it had never seen. It answers what
+// came back and how many listings there were; a keeper with no stall is
+// (nil, 0, nil). The sales ledger stays, as it does when the keeper closes up.
+func closeStallTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (map[string]int64, int, error) {
+	stall, err := stallByOwnerTx(conn, userID)
+	if err != nil {
+		return nil, 0, err
+	}
+	if stall == nil {
+		return nil, 0, nil
+	}
+	rows, err := stallListingRows(conn, catalog, userID)
+	if err != nil {
+		return nil, 0, err
 	}
 	returned := map[string]int64{}
 	for _, row := range rows {
@@ -567,17 +592,16 @@ func stallCloseAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	}
 	if len(returned) > 0 {
 		if err := addInventoryTx(conn, userID, returned); err != nil {
-			return authoritativeMutation{}, err
+			return nil, 0, err
 		}
 	}
 	if _, err := conn.Execute(`DELETE FROM stall_listings WHERE user_id=?`, []any{userID}); err != nil {
-		return authoritativeMutation{}, err
+		return nil, 0, err
 	}
 	if _, err := conn.Execute(`DELETE FROM player_stalls WHERE user_id=?`, []any{userID}); err != nil {
-		return authoritativeMutation{}, err
+		return nil, 0, err
 	}
-	out := map[string]any{"city": stall["city"], "name": stall["name"], "returned": returned, "listings_returned": len(rows)}
-	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "economy", EventType: "stall.close", EntityType: "stall", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: out}}, nil
+	return returned, len(rows), nil
 }
 
 // stallSaleTx is the one payout (rule 4). It takes `quantity` off the listing

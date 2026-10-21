@@ -55,24 +55,27 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 	catalog, _ := worlddata.Load(worldPath)
 	var result any
 	switch req.Operation {
-	case "relationship.update":
-		result, err = relationshipUpdate(conn, req.ActorID, req.Payload)
 	case "npc.found":
 		result, err = npcFound(conn, catalog, req.ActorID, req.Payload)
 	case "scene.transition":
 		result, err = sceneTransition(conn, req.ActorID, req.Payload)
 	case "quest.progress":
 		result, err = questProgress(conn, catalog, req.ActorID, req.Payload)
-	case "combat.apply_damage":
-		result, err = combatApplyDamage(conn, req.ActorID, req.Payload)
-	case "cultivation.reward":
-		result, err = cultivationReward(conn, catalog, req.ActorID, req.Payload)
 	case "admin.world.advance_time":
 		result, err = adminAdvanceTime(conn, req.ActorID, req.Payload)
 	case "admin.player.grant_currency":
 		result, err = adminGrantCurrency(conn, catalog, req.ActorID, req.Payload)
 	case "admin.player.karma":
 		result, err = adminKarma(conn, req.ActorID, req.Payload)
+	// The three Python-era levers, GM-only and audited since v1.37.0
+	// (admin_player_levers.go): a relationship's six dimensions, a
+	// cultivation reward and a point of battle damage.
+	case "admin.player.relationship":
+		result, err = adminPlayerRelationship(conn, req.ActorID, req.Payload)
+	case "admin.player.cultivation_reward":
+		result, err = adminPlayerCultivationReward(conn, catalog, req.ActorID, req.Payload)
+	case "admin.player.apply_damage":
+		result, err = adminPlayerApplyDamage(conn, req.ActorID, req.Payload)
 	case "admin.player.fate":
 		result, err = adminFate(conn, req.ActorID, req.Payload)
 	case "admin.player.teleport":
@@ -285,70 +288,6 @@ func narrowToInt(v int64) int {
 		return math.MinInt
 	}
 	return int(v)
-}
-
-type relationshipPayload struct {
-	NPCName   string `json:"npc_name"`
-	Trust     int64  `json:"trust"`
-	Respect   int64  `json:"respect"`
-	Fear      int64  `json:"fear"`
-	Affection int64  `json:"affection"`
-	Debt      int64  `json:"debt"`
-	Grudge    int64  `json:"grudge"`
-	Summary   string `json:"summary"`
-}
-
-func relationshipUpdate(conn *storage.Conn, userID int64, raw json.RawMessage) (any, error) {
-	var p relationshipPayload
-	if err := json.Unmarshal(raw, &p); err != nil {
-		return nil, err
-	}
-	p.NPCName = strings.TrimSpace(p.NPCName)
-	if p.NPCName == "" {
-		return nil, errors.New("npc_name is required")
-	}
-	if err := begin(conn); err != nil {
-		return nil, err
-	}
-	defer func() {
-		if conn.InTransaction() {
-			rollback(conn)
-		}
-	}()
-	rowRes, err := conn.Execute(`SELECT trust,respect,fear,affection,debt,grudge,encounter_count FROM npc_relationships WHERE user_id=? AND npc_name=?`, []any{userID, p.NPCName})
-	if err != nil {
-		return nil, err
-	}
-	current := map[string]int64{"trust": 0, "respect": 0, "fear": 0, "affection": 0, "debt": 0, "grudge": 0, "encounter_count": 0}
-	if row := firstRowMap(rowRes); row != nil {
-		for k := range current {
-			current[k] = i64(row[k])
-		}
-	}
-	values := map[string]int64{
-		"trust": clamp(current["trust"]+p.Trust, -100, 100), "respect": clamp(current["respect"]+p.Respect, -100, 100),
-		"fear": clamp(current["fear"]+p.Fear, -100, 100), "affection": clamp(current["affection"]+p.Affection, -100, 100),
-		"debt": clamp(current["debt"]+p.Debt, -100, 100), "grudge": clamp(current["grudge"]+p.Grudge, -100, 100),
-	}
-	encounter := current["encounter_count"] + 1
-	summary := []rune(p.Summary)
-	if len(summary) > 800 {
-		summary = summary[:800]
-	}
-	now := float64(time.Now().UnixNano()) / 1e9
-	_, err = conn.Execute(`INSERT INTO npc_relationships(user_id,npc_name,trust,respect,fear,affection,debt,grudge,encounter_count,last_summary,updated_at)
-VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id,npc_name) DO UPDATE SET trust=excluded.trust,respect=excluded.respect,fear=excluded.fear,affection=excluded.affection,debt=excluded.debt,grudge=excluded.grudge,encounter_count=excluded.encounter_count,last_summary=excluded.last_summary,updated_at=excluded.updated_at`, []any{userID, p.NPCName, values["trust"], values["respect"], values["fear"], values["affection"], values["debt"], values["grudge"], encounter, string(summary), now})
-	if err != nil {
-		return nil, err
-	}
-	if err := conn.Commit(); err != nil {
-		return nil, err
-	}
-	out := map[string]any{"user_id": userID, "npc_name": p.NPCName, "encounter_count": encounter, "last_summary": string(summary), "updated_at": now}
-	for k, v := range values {
-		out[k] = v
-	}
-	return out, nil
 }
 
 type scenePayload struct {
@@ -738,131 +677,6 @@ func forcedQuestTransition(objectives []map[string]any) map[string]any {
 		progress[id] = required
 	}
 	return map[string]any{"touched": true, "complete": true, "progress": progress}
-}
-
-type combatPayload struct {
-	BattleID int64 `json:"battle_id"`
-	Damage   int64 `json:"damage"`
-}
-
-func combatApplyDamage(conn *storage.Conn, userID int64, raw json.RawMessage) (any, error) {
-	var p combatPayload
-	if err := json.Unmarshal(raw, &p); err != nil {
-		return nil, err
-	}
-	if p.Damage < 0 {
-		p.Damage = 0
-	}
-	if err := begin(conn); err != nil {
-		return nil, err
-	}
-	defer func() {
-		if conn.InTransaction() {
-			rollback(conn)
-		}
-	}()
-	res, err := conn.Execute(`SELECT b.player_hp,c.vitality,c.vitality_max FROM battles b JOIN characters c ON c.user_id=b.user_id WHERE b.battle_id=? AND b.user_id=? AND b.status='active'`, []any{p.BattleID, userID})
-	if err != nil {
-		return nil, err
-	}
-	row := firstRowMap(res)
-	if row == nil {
-		_ = conn.Commit()
-		return map[string]any{}, nil
-	}
-	current := i64(row["player_hp"])
-	if v := i64(row["vitality"]); v < current {
-		current = v
-	}
-	updated := current - p.Damage
-	if updated < 0 {
-		updated = 0
-	}
-	vmax := i64(row["vitality_max"])
-	now := float64(time.Now().UnixNano()) / 1e9
-	if _, err = conn.Execute(`UPDATE characters SET vitality=?,updated_at=? WHERE user_id=?`, []any{updated, now, userID}); err != nil {
-		return nil, err
-	}
-	if _, err = conn.Execute(`UPDATE battles SET player_hp=?,player_hp_max=MAX(player_hp_max,?),version=version+1,updated_at=? WHERE battle_id=? AND user_id=? AND status='active'`, []any{updated, vmax, now, p.BattleID, userID}); err != nil {
-		return nil, err
-	}
-	if err := conn.Commit(); err != nil {
-		return nil, err
-	}
-	return map[string]any{"vitality": updated, "vitality_max": vmax}, nil
-}
-
-type cultivationPayload struct {
-	Cultivation    int64            `json:"cultivation"`
-	CultivationCap *int64           `json:"cultivation_cap"`
-	SpiritStones   int64            `json:"spirit_stones"`
-	InsightXP      int64            `json:"insight_xp"`
-	Items          map[string]int64 `json:"items"`
-	EventType      string           `json:"event_type"`
-}
-
-func cultivationReward(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (any, error) {
-	var p cultivationPayload
-	if err := json.Unmarshal(raw, &p); err != nil {
-		return nil, err
-	}
-	if p.Cultivation < 0 {
-		p.Cultivation = 0
-	}
-	if p.EventType == "" {
-		p.EventType = "reward"
-	}
-	if err := begin(conn); err != nil {
-		return nil, err
-	}
-	defer func() {
-		if conn.InTransaction() {
-			rollback(conn)
-		}
-	}()
-	awarded := p.Cultivation
-	if p.CultivationCap != nil {
-		res, err := conn.Execute(`SELECT cultivation FROM characters WHERE user_id=?`, []any{userID})
-		if err != nil {
-			return nil, err
-		}
-		current := int64(0)
-		if row := firstRowMap(res); row != nil {
-			current = i64(row["cultivation"])
-		}
-		room := *p.CultivationCap - current
-		if room < 0 {
-			room = 0
-		}
-		if awarded > room {
-			awarded = room
-		}
-	}
-	now := float64(time.Now().UnixNano()) / 1e9
-	if _, err := conn.Execute(`UPDATE characters SET cultivation=cultivation+?,insight_xp=insight_xp+?,updated_at=? WHERE user_id=?`, []any{awarded, p.InsightXP, now, userID}); err != nil {
-		return nil, err
-	}
-	if p.SpiritStones != 0 {
-		if _, err := characterWalletDeltaTx(conn, catalog, userID, p.SpiritStones, now); err != nil {
-			return nil, err
-		}
-	}
-	for item, qty := range p.Items {
-		if qty <= 0 {
-			continue
-		}
-		if _, err := conn.Execute(`INSERT INTO inventory(user_id,item_id,quantity) VALUES(?,?,?) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=quantity+excluded.quantity`, []any{userID, item, qty}); err != nil {
-			return nil, err
-		}
-	}
-	eventPayload, _ := json.Marshal(map[string]any{"cultivation": awarded, "spirit_stones": p.SpiritStones, "insight_xp": p.InsightXP, "items": p.Items})
-	if _, err := conn.Execute(`INSERT INTO event_log(user_id,event_type,payload_json,created_at) VALUES(?,?,?,?)`, []any{userID, p.EventType, string(eventPayload), now}); err != nil {
-		return nil, err
-	}
-	if err := conn.Commit(); err != nil {
-		return nil, err
-	}
-	return map[string]any{"cultivation_awarded": awarded}, nil
 }
 
 func auditAdmin(conn *storage.Conn, adminUserID int64, action, target string, before, after any, reason string) error {

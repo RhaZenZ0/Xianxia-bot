@@ -103,6 +103,92 @@ func resolveLeavingEscrowTx(conn *storage.Conn, catalog worlddata.Catalog, userI
 		}
 		out["caravans_lost"] = lost
 	}
+	dealings, err := settleLeavingDealingsTx(conn, catalog, userID, now)
+	if err != nil {
+		return nil, err
+	}
+	for key, value := range dealings {
+		out[key] = value
+	}
+	return out, nil
+}
+
+// settleLeavingDealingsTx closes what a body had open with other people when
+// it leaves (v1.37.0): the trade offers it made and was made, the Dao
+// partnership it was in, the duel it was fighting and the stall it kept. Each
+// was a row keyed on the persistent id that the samsara table gate
+// (samsara_tables_test.go) found a reborn cultivator still holding - an offer
+// the other party could accept against an empty inventory, a duel whose turn
+// never came, a stall the town went on buying from with nobody to pay. Nothing
+// here pays or punishes: an offer is voided (nothing was ever escrowed), a
+// bond is severed, a duel is a forfeit with no reputation on either side
+// (finishBreachedMatch), and the stall's goods go back to the corpse's own
+// rows for the rebirth to wipe or the erasure to take.
+//
+// It runs through resolveLeavingEscrowTx, so a death, a reset and an erasure
+// settle alike; a missing table is a feature the database does not have yet
+// (the compose stack's migration window), not an error. The death reads the
+// partner echo off the Dao partnership before it reaches here
+// (recordTrueDeathAuthoritative), and that order is load-bearing.
+func settleLeavingDealingsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, now float64) (map[string]any, error) {
+	out := map[string]any{
+		"trades_voided":        int64(0),
+		"dao_bonds_severed":    int64(0),
+		"duels_forfeited":      int64(0),
+		"stall_closed":         false,
+		"stall_goods_returned": map[string]int64{},
+	}
+	if tableExistsTx(conn, "trade_offers") {
+		voided, err := conn.Execute(
+			`UPDATE trade_offers SET status='voided',resolved_at=?,updated_at=? WHERE status='open' AND (from_user_id=? OR to_user_id=?)`,
+			[]any{now, now, userID, userID})
+		if err != nil {
+			return nil, err
+		}
+		out["trades_voided"] = voided.RowsAffected
+	}
+	if tableExistsTx(conn, "dao_partnerships") {
+		severed, err := conn.Execute(
+			`UPDATE dao_partnerships SET status='severed',updated_at=? WHERE status IN ('pending','active') AND (user_a=? OR user_b=?)`,
+			[]any{now, userID, userID})
+		if err != nil {
+			return nil, err
+		}
+		out["dao_bonds_severed"] = severed.RowsAffected
+	}
+	if tableExistsTx(conn, "pvp_matches") {
+		active, err := conn.Execute(
+			`SELECT match_id,player1_user_id,player2_user_id FROM pvp_matches WHERE status='active' AND (player1_user_id=? OR player2_user_id=?) ORDER BY match_id`,
+			[]any{userID, userID})
+		if err != nil {
+			return nil, err
+		}
+		forfeited := int64(0)
+		for _, raw := range active.Rows {
+			row := rowMap(active.Columns, raw)
+			survivor := i64(row["player1_user_id"])
+			if survivor == userID {
+				survivor = i64(row["player2_user_id"])
+			}
+			breach := &pvpBreach{Reason: "a cultivator has died", Forfeiter: userID, Winner: survivor}
+			if _, err := finishBreachedMatch(conn, i64(row["match_id"]), breach, now); err != nil {
+				return nil, err
+			}
+			forfeited++
+		}
+		out["duels_forfeited"] = forfeited
+	}
+	if stallTablesExist(conn) {
+		returned, listings, err := closeStallTx(conn, catalog, userID)
+		if err != nil {
+			return nil, err
+		}
+		if returned != nil {
+			out["stall_closed"] = true
+			out["stall_goods_returned"] = returned
+			out["stall_entries_returned"] = int64(listings)
+		}
+	}
 	return out, nil
 }
 

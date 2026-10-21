@@ -8724,3 +8724,99 @@ returned None, and the daily door that was going to press a leaf on the returned
 nothing; it clears `content` and `embed` now and the AST gate prints *"cleared: []"* without it. And
 the engine playtest claims the imperial city from its north gate, naming the gate, and reads the
 city's row for the banner and the gate's for none.
+
+### What a body leaves open, settled at the door (v1.37.0)
+
+v1.36.0's table gate named twenty-three columns a reborn cultivator still found of the old body and
+put them to the owner. The owner's word, by group: the body's residue goes (its qi body, its furnace
+state and the batch brewing in it, the beast it was facing); its sect ties go (the residence, the
+recommendation, the bond with a master among the sect's people), but the failed recruitment attempts
+stay, because they pace the next attempt and a reborn soul does not get to re-roll a gate that
+refused it; its open dealings - the trade offers each way, the Dao partnership, the duel - are settled
+at death; its stall closes at death with its goods back on the corpse; its expedition thread is
+collected like the erasure collects it; and the party it led, which the rebirth already disbands in
+place, is kept as the record of a party that was.
+
+Two things the gate had said were not quite so. `npc_mentorships` was listed open "which the rebirth
+does not end", and the rebirth had ended it since v1.34.0 - through `severNPCMasterTx`, a function
+beside the lists, which the gate reads by table and column and could not see. The fault was the
+listing's, not the wipe's: a gate that reads a class by its lists marks as open whatever a sibling
+function does by hand, so the bond is a line in `incarnationScopedLinks` now and the call beside the
+loop is gone. And the stall's sales ledger, grouped with the stall, is the keeper's own record: the
+stall's own close has always left it, and the death's does the same.
+
+The dealings go through the leaving door every way out of a body shares (`resolveLeavingEscrowTx`,
+v1.34.0), in `settleLeavingDealingsTx`: an open offer the dead made or was made is voided (nothing
+was ever escrowed, so nothing comes back), a pending or active Dao bond is severed after the death
+has read the partner echo off it - the order is load-bearing and the test asserts the echo - an
+active duel is a forfeit to the survivor through `finishBreachedMatch` (no reputation either way),
+and the stall closes through `closeStallTx`, which the keeper's own `stall.close` now reaches after
+its here-check. Three gates hold it: the death test drives `lifecycle.true_death` through the
+engine's own door on production's DDL and asks each table what the dead still hold;
+`TestTheLeavingDoorSettlesTheDealings` reads by AST that the leaving door, and nothing else, calls
+the settlement; `TestEveryWayOutOfABodyLeavesThroughTheOneDoor` pins the death's, the reset's and the
+erasure's call to the door. The bot's half: every door a death comes through ends in
+`_record_true_death_history`, which takes the guild now and refreshes the stall card after the
+engine has committed (`test_a_death_takes_the_card_down.py` reads every function in the bot that
+names a death result and holds it to that call with four arguments), and `/reincarnate` reads the
+old body's thread ids before the engine call and deletes the threads after it, the reset's order; it
+joined the thread gate's lever list, and the lot-card half of that gate was scoped to the two levers
+that end lots, because a rebirth's lots were closed by the death before it.
+
+A fixture lesson came with it. No Go test had ever let a character die through the engine's door -
+the one test naming `lifecycle.true_death` sends it a refused field - and building one on production's
+DDL found that a table's `CREATE` is the table as first shipped: `reincarnation_state` came up without
+`partner_echo`, which a migration added. `productionTableDDL` reads the CREATE and then every column a
+migration added to it, the literal `ALTER TABLE ... ADD COLUMN` statements and the
+`for name, ddl in (...)` loops that write the same statement from tuples, and `createProductionTable`
+applies them tolerating a column already there.
+
+Drills: the settlement removed from the leaving door prints *"2 open trade offer(s) survive the death:
+the other party can accept against a corpse's inventory"*, *"the Dao partnership reads "active" after
+the death"*, *"the duel reads "active:0" after the death, want finished:43"* and *"the dead keeper's
+stall is still open (1 row)"*, and the AST gate *"resolveLeavingEscrowTx no longer calls
+settleLeavingDealingsTx"*; the eight links struck from the wipe list print *"8 table column(s)
+carrying a person are not accounted for"* from the table gate and *"a reincarnation left 1 bond(s)
+with the sect's people"* from the bond test.
+
+### Three levers, and what a talk is worth (v1.37.0)
+
+`relationship.update`, `cultivation.reward` and `combat.apply_damage` were the bot's own reporters,
+allowlisted in the payload sweep as a Python-era class with the owner's decision pending. The owner's
+word: GM levers, audited, and an engine rule for the one thing the bot still wrote through them. The
+three are `admin.player.relationship`, `admin.player.cultivation_reward` and
+`admin.player.apply_damage` now (`admin_player_levers.go`): each names the player, takes a reason,
+writes `admin_audit_log` with the row before and after, and reads a decoded map like every other
+admin lever, so the sweep's `statesLegacy` class is gone with nothing left to state. The Player
+Editor gate (`test_the_player_editor_edits_what_the_engine_writes.py`) holds every `admin.player.*`
+the engine dispatches to a card or a reason, so the three have cards - the relationship's picker
+offers everyone the world knows with the people who remember this cultivator first, the reward's cap
+is blank for none, the damage card draws only inside an active battle - and the engine playtest
+pulls each as the GM through `audited`, which reads the newest audit row back.
+
+What a talk is worth is the engine's: `npc.talk` counts the encounter and keeps the summary every
+time and pays one trust the first time a cultivator speaks with an NPC in a world day, read off
+`npc_relationships.last_talk_game_minute` (schema 82; 0 for every pair, so the first talk after the
+upgrade pays). The bot's `NPCRelationshipService.talk` sends a name and a text and no number, which
+`test_core_services` asserts by listing the payload's keys. On a database that has not migrated the
+column is absent and every talk pays its point, as every talk did - the v1.1.0 shape, because a
+refused talk in the migration window is the worse failure. The insight gate's allowlist had named
+`actions.go` for the old lever and names the new file; the quest-authoring tests that save a 400-stone
+reward to tell terms apart raise the budget first.
+
+Drill: the day's gate removed prints *"the second talk the same day: ... trust:2 trust_gained:true - a
+talk paid its point every time, so sixty talks in an afternoon made an old friend"*.
+
+### The budget the engine reads (v1.37.0)
+
+The GM reward budget was the Forge's: `validate_quest_definition` held a quest's rewards to
+`QUEST_REWARD_MAX_XP`, `QUEST_REWARD_MAX_STONES` and `QUEST_REWARD_MAX_ITEMS` when the dashboard saved
+one, and `admin.quest.save` wrote whatever it was given - a bound that lived in the client (rc.48).
+The engine reads the three keys itself now (`quest_budget.go`; compose passes them, the rc.39 shape)
+and refuses a save that raises a reward over the budget with the validator's own sentence, keeping
+v1.36.0's rule that the stored row's rewards are the baseline so a shipped quest above the budget
+saves unchanged. The validator stays as presentation, anticipating the refusal. The three defaults
+are stated in Go, in the bot's config and in the dashboard, and
+`test_the_quest_budget_is_the_engines_key_too` holds the three statements equal and the key to its
+four places. Drill: the check removed from `adminQuestSave` prints *"a new quest paying 120 insight
+was saved"*.

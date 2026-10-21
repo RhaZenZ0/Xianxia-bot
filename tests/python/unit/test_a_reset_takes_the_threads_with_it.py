@@ -36,8 +36,15 @@ THREADS = (APP / "bot" / "threads.py").read_text(encoding="utf-8")
 RESET = (APP / "bot" / "commands" / "character.py").read_text(encoding="utf-8")
 ERASE = (APP / "bot" / "admin" / "world_ops.py").read_text(encoding="utf-8")
 
-# The two levers that delete a player's rows, and the handler each lives in.
-LEVERS = (("character.reset", RESET, "reset"), ("admin.player.erase", ERASE, "admin_erase"))
+# The levers that delete a player's rows, and the handler each lives in. The
+# rebirth joined them in v1.37.0: it wipes expedition_threads and the abode rows
+# that name the threads (incarnationScopedLinks), and left the last life's
+# journal standing until it read the ids first.
+LEVERS = (
+    ("character.reset", RESET, "reset"),
+    ("admin.player.erase", ERASE, "admin_erase"),
+    ("lifecycle.reincarnate", RESET, "reincarnate"),
+)
 
 
 def _function(source: str, name: str) -> ast.AsyncFunctionDef | ast.FunctionDef:
@@ -184,8 +191,14 @@ class BothLeversTakeTheirLotCardsDown(unittest.TestCase):
     the stall card: the cards are read before the engine call, because the sweep
     takes the rows that say which lots were theirs, and settled after it."""
 
+    # The two levers that end a life's lots. A rebirth is not one: the death
+    # before it closed the lots through the leaving door (v1.34.0) and the
+    # floor's own sync (`sync_lots`, after every tick) took their cards down,
+    # so by the time a soul is reborn there is no card left that names it.
+    LOT_LEVERS = tuple(lever for lever in LEVERS if lever[0] != "lifecycle.reincarnate")
+
     def test_the_cards_are_read_before_the_engine_and_settled_after(self):
-        for operation, source, handler in LEVERS:
+        for operation, source, handler in self.LOT_LEVERS:
             with self.subTest(operation=operation):
                 fn = _function(source, handler)
                 reads = _call_lines(fn, "player_lot_cards")

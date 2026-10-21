@@ -9,6 +9,22 @@ section in it.
 
 ## Fixed
 
+- **fixed (v1.37.0)** — *What a rebirth leaves of the last life.* The twenty-three columns
+  `samsaraOpen` named carry the owner's decision: the old body's qi body, furnace residue and batch,
+  the beast it faced, its sect residence and recommendation, its expedition thread and the bond with
+  a master among the sect's people are wiped with the life (`incarnationScopedLinks`; the bot
+  collects the thread first); its failed recruitment attempts stay, as the record of a disbanded
+  party does (`samsaraKept`); its open trade offers, its Dao partnership, the duel it was fighting
+  and its stall are settled when the body leaves, through the leaving door every way out shares
+  (`settleLeavingDealingsTx`, `closeStallTx` in `resolveLeavingEscrowTx`), and the stall card comes
+  down at every death door (docs/FINDINGS.md, "What a body leaves open, settled at the door").
+- **fixed (v1.37.0)** — *Three Python-era levers the bot's own code still writes through.*
+  `relationship.update`, `cultivation.reward` and `combat.apply_damage` are GM levers now -
+  `admin.player.relationship`, `admin.player.cultivation_reward`, `admin.player.apply_damage` -
+  audited, mapped in the Player Editor and driven by the engine playtest as the GM; `/talk` sends no
+  number, and what a talk is worth is the engine's rule: one trust the first time a cultivator speaks
+  with an NPC in a world day (`npc.talk`, schema 82) (docs/FINDINGS.md, "Three levers, and what a
+  talk is worth").
 - **fixed (v1.36.0)** — *A sweep of every payload field an engine action reads.*
   `payload_fields_test.go` walks every struct the engine unmarshals a request into and holds each
   json field to `callerStates`, `callerIgnored` (kept for an older bot and proven unread) or

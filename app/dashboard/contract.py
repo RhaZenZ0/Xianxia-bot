@@ -56,7 +56,7 @@ DASHBOARD_API_VERSION = 2
 # perfected realm, an inheritance or a GM's cap has put on the pool: a column on
 # the table the Player Editor already reads, and the one `set_resource_caps`
 # (its qi_max lever) writes - no table, and no new lever.
-DASHBOARD_REVIEWED_SCHEMA_VERSION = 81
+DASHBOARD_REVIEWED_SCHEMA_VERSION = 82
 
 DASHBOARD_GET_API_PATHS = frozenset({
     "/api/overview", "/api/capabilities", "/api/timeline", "/api/npcs", "/api/npc",

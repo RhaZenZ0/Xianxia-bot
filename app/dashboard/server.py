@@ -215,7 +215,7 @@ def _editor_catalogue() -> dict[str, Any]:
         "flames": [], "max_refinement": 0, "spirit_sense_max_stage": 0,
         "sect_ranks": [], "laws": [], "professions": list(EDITOR_TRADES),
         "realms": [], "body_realms": [], "tribulation_gates": [], "root_mutations": [],
-        "items": [], "storage_presets": [],
+        "items": [], "storage_presets": [], "npcs": [],
     }
     try:
         world = json.loads((ROOT / "content" / "world.json").read_text(encoding="utf-8"))
@@ -237,6 +237,10 @@ def _editor_catalogue() -> dict[str, Any]:
         ],
         "laws": sorted(({"id": str(lid), "name": str((law or {}).get("name") or lid)} for lid, law in laws.items()), key=lambda x: x["name"]),
         "professions": list(EDITOR_TRADES),
+        # The people the relationship lever (v1.37.0) may name: every NPC the
+        # content file knows, the hidden masters' cover names included - a
+        # relationship is held with the person as the world shows them.
+        "npcs": sorted(str(name) for name in (world.get("npcs") or {}) if str(name).strip()),
         # The two ladders by index, so a realm is picked by its name.
         "realms": _ladder(world.get("realms")),
         "body_realms": _ladder(world.get("body_realms")),
@@ -1800,6 +1804,19 @@ class ReadOnlyDashboardStore:
             laws = await self._fetchall_if_table(db, "law_progress", "SELECT law_id,comprehension,insights FROM law_progress WHERE user_id=? ORDER BY comprehension DESC,law_id", (one,))
             professions = await self._fetchall_if_table(db, "profession_progress", "SELECT profession,level,xp,successes,failures FROM profession_progress WHERE user_id=? ORDER BY level DESC,profession", (one,))
             manuals = await self._fetchall_if_table(db, "character_manuals", "SELECT manual_id,mastery,practice FROM character_manuals WHERE user_id=? ORDER BY mastery DESC,manual_id", (one,))
+            # The three levers of v1.37.0: the relationships the player holds
+            # (the relationship card pre-fills from them), and the battle the
+            # damage lever acts inside.
+            relationships = await self._fetchall_if_table(
+                db, "npc_relationships",
+                "SELECT npc_name,trust,respect,fear,affection,debt,grudge,encounter_count FROM npc_relationships WHERE user_id=? ORDER BY npc_name",
+                (one,),
+            )
+            battles = await self._fetchall_if_table(
+                db, "battles",
+                "SELECT battle_id,npc_name,player_hp,player_hp_max,npc_hp FROM battles WHERE user_id=? AND status='active' ORDER BY battle_id DESC",
+                (one,),
+            )
             sense = sense_rows[0] if sense_rows else {}
             storage_row = dict(storage_rows[0]) if storage_rows else {}
             if storage_row:
@@ -1816,6 +1833,7 @@ class ReadOnlyDashboardStore:
                 "sect": membership[0] if membership else {}, "flames": flames, "spirit_sense": sense,
                 "storage": storage_row, "master": master_rows[0] if master_rows else {}, "disciples": disciples,
                 "laws": laws, "professions": professions, "manuals": manuals,
+                "relationships": relationships, "battles": battles,
                 "editor_catalogue": _editor_catalogue(),
             }
         # Outside the query session on purpose: this one is an HTTP round trip
@@ -2766,6 +2784,10 @@ class AdminDashboardController:
         "player.set_profession": "admin.player.set_profession",
         "player.set_law": "admin.player.set_law",
         "player.set_sect_contribution": "admin.player.set_sect_contribution",
+        # The three Python-era levers, GM-only and audited since v1.37.0.
+        "player.relationship": "admin.player.relationship",
+        "player.cultivation_reward": "admin.player.cultivation_reward",
+        "player.apply_damage": "admin.player.apply_damage",
         "audit.undo_last": "admin.audit.undo_last",
         # Trades (v1.0.0-rc.2): void an open offer between cultivators. It
         # moves nothing - an offer never did - and audits in the engine.

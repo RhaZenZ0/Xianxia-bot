@@ -994,6 +994,16 @@ async def reincarnate(interaction:discord.Interaction,name:str,path:str,gender:a
     if not normalized_path:
         await interaction.response.send_message("Unknown path. Choose: "+", ".join(WORLD.paths.keys()),ephemeral=False);return
     wt=await current_world_time()
+    # The old body's rooms (v1.37.0): the rebirth wipes expedition_threads and
+    # the abode rows that name the threads (incarnationScopedLinks), so read the
+    # ids before the engine call and delete the threads after it, the order the
+    # reset keeps (v1.0.8). A rebirth that left the last life's journal standing
+    # gave the new life a thread full of somebody it has never been.
+    doomed_threads: list[dict[str, Any]] = []
+    try:
+        doomed_threads = await DB.player_thread_ids(int(interaction.guild_id or 0), interaction.user.id)
+    except Exception:
+        log.exception("Could not read the private threads of user %s before a rebirth", interaction.user.id)
     try:
         envelope=await ENGINE.authoritative_action(
             "lifecycle.reincarnate",interaction.user.id,
@@ -1003,6 +1013,8 @@ async def reincarnate(interaction:discord.Interaction,name:str,path:str,gender:a
     except GameEngineError as exc:
         await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
     result=dict(envelope.get("result") or {})
+    # The engine committed, so the rooms go with the life.
+    await delete_player_threads(interaction.guild, doomed_threads)
     partner_echo=max(0,min(25,int(result.get("partner_echo",0))))
     partner_name=str(result.get("partner_name") or "")
     lines=[

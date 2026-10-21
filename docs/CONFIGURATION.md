@@ -320,7 +320,10 @@ the bot also drafts one quest per notable world-history event (significance ≥
 only, never auto-approved; each costs one routine-tier request. Rewards a
 forged quest may declare are capped by `QUEST_REWARD_MAX_XP`,
 `QUEST_REWARD_MAX_STONES` and `QUEST_REWARD_MAX_ITEMS` and granted through the
-engine on completion. The same budget applies to quests written by hand.
+engine on completion. The same budget applies to quests written by hand, and
+the engine reads the three keys itself (v1.37.0; compose passes them to the
+engine service): `admin.quest.save` refuses a reward raised over the budget,
+whoever asks, and lets a stored reward already above it save unchanged.
 
 ## Authoritative Go engine / SQLite WAL
 

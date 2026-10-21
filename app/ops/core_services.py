@@ -168,20 +168,21 @@ class NPCRelationshipService:
     async def get(self, user_id: int, npc_name: str) -> dict[str, Any]:
         return await self.db.get_npc_relationship(int(user_id), str(npc_name))
 
-    async def record_encounter(
-        self,
-        user_id: int,
-        npc_name: str,
-        *,
-        summary: str,
-        deltas: dict[str, int] | None = None,
-    ) -> dict[str, Any]:
-        safe = {key: int((deltas or {}).get(key, 0)) for key in self.DIMENSIONS}
-        return dict(await self.engine.action(
-            "relationship.update",
-            int(user_id),
-            {"npc_name": str(npc_name), "summary": str(summary)[:800], **safe},
-        ))
+    async def talk(self, user_id: int, npc_name: str, *, summary: str, action_id: str) -> dict[str, Any]:
+        """One conversation, recorded by the engine (v1.37.0).
+
+        The bot used to send `trust: 1` through relationship.update here, so
+        it decided what a talk was worth. The engine counts the encounter,
+        keeps the summary and pays one trust the first time in a world day
+        (`npc.talk`); the six dimensions are a GM's to move
+        (admin.player.relationship), never a player action's.
+        """
+        envelope = await self.engine.authoritative_action(
+            "npc.talk", int(user_id),
+            {"npc_name": str(npc_name), "summary": str(summary)[:800]},
+            action_id=action_id,
+        )
+        return dict((envelope or {}).get("result") or {})
 
     @staticmethod
     def public_label(row: dict[str, Any]) -> str:
@@ -584,14 +585,6 @@ class CombatService:
     def __init__(self, db: Any, *, engine: Any):
         self.db = db
         self.engine = engine
-
-    async def apply_damage(self, battle_id: int, user_id: int, damage: int) -> dict[str, int]:
-        # Legacy compatibility path. New battle exchanges use turn(), which owns the
-        # counter-roll and damage mutation atomically in Go.
-        return dict(await self.engine.action(
-            "combat.apply_damage", int(user_id),
-            {"battle_id": int(battle_id), "damage": max(0, int(damage))},
-        ))
 
     async def start(
         self, user_id: int, *, kind: str, action_id: str, npc_name: str = "",
