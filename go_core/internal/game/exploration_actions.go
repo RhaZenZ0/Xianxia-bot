@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -15,11 +16,25 @@ import (
 	"xianxia/core/internal/worlddata"
 )
 
+// explorationPayload names the event an explore may spawn. Whether unexpected
+// events run at all and how likely one is used to ride here from the bot's
+// settings (v1.36.0): the engine reads world_state.automation_settings and
+// UNEXPECTED_EVENT_CHANCE_PERCENT itself.
 type explorationPayload struct {
-	GameMinute              int64  `json:"game_minute"`
-	UnexpectedEventsEnabled *bool  `json:"unexpected_events_enabled,omitempty"`
-	UnexpectedEventChance   int    `json:"unexpected_event_chance_percent"`
-	EventKey                string `json:"event_key"`
+	GameMinute int64  `json:"game_minute"`
+	EventKey   string `json:"event_key"`
+}
+
+// The chance, in percent, that an explore rolls an unexpected event: the
+// operator's UNEXPECTED_EVENT_CHANCE_PERCENT, 0 to 100, else 28 - the default
+// the bot's Settings carried until v1.36.0, when the bot stopped sending it.
+const unexpectedEventChanceDefault = int64(28)
+
+func unexpectedEventChanceFromEnv() int {
+	chance := boundedEnvValue(os.Getenv("UNEXPECTED_EVENT_CHANCE_PERCENT"), unexpectedEventChanceDefault, 0, 100)
+	// boundedEnvValue holds it to 0..100; narrowToInt is the one door every
+	// 64-bit read takes to an int, and the one CodeQL reads as a bound.
+	return narrowToInt(chance)
 }
 
 type travelPayload struct {
@@ -1037,10 +1052,7 @@ func eligibleUnexpectedEvents(catalog worlddata.Catalog, c mechanicsCharacter) [
 	return out
 }
 
-func unexpectedEventsEnabledTx(conn *storage.Conn, override *bool) (bool, error) {
-	if override != nil {
-		return *override, nil
-	}
+func unexpectedEventsEnabledTx(conn *storage.Conn) (bool, error) {
 	r, err := conn.Execute(`SELECT value_json FROM world_state WHERE key='automation_settings'`, nil)
 	if err != nil {
 		return false, err
@@ -1439,11 +1451,11 @@ func explorationExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	enabled, err := unexpectedEventsEnabledTx(conn, p.UnexpectedEventsEnabled)
+	enabled, err := unexpectedEventsEnabledTx(conn)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	surprise, err := rollUnexpectedEvent(catalog, c, enabled, p.UnexpectedEventChance)
+	surprise, err := rollUnexpectedEvent(catalog, c, enabled, unexpectedEventChanceFromEnv())
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

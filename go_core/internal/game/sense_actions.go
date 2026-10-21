@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 
 	"xianxia/core/internal/eventledger"
 	"xianxia/core/internal/gamerng"
@@ -12,12 +13,17 @@ import (
 	"xianxia/core/internal/worlddata"
 )
 
+// sensePayload is what a sensor asks: which mode, and whom. Which hidden
+// masters stood where the sensor stood used to be the bot's word
+// (present_hidden_npcs, v1.36.0): the bot walked the catalogue's hidden
+// masters through its own whereabouts reader and sent the names, so a request
+// naming any hidden master got a reading of them. The engine asks
+// npcWhereaboutsTx, the reader the challenge and the recommender use.
 type sensePayload struct {
-	Mode              string   `json:"mode"`
-	TargetUserID      int64    `json:"target_user_id"`
-	NPCName           string   `json:"npc_name"`
-	PresentHiddenNPCs []string `json:"present_hidden_npcs"`
-	GameMinute        int64    `json:"game_minute"`
+	Mode         string `json:"mode"`
+	TargetUserID int64  `json:"target_user_id"`
+	NPCName      string `json:"npc_name"`
+	GameMinute   int64  `json:"game_minute"`
 }
 
 type senseCharacter struct {
@@ -40,6 +46,31 @@ func loadSenseCharacter(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	row := r.Rows[0]
 	attrs := characterAttributes(catalog, row[2], fmt.Sprint(row[3]), storage.ParseInt(row[0]), storage.ParseInt(row[1]))
 	return senseCharacter{Realm: storage.ParseInt(row[0]), Phase: storage.ParseInt(row[1]), Spirit: attrs["spirit"], Insight: attrs["insight"], Will: attrs["will"], SensePowerBonus: storage.ParseInt(row[4]), SensePrecisionBonus: storage.ParseInt(row[5]), SenseRangeBonus: storage.ParseInt(row[6]), ConcealmentBonus: storage.ParseInt(row[7]), ConcealmentActive: storage.ParseInt(row[8]) != 0, Location: fmt.Sprint(row[9])}, nil
+}
+
+// hiddenMastersAtTx names the catalogue's hidden masters standing at a place
+// this minute, in name order: alive, and wherever their circuit, their
+// schedule or the registry puts them (npcWhereaboutsTx).
+func hiddenMastersAtTx(conn *storage.Conn, catalog worlddata.Catalog, location string, gameMinute int64) ([]string, error) {
+	names := make([]string, 0, len(catalog.NPCs))
+	for name, npc := range catalog.NPCs {
+		if npc.HiddenMaster != nil {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	present := []string{}
+	now := nowSeconds()
+	for _, name := range names {
+		where, err := npcWhereaboutsTx(conn, catalog, name, gameMinute, now)
+		if err != nil {
+			return nil, err
+		}
+		if !where.Dead && where.Location == location {
+			present = append(present, name)
+		}
+	}
+	return present, nil
 }
 
 func senseExtraModifier(conn *storage.Conn, catalog worlddata.Catalog, userID, gameMinute int64, stat string) (int64, error) {
@@ -622,11 +653,11 @@ func senseInspectAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 			hints = append(hints, loc.SenseHints[:count]...)
 		}
 		signals := []string{}
-		for _, name := range p.PresentHiddenNPCs {
-			npc, ok := catalog.NPCs[name]
-			if !ok || npc.HiddenMaster == nil {
-				continue
-			}
+		present, err := hiddenMastersAtTx(conn, catalog, sensor.Location, gameMinute)
+		if err != nil {
+			return authoritativeMutation{}, err
+		}
+		for _, name := range present {
 			hidden, err := hiddenSenseReading(catalog, sensor, power, precision, name, roll["die1"].(int64), roll["die2"].(int64))
 			if err != nil {
 				continue

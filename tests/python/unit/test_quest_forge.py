@@ -128,6 +128,26 @@ class ValidatorTests(unittest.TestCase):
     def test_the_budget_is_enforced_on_items_and_stones(self):
         draft = {**GOOD, "rewards": {"spirit_stones": 201}}
         self.assertIn("reward spirit_stones=201 exceeds the GM budget (200)", validate_quest_definition(draft, WORLD, BUDGET)[1])
+
+    def test_a_reward_left_as_it_was_passes_above_the_budget_and_a_raised_one_does_not(self):
+        """The budget bounds what a GM raises a reward to (v1.36.0): 35 shipped
+        quests pay more than the default budget and could not be saved without
+        first being cut. With the stored rewards as the baseline, the same
+        number passes; one coin more, one more pill, or a different item is a
+        raise and is refused as before."""
+        stored = {"spirit_stones": 900, "insight_xp": 120, "items": {"qi_pill": 5}}
+        same = {**GOOD, "rewards": {"spirit_stones": 900, "insight_xp": 120, "items": {"qi_pill": 5}}}
+        definition, errors = validate_quest_definition(same, WORLD, BUDGET, baseline=stored)
+        self.assertEqual(errors, [])
+        self.assertEqual(definition["rewards"], {"spirit_stones": 900, "insight_xp": 120, "items": {"qi_pill": 5}})
+        raised = {**GOOD, "rewards": {"spirit_stones": 901, "insight_xp": 120, "items": {"qi_pill": 5}}}
+        self.assertIn("reward spirit_stones=901 exceeds the GM budget (200)", validate_quest_definition(raised, WORLD, BUDGET, baseline=stored)[1])
+        more_pills = {**GOOD, "rewards": {"spirit_stones": 900, "items": {"qi_pill": 6}}}
+        self.assertIn("reward items total 6 exceeds the GM budget (3)", validate_quest_definition(more_pills, WORLD, BUDGET, baseline=stored)[1])
+        other_item = {**GOOD, "rewards": {"items": {"spirit_herb": 5}}}
+        self.assertIn("reward items total 5 exceeds the GM budget (3)", validate_quest_definition(other_item, WORLD, BUDGET, baseline=stored)[1])
+        # No baseline - a new quest - is the old rule exactly.
+        self.assertIn("reward spirit_stones=900 exceeds the GM budget (200)", validate_quest_definition(same, WORLD, BUDGET)[1])
         draft = {**GOOD, "rewards": {"items": {"spirit_herb": 2, "beast_core": 2}}}
         self.assertIn("reward items total 4 exceeds the GM budget (3)", validate_quest_definition(draft, WORLD, BUDGET)[1])
 

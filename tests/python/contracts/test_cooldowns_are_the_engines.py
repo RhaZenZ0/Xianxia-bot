@@ -56,6 +56,15 @@ AUTHORITATIVE = (GO / "authoritative.go").read_text(encoding="utf-8")
 FORBIDDEN_FIELDS = (
     "cooldown_seconds", "quest_cooldown_seconds", "trial_cooldown_seconds",
     "minutes_per_year", "base_samsara_years", "max_wait_seconds", "ttl_seconds",
+    # Three of the payload sweep's seven (v1.36.0): the explore's event chance
+    # and switch and the sensor's roster. The other four (`world_name`,
+    # `cooldown_game_minutes`, `age_at_creation_years`, `talent_echo`) are
+    # ordinary result keys and column names the bot reads in dozens of places,
+    # and this sweep is a quoted-substring read over every line of app/ - it
+    # cannot tell a payload from a row. Those four are held by the engine's
+    # refusal (callerOwnedNothing, drilled by TestAWaitIsNotTheCallersToSend)
+    # and by the Go payload gate (payload_fields_test.go), not by this list.
+    "unexpected_event_chance_percent", "unexpected_events_enabled", "present_hidden_npcs",
 )
 
 # Two files keep a wait of their own, and it is genuinely somebody else's: the
@@ -149,7 +158,8 @@ class NothingInPythonSendsAWait(unittest.TestCase):
         config = (PROJECT_ROOT / "app" / "ops" / "config.py").read_text(encoding="utf-8")
         for setting in ("cultivate_cooldown_minutes", "explore_cooldown_minutes",
                         "hunt_cooldown_minutes", "secret_realm_cooldown_minutes",
-                        "perfect_quest_cooldown_minutes", "perfect_trial_cooldown_minutes"):
+                        "perfect_quest_cooldown_minutes", "perfect_trial_cooldown_minutes",
+                        "unexpected_event_chance_percent"):
             self.assertNotIn(setting, config,
                              f"{setting} is the engine's now; a second copy here is free to drift")
 

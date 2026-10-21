@@ -181,12 +181,20 @@ class TheFamilyWaitIsTheEngines(unittest.TestCase):
                         sent.extend(str(getattr(k, "value", "")) for k in payload.keys)
         self.assertNotIn("cooldown_game_minutes", sent, "the bot sends the wait it is not allowed to decide")
 
-    def test_the_engine_ignores_a_wait_the_caller_sends(self):
+    def test_the_engine_refuses_a_wait_the_caller_sends(self):
+        # v1.2.1 overrode the caller's wait with the engine's; v1.36.0's payload
+        # sweep retired the wire field, so a caller sending it is refused by the
+        # central gate and the payload struct has nowhere to put it.
         source = GO.read_text(encoding="utf-8")
-        self.assertIn("p.CooldownGameMinutes = familySupportCooldownGameMinutes", source,
-                      "familySupportActionGo no longer overrides the caller's wait with the engine's")
-        self.assertNotIn("if p.CooldownGameMinutes <= 0", source,
-                         "the payload decides the wait again whenever it is positive")
+        self.assertNotIn("p.CooldownGameMinutes", source,
+                         "familySupportActionGo reads the caller's wait again; the engine's is familySupportCooldownGameMinutes")
+        self.assertNotIn('json:"cooldown_game_minutes"', source,
+                         "familySupportPayload carries the wait again")
+        self.assertIn("familySupportCooldownGameMinutes - max64(0, p.GameMinute", source,
+                      "the remaining wait is no longer the engine's constant")
+        authoritative = (PROJECT_ROOT / "go_core" / "internal" / "game" / "authoritative.go").read_text(encoding="utf-8")
+        block = authoritative.split("var callerOwnedNothing = []string{", 1)[1].split("}", 1)[0]
+        self.assertIn('"cooldown_game_minutes"', block, "the central gate no longer refuses the household's wait")
 
 
 # --- from test_samsara_wipes_real_tables.py ---

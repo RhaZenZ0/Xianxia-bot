@@ -87,7 +87,7 @@ async def begin(interaction: discord.Interaction) -> None:
         offer_envelope = await ENGINE.authoritative_action(
             "character.family_options",
             interaction.user.id,
-            {"world_name": "Mortal World"},
+            {},
             action_id=f"discord:{interaction.id}:character.family_options",
         )
     except GameEngineError as exc:

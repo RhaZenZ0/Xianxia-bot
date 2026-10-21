@@ -121,15 +121,23 @@ def _configure(url: str, token: str, db_path: str) -> None:
         "BOT_CONTROL_TOKEN": CONTROL_TOKEN,
         "MESSAGE_CONTENT_INTENT": "true", "AUTO_NARRATE": "true",  # typed play listens in a private scene only with both
         "UPDATE_CHECK_ENABLED": "false", "QUEST_FORGE_AUTO": "false", "ROUTE_AUDIT_HOURS": "0",
-        # A surprise on the typed explore (28% by default) blocks the road
-        # until it is resolved, which would fail the capital step on the dice
-        # about one run in four; the engine playtest drives the surprises.
-        "UNEXPECTED_EVENT_CHANCE_PERCENT": "0",
+        # The surprise chance used to be set here for the bot, which sent it on
+        # every explore; since v1.36.0 the engine reads it, so the scratch
+        # engine is launched with it (ENGINE_ENV below) and the bot's copy is
+        # gone. Against an engine somebody else runs, that engine's setting is
+        # what the typed explore meets.
         # The per-player action meter (about six a minute) is right for a
         # person and wrong for a harness that presses sixty buttons in one;
         # the meter itself is held by tests/python/contracts/test_narrator_budget.py.
         "TYPED_PLAY_BURST": "1000", "TYPED_PLAY_PER_MINUTE": "6000",
     })
+
+
+# What the scratch engine reads that the bot does not (v1.36.0). A surprise on
+# the typed explore (28% by default) blocks the road until it is resolved, which
+# would fail the capital step on the dice about one run in four; the engine
+# playtest drives the surprises, so this sweep's engine rolls none.
+ENGINE_ENV = {"UNEXPECTED_EVENT_CHANCE_PERCENT": "0"}
 
 
 # ---------------------------------------------------------------------------
@@ -1718,7 +1726,7 @@ def main() -> int:
     tmp = Path(tempfile.mkdtemp(prefix="xianxia-playtest-discord-"))
     try:
         if args.launch:
-            proc, url, token = launch_engine(tmp)
+            proc, url, token = launch_engine(tmp, ENGINE_ENV)
             db_path = str(tmp / "playtest.sqlite3")
             bootstrap(url, token, db_path)
         else:

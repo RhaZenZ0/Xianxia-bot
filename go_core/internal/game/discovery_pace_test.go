@@ -27,10 +27,9 @@ func exploreOnce(t *testing.T, path, world string, seq int, roll int) string {
 	}
 	defer func() { locationDiscoveryIntn = original }()
 	clearCooldowns(t, path, 42)
+	unexpectedEventsOff(t, path)
 	result := batch4Result(t, batch4Apply(t, path, world, "exploration.explore", seq, map[string]any{
-		"game_minute":                     600 + int64(seq),
-		"unexpected_events_enabled":       false,
-		"unexpected_event_chance_percent": 0}))
+		"game_minute": 600 + int64(seq)}))
 	found := fmt.Sprint(result["discovered_location"])
 	if found == "<nil>" {
 		return ""

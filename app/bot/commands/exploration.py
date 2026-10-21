@@ -323,8 +323,6 @@ async def explore(interaction: discord.Interaction) -> None:
         envelope = await ENGINE.authoritative_action(
             "exploration.explore", interaction.user.id,
             {
-                
-                "unexpected_event_chance_percent": SETTINGS.unexpected_event_chance_percent,
                 "event_key": f"discord:{interaction.id}:exploration:event",
             },
             action_id=f"discord:{interaction.id}:exploration.explore",

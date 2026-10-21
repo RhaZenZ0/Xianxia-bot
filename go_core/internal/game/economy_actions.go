@@ -419,6 +419,117 @@ func blackMarketAuthorized(conn *storage.Conn, catalog worlddata.Catalog, userID
 	return "", rep, nil
 }
 
+// blackMarketStockShare is what a broker pays for a good the post itself
+// stocks, against the post's own asking price (v0.3x's 0.55); the pay is then
+// held under the cheapest shelf by blackMarketStockPay.
+const blackMarketStockShare = 0.55
+
+// UnderworldGood is the one statement of what a post stocks and a finder
+// smuggles (v1.36.0): the contraband legal statuses, a dark manual, and
+// anything the auction floors call special or legendary. The rotation
+// (simulation.blackMarkets) and the arbitrage gate read the same predicate.
+func UnderworldGood(item worlddata.Item) bool {
+	legal := strings.ToLower(strings.TrimSpace(item.LegalStatus))
+	interest := strings.ToLower(strings.TrimSpace(item.AuctionInterest))
+	typ := strings.ToLower(strings.TrimSpace(item.Type))
+	name := strings.ToLower(item.Name)
+	if legal == "forbidden" || legal == "contraband" || legal == "restricted" {
+		return true
+	}
+	if typ == "manual" {
+		for _, word := range []string{"demon", "blood", "soul", "nether", "bone", "venom"} {
+			if strings.Contains(name, word) {
+				return true
+			}
+		}
+	}
+	return interest == "special" || interest == "legendary"
+}
+
+// UnderworldBase is the price a post's arithmetic starts from, in the post's
+// own coin: the item's base price (or eight times its sect value for an item
+// that has none), which content authors in the Mortal stone, carried along the
+// currency ladder into `currency` the way a shelf price is (shelfPriceAcross).
+// An item worth less than one whole coin up there has no base and the post
+// does not stock it (false) - the ceiling doing its job, as it does on the
+// keepers' boards. Until v1.36.0 the Mortal number was written raw into every
+// world's coin, so a manual asking 133 stones at the Mortal post asked 133
+// crystals at the Celestial one and the Celestial broker paid a million times
+// the Mortal shelf to buy it back.
+func UnderworldBase(catalog worlddata.Catalog, itemID, currency string) (int64, bool) {
+	base := ItemBasePrice(catalog, itemID)
+	if base <= 0 {
+		base = max64(8, ItemSectValue(catalog, itemID)*8)
+	}
+	converted, ok := shelfPriceAcross(catalog, map[string]shelfRate{}, worldBaseCurrency(catalog, "Mortal World"), currency, base)
+	if !ok || converted < 1 {
+		return 0, false
+	}
+	return converted, true
+}
+
+// blackMarketDearestAsk is the most a post can ever ask for one of an item in
+// its coin: the hottest rotation with one unit left, or the hottest smuggler's
+// price, whichever is more. A stock row priced above it is stale or wrong (a
+// row written before v1.36.0 in an upper world is both), and a broker's pay is
+// bounded by it rather than by the row.
+func blackMarketDearestAsk(base int64) int64 {
+	return max64(BlackMarketStockAsk(base, BlackMarketHeatCeiling, 1), BlackMarketSmuggledAsk(base, BlackMarketHeatCeiling))
+}
+
+// A post's heat is set when it rotates and does not move between rotations:
+// BlackMarketHeatFloor plus a hash's share of the span up to
+// BlackMarketHeatCeiling (simulation.blackMarkets). The arbitrage gate reads
+// the two ends: the dearest ask a post can set (for what a broker then pays)
+// and the cheapest (for what a cultivator can buy there and carry away).
+const (
+	BlackMarketHeatFloor   = int64(20)
+	BlackMarketHeatCeiling = int64(80)
+	// How many units a rotation stocks of one good, at most; the fewest is one.
+	BlackMarketStockMostUnits = int64(4)
+)
+
+// BlackMarketStockAsk is what a post asks for a unit it stocks at a rotation:
+// the base, dearer for scarcity (few on hand) and for the danger of the post's
+// heat (v1.36.0: the formula moved here from simulation.blackMarkets so the
+// arbitrage gate can read the floor it never goes under).
+func BlackMarketStockAsk(base, heat, quantity int64) int64 {
+	scarcity := 1.0 + float64(max64(0, 8-quantity))*0.05
+	danger := 1.15 + float64(heat)/250.0
+	return max64(1, int64(math.Round(float64(base)*scarcity*danger)))
+}
+
+// BlackMarketSmuggledAsk is what a post asks for a unit a finder smuggled to
+// it: the base plus the post's heat as a percentage (simulation.smuggleToNightMarket).
+func BlackMarketSmuggledAsk(base, heat int64) int64 {
+	return max64(1, base+base*heat/100)
+}
+
+// blackMarketStockPay is what a broker pays per unit for a good the post
+// stocks, in the post's coin: blackMarketStockShare of the row's asking price,
+// the row held under the dearest ask the engine's own arithmetic can set
+// (blackMarketDearestAsk, so a stale or mispriced row never pays more than a
+// real one), and never a whole shelf's worth - the cheapest shelf anywhere,
+// read across the ladder, caps it at one coin under, and a shelf under two
+// coins leaves nothing to pay (0, and the sale is refused). One door: the
+// arbitrage gate walks it beside the keepers, the merchants and the ordinary
+// fence, and the trade calls it.
+func blackMarketStockPay(catalog worlddata.Catalog, itemID, currency string, rowAsk int64) int64 {
+	base, ok := UnderworldBase(catalog, itemID, currency)
+	if !ok {
+		return 0
+	}
+	ask := min64(rowAsk, blackMarketDearestAsk(base))
+	unit := max64(1, int64(math.Round(float64(ask)*blackMarketStockShare)))
+	if shelf, ok := cheapestShelfPrice(catalog, itemID, currency); ok {
+		if shelf < 2 {
+			return 0
+		}
+		unit = min64(unit, shelf-1)
+	}
+	return unit
+}
+
 // blackMarketOrdinaryShare is what a broker pays for an ordinary good against
 // the cheapest shelf anywhere, in the post's coin: less than the 0.55 of the
 // post's own stock, and always under the shelf, so nothing bought on a shelf
@@ -591,7 +702,10 @@ func blackMarketTradeAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 		if owned < p.Quantity {
 			return authoritativeMutation{}, errors.New("not enough carried item")
 		}
-		unit = max64(1, int64(math.Round(float64(unit)*0.55)))
+		unit = blackMarketStockPay(catalog, p.ItemID, currency, unit)
+		if unit < 1 {
+			return authoritativeMutation{}, fmt.Errorf("no broker here will pay a whole %s for %s", coinName(catalog, currency), itemDisplayName(catalog, p.ItemID))
+		}
 		total = unit * p.Quantity
 		_, err = conn.Execute(`UPDATE inventory SET quantity=quantity-? WHERE user_id=? AND item_id=?`, []any{p.Quantity, userID, p.ItemID})
 		if err != nil {

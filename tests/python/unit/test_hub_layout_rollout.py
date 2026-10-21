@@ -362,6 +362,36 @@ class HubFailurePublicSurfaceTests(unittest.TestCase):
         self.assertIn("_layout_result_send(", body)
         self.assertIn("source_message == hub_message", body)
 
+    def test_opening_a_hub_in_place_clears_the_old_messages_content_and_embed(self):
+        """A V2 message carries no content and no embeds, so the edit that turns
+        the message a door was pressed on into the panel clears both (v1.36.0).
+        The classic journal is an embed message; `open_hub_in_place` edited it
+        with the view alone, Discord refused the conversion, the fallback sent
+        a new panel and returned None - and the daily door that was going to
+        press a leaf on the returned view pressed nothing. Read by AST: the one
+        `edit_message` call inside `open_hub_in_place` names `content=None` and
+        `embed=None`."""
+        tree = ast.parse(HUBS_SOURCE)
+        opener = next(
+            n for n in ast.walk(tree)
+            if isinstance(n, ast.AsyncFunctionDef) and n.name == "open_hub_in_place"
+        )
+        edits = [
+            n for n in ast.walk(opener)
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "edit_message"
+        ]
+        self.assertEqual(len(edits), 1, "open_hub_in_place edits the message in exactly one place")
+        cleared = {
+            kw.arg for kw in edits[0].keywords
+            if isinstance(kw.value, ast.Constant) and kw.value.value is None
+        }
+        self.assertTrue(
+            {"content", "embed"} <= cleared,
+            "open_hub_in_place turns an embed message into a layout panel without clearing "
+            f"content and embed (cleared: {sorted(cleared)}); Discord refuses that edit, the door "
+            "falls back to a new panel and the leaf it was opening is never pressed",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

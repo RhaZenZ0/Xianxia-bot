@@ -23,8 +23,7 @@ type familySimPayload struct {
 	GameMinute int64 `json:"game_minute"`
 }
 type familySupportPayload struct {
-	GameMinute          int64 `json:"game_minute"`
-	CooldownGameMinutes int64 `json:"cooldown_game_minutes"`
+	GameMinute int64 `json:"game_minute"`
 }
 type familyChildPayload struct {
 	Name       string `json:"name"`
@@ -225,10 +224,9 @@ func familySupportActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID
 	}
 	// The wait is the engine's (v1.2.1). The payload used to decide it - a
 	// bound that lives in the client is not a bound (rc.48, rc.56) - and any
-	// caller could send 1 and draw the stipend every minute. The wire field is
-	// still accepted so an older bot mid-upgrade is not refused; its value is
-	// ignored.
-	p.CooldownGameMinutes = familySupportCooldownGameMinutes
+	// caller could send 1 and draw the stipend every minute. The wire field
+	// was accepted and overwritten for a while; since v1.36.0 it is refused
+	// (callerOwnedNothing), as no bot has sent it since v1.2.1.
 	f, e := birthFamilyForUserGo(conn, userID)
 	if e != nil {
 		return authoritativeMutation{}, e
@@ -241,7 +239,7 @@ func familySupportActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID
 	if _, err := requireAtHomeTx(conn, userID, "the household's support"); err != nil {
 		return authoritativeMutation{}, err
 	}
-	remain := p.CooldownGameMinutes - max64(0, p.GameMinute-i64(f["last_support_game_minute"]))
+	remain := familySupportCooldownGameMinutes - max64(0, p.GameMinute-i64(f["last_support_game_minute"]))
 	if remain > 0 {
 		return authoritativeMutation{}, fmt.Errorf("family support cooldown has %d in-world minutes remaining", remain)
 	}

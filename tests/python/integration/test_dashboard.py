@@ -706,6 +706,25 @@ class QuestSaveValidationTests(unittest.IsolatedAsyncioTestCase):
         saved, _ = await self.admin._validated_quest(self._draft(quest_key="k", hold_policy="migrate"))
         self.assertEqual(saved["hold_policy"], "migrate")
 
+    async def test_a_stored_quest_above_the_budget_saves_unchanged_and_is_refused_a_raise(self):
+        # The stored row is the baseline (v1.36.0): a shipped quest paying more
+        # than the budget opens and saves as it is; typing a bigger number is
+        # still a raise, held to the budget.
+        await self.db.save_quest_definition(
+            {"quest_key": "generous_one", "title": "The Generous One", "description": "Pays well.",
+             "objectives": [{"id": "explore_1", "type": "explore", "target": self.location, "count": 1}],
+             "rewards": {"spirit_stones": 900}},
+            status="approved", origin="gm_prompt", created_by=1)
+        saved, notes = await self.admin._validated_quest(self._draft(quest_key="generous_one", rewards={"spirit_stones": 900}))
+        self.assertEqual(saved["rewards"], {"spirit_stones": 900})
+        self.assertEqual(notes, [])
+        with self.assertRaises(ValueError) as caught:
+            await self.admin._validated_quest(self._draft(quest_key="generous_one", rewards={"spirit_stones": 901}))
+        self.assertIn("exceeds the GM budget", str(caught.exception))
+        # A key no row carries has no baseline: the budget applies in full.
+        with self.assertRaises(ValueError):
+            await self.admin._validated_quest(self._draft(quest_key="never_stored", rewards={"spirit_stones": 900}))
+
     # ---- the Workbench's round trip (v1.34.0) ---------------------------------
     #
     # Opening a quest and pressing Save must change nothing about it. The editor

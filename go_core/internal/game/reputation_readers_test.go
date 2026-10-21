@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -318,5 +319,56 @@ func TestAnUnderworldHouseholdSendsItsChildOutKnown(t *testing.T) {
 	}
 	if _, raised := again["reputation"]; raised {
 		t.Fatalf("a floor already met must not be reported as raised: %v", again["reputation"])
+	}
+}
+
+// A broker pays for the post's own stock under every shelf too (v1.36.0). The
+// post's asking price is its own arithmetic - base, scarcity, heat - and the
+// broker used to pay 0.55 of it however it compared with the shelves, so a
+// stock row priced above a shelf (a hot post, a scarce good, or a shelf priced
+// under its base) paid a cultivator more than the shelf sold for. The pay goes
+// through blackMarketStockPay now, the door the arbitrage gate walks.
+func TestABrokerPaysForItsOwnStockUnderTheCheapestShelf(t *testing.T) {
+	path := underworldPostDB(t)
+	world := batch4WorldPath(t)
+	catalog := crossingCatalog(t)
+	shelf, ok := cheapestShelfPrice(catalog, "qi_pill", "low_spirit_stone")
+	if !ok || shelf < 2 {
+		t.Fatalf("the shipped content gives qi_pill a shelf of %d (%v); pick an item a shelf sells for two or more", shelf, ok)
+	}
+	// The post stocks the pill at ten times any shelf: a rotation at heat 80
+	// and a single unit left prices the ask well above the base, and the
+	// row is what the trade reads.
+	batch4Exec(t, path, `INSERT INTO black_market_stock(world_name,item_id,currency_id,unit_price,quantity,legal_status,updated_at) VALUES('Mortal World','qi_pill','low_spirit_stone',?,2,'restricted',0)`, shelf*10)
+	batch4Exec(t, path, `INSERT INTO inventory(user_id,item_id,quantity) VALUES(42,'qi_pill',3) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=3`)
+	sold := batch4Result(t, batch4Apply(t, path, world, "black_market.trade", 21, map[string]any{"item_id": "qi_pill", "quantity": 1, "buy": false}))
+	if sold["ordinary"] == true {
+		t.Fatalf("a stocked good went through the ordinary fence: %v", sold)
+	}
+	unit := i64(sold["unit_price"])
+	if unit >= shelf {
+		t.Fatalf("a broker paid %d for a pill the cheapest shelf sells for %d: list it, buy it there and sell it here, and the post prints money", unit, shelf)
+	}
+	if want := blackMarketStockPay(catalog, "qi_pill", "low_spirit_stone", shelf*10); unit != want {
+		t.Fatalf("the broker paid %d and blackMarketStockPay says %d: one door", unit, want)
+	}
+	// The row is bounded by the engine's own dearest ask before the share is
+	// taken, so a row priced ten shelves pays what a real row at the hottest
+	// post would, and never over the shelf.
+	base, ok := UnderworldBase(catalog, "qi_pill", "low_spirit_stone")
+	if !ok {
+		t.Fatal("qi_pill has no base in the Mortal stone")
+	}
+	if want := min64(shelf-1, max64(1, int64(math.Round(float64(blackMarketDearestAsk(base))*blackMarketStockShare)))); unit != want {
+		t.Fatalf("a row at ten shelves pays %d; the dearest real ask (%d) shares to %d under the shelf %d", unit, blackMarketDearestAsk(base), want, shelf)
+	}
+	// Under the shelf the share is the share.
+	if got, want := blackMarketStockPay(catalog, "qi_pill", "low_spirit_stone", 2), int64(1); got != want {
+		t.Fatalf("an ask of 2 pays %d, want %d (the floor of one coin)", got, want)
+	}
+	// And an upper-world post pays nothing for a Mortal pill, because it never
+	// stocked one: less than a coin of crystal, it has no base there.
+	if got := blackMarketStockPay(catalog, "qi_pill", worldBaseCurrency(catalog, "Celestial World"), 1<<40); got != 0 {
+		t.Fatalf("a Celestial broker pays %d crystals for a Mortal pill worth a few stones", got)
 	}
 }

@@ -28,7 +28,6 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(settings.narrator_context_max_chars, 4000)
         self.assertEqual(settings.rag_context_cache_seconds, 4.0)
         self.assertEqual(settings.rag_canon_cache_seconds, 120.0)
-        self.assertEqual(settings.unexpected_event_chance_percent, 28)
         self.assertEqual(settings.health_host, "127.0.0.1")  # loopback off Docker since v0.29.0
         self.assertEqual(settings.health_port, 8082)  # 8080 is the QNAP QTS admin port
         self.assertEqual(settings.slow_query_ms, 100.0)
@@ -205,13 +204,6 @@ class ConfigTests(unittest.TestCase):
         env["GUILD_ID"] = "not-a-number"
         with patch.dict(os.environ, env, clear=True):
             with self.assertRaisesRegex(RuntimeError, "GUILD_ID"):
-                Settings.from_env()
-
-    def test_invalid_event_chance_is_rejected(self):
-        env = self.base_env()
-        env["UNEXPECTED_EVENT_CHANCE_PERCENT"] = "101"
-        with patch.dict(os.environ, env, clear=True):
-            with self.assertRaisesRegex(RuntimeError, "between 0 and 100"):
                 Settings.from_env()
 
     def test_invalid_thread_archive_value_is_rejected(self):

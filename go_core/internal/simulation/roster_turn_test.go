@@ -2,8 +2,10 @@ package simulation
 
 import (
 	"fmt"
+	"sort"
 	"testing"
 
+	"xianxia/core/internal/gamerng"
 	"xianxia/core/internal/storage"
 )
 
@@ -121,4 +123,155 @@ func TestEveryFinderEventuallyHasATurn(t *testing.T) {
 		t.Fatalf("%d of %d finders never consigned anything in 700 ticks; the last who never did is %s",
 			len(names)-len(found), len(names), lastUnreached(names, found))
 	}
+}
+
+// The other three capped walks (v1.36.0). Crimes and hunts read the whole
+// alive roster to a cap of five, childbirth reads up to a hundred and fifty
+// couples to a cap of six; each walked in name order from the top every tick,
+// so the same five criminals robbed, the same five hunters hunted and the same
+// six couples bore, and the rest of the world never did.
+
+func TestEveryCriminalEventuallyRobsSomebody(t *testing.T) {
+	defer everyRollLands()()
+	path := deedsDB(t)
+	r := deedsRunner()
+	names := make([]string, 100)
+	for i := range names {
+		names[i] = fmt.Sprintf("Cutpurse %03d", i)
+		addPerson(t, path, names[i], "Greenriver Town", "cutpurse", 10, 50, 0)
+	}
+	// Somebody worth robbing beside each of them; a victim keeps nothing a
+	// robbery could make a richer target of the thief, so the merchants stay
+	// the richest neighbours for the whole run.
+	for i := 0; i < 100; i++ {
+		addPerson(t, path, fmt.Sprintf("Merchant %03d", i), "Greenriver Town", "cloth merchant", 100000, 10, 0)
+	}
+	// A start hashed from the minute is a fair draw, not a round robin: five
+	// of a hundred a tick needs a few hundred ticks before every name has
+	// been inside the window once, as the finds (six of a hundred) took 700.
+	robbed := map[string]bool{}
+	for tick := 0; tick < 400; tick++ {
+		runCrimesFrom(t, path, r, 1, int64(1000+tick*1440))
+		conn, err := storage.Open(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res, err := conn.Execute(`SELECT npc_name FROM npc_civilization_state WHERE profession='cutpurse' AND wealth<>10`, nil)
+		conn.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, row := range res.Rows {
+			robbed[fmt.Sprint(row[0])] = true
+		}
+	}
+	if len(robbed) != len(names) {
+		t.Fatalf("%d of %d criminals never robbed anybody in four hundred ticks at a cap of %d; the last who never did is %s",
+			len(names)-len(robbed), len(names), crimeCap, lastUnreached(names, robbed))
+	}
+}
+
+func TestEveryHunterEventuallyHunts(t *testing.T) {
+	defer everyHuntLands()()
+	path := deedsDB(t)
+	r := deedsRunner()
+	names := make([]string, 100)
+	for i := range names {
+		names[i] = fmt.Sprintf("Trapper %03d", i)
+		addPerson(t, path, names[i], "Greenriver Town", "beast hunter", 10, 50, 6)
+	}
+	hunted := map[string]bool{}
+	for tick := 0; tick < 400; tick++ {
+		conn, err := storage.Open(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, _, _, err := r.npcBeastHunts(conn, int64(2000+tick*1440)); err != nil {
+			t.Fatal(err)
+		}
+		// Who went out is the deed's own record; the floor is emptied so its
+		// cap of active lots does not stand in for the roster's.
+		res, err := conn.Execute(`SELECT DISTINCT seller_npc_name FROM auctions`, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, row := range res.Rows {
+			hunted[fmt.Sprint(row[0])] = true
+		}
+		if _, err := conn.Execute(`DELETE FROM auctions`, nil); err != nil {
+			t.Fatal(err)
+		}
+		if err := conn.Commit(); err != nil {
+			t.Fatal(err)
+		}
+		conn.Close()
+	}
+	if len(hunted) != len(names) {
+		t.Fatalf("%d of %d hunters never went out in four hundred ticks at a cap of %d; the last who never did is %s",
+			len(names)-len(hunted), len(names), huntCap, lastUnreached(names, hunted))
+	}
+}
+
+// Childbirth consumes the state it walks - a couple that bore moves down the
+// list - so given enough ticks every couple bears whether or not the walk
+// turns, and "who never got a turn" proves nothing here. What the turn changes
+// is *which* six bear first: the tick's start is rosterTurn's, so the first
+// births are the six couples from that start and not the six at the top of the
+// alphabet.
+func TestTheFirstBirthsOfATickStartWhereTheRosterTurns(t *testing.T) {
+	path := livesDB(t)
+	r := livesRunner()
+	couples := make([]string, 100)
+	for i := range couples {
+		a, b := fmt.Sprintf("Chen%03d A", i), fmt.Sprintf("Chen%03d B", i)
+		couples[i] = a
+		addNPC(t, path, a, "Greenriver Town", "Greenriver Town", "Mortal World", "Farmer", 50, "Independent")
+		addNPC(t, path, b, "Greenriver Town", "Greenriver Town", "Mortal World", "Farmer", 50, "Independent")
+		addLife(t, path, a, map[string]any{"relationship_status": "married", "spouse_name": b, "health": 90})
+		addLife(t, path, b, map[string]any{"relationship_status": "married", "spouse_name": a, "health": 90})
+	}
+	defer gamerng.UseRoller(func(int) int { return 0 })()
+	const gm = int64(50000)
+	start := int(hash64("roster-turn", fmt.Sprint(gm)) % uint64(len(couples)))
+	if start == 0 {
+		t.Fatalf("minute %d turns the roster to its top, where an unturned walk also starts; pick another minute", gm)
+	}
+	conn := livesConn(t, path)
+	born, err := r.npcChildbirth(conn, 4, gm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if born != childbirthCap {
+		t.Fatalf("a hundred healthy couples produced %d child(ren), cap is %d", born, childbirthCap)
+	}
+	res, err := conn.Execute(`SELECT npc_name FROM npc_life_state WHERE children_count>0 AND npc_name<spouse_name ORDER BY npc_name`, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bore := map[string]bool{}
+	for _, row := range res.Rows {
+		bore[fmt.Sprint(row[0])] = true
+	}
+	for i := 0; i < int(childbirthCap); i++ {
+		want := couples[(start+i)%len(couples)]
+		if !bore[want] {
+			t.Fatalf("the tick at minute %d starts at %s (roster position %d) and should have reached %s; it bore for %v - the walk is not turning",
+				gm, couples[start], start, want, keysOf(bore))
+		}
+	}
+	if bore[couples[0]] && start > int(childbirthCap) {
+		t.Fatalf("the alphabet's first couple bore on a tick that starts at position %d: the walk starts at the top", start)
+	}
+}
+
+func keysOf(set map[string]bool) []string {
+	out := make([]string, 0, len(set))
+	for k := range set {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }

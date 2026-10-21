@@ -90,7 +90,6 @@ class CharacterModal(discord.ui.Modal):
                     "gender": self.selected_gender,
                     "path": normalized_path,
                     "family_choice_id": str(family.get("choice_id") or ""),
-                    "age_at_creation_years": 18,
                 },
                 action_id=f"discord:{interaction.id}:character.create",
                 expected_version=self.offer_state_version,

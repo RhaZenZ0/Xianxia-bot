@@ -139,8 +139,24 @@ func TestTheTownBuysAGradeNoShelfSellsAtItsWorth(t *testing.T) {
 	if dear["npc_may_buy"] != false {
 		t.Fatalf("the town would pay a High pill's full worth or more: %v", dear)
 	}
-	// An ungraded item no shelf sells still has no reference at all.
-	if _, ok := NPCStallCeiling(catalog, "hundred_year_peach", "low_spirit_stone"); ok {
-		t.Fatal("the town has a price for a peach no shelf sells")
+	// An ungraded item no shelf sells still has no reference at all - and
+	// since v1.36.0 the underworld post is a shelf, so the peach (legendary,
+	// so the posts stock it) has one: the coolest rotation's ask, less a coin.
+	// A formation disk no shop, merchant or post carries is the item with no
+	// reference now.
+	if _, ok := NPCStallCeiling(catalog, "spatial_ring", "low_spirit_stone"); ok {
+		t.Fatal("the town has a price for a ring no shelf and no post sells")
+	}
+	base, ok := UnderworldBase(catalog, "hundred_year_peach", "low_spirit_stone")
+	if !ok {
+		t.Fatal("the peach has no base in the Mortal stone; the posts could never stock it")
+	}
+	mortalPost := BlackMarketStockAsk(base, BlackMarketHeatFloor, BlackMarketStockMostUnits)
+	shelf, ok := cheapestShelfPrice(catalog, "hundred_year_peach", "low_spirit_stone")
+	if !ok || shelf > mortalPost {
+		t.Fatalf("the peach's cheapest shelf is %d (%v); the Mortal post sells one for %d, so a shelf exists and asks no more than that (an upper post, read down the ladder, may ask less)", shelf, ok, mortalPost)
+	}
+	if ceiling, ok := NPCStallCeiling(catalog, "hundred_year_peach", "low_spirit_stone"); !ok || ceiling != shelf-1 {
+		t.Fatalf("the town's ceiling for a peach is %d (%v); its cheapest shelf is a post at %d, so the town pays at most %d", ceiling, ok, shelf, shelf-1)
 	}
 }

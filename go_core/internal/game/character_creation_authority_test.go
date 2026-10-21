@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"xianxia/core/internal/gamerng"
 	"xianxia/core/internal/storage"
 )
 
@@ -96,7 +97,7 @@ func TestCharacterFamilyOptionsAreGoGeneratedPersistedAndVersioned(t *testing.T)
 	path := setupCharacterCreationAuthorityDB(t)
 	world := batch4WorldPath(t)
 	zero := int64(0)
-	out := creationApply(t, path, world, "creation-family-options-1", "character.family_options", 77, &zero, map[string]any{"world_name": "Mortal World", "game_minute": 123})
+	out := creationApply(t, path, world, "creation-family-options-1", "character.family_options", 77, &zero, map[string]any{"game_minute": 123})
 	if out.StateVersion != 1 {
 		t.Fatalf("state_version=%d", out.StateVersion)
 	}
@@ -133,7 +134,7 @@ func TestCharacterCreateRejectsClientSuppliedFamilyPayload(t *testing.T) {
 	path := setupCharacterCreationAuthorityDB(t)
 	world := batch4WorldPath(t)
 	zero := int64(0)
-	offers := creationApply(t, path, world, "creation-family-options-forge", "character.family_options", 77, &zero, map[string]any{"world_name": "Mortal World", "game_minute": 123})
+	offers := creationApply(t, path, world, "creation-family-options-forge", "character.family_options", 77, &zero, map[string]any{"game_minute": 123})
 	expected := offers.StateVersion
 	batch4SetCanonicalGameMinute(t, path, 124)
 	raw, _ := json.Marshal(map[string]any{
@@ -153,14 +154,14 @@ func TestCharacterCreateConsumesCanonicalOfferAndPersistsExactFamily(t *testing.
 	path := setupCharacterCreationAuthorityDB(t)
 	world := batch4WorldPath(t)
 	zero := int64(0)
-	optionsOut := creationApply(t, path, world, "creation-family-options-commit", "character.family_options", 77, &zero, map[string]any{"world_name": "Mortal World", "game_minute": 200})
+	optionsOut := creationApply(t, path, world, "creation-family-options-commit", "character.family_options", 77, &zero, map[string]any{"game_minute": 200})
 	optionsResult := batch4Result(t, optionsOut)
 	offers := optionsResult["families"].([]familyOffer)
 	selected := offers[len(offers)-1]
 	expected := optionsOut.StateVersion
 	createdOut := creationApply(t, path, world, "creation-character-commit", "character.create", 77, &expected, map[string]any{
 		"discord_name": "Tester", "name": "Lin Authority", "concept": "Prove the Dao", "gender": "female",
-		"path": "Sword Cultivator", "family_choice_id": selected.ChoiceID, "game_minute": 201, "age_at_creation_years": 18,
+		"path": "Sword Cultivator", "family_choice_id": selected.ChoiceID, "game_minute": 201,
 	})
 	if createdOut.StateVersion != 2 {
 		t.Fatalf("state_version=%d", createdOut.StateVersion)
@@ -189,8 +190,8 @@ func TestStarterHouseholdsAreSharedStableAndCoLocatedPlayersCanMeet(t *testing.T
 	world := batch4WorldPath(t)
 	zero := int64(0)
 
-	firstOptions := creationApply(t, path, world, "shared-household-options-1", "character.family_options", 101, &zero, map[string]any{"world_name": "Mortal World", "game_minute": 300})
-	secondOptions := creationApply(t, path, world, "shared-household-options-2", "character.family_options", 202, &zero, map[string]any{"world_name": "Mortal World", "game_minute": 300})
+	firstOptions := creationApply(t, path, world, "shared-household-options-1", "character.family_options", 101, &zero, map[string]any{"game_minute": 300})
+	secondOptions := creationApply(t, path, world, "shared-household-options-2", "character.family_options", 202, &zero, map[string]any{"game_minute": 300})
 	firstOffers := batch4Result(t, firstOptions)["families"].([]familyOffer)
 	secondOffers := batch4Result(t, secondOptions)["families"].([]familyOffer)
 	if len(firstOffers) == 0 || len(secondOffers) == 0 {
@@ -261,12 +262,12 @@ func TestFamilyAddChildOwnsInheritedRootAndRejectsClientRoot(t *testing.T) {
 	path := setupCharacterCreationAuthorityDB(t)
 	world := batch4WorldPath(t)
 	zero := int64(0)
-	optionsOut := creationApply(t, path, world, "child-family-options", "character.family_options", 77, &zero, map[string]any{"world_name": "Mortal World", "game_minute": 500})
+	optionsOut := creationApply(t, path, world, "child-family-options", "character.family_options", 77, &zero, map[string]any{"game_minute": 500})
 	offers := batch4Result(t, optionsOut)["families"].([]familyOffer)
 	expected := optionsOut.StateVersion
 	createdOut := creationApply(t, path, world, "child-character-create", "character.create", 77, &expected, map[string]any{
 		"discord_name": "Parent", "name": "Lin Parent", "concept": "Raise a lineage", "gender": "female",
-		"path": "Sword Cultivator", "family_choice_id": offers[0].ChoiceID, "game_minute": 501, "age_at_creation_years": 25,
+		"path": "Sword Cultivator", "family_choice_id": offers[0].ChoiceID, "game_minute": 501,
 	})
 	expected = createdOut.StateVersion
 	batch4SetCanonicalGameMinute(t, path, 502)
@@ -289,5 +290,34 @@ func TestFamilyAddChildOwnsInheritedRootAndRejectsClientRoot(t *testing.T) {
 	}
 	if got := storage.ParseInt(actionScalar(t, path, "SELECT COUNT(*) FROM authoritative_action_receipts WHERE operation='family.add_child'")); got != 1 {
 		t.Fatalf("child receipts=%d", got)
+	}
+}
+
+// The echo of a past life's talent is soul_legacy's, not the caller's
+// (v1.36.0). character.create read `talent_echo` straight off the payload into
+// the aptitude roll, so a forged first life could open with a perfect echo; it
+// is read off the soul now (soulTalentEchoTx), and a caller stating it is
+// refused (TestAWaitIsNotTheCallersToSend). With the dice lent, the only
+// difference between two first lives is the echo one soul carries, and the
+// root's purity is the echo's eighth on top of the grade it buys.
+func TestTheTalentEchoIsTheSoulsNotTheCallers(t *testing.T) {
+	path := setupCharacterCreationAuthorityDB(t)
+	world := batch4WorldPath(t)
+	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS soul_legacy(user_id INTEGER PRIMARY KEY,incarnation_count INTEGER NOT NULL DEFAULT 1,legacy_points INTEGER NOT NULL DEFAULT 0,memory_seed INTEGER NOT NULL DEFAULT 0,talent_echo INTEGER NOT NULL DEFAULT 0,law_echo INTEGER NOT NULL DEFAULT 0,insight_echo INTEGER NOT NULL DEFAULT 0,karmic_fortune INTEGER NOT NULL DEFAULT 0,special_trait TEXT NOT NULL DEFAULT '',awakened_memory INTEGER NOT NULL DEFAULT 0,past_lives_json TEXT NOT NULL DEFAULT '[]',updated_at REAL NOT NULL DEFAULT 0)`)
+	batch4Exec(t, path, `INSERT INTO soul_legacy(user_id,talent_echo) VALUES(77,100)`)
+	defer gamerng.UseRoller(func(int) int { return 0 })()
+	purity := func(user int64, label string) int64 {
+		zero := int64(0)
+		options := creationApply(t, path, world, "echo-options-"+label, "character.family_options", user, &zero, map[string]any{"game_minute": 900})
+		offers := batch4Result(t, options)["families"].([]familyOffer)
+		expected := options.StateVersion
+		creationApply(t, path, world, "echo-create-"+label, "character.create", user, &expected, map[string]any{
+			"discord_name": label, "name": "Echo " + label, "concept": "the same life twice", "gender": "female",
+			"path": "Sword Cultivator", "family_choice_id": offers[0].ChoiceID, "game_minute": 901})
+		return i64(actionScalar(t, path, `SELECT purity FROM character_spiritual_roots WHERE user_id=?`, user))
+	}
+	echoed, fresh := purity(77, "echoed"), purity(78, "fresh")
+	if echoed < fresh+12 {
+		t.Fatalf("a soul echoing 100 talent rolled purity %d and a fresh soul %d; the echo's eighth (12) is missing from the roll, so the engine is not reading soul_legacy", echoed, fresh)
 	}
 }

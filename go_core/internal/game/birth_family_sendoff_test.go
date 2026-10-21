@@ -192,7 +192,7 @@ func TestComingHomeAndAskingGetsTheHeirloomOnce(t *testing.T) {
 	batch4Exec(t, path, `UPDATE characters SET location=? WHERE user_id=42`, birthFamilyHouseholdLocation(fid))
 
 	batch4SetCanonicalGameMinute(t, path, 5000)
-	first := batch4Result(t, batch4Apply(t, path, world, "family.support", 1, map[string]any{"cooldown_game_minutes": 100}))
+	first := batch4Result(t, batch4Apply(t, path, world, "family.support", 1, map[string]any{}))
 	gift, _ := first["family_sendoff"].(map[string]any)
 	if gift == nil {
 		t.Fatalf("coming home got no heirloom: %v", first)
@@ -230,7 +230,7 @@ func TestTheGhostHouseholdsSupportTheirOwn(t *testing.T) {
 		batch4Exec(t, path, `UPDATE characters SET location=? WHERE user_id=?`, birthFamilyHouseholdLocation(fid), user)
 
 		batch4SetCanonicalGameMinute(t, path, int64(6000+i*1000))
-		raw, _ := json.Marshal(map[string]any{"cooldown_game_minutes": 100})
+		raw, _ := json.Marshal(map[string]any{})
 		out, err := ApplyWithWorld(path, world, ActionRequest{APIVersion: authoritativeAPIVersion, ActionID: fmt.Sprintf("ghost-support-%d", i), Operation: "family.support", ActorID: user, Payload: raw})
 		if err != nil {
 			t.Fatal(err)
@@ -244,7 +244,9 @@ func TestTheGhostHouseholdsSupportTheirOwn(t *testing.T) {
 
 // The wait between two handouts is the engine's (v1.2.1). The payload used
 // to set it, so a caller sending 1 could draw the stipend every minute; the
-// field is still accepted on the wire (rc.48) and ignored.
+// field was accepted on the wire and ignored for a while, and since v1.36.0
+// a caller sending it is refused outright (callerOwnedNothing) - the wait
+// the engine then serves is its own month.
 func TestTheSupportWaitIsNotTheCallers(t *testing.T) {
 	path := sendoffDB(t)
 	world := batch4WorldPath(t)
@@ -252,11 +254,15 @@ func TestTheSupportWaitIsNotTheCallers(t *testing.T) {
 	batch4Exec(t, path, `INSERT INTO character_birth_family(user_id,family_id,birth_order,generation,last_support_game_minute) VALUES(42,?,1,1,-999999999)`, fid)
 	batch4Exec(t, path, `UPDATE characters SET location=? WHERE user_id=42`, birthFamilyHouseholdLocation(fid))
 	batch4SetCanonicalGameMinute(t, path, 5000)
-	batch4Result(t, batch4Apply(t, path, world, "family.support", 11, map[string]any{"cooldown_game_minutes": 1}))
+	forged, _ := json.Marshal(map[string]any{"cooldown_game_minutes": 1})
+	if _, err := ApplyWithWorld(path, world, ActionRequest{APIVersion: authoritativeAPIVersion, ActionID: "support-wait-forged", Operation: "family.support", ActorID: 42, Payload: forged}); err == nil || !strings.Contains(err.Error(), "client-supplied cooldown_game_minutes is forbidden") {
+		t.Fatalf("a caller stating the household's wait was not refused: %v", err)
+	}
+	batch4Result(t, batch4Apply(t, path, world, "family.support", 11, map[string]any{}))
 	batch4SetCanonicalGameMinute(t, path, 5000+familySupportCooldownGameMinutes-1)
-	raw, _ := json.Marshal(map[string]any{"cooldown_game_minutes": 1})
-	if _, err := ApplyWithWorld(path, world, ActionRequest{APIVersion: authoritativeAPIVersion, ActionID: "support-wait-12", Operation: "family.support", ActorID: 42, Payload: raw}); err == nil {
-		t.Fatal("a caller-supplied wait of one minute drew the stipend again inside the engine's month")
+	raw, _ := json.Marshal(map[string]any{})
+	if _, err := ApplyWithWorld(path, world, ActionRequest{APIVersion: authoritativeAPIVersion, ActionID: "support-wait-12", Operation: "family.support", ActorID: 42, Payload: raw}); err == nil || !strings.Contains(err.Error(), "cooldown has") {
+		t.Fatalf("a second handout inside the engine's month: %v", err)
 	}
 	batch4SetCanonicalGameMinute(t, path, 5000+familySupportCooldownGameMinutes)
 	batch4Result(t, batch4Apply(t, path, world, "family.support", 13, map[string]any{}))

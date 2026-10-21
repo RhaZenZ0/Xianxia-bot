@@ -137,7 +137,6 @@ class Settings:
     auto_narrate: bool
     auto_narrate_event_threads: bool
     event_thread_auto_archive_minutes: int
-    unexpected_event_chance_percent: int
     database_path: Path
     health_host: str
     http_max_request_line_bytes: int
@@ -354,13 +353,6 @@ class Settings:
                 "EVENT_THREAD_AUTO_ARCHIVE_MINUTES must be one of 60, 1440, 4320, or 10080"
             )
 
-        chance = _as_int(
-            os.getenv("UNEXPECTED_EVENT_CHANCE_PERCENT"), 28,
-            name="UNEXPECTED_EVENT_CHANCE_PERCENT",
-        )
-        if not 0 <= chance <= 100:
-            raise RuntimeError("UNEXPECTED_EVENT_CHANCE_PERCENT must be between 0 and 100")
-
         # Bounds for the pre-auth HTTP request head on the health listener.
         # Shared names with the dashboard: one knob per limit, both servers.
         http_max_request_line_bytes = _as_int(
@@ -521,7 +513,6 @@ class Settings:
             auto_narrate=_as_bool(os.getenv("AUTO_NARRATE"), False),
             auto_narrate_event_threads=_as_bool(os.getenv("AUTO_NARRATE_EVENT_THREADS"), False),
             event_thread_auto_archive_minutes=archive_minutes,
-            unexpected_event_chance_percent=chance,
             database_path=Path(os.getenv("DATABASE_PATH", "data/xianxia.sqlite3")),
             health_host=health_host,
             http_max_request_line_bytes=http_max_request_line_bytes,

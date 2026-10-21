@@ -58,10 +58,9 @@ func TestExploreDiscoveryStaysOnTheRoadFrontierNotAnywhereInTheWorld(t *testing.
 		return idx, nil
 	}
 
+	unexpectedEventsOff(t, path)
 	result := batch4Result(t, batch4Apply(t, path, world, "exploration.explore", 1, map[string]any{
-		"game_minute":                     600,
-		"unexpected_events_enabled":       false,
-		"unexpected_event_chance_percent": 0}))
+		"game_minute": 600}))
 	loc := fmt.Sprint(result["discovered_location"])
 	if loc == "" || loc == "<nil>" {
 		t.Fatalf("expected the very first exploration to discover a first-ring frontier city, got none")
@@ -113,10 +112,9 @@ func TestExploreDiscoveryExpandsTheFrontierAsCitiesAreCharted(t *testing.T) {
 	found := false
 	for i := 0; i < 8; i++ {
 		clearCooldowns(t, path, 42)
+		unexpectedEventsOff(t, path)
 		result := batch4Result(t, batch4Apply(t, path, world, "exploration.explore", i+1, map[string]any{
-			"game_minute":                     700 + i,
-			"unexpected_events_enabled":       false,
-			"unexpected_event_chance_percent": 0}))
+			"game_minute": 700 + i}))
 		loc := fmt.Sprint(result["discovered_location"])
 		if loc == secondRingOnly {
 			found = true

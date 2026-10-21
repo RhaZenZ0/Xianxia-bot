@@ -214,14 +214,14 @@ async def run(url: str, token: str, db_path: str) -> Report:
 
     # ---- 1. begin ----------------------------------------------------------
     for uid, name in ((PLAYER, "Playtest Lin"), (BUYER, "Playtest Bidder")):
-        offers = await step(report, f"family options for {uid}", act("character.family_options", uid, {"world_name": "Mortal World"}))
+        offers = await step(report, f"family options for {uid}", act("character.family_options", uid, {}))
         families = list((offers or {}).get("families") or [])
         if not families:
             report.add("FAIL", f"create {uid}", "no family offers")
             continue
         created = await step(report, f"character.create {uid}", act("character.create", uid, {
             "discord_name": name, "name": name, "concept": "a playtest cultivator", "gender": "female",
-            "path": "Sword Cultivator", "family_choice_id": str(families[0].get("choice_id") or ""), "age_at_creation_years": 18,
+            "path": "Sword Cultivator", "family_choice_id": str(families[0].get("choice_id") or ""),
         }))
         if created is not None and not created.get("created"):
             report.add("FAIL", f"character.create {uid}", f"created=false: {created.get('reason')}")
@@ -253,7 +253,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     far_town = "Greenriver Town" if home_town != "Greenriver Town" else "Riverguard City"
     household = f"birth_family:{int((fam or {}).get('family_id') or 0)}"
     await step(report, f"teleport to {far_town}, away from home", gm("admin.player.teleport", {"user_id": PLAYER, "location": far_town, "reason": "playtest"}))
-    await step(report, "family.support away from home is refused", act("family.support", PLAYER, {"cooldown_game_minutes": 100}),
+    await step(report, "family.support away from home is refused", act("family.support", PLAYER, {}),
                expect_error="asked for at home")
     await step(report, "the door does not open from another town", act("family.household.enter", PLAYER, {}),
                expect_error="travel there first")
@@ -262,7 +262,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         home = dict(burned.get("homeward") or {})
         report.add("PASS" if home.get("location") == household and home.get("return_location") == far_town else "FAIL",
                    "the talisman marks where it found you", f"{home}")
-    supported = await step(report, "family.support at home", act("family.support", PLAYER, {"cooldown_game_minutes": 100}))
+    supported = await step(report, "family.support at home", act("family.support", PLAYER, {}))
     if supported is not None:
         report.add("PASS" if int(supported.get("standing_bonus", -1)) == 0 else "FAIL", "a stranger to the ledger earns no standing term", f"{supported.get('standing_bonus')}")
     # Support just cost the house a few stones of wealth, so the figures are
@@ -350,8 +350,14 @@ async def run(url: str, token: str, db_path: str) -> Report:
     await step(report, "teleport back to Greenriver Town", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Greenriver Town", "reason": "playtest"}))
 
     # ---- 2. $ I explore ----------------------------------------------------
+    # Whether an explore can be surprised is the GM's switch (v1.36.0,
+    # admin.automation.set unexpected_events) and the chance the engine's own
+    # setting; the quiet legs used to send chance 0 on every explore. The
+    # surprise leg turns the switch back on for itself.
+    await audited("admin.automation.set", {"system": "unexpected_events", "enabled": False, "reason": "playtest: the quiet legs"},
+                  name="admin.automation.set unexpected_events off for the quiet legs")
     explored = await step(report, "exploration.explore", act("exploration.explore", PLAYER, {
-        "unexpected_event_chance_percent": 0, "event_key": aid("exploration:event")}))
+        "event_key": aid("exploration:event")}))
     if explored is not None and not (explored.get("narration") or explored.get("summary") or explored.get("encounter") or explored):
         report.add("FAIL", "exploration.explore", "empty result")
 
@@ -412,12 +418,12 @@ async def run(url: str, token: str, db_path: str) -> Report:
     # travel list. A sect's entry-level work is open to somebody in no sect
     # and pays standing with it - the number the trial's TN reads. Nothing
     # here is a roll.
-    offers = await step(report, "family options for an applicant", act("character.family_options", APPLICANT, {"world_name": "Mortal World"}))
+    offers = await step(report, "family options for an applicant", act("character.family_options", APPLICANT, {}))
     families = list((offers or {}).get("families") or [])
     if families:
         await step(report, "an applicant is created", act("character.create", APPLICANT, {
             "discord_name": "Playtest Applicant", "name": "Playtest Wen", "concept": "wants a sect", "gender": "female",
-            "path": "Sword Cultivator", "family_choice_id": str(families[0].get("choice_id") or ""), "age_at_creation_years": 18}))
+            "path": "Sword Cultivator", "family_choice_id": str(families[0].get("choice_id") or "")}))
     mortal_capital = next(name for name, loc in world["locations"].items() if loc.get("realm_hub") and loc.get("world") == "Mortal World")
     hall = next(name for name, loc in world["locations"].items() if loc.get("district") == "temple" and loc.get("outside_location") == mortal_capital)
     public_gates = {name: str(s["recruitment"]["location"]) for name, s in world["sects"].items()
@@ -610,7 +616,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     total_shops = int((here or {}).get("total") or 0)
     found = None
     for _ in range(12):
-        walked = await act_free("exploration.explore", PLAYER, {"unexpected_event_chance_percent": 0, "event_key": aid("exploration:event")})
+        walked = await act_free("exploration.explore", PLAYER, {"event_key": aid("exploration:event")})
         if isinstance(walked.get("discovered_shop"), dict):
             found = dict(walked["discovered_shop"])
             break
@@ -1080,7 +1086,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     # base holds still and the engine reports what the stage added.
     gate = dict(await engine.action("cultivation.status", PLAYER, {}) or {})
     if int(gate.get("insight_xp") or 0) < int(gate.get("insight_cost") or 0):
-        await step(report, "earn the last of the gate insight", act_free("exploration.explore", PLAYER, {"unexpected_event_chance_percent": 0, "event_key": aid("exploration:gate")}))
+        await step(report, "earn the last of the gate insight", act_free("exploration.explore", PLAYER, {"event_key": aid("exploration:gate")}))
     if not gate.get("insight_banked"):
         await step(report, "bank the gate insight", act("cultivation.insight", PLAYER, {}))
     def will_of(character: dict[str, Any]) -> int:
@@ -1183,7 +1189,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     await step(report, "the living cannot harvest death qi", act("ghost.harvest", PLAYER, {}), expect_error="born to a ghost household")
     await step(report, "the living cannot burn the rites", act("ghost.appease", PLAYER, {}), expect_error="born to a ghost household")
 
-    offers = await step(report, "family options carry the ghost households", act("character.family_options", GHOST, {"world_name": "Mortal World"}))
+    offers = await step(report, "family options carry the ghost households", act("character.family_options", GHOST, {}))
     families = list((offers or {}).get("families") or [])
     by_id = {str(f.get("id")): f for f in families}
     report.add("PASS" if len(families) == 13 and {"nether_market_house", "tomb_watch_clan"} <= set(by_id) else "FAIL",
@@ -1193,13 +1199,13 @@ async def run(url: str, token: str, db_path: str) -> Report:
         await step(report, "a martial household cannot raise a ghost cultivator",
                    act("character.create", GHOST, {"discord_name": "Playtest Ghost", "name": "Playtest Wrongborn",
                                                    "concept": "a playtest cultivator", "gender": "male", "path": "Ghost Cultivator",
-                                                   "family_choice_id": str(ordinary.get("choice_id") or ""), "age_at_creation_years": 18}),
+                                                   "family_choice_id": str(ordinary.get("choice_id") or "")}),
                    expect_error="born among the dead")
     tomb = by_id.get("tomb_watch_clan")
     if tomb:
         born = await step(report, "the tomb-watch clan can", act("character.create", GHOST, {
             "discord_name": "Playtest Ghost", "name": "Xie Graveborn", "concept": "keep the barrows", "gender": "female",
-            "path": "Ghost Cultivator", "family_choice_id": str(tomb.get("choice_id") or ""), "age_at_creation_years": 18}))
+            "path": "Ghost Cultivator", "family_choice_id": str(tomb.get("choice_id") or "")}))
         if born is not None and not born.get("created"):
             report.add("FAIL", "the tomb-watch clan can", f"created=false: {born.get('reason')}")
     ruin = next((n for n, l in locations.items() if l.get("road_site") == "ruin" and l.get("world") == "Mortal World"), "")
@@ -1724,9 +1730,11 @@ async def run(url: str, token: str, db_path: str) -> Report:
         await audited("admin.world_event.end", {"event_key": str(opened["event_key"]), "reason": "playtest"}, name="admin.world_event.end the sword grave")
 
     # -- a surprise made certain, of each kind the content rolls
-    # `unexpected_event_chance_percent: 100` makes the roll for *a* surprise
-    # certain; *which* kind comes (personal, world_event, secret_realm) is
-    # the roll's. Each kind is driven the moment it comes and the loop goes
+    # The GM's switch is turned on for this leg and the scratch engine was
+    # launched with UNEXPECTED_EVENT_CHANCE_PERCENT=100 (the chance is the
+    # engine's own setting since v1.36.0, never the payload's), which makes
+    # the roll for *a* surprise certain; *which* kind comes (personal,
+    # world_event, secret_realm) is the roll's. Each kind is driven the moment it comes and the loop goes
     # on until the two with operations behind them have both come, or twenty
     # explores have not - in which case the missing kind is reported, never
     # failed (CLAUDE.md: never assert that a random thing happened). A
@@ -1750,6 +1758,8 @@ async def run(url: str, token: str, db_path: str) -> Report:
                     return found
         return ""
 
+    await audited("admin.automation.set", {"system": "unexpected_events", "enabled": True, "reason": "playtest: a surprise made certain"},
+                  name="admin.automation.set unexpected_events on for the surprise leg")
     came: dict[str, str] = {}
     for _ in range(20):
         if {"personal", "world_event"} <= set(came):
@@ -1757,8 +1767,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         surprise_key = aid("exploration:event")
         try:
             await gm("admin.player.reset_cooldowns", {"user_id": PLAYER, "reason": "playtest"})
-            surprised = await act("exploration.explore", PLAYER, {
-                "unexpected_events_enabled": True, "unexpected_event_chance_percent": 100, "event_key": surprise_key})
+            surprised = await act("exploration.explore", PLAYER, {"event_key": surprise_key})
         except GameEngineError as exc:
             report.add("FAIL", "exploration.explore with a surprise certain", str(exc))
             break
@@ -1794,6 +1803,8 @@ async def run(url: str, token: str, db_path: str) -> Report:
             break
     for kind in ("personal", "world_event", "secret_realm"):
         report.add("PASS", f"a {kind} surprise came" if kind in came else f"a {kind} surprise did not come in twenty explores (the dice, not the wiring)", came.get(kind, ""))
+    await audited("admin.automation.set", {"system": "unexpected_events", "enabled": False, "reason": "playtest: the quiet legs again"},
+                  name="admin.automation.set unexpected_events off again")
 
     # -- the sect and the homestead (v1.0.0-rc.36)
     # PLAYER is an Outer Disciple of the Azure Cloud Sect since the trial;
@@ -1943,6 +1954,27 @@ async def run(url: str, token: str, db_path: str) -> Report:
         if elder_home:
             await audited("admin.npc.relocate", {"npc_name": elder_name, "location": elder_home, "reason": "playtest: home again"}, name="admin.npc.relocate the Elder home")
         await step(report, "the buyer's realm is put back", gm("admin.player.set_realm", {"user_id": BUYER, "realm_index": int(buyer_before.get("realm_index") or 0), "phase": int(buyer_before.get("phase") or 1), "reason": "playtest"}))
+    # A sect holds a city, not one of its streets (v1.33.0): a claim made from
+    # a gate, naming the gate, lands on the city's row. Driven here against a
+    # real server for the first time (v1.36.0); the Go tests and the Python
+    # command tests held the redirect before, and neither is a server. The
+    # imperial city is nobody's seat, so the claim is the sect's to make - and
+    # if the world's own sects got there first the claim starts a war instead,
+    # which is as good a proof: the war is over the city, never the gate.
+    gate_city, city_gate = "Azure Crown Imperial City", "Azure Crown Imperial City North Gate"
+    await step(report, "to a city's gate", gm("admin.player.teleport", {"user_id": PLAYER, "location": city_gate, "reason": "playtest"}))
+    from_gate = await step(report, "territory.claim from a gate, naming the gate", act("territory.claim", PLAYER, {"territory_key": city_gate}))
+    if from_gate is not None:
+        report.add("PASS" if str(from_gate.get("territory_key")) == gate_city else "FAIL",
+                   "a claim naming a gate is a claim on its city", str(from_gate.get("territory_key")))
+        city_rows = {str(r.get("territory_key")): r for r in await db.get_territories(region=gate_city)}
+        gate_rows = {str(r.get("territory_key")): r for r in await db.get_territories(region=city_gate)}
+        city_row, gate_row = city_rows.get(gate_city) or {}, gate_rows.get(city_gate) or {}
+        banner = str(city_row.get("controller_key") or "")
+        report.add("PASS" if (from_gate.get("claimed") and banner == sect) or (from_gate.get("war_id") and banner) else "FAIL",
+                   "the city's row carries the banner (or the war is over the city)", f"claimed={from_gate.get('claimed')} war={from_gate.get('war_id')} city holder={banner!r}")
+        report.add("PASS" if not str(gate_row.get("controller_key") or "") else "FAIL",
+                   "the gate's own row carries no banner", f"gate holder={gate_row.get('controller_key')!r}")
     # A territory is claimed standing in its region (v1.3.1); both claims were
     # made from the town and refused (v1.7.1).
     await step(report, "to the hills to claim them", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Cloudspine Foothills", "reason": "playtest"}))
@@ -2996,13 +3028,13 @@ async def run(url: str, token: str, db_path: str) -> Report:
     # asserting, so both halves are driven: the fresh cultivator is allowed and
     # the veteran is refused.
     offers = await step(report, "family options for a cultivator who will not stay",
-                        act("character.family_options", QUITTER, {"world_name": "Mortal World"}))
+                        act("character.family_options", QUITTER, {}))
     first = list((offers or {}).get("families") or [])
     if first:
         await step(report, "a fourth cultivator is created", act("character.create", QUITTER, {
             "discord_name": "Playtest Quitter", "name": "Mo Secondthoughts", "concept": "reconsider everything",
             "gender": "neutral", "path": "Sword Cultivator",
-            "family_choice_id": str(first[0].get("choice_id") or ""), "age_at_creation_years": 18}))
+            "family_choice_id": str(first[0].get("choice_id") or "")}))
         reset = await step(report, "character.reset takes the life back", act("character.reset", QUITTER, {}))
         if reset is not None:
             gone = await db.get_character(QUITTER)
@@ -3034,13 +3066,13 @@ async def run(url: str, token: str, db_path: str) -> Report:
                            "and names the life that was given up",
                            str([row.get("name") for row in lives])[:80])
         again = await step(report, "family options again after a reset",
-                           act("character.family_options", QUITTER, {"world_name": "Mortal World"}))
+                           act("character.family_options", QUITTER, {}))
         second = list((again or {}).get("families") or [])
         if second:
             await step(report, "and /begin works again", act("character.create", QUITTER, {
                 "discord_name": "Playtest Quitter", "name": "Mo Resolved", "concept": "this time for certain",
                 "gender": "neutral", "path": "Body Refiner",
-                "family_choice_id": str(second[0].get("choice_id") or ""), "age_at_creation_years": 18}))
+                "family_choice_id": str(second[0].get("choice_id") or "")}))
     # By this point PLAYER has died and come back, so the incarnation rule
     # answers. The world-mark refusal is kept as an alternative only for an
     # anonymise column a reset has not been told how to release; since v1.0.14
@@ -3077,7 +3109,11 @@ def main() -> int:
     tmp = Path(tempfile.mkdtemp(prefix="xianxia-playtest-"))
     try:
         if args.launch:
-            proc, url, token = launch_engine(tmp)
+            # The surprise leg wants the roll for *a* surprise certain, and the
+            # chance is the engine's own setting since v1.36.0, so the scratch
+            # engine is launched with it; against an engine somebody else runs
+            # the leg reports the dice instead (never asserts a roll landed).
+            proc, url, token = launch_engine(tmp, {"UNEXPECTED_EVENT_CHANCE_PERCENT": "100"})
             db_path = str(tmp / "playtest.sqlite3")
             bootstrap(url, token, db_path)
         else:

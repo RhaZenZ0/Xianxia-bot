@@ -224,6 +224,7 @@ type ArrayEffect struct {
 
 type Item struct {
 	Name string  `json:"name"`
+	Type string  `json:"type"`
 	Use  ItemUse `json:"use"`
 	// PillToxicity overrides the derived medicinal-residue value when the
 	// content sets it (nil = derive from tags/use, as app/rules/alchemy.py).
