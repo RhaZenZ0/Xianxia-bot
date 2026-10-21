@@ -31,7 +31,14 @@ type explorationPayload struct {
 const unexpectedEventChanceDefault = int64(28)
 
 func unexpectedEventChanceFromEnv() int {
-	return int(boundedEnvValue(os.Getenv("UNEXPECTED_EVENT_CHANCE_PERCENT"), unexpectedEventChanceDefault, 0, 100))
+	chance := boundedEnvValue(os.Getenv("UNEXPECTED_EVENT_CHANCE_PERCENT"), unexpectedEventChanceDefault, 0, 100)
+	// boundedEnvValue already holds it to 0..100; the bound is restated here
+	// so the narrowing to int is visibly guarded (CodeQL reads the guard, not
+	// the callee).
+	if chance < 0 || chance > 100 {
+		chance = unexpectedEventChanceDefault
+	}
+	return int(chance)
 }
 
 type travelPayload struct {

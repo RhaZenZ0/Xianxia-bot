@@ -501,8 +501,9 @@ func addFateGo(conn *storage.Conn, userID int64, reason string, gameMinute int64
 // from there when EventKey is empty. NPCRealmIndex, NPCStage, Severity and
 // TargetKey are the realm, stage, severity and lock an older bot sent: kept
 // on the wire so that bot is answered rather than refused (rc.48's rule for
-// the minute), and read by nothing - which the payload sweep proves
-// (payload_fields_test.go, callerIgnored) rather than this comment claiming.
+// the minute), and deliberately ignored - read by nothing, which the payload
+// sweep proves (payload_fields_test.go, callerIgnored) rather than this
+// comment claiming.
 type combatStartPayload struct {
 	Kind          string `json:"kind"`
 	NPCName       string `json:"npc_name"`

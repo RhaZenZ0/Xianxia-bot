@@ -974,7 +974,13 @@ func soulTalentEchoTx(conn *storage.Conn, userID int64) int {
 	if err != nil || len(res.Rows) == 0 {
 		return 0
 	}
-	return int(minI64(100, maxI64(0, i64(res.Rows[0][0]))))
+	echo := i64(res.Rows[0][0])
+	if echo < 0 || echo > 100 {
+		// An echo is 0..100 by the install that writes it; a row outside that
+		// is clamped, and the narrowing to int below is visibly guarded.
+		echo = minI64(100, maxI64(0, echo))
+	}
+	return int(echo)
 }
 
 // clearIncarnationStateTx is what a rebirth wipes before the new body is

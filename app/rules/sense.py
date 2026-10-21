@@ -102,14 +102,3 @@ def _land_reading(ground: Mapping[str, Any]) -> str:
     return f" The land itself reads as **{said}**." if said else ""
 
 
-def hidden_npc_names(
-    hidden_masters: Mapping[str, Mapping[str, Any]],
-    location: str | None = None,
-) -> list[str]:
-    return [
-        str(name)
-        for name, npc in hidden_masters.items()
-        if not location or npc.get("location") == location
-    ]
-
-
