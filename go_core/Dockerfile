@@ -1,6 +1,6 @@
 # Both base images are pinned by digest as well as tag (v0.29.0); see the
 # note in the root Dockerfile for how to move them.
-FROM golang:1.26-bookworm@sha256:9fdc884aacc3bec89b20ffc69f4bb369c78210e3e4f600387b5128b12c199f81 AS build
+FROM golang:1.26-bookworm@sha256:5b1f78db1f54cc8cb46e652c51d3f854441c4310a449161b6fe9fb553edab505 AS build
 WORKDIR /src
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libsqlite3-dev \
