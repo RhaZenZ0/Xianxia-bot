@@ -85,6 +85,17 @@ class TheSlashSurface(unittest.TestCase):
         self.assertIn('" from the shop" if str(result.get("source"))=="wares"', _body(ECONOMY, "merchant_buy"))
         self.assertIn('"shop" if str(line.get("source"))=="wares" else "floor find"', _body(ECONOMY, "merchant_buy_item_autocomplete"))
 
+    def test_the_merchant_picker_offers_only_who_is_within_reach(self):
+        # v1.39.0: the sweep's refusal roster found the picker offering a
+        # merchant in another world first, and merchant.buy refusing it (rc.46).
+        # The engine's merchant.status says who is meetable; the picker offers
+        # those and nobody else, and says where they walk when none is.
+        picker = _body(ECONOMY, "merchant_buy_merchant_autocomplete")
+        self.assertIn('reachable=[r for r in rows if bool(r.get("meetable"))]', picker)
+        self.assertIn("for row in reachable:", picker)
+        self.assertNotIn('not bool(r.get("meetable"))', picker, "the picker still offers the merchants out of reach")
+        self.assertIn('register_hub_option_hint(\n    merchant_buy,\n    "merchant",', ECONOMY)
+
     def test_the_item_picker_follows_the_chosen_merchant(self):
         picker = _body(ECONOMY, "merchant_buy_item_autocomplete")
         self.assertIn('getattr(interaction.namespace,"merchant","")', picker)

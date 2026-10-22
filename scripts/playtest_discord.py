@@ -139,7 +139,7 @@ MUST_RESOLVE: dict[str, str] = {
 }
 REFUSAL_ACCEPTED: dict[str, str] = {
     "/cultivate": "the daily five (section 5) resolve it and leave it on cooldown; the refusal is the cooldown read back",
-    "/merchant buy": "the picker offers every merchant and the first is out of reach; the reach rule is the engine's and holds (recorded in docs/TODO.md)",
+    "/merchant buy": "no merchant walks within reach of the sweep's player; since v1.39.0 the picker offers only who is meetable, so the press meets an empty picker with its hint, and a merchant that does stand here is refused by nothing",
     "/family enter": "the player's household stands in another city; entering it from here is the refusal",
     "/family house invite": "the member picker is answered with a cultivator who has no character, by design (nothing here reaches the player)",
     "/admin player erase": "the confirm word must be typed exactly; a generic answer is refused by design",
@@ -1750,6 +1750,13 @@ async def run(url: str, token: str, db_path: str, shard: tuple[int, int] | None 
                     except Exception as exc:  # noqa: BLE001 - a playtest reports, it does not crash
                         report.add("FAIL", name, f"{type(exc).__name__}: {exc}")
                         continue
+                    # A press that timed out proves nothing (v1.39.0): the
+                    # reply is lost to the record, so a must-resolve leaf that
+                    # answered with silence is unproven, not resolved.
+                    if status == "pressed" and note.startswith("slow") and action.path in MUST_RESOLVE:
+                        report.add("FAIL", name, f"timed out where it must resolve - the press was never read: {note}")
+                        pressed[action.path] = note
+                        continue
                     # A refusal is decided, never merely counted (v1.38.0).
                     if status == "pressed" and REFUSAL_MARK in note:
                         if action.path in MUST_RESOLVE:
@@ -1830,6 +1837,15 @@ async def run(url: str, token: str, db_path: str, shard: tuple[int, int] | None 
                 await player.click(panel.message(), custom_id=str(button["custom_id"]))
             except SetupError as exc:
                 return f"buttons disabled: {exc}"
+            except TimeoutError:
+                # The press reached the bot and the bot was still on it when
+                # SimCord's five-second settle gave up (v1.39.0: once, with the
+                # engine under another run's load). Wait the work out and read
+                # what the panel did, the way press_leaf does; the step holds
+                # the panel's state, not the settle's speed.
+                await settle_patiently(env)
+                if "Reopen" in panel.labels():
+                    return "expired to a Reopen button after a slow press"
             raise Failed("the panel still takes presses after its timeout:\n" + text[:400])
         tail = shard is None or shard[0] == 1  # 9 and 9b run once, in the whole run or part 1
         note = await step(report, "a panel left past its idle window goes quiet and can be reopened", quiet()) if tail else None

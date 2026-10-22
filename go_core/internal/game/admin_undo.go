@@ -293,8 +293,12 @@ func legacyLocationRestore(uid int64, location string) sqlStmt {
 }
 
 func decodeSnapshot(raw any) map[string]any {
-	var m map[string]any
-	if err := json.Unmarshal([]byte(fmt.Sprint(raw)), &m); err != nil {
+	// Through the one UseNumber door (v1.39.0). The ids a reverse lever acts
+	// on ride the audit row's target string (parseTargetUserID), never the
+	// snapshot, so no undo was ever rounded; the snapshot's numbers are held
+	// to the same door so a lever that one day reads an id off one cannot be.
+	m := decodeJSONMap(raw)
+	if len(m) == 0 {
 		return map[string]any{}
 	}
 	return m

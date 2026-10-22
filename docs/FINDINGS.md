@@ -8959,3 +8959,94 @@ and writes the minute as a RawMessage of its own, so every other field goes thro
 `TestCanonicalisingAPayloadKeepsASnowflakeExact` holds the id to its spelling and fails against the
 old path with the rounded digits in its message. The lesson joins the standing rules beside the
 other sentinels: a JSON number decoded into `any` is a float64, and an id is never read through one.
+
+### The class behind the snowflake (v1.39.0)
+
+v1.38.0 fixed the payload canonicaliser and wrote the rule down: a JSON number decoded into `any`
+is a float64, and a Discord id is above 2^53. v1.36.0's lesson is that a fault with a class gets a
+gate over the class before the instance is fixed, so the first thing this release did was write
+the walk: `TestNoPayloadIsDecodedIntoAPlainMap` parses every non-test file of `game`, `server` and
+`simulation` and refuses any `json.Unmarshal(..., &m)` or `Decode(&m)` whose target is a
+`map[string]any`, unless the function also calls `UseNumber`. It found nineteen. One was the lever
+the v1.38.0 write-up had already named (`adminTradeVoid`); the other eighteen were not request
+payloads at all but the stored JSON the engine reads back - undo snapshots, the clock and the
+narration chain in `world_state`, event payloads and seeds, the realm rules a personal world keeps,
+the update watcher's heartbeat, the era modifiers, the caravan's cargo. Each decoded a number
+through float64. None of those happens to carry a Discord id today (an undo reads the player off
+the audit row's target string, which is why `TestAdminUndoLastReachesAPlayerWithASnowflakeId`
+passes against the old decode and says so in its comment: a hold on the wiring, not a drill), but a
+rule that holds only where somebody checked is prose, and `era modifiers` decoded through float64
+is a `case float64` switch that drops a `json.Number` on the floor the day the door changes.
+
+So there is one door: `decodeJSONMapStrict`, which decodes with `UseNumber`, and every one of the
+nineteen sites goes through it or through `decodeMap`, which always did. The consumers were
+walked too, because a `json.Number` is neither a `float64` nor a `string` to a type switch: the
+coercions with a `default` that prints and rescans were already fine, and the four that were not
+(`adminAdvanceTime`'s anchor, the watcher heartbeat's `at`, the era modifiers, and the clock state)
+read through `parseFloat` or carry a `case json.Number` now. The gate itself was drilled by putting
+the old `decodeSnapshot` back - it names the function and the variable - and the end-to-end hold
+is a Dao proposal between two ids of Discord's size through `ApplyWithWorld`, with the row read
+back to the digit. The game suite passing after a change to nineteen decode sites is what says the
+coercions were walked properly; where it would not have, the gate's own list is the map.
+
+### A board carries its own world's goods (v1.39.0)
+
+The v1.38.0 sweep's market builder granted the player the dearest listing's price and bought it:
+"Starsteel Sky-Treader Boots - Method Slip" for 1,359,999,999 Low-Grade Spirit Stones, sold back
+for 317. The slip is a Celestial good; the board was Azure Crown Imperial City's, in the Mortal
+World. Bootstrap stocked every market-tradeable item in every city, with its base price scaled by
+the world's factor, so a Mortal board carried the whole catalogue. The quote then ran through
+`marketUnitPrice`, whose buy floor is `highestNPCPays` - the most any of the world's own people
+would hand over, which since v1.34.0 reads the cheapest shelf anywhere along the currency ladder.
+For a good no Mortal shop sells, that is a Celestial shelf converted down: 1,360 of a coin worth a
+million stones, less one. Neither rule was wrong on its own; the fault was a board offering a good
+that had no business in its world, which is rc.44's class (a world's money and goods have one door)
+on the demand side.
+
+A board now carries what a shop of its world sells or buys - `worldGoods`, read off the shop
+catalogue the v1.38.0 content pass had just made whole - and bootstrap deletes the rest, which is
+the same delete it already ran for a good taken off the market, so a running world's boards are
+corrected at the next boot without a migration. `TestAMarketCarriesOnlyItsOwnWorldsGoods` plants
+the Celestial slip on the Mortal board, bootstraps, and holds every remaining row to its world's
+goods, with a floor on how many rows remain so a rule that emptied the boards could not pass;
+dropping the filter fails it with the slip still on the board. The price floor is left as it is:
+with every listed good sold or bought in its own world, the cheapest shelf along the ladder is at
+worst its own world's shelf.
+
+### Between two passes (v1.39.0)
+
+The dashboard header read "1 system behind" on a healthy world at ×4 time and "simulation current"
+a minute later. The attention feed's rule was the v1.34.0 one - a system is late when its lag has
+passed its own interval, which is the only lag reading that means anything - and it was right as
+far as it went: the bot's worker runs the due systems every thirty seconds, so at ×4 a system
+reads two game minutes past its interval before the next pass clears it, and the feed flagged the
+gap. It also flagged a system the GM had switched off forever, since a disabled system's clock
+stands still on purpose. Both are the rc.56 fault from the other side: a panel stating a rule
+("behind") that its own setting (the pass length, the toggles) falsifies.
+
+The rule lives once now, in `_simulation_behind`: behind means further past the interval than two
+worker passes at the clock's scale, and never for a system whose toggle is off. The pass length
+was a literal `30` in the worker's sleep; it is `SIMULATION_PASS_SECONDS` in `app/ops/config.py`,
+read by the worker and by the feed, and a test reads the worker's sleep by AST to hold them to one
+name. The toggles the feed reads are the dashboard's `AUTOMATION_DEFAULTS`, hoisted to module
+level and read through `_automation_settings` by the overview page and the feed alike; the
+contract test that holds that dict to the Go table and core.py now reads an annotated assignment.
+The unit tests walk the rule's edges at ×1, ×4 and ×60, and the integration test flips a toggle in
+`world_state` and watches the flag go.
+
+### Silence is not a result (v1.39.0)
+
+Two small holes in the v1.38.0 harness, found by reading its own logs. A must-resolve leaf whose
+press timed out was recorded as "slow → (no reply)" and passed, because the rule looked for a
+refusal mark in a reply that was never read; it fails now, naming the leaf, since a leaf that must
+resolve has proved nothing by silence. And the idle-panel step pressed its one button without the
+patience every other press has: under another run's load the five-second settle gave up once and
+the step failed on the settle's speed rather than the panel's state. It waits the press out the
+way `press_leaf` does and reads what the panel did.
+
+The merchant picker closes with them, because it is the same shape: the sweep's roster had
+recorded `/merchant buy` offering a merchant in another world first, and the picker's list was
+every merchant, reachable ones first, the rest labelled - a surface offering what the engine will
+refuse (rc.46), politely. The engine's `merchant.status` already says who is `meetable`; the picker
+offers those and nobody else, and a `register_hub_option_hint` says where the rest walk when none
+is within reach.

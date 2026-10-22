@@ -943,8 +943,7 @@ func personalWorldRuleActionGo(conn *storage.Conn, userID int64, raw json.RawMes
 	if w == nil {
 		return authoritativeMutation{}, errors.New("you have not created a personal world")
 	}
-	rules := map[string]any{}
-	_ = json.Unmarshal([]byte(fmt.Sprint(w["laws_json"])), &rules)
+	rules := decodeJSONMap(w["laws_json"])
 	rules[p.Rule] = p.Definition
 	enc, _ := json.Marshal(rules)
 	st := min64(100, i64(w["stability"])+1)

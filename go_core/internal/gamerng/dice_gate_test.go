@@ -48,6 +48,7 @@ var diceAllowed = map[string]string{
 	// tick produced, so each of these says which it is.
 	"TestBootstrapOwnsSimulationAndClanSeedWrites":                    "counts civilization_regions, which bootstrap seeds one per content location with no roll anywhere on the path",
 	"TestBootstrapSkipsHiddenSectsAndKeepsManualsOffTheMarket":        "counts the manual items the content file declares, derived from the catalogue rather than from anything the tick rolled",
+	"TestAMarketCarriesOnlyItsOwnWorldsGoods":                         "counts economy_markets rows per world, which bootstrap seeds one per (location, good a shop of that world sells or buys) with no roll on the path; the content file gives every world shops",
 	"TestAMerchantsOwnShopIsStockedAtSeedAndRestockedAtHome":          "the zero-check is len(hu.Wares) on the merchant the content file authors, read before any action runs",
 	"TestFamilyCityRoadGraphIsBidirectionalConnectedAndWorldLocal":    "the zero-check is len(location.Roads) on the authored map, which is the property under test and is not rolled",
 	"TestFamilyRoadNeighborCanBeTravelledAndIsPersistentlyDiscovered": "the same len(location.Roads) on the authored map, read out of the catalogue before the travel it sets up",

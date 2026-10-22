@@ -1188,6 +1188,23 @@ class AttentionFeedTests(unittest.IsolatedAsyncioTestCase):
         kinds = {a["kind"] for a in (await self.store.overview())["attention"]}
         self.assertNotIn("simulation_lag", kinds)
 
+    async def test_a_system_the_gm_switched_off_is_not_reported_behind(self):
+        # v1.39.0: a disabled system's clock stands still on purpose, so its
+        # lag grows without bound and the feed used to flag it forever.
+        async with self.db._connect() as conn:
+            await conn.execute(
+                "UPDATE world_simulation_state SET interval_game_minutes=10,last_game_minute=0 WHERE system=?",
+                ("black_markets",))
+            await conn.commit()
+        kinds = {a["kind"] for a in (await self.store.overview())["attention"]}
+        self.assertIn("simulation_lag", kinds, "the fixture is not behind when on; the test proves nothing")
+        async with self.db._connect() as conn:
+            await conn.execute(
+                "INSERT OR REPLACE INTO world_state(key,value_json,updated_at) VALUES('automation_settings','{\"black_markets\": false}',0)")
+            await conn.commit()
+        kinds = {a["kind"] for a in (await self.store.overview())["attention"]}
+        self.assertNotIn("simulation_lag", kinds)
+
     async def test_the_feed_puts_the_worst_thing_first(self):
         # The draft is collected before the lag is, so only the sort can put the
         # missed tick at the top - which is where it belongs, because it is the

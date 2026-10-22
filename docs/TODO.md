@@ -94,10 +94,3 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   until the clock moves. A real-time column would fix it for this one effect at a schema change; it is
   left until a second effect wants a real-time end. Decided (v1.36.0): left until a second
   effect wants a real-time end.
-- **deferred (design)** — *The merchant picker offers a merchant out of reach.* `/merchant buy`'s
-  picker lists every travelling merchant and the first it offers can be in another world, so the press
-  is refused with "is not within reach" - a surface offering what the engine will refuse (rc.46). The
-  sweep's refusal roster found it (v1.38.0) and accepts the refusal, because the reach rule is the
-  engine's and holds. The fix is one engine question, "who is within reach of me", read by the picker;
-  whether an out-of-reach merchant is left off or drawn disabled with the world named is the owner's
-  call. Decided (v1.38.0): recorded, not built with this release.

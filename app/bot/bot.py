@@ -18,6 +18,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from ..database import SCHEMA_VERSION
+from ..ops.config import SIMULATION_PASS_SECONDS
 from ..ops.health import HealthServer, HealthState
 from ..ops.http_limits import HeaderLimits
 from ..ops.release_channel import announcement, api_url, newer_than_installed, newest_for_channel, parse_releases, read_release_check
@@ -802,7 +803,7 @@ class XianxiaBot(commands.Bot):
                     await self.sweep_events_without_a_scene()
                 except Exception:
                     log.exception("Could not sweep the events without a scene")
-                await asyncio.sleep(30)
+                await asyncio.sleep(SIMULATION_PASS_SECONDS)
         except asyncio.CancelledError:
             pass
 

@@ -106,8 +106,8 @@ func (s updateRequestState) open() bool {
 // stale window. An absent or unreadable heartbeat is a watcher nobody has
 // heard from - not running - never a zero age.
 func updateWatcherRunning(heartbeat map[string]any, now float64) bool {
-	at, ok := heartbeat["at"].(float64)
-	if !ok {
+	at := parseFloat(heartbeat["at"])
+	if at <= 0 {
 		return false
 	}
 	return now-at < updateWatcherStaleSeconds
@@ -142,8 +142,8 @@ func readUpdateStateTx(conn *storage.Conn, key string) (map[string]any, error) {
 	if row == nil {
 		return nil, nil
 	}
-	var out map[string]any
-	if err := json.Unmarshal([]byte(fmt.Sprint(row["value_json"])), &out); err != nil {
+	out, err := decodeJSONMapStrict(fmt.Sprint(row["value_json"]))
+	if err != nil {
 		return nil, nil
 	}
 	return out, nil

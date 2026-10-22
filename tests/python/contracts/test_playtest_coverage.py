@@ -300,7 +300,9 @@ class TheDiscordHalfPressesEveryLeaf(unittest.TestCase):
         self.assertEqual(sorted(set(builders.values()) - defined), [], "a builder that is not an async def at module level")
         text = DISCORD_SCRIPT.read_text(encoding="utf-8")
         for marker in ("STATE_BUILDERS.get(action.path)", "refused where it must resolve",
-                       "in neither MUST_RESOLVE nor REFUSAL_ACCEPTED", "REFUSAL_MARK in note"):
+                       "in neither MUST_RESOLVE nor REFUSAL_ACCEPTED", "REFUSAL_MARK in note",
+                       # v1.39.0: a press that timed out is unproven, not resolved
+                       "timed out where it must resolve"):
             with self.subTest(marker=marker):
                 self.assertIn(marker, text, "the sweep no longer decides its refusals")
 
