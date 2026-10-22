@@ -452,7 +452,8 @@ func UnderworldGood(item worlddata.Item) bool {
 // currency ladder into `currency` the way a shelf price is (shelfPriceAcross).
 // An item worth less than one whole coin up there has no base and the post
 // does not stock it (false) - the ceiling doing its job, as it does on the
-// keepers' boards. Until v1.36.0 the Mortal number was written raw into every
+// keepers' boards. (Rounding up, that is an item worth nothing at all; one
+// worth any part of a coin asks the whole coin.) Until v1.36.0 the Mortal number was written raw into every
 // world's coin, so a manual asking 133 stones at the Mortal post asked 133
 // crystals at the Celestial one and the Celestial broker paid a million times
 // the Mortal shelf to buy it back.
@@ -461,7 +462,9 @@ func UnderworldBase(catalog worlddata.Catalog, itemID, currency string) (int64, 
 	if base <= 0 {
 		base = max64(8, ItemSectValue(catalog, itemID)*8)
 	}
-	converted, ok := shelfPriceAcross(catalog, map[string]shelfRate{}, worldBaseCurrency(catalog, "Mortal World"), currency, base)
+	// Rounded up on the climb (v1.38.0, shelfPriceAcrossUp): a post never
+	// asks less than the base below it is worth.
+	converted, ok := shelfPriceAcrossUp(catalog, map[string]shelfRate{}, worldBaseCurrency(catalog, "Mortal World"), currency, base)
 	if !ok || converted < 1 {
 		return 0, false
 	}

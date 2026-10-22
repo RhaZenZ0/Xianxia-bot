@@ -66,8 +66,8 @@ from typing import Any
 # checked again on the press, so the panel is where a secluded player finds
 # the way out. Refusing the panel itself would hide that door.
 HUB_ROOTS = frozenset({
-    "abode", "admin", "ascend", "beast", "character", "combat", "craft", "cultivation",
-    "economy", "family", "innerworld", "items", "npc", "realm", "sect", "travel", "world",
+    "admin", "adventure", "beast", "character", "craft", "cultivation",
+    "economy", "family", "home", "items", "sect", "travel", "world",
 })
 
 # The slash commands that only read. `begin` (creation), `action` (the guided

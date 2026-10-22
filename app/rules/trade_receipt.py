@@ -93,7 +93,7 @@ def format_trade_receipt(
         head = (
             f"{icon} {verb} **{item_label} x{quantity}** — "
             f"⚠️ the engine did not report a price. Check your balance with "
-            f"**/economy → Wallet** and report this."
+            f"**/economy → City Shops → Wallet** and report this."
         )
     else:
         head = f"{icon} {verb} **{item_label} x{quantity}** for **{_money(total)} {label}**."

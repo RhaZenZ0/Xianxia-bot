@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -363,18 +364,35 @@ func stage5CanonicalizeMutationPayload(conn *storage.Conn, operation string, raw
 		return raw, gameMinute, nil
 	}
 
-	payload := map[string]any{}
-	if len(raw) > 0 && string(raw) != "null" {
-		if err := json.Unmarshal(raw, &payload); err != nil {
-			return nil, 0, err
-		}
-	}
-	payload["game_minute"] = gameMinute
-	encoded, err := json.Marshal(payload)
+	encoded, err := canonicalPayloadWithGameMinute(raw, gameMinute)
 	if err != nil {
 		return nil, 0, err
 	}
 	return encoded, gameMinute, nil
+}
+
+// canonicalPayloadWithGameMinute writes the engine's game_minute over the
+// caller's payload and hands every other field on byte for byte. It used to
+// decode the payload into map[string]any and marshal it back, and a JSON
+// number decoded into `any` is a float64: a Discord snowflake (every member
+// id since 2015 is above 2^53) came out of it with its last digits rounded,
+// so `dao.propose` could not find the partner it named and answered "both
+// cultivators must be living incarnations", `duel.challenge`, `abode.invite`
+// and `formation.assign` lost their target the same way, and nothing in the
+// engine's own tests saw it because they pair small ids (v1.38.0; the
+// Discord sweep's Dao-partner builder, the first to pair two real ids, did).
+// The admin levers were never affected: decodeMap already decodes with
+// UseNumber. RawMessage values are never re-interpreted, so a number is the
+// number the caller sent.
+func canonicalPayloadWithGameMinute(raw json.RawMessage, gameMinute int64) (json.RawMessage, error) {
+	payload := map[string]json.RawMessage{}
+	if len(raw) > 0 && string(raw) != "null" {
+		if err := json.Unmarshal(raw, &payload); err != nil {
+			return nil, err
+		}
+	}
+	payload["game_minute"] = json.RawMessage(strconv.FormatInt(gameMinute, 10))
+	return json.Marshal(payload)
 }
 
 // replayResponse returns the stored response for an action_id that has already

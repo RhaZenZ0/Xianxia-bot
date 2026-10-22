@@ -20,20 +20,21 @@ _MENTION_ID = re.compile(r"(?:<@!?|<#)?(\d{15,22})>?$")
 _RANGE_ANNOTATION = re.compile(r"Range\[(int|float)\s*,\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\]")
 
 
+# Twelve player hubs and /admin (v1.38.0; sixteen before the fold).
 _HUB_COLOURS = {
-    "character": 0x6C7A89, "ascend": 0xA87D32, "cultivation": 0x5B8C5A,
-    "items": 0x8A6D3B, "npc": 0x6D78A8, "world": 0x3F7F73,
-    "travel": 0x557A95, "combat": 0x9A4A4A, "economy": 0xA5863B,
+    "character": 0x6C7A89, "cultivation": 0x5B8C5A,
+    "items": 0x8A6D3B, "world": 0x3F7F73,
+    "travel": 0x557A95, "adventure": 0x9A4A4A, "economy": 0xA5863B,
     "craft": 0x8B6F47, "beast": 0x6B875F, "sect": 0x815D73,
-    "family": 0x8A694D, "abode": 0x587A63, "innerworld": 0x5D5A91,
-    "realm": 0x744F8A, "admin": 0xB23A48,
+    "family": 0x8A694D, "home": 0x587A63,
+    "admin": 0xB23A48,
 }
 
 _HUB_ICONS = {
-    "character": "🧑", "ascend": "☯️", "cultivation": "🧘", "items": "🎒",
-    "npc": "👥", "world": "🌍", "travel": "🗺️", "combat": "⚔️",
+    "character": "🧑", "cultivation": "🧘", "items": "🎒",
+    "world": "🌍", "travel": "🗺️", "adventure": "⚔️",
     "economy": "💰", "craft": "🛠️", "beast": "🐉", "sect": "🏯",
-    "family": "🏠", "abode": "🏡", "innerworld": "🌌", "realm": "🌀",
+    "family": "🏠", "home": "🏡",
     "admin": "🛡️",
 }
 
@@ -62,13 +63,15 @@ LAYOUT_COMPONENTS_AVAILABLE = all(
 #   3. multi-page hubs that chunk, or sit right on the 8-action limit
 #   4. admin - last, because it is how the server is operated and because it
 #      needs the administrator re-check in interaction_check below
+# The stages are history now (every hub is on the layout); the fold (v1.38.0)
+# renamed the entries, with each folded hub's stage going to the hub it joined.
 LAYOUT_HUB_NAMES: set[str] = {
     # stage 1
-    "character", "npc", "world", "travel", "craft", "realm", "items", "combat", "economy",
+    "character", "world", "travel", "craft", "items", "adventure", "economy",
     # stage 2
-    "innerworld", "beast", "abode", "family",
+    "beast", "home", "family",
     # stage 3
-    "ascend", "cultivation", "sect",
+    "cultivation", "sect",
     # stage 4
     "admin",
 }
@@ -831,6 +834,17 @@ def _claimed_by(item: Any, only: tuple[str, ...]) -> bool:
 # right for "explore" and wrong for "npcinfo". The hint resolver still answers
 # to the command name, so a printed path written with the old label resolves.
 LEAF_LABELS: dict[str, str] = {
+    # The two pages the fold (v1.38.0) gave a second root would otherwise
+    # qualify every row by its group - "Alchemy Forage", "Shop Buy" - and
+    # the Daily row, the tutorial and the printed paths say "Forage" and
+    # "Buy". Nothing on either page collides with the bare names.
+    "/alchemy status": "Status",
+    "/alchemy forage": "Forage",
+    "/alchemy purge": "Purge",
+    "/shop here": "Here",
+    "/shop browse": "Browse",
+    "/shop buy": "Buy",
+    "/shop sell": "Sell",
     "/travel city": "Cities",
     "/travel nearby": "This City",
     "/travel road": "Road Sites",

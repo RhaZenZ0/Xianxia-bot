@@ -1993,6 +1993,18 @@ async def run(url: str, token: str, db_path: str) -> Report:
     claimed = await step(report, "territory.claim the hills", act("territory.claim", PLAYER, {"territory_key": "Cloudspine Foothills"}))
     if claimed is not None:
         report.add("PASS" if claimed.get("claimed") else "FAIL", "a neutral territory is claimed", str(claimed.get("controller_key")))
+    # The GM's hand on a banner (v1.38.0): neutral, then the undo hands it
+    # back, and a sect the catalogue does not know is refused.
+    await audited("admin.territory.set_controller", {"territory_key": "Cloudspine Foothills", "sect_name": "", "reason": "playtest"}, name="admin.territory.set_controller makes the hills neutral")
+    hills = {str(r.get("territory_key")): r for r in await db.get_territories(region="Cloudspine Foothills")}.get("Cloudspine Foothills") or {}
+    report.add("PASS" if str(hills.get("controller_type")) == "neutral" and not str(hills.get("controller_key") or "") else "FAIL",
+               "the hills read neutral after the GM's hand", f"{hills.get('controller_type')}:{hills.get('controller_key')!r}")
+    await audited("admin.audit.undo_last", {"reason": "playtest: undo the hand"})
+    hills = {str(r.get("territory_key")): r for r in await db.get_territories(region="Cloudspine Foothills")}.get("Cloudspine Foothills") or {}
+    report.add("PASS" if str(hills.get("controller_key") or "") == sect else "FAIL",
+               "the undo hands the hills back to the sect that claimed them", f"holder={hills.get('controller_key')!r}")
+    await step(report, "admin.territory.set_controller refuses a sect the catalogue does not know",
+               gm("admin.territory.set_controller", {"territory_key": "Cloudspine Foothills", "sect_name": "No Such Sect", "reason": "playtest"}), expect_error="unknown sect")
     await audited("admin.player.set_sect", {"user_id": BUYER, "sect_name": "Crimson Furnace Sect", "rank_name": "Outer Disciple", "rank_level": 10, "reason": "playtest"}, name="admin.player.set_sect the buyer into the Crimson Furnace")
     await step(report, "the buyer to the hills to contest them", gm("admin.player.teleport", {"user_id": BUYER, "location": "Cloudspine Foothills", "reason": "playtest"}))
     # A sect's doors follow its ranks (v1.25.0): an Outer Disciple claims no

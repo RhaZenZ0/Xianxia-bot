@@ -157,6 +157,40 @@ func shelfPriceAcross(catalog worlddata.Catalog, rates map[string]shelfRate, fro
 	if from == to {
 		return price, true
 	}
+	r, ok := shelfRateBetween(catalog, rates, from, to)
+	if !ok {
+		return 0, false
+	}
+	converted, _ := ladderConvert(price, r.steps, r.rate)
+	return converted, true
+}
+
+// shelfPriceAcrossUp is shelfPriceAcross rounding the other way on the climb
+// (v1.38.0): a price carried up the ladder lands on the next whole coin
+// rather than the last. It is the posts' conversion (UnderworldBase): a post
+// that rounded down asked one immortal stone - 10,000 stones' worth - for a
+// peach the Mortal post sold for 17,712, so the upper post undercut the world
+// below it. Rounding up, a post never asks less than the base below it is
+// worth, and every ceiling that reads the post as a shelf moves by at most
+// one coin. A shelf price stays rounded down, as it has been since v1.34.0.
+func shelfPriceAcrossUp(catalog worlddata.Catalog, rates map[string]shelfRate, from, to string, price int64) (int64, bool) {
+	if from == to {
+		return price, true
+	}
+	r, ok := shelfRateBetween(catalog, rates, from, to)
+	if !ok {
+		return 0, false
+	}
+	if r.steps > 0 && r.rate > 0 {
+		return (price + r.rate - 1) / r.rate, true
+	}
+	converted, _ := ladderConvert(price, r.steps, r.rate)
+	return converted, true
+}
+
+// shelfRateBetween is the ladder between two base coins, cached per `from`
+// in `rates` the way every shelf walk caches it.
+func shelfRateBetween(catalog worlddata.Catalog, rates map[string]shelfRate, from, to string) (shelfRate, bool) {
 	r, seen := rates[from]
 	if !seen {
 		fromDef, fromOK := catalog.Currencies[from]
@@ -167,11 +201,7 @@ func shelfPriceAcross(catalog worlddata.Catalog, rates map[string]shelfRate, fro
 		}
 		rates[from] = r
 	}
-	if !r.ok {
-		return 0, false
-	}
-	converted, _ := ladderConvert(price, r.steps, r.rate)
-	return converted, true
+	return r, r.ok
 }
 
 // keeperBuyBase is what a keeper pays anybody for one of an item: the

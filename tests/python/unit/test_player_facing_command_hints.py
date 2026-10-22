@@ -46,9 +46,8 @@ WIRING = bot_module_defining("_HUB_DEFINITIONS")
 
 # The hubs a player can actually type, from _HUB_DEFINITIONS plus the standalone roots.
 HUB_COMMANDS = {
-    "character", "quest", "cultivation", "items", "npc", "world", "travel",
-    "combat", "economy", "craft", "beast", "sect", "family", "abode",
-    "innerworld", "realm",
+    "character", "quest", "cultivation", "items", "world", "travel",
+    "adventure", "economy", "craft", "beast", "sect", "family", "home",
 }
 
 # "/family leave" - a hub followed by a bare word, with no arrow between them.
@@ -117,7 +116,7 @@ class PlayerFacingCommandHintTests(unittest.TestCase):
     def test_the_detector_actually_catches_the_shape_it_is_for(self):
         """A guard that cannot fail is worse than no guard."""
         self.assertTrue(BAD_HINT.search("Use **/family leave** to go outside"))
-        self.assertTrue(BAD_HINT.search("try /abode enter now"))
+        self.assertTrue(BAD_HINT.search("try /home enter now"))
         # The correct forms must not trip it.
         self.assertFalse(BAD_HINT.search("Use **/family → Leave** to go outside"))
         self.assertFalse(BAD_HINT.search("Open **/family** and choose Leave"))
@@ -131,9 +130,9 @@ class PlayerFacingCommandHintTests(unittest.TestCase):
         source = defining[0].read_text(encoding="utf-8")
         start = re.search(r"^PRIVATE_LOCATION_EXITS", source, re.M).start()
         block = source[start : start + 500]
-        # A sect residence has its own way out since v1.1.0: `/abode → Leave`
+        # A sect residence has its own way out since v1.1.0: `/home → Property → Leave`
         # reads `cave_abodes` and refused a `sect_abodes` row.
-        for command in ("/family → Leave", "/abode → Leave", "/sect → Holdings → Abode", "/innerworld → Leave"):
+        for command in ("/family → Leave", "/home → Property → Leave", "/sect → Holdings → Abode", "/home → Personal World → Leave"):
             self.assertIn(command, block, f"{command} missing from the exit table")
 
 

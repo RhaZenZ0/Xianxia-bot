@@ -293,11 +293,11 @@ class TheCopiesStayCopies(unittest.TestCase):
             self.assertIn(f'"{prefix}"', refusal, f"{prefix} is not a prefix the engine refuses exploring inside")
 
     def test_a_sect_residence_names_its_own_way_out(self):
-        """`/abode → Leave` reads `cave_abodes`, and a sect residence is a
+        """`/home → Property → Leave` reads `cave_abodes`, and a sect residence is a
         `sect_abodes` row: the old exit refused the player it was shown to."""
         runtime = importlib.import_module("app.bot.runtime")
         command, _ = runtime.private_location_exit("sect_abode:42")
-        self.assertNotIn("/abode → Leave", command)
+        self.assertNotIn("/home → Property → Leave", command)
         self.assertIn("/sect → Holdings → Abode", command)
 
     def test_a_guests_way_out_is_not_hidden_for_owning_no_home(self):

@@ -289,7 +289,7 @@ class TheHintPatternIsUnambiguous(unittest.TestCase):
         for text, expected in (
             ("**/world → City → Look**", [("world", " → City → Look")]),
             ("**/cultivation → Qi Body → Refine**", [("cultivation", " → Qi Body → Refine")]),
-            ("**/abode → Upgrade**", [("abode", " → Upgrade")]),
+            ("**/home → Upgrade**", [("home", " → Upgrade")]),
             ("**/menu**", [("menu", "")]),
             ("a line with **/world → City → Look** inside", [("world", " → City → Look")]),
             ("two **/menu** and **/sheet**", [("menu", ""), ("sheet", "")]),

@@ -264,27 +264,20 @@ _HUB_DEFINITIONS = (
                       "reincarnate", "reset"),
         ),
     ),
-    # `/ascend`, not `/quest` (v1.0.0-rc.13). This hub holds no quests: it is
-    # breakthrough, the two Perfection paths and the tribulation gates. The
-    # quests are `/quests`, one character away, which is how long it took a
-    # player to pick the wrong one. Bounties moved to /character -> Consequences
-    # with the rest of what the world holds against you.
-    HubDefinition(
-        name="ascend",
-        title="☰ Ascension Path",
-        description="Breakthrough, the optional Perfection paths, and the heavenly tribulations that gate the next realm.",
-        pages=(
-            _hub_page("breakthrough", "Main Progression", "Normal realm breakthrough and Stage 9 progression."),
-            # One page, one group (v1.0.0-rc.13): `perfect` and `bodyperfect`
-            # were the same six verbs twice, and are now a `path` on each.
-            _hub_page("perfect", "Perfection", "The optional Stage 9 Perfection path, for the cultivation realm or the body: start it, work its quests, read its clues, attempt its final trial."),
-            _hub_page("tribulation", "Tribulation / Ascension", "Prepare for and attempt heavenly tribulations."),
-        ),
-    ),
+    # Sixteen hubs became twelve (v1.38.0), on the Most-used commands card's
+    # data: `/ascend` (92 presses in thirty days, against 317 for the hub it
+    # fed) folded into Cultivation, whose Cultivate page already held the
+    # breakthrough; `/npc` into World; `/combat` and `/realm` into Adventure;
+    # `/abode` and `/innerworld` into Home. The seven one-action pages went
+    # with them: Inventory, Use Item and Provenance are one Bag page, Wallet
+    # sits on City Shops, General Crafting on Alchemy. Every leaf kept its
+    # path and its group name, so a typed `/perfect quest` is where it was;
+    # only the hub a page is reached through changed, and migration 83
+    # rewrites the quest terms players already hold.
     HubDefinition(
         name="cultivation",
         title="🧘 Cultivation Hub",
-        description="The cultivation sheet, and four pages for what you are doing: meditate, temper the body, walk the path, practise the arts.",
+        description="The cultivation sheet, what you are doing - meditate, temper the body, walk the path, practise the arts - and the way up: the Perfection paths and the tribulations that gate the next realm.",
         pages=(
             # Four pages, grouped by what you are doing (v1.0.0-rc.4). Ten
             # pages named after commands became four named after the work:
@@ -308,31 +301,29 @@ _HUB_DEFINITIONS = (
             # handler appearing twice.
             _hub_page("manual", "Arts", "Manuals and techniques, and the concealment of your aura.", "conceal",
                       order=("manual study", "manual cultivate_by", "manual technique", "manual list", "conceal")),
+            # The way up, from `/ascend` (v1.38.0). Its Main Progression page
+            # held the one breakthrough leaf Cultivate already draws, so it is
+            # gone rather than drawn twice. One page, one group (v1.0.0-rc.13):
+            # `perfect` and `bodyperfect` were the same six verbs twice, and
+            # are now a `path` on each.
+            _hub_page("perfect", "Perfection", "The optional Stage 9 Perfection path, for the cultivation realm or the body: start it, work its quests, read its clues, attempt its final trial."),
+            _hub_page("tribulation", "Tribulation / Ascension", "Prepare for and attempt heavenly tribulations."),
         ),
     ),
     HubDefinition(
         name="items",
         title="🎒 Items Hub",
-        description="Inventory, storage, equipment, artifacts, consumables and provenance.",
+        description="Your bag and what you do with it, storage, equipment and artifacts.",
         pages=(
-            _hub_page("inventory", "Inventory", "View carried items and materials."),
+            # One Bag page (v1.38.0): Inventory, Use Item and Provenance were
+            # three pages of one leaf each, and the three leaves are one
+            # question - what do I carry, and what can I do with it.
+            _hub_page("inventory", "Bag", "What you carry: the bag itself, using or activating an item from it, and the ownership marks, legality and tracking on one.",
+                      "use", "provenance"),
             _hub_page("storage", "Storage", "Inspect, deposit into and withdraw from spatial storage."),
-            _hub_page("use", "Use Item", "Consume or activate a carried item."),
             _hub_page("equipment", "Equipment", "Bind, equip, unequip and repair durable equipment.",
                       order=("equipment status", "equipment equip", "equipment unequip", "equipment bind", "equipment repair")),
             _hub_page("artifact", "Artifacts", "Bond and awaken personal artifacts."),
-            _hub_page("provenance", "Provenance", "Inspect ownership marks, legality and tracking."),
-        ),
-    ),
-    HubDefinition(
-        name="npc",
-        title="👥 NPC Hub",
-        description="Public, location-aware NPC inspection and interaction.",
-        pages=(
-            # One page (v1.0.0-rc.13): three pages of one action each, in a hub
-            # whose every page was one action. Eight fit on a page.
-            _hub_page("npcinfo", "People", "Inspect a known NPC, speak with one, or turn Spiritual Sense on a person, a cultivator or the area.",
-                      "talk", "sense"),
         ),
     ),
     HubDefinition(
@@ -351,6 +342,10 @@ _HUB_DEFINITIONS = (
                       "hunt", "mine"),
             _hub_page("scene", "Here", "This spot: the running scene and its in-world time, and the region's population, security and named NPC activity.",
                       "civilization"),
+            # The people here, from `/npc` (v1.38.0): one page (v1.0.0-rc.13)
+            # that was a whole hub, in a hub about where you are.
+            _hub_page("npcinfo", "People", "Inspect a known NPC, speak with one, or turn Spiritual Sense on a person, a cultivator or the area.",
+                      "talk", "sense"),
         ),
     ),
     HubDefinition(
@@ -368,10 +363,12 @@ _HUB_DEFINITIONS = (
             _hub_page("array", "Teleportation Arrays", "List and use public teleportation formations."),
         ),
     ),
+    # Combat and Secret Realms are one Adventure hub (v1.38.0): eight pages
+    # of leaving the road to fight something or find something.
     HubDefinition(
-        name="combat",
-        title="⚔️ Combat Hub",
-        description="Battles, duels, parties, formations, bosses and bounty-hunter pursuits.",
+        name="adventure",
+        title="⚔️ Adventure Hub",
+        description="Battles, duels, parties, formations, bosses and bounty-hunter pursuits; secret realms, active expeditions and spatial keys.",
         pages=(
             _hub_page("battle", "Active Battle", "Current battle, challenges and battle actions."),
             _hub_page("duel", "Duels", "Consent-gated nonlethal PvP duels."),
@@ -379,16 +376,19 @@ _HUB_DEFINITIONS = (
             _hub_page("formation", "Formations", "Assign party positions and formation stances."),
             _hub_page("boss", "Boss Raids", "Persistent multi-phase party boss encounters."),
             _hub_page("hunter", "Bounty Hunter", "Respond to autonomous bounty-hunter pursuits."),
+            _hub_page("secretrealm", "Secret Realms", "Available realms and active realm exploration."),
+            _hub_page("spatialkey", "Spatial Keys", "Use a key/token to open its linked dimension."),
         ),
     ),
     HubDefinition(
         name="economy",
         title="💰 Economy Hub",
-        description="Wallet, city shops, local markets, black markets, protected auctions, travelling merchants and trade caravans.",
+        description="Your purse and the city shops, local markets, black markets, protected auctions, travelling merchants and trade caravans.",
         pages=(
-            _hub_page("wallet", "Wallet", "View cultivation currencies."),
-            _hub_page("shop", "City Shops", "The smithy, apothecary and talisman hall of each city: find them by exploring, enter them by travelling, buy and sell inside.",
-                      order=("shop here", "shop browse", "shop buy", "shop sell")),
+            # The wallet is the first leaf of City Shops (v1.38.0), not a page
+            # of its own: a read of one number beside the counters it is spent at.
+            _hub_page("shop", "City Shops", "Your purse, and the smithy, apothecary and talisman hall of each city: find them by exploring, enter them by travelling, buy and sell inside.",
+                      "wallet", order=("wallet", "shop here", "shop browse", "shop buy", "shop sell")),
             _hub_page("stall", "Market Stalls", "Your own stall in a city's street: standing listings that sell to cultivators and townsfolk while you are away, grown by your homestead's merchant hall.",
                       order=("stall board", "stall buy", "stall status", "stall open", "stall list", "stall withdraw", "stall close")),
             _hub_page("market", "Local Market", "Buy and sell in the dynamic local economy."),
@@ -402,10 +402,13 @@ _HUB_DEFINITIONS = (
     HubDefinition(
         name="craft",
         title="🛠 Craft Hub",
-        description="Craft alchemy, forging, formation and talisman-inscription recipes; deploy shared location arrays through Items → Use Item.",
+        description="Craft alchemy, forging, formation and talisman-inscription recipes; deploy shared location arrays through Items → Bag.",
         pages=(
-            _hub_page("alchemy", "Alchemy", "Refine pills, forage simulated herb resources, track toxicity and purge medicinal residue."),
-            _hub_page("craft", "General Crafting", "Practice alchemy, forging, formation or talisman inscription from known recipes: one at a time, or Craft All for as many as your materials pay for.", "craft_all"),
+            # General Crafting is on the Alchemy page (v1.38.0): the craft
+            # roll and Craft All beside the forage and the pills, one page of
+            # making things. `craft_all` stays a leaf here (v1.33.0).
+            _hub_page("alchemy", "Alchemy", "Refine pills, forage simulated herb resources, track toxicity and purge medicinal residue; and practice any trade from known recipes - alchemy, forging, formation or talisman inscription - one at a time, or Craft All for as many as your materials pay for.",
+                      "craft", "craft_all"),
             _hub_page("profession", "Profession", "Your crafting and support-profession mastery: what rank you hold, the hall examination that certifies it, and reading a method slip into a method you keep.", "learn"),
             _hub_page("flame", "Flames", "Capture a flame at a world's forge terraces, refine it and bind it: it steadies every alchemy and forging roll, and a fully refined heavenly flame opens the Transcendent grade."),
             _hub_page("spirit", "Spirit Sense", "Build your spirit sense through formation and inscription, meditation and scene actions, and settle each stage with qi: it steadies those two trades, and fully built it opens the Transcendent grade."),
@@ -466,10 +469,12 @@ _HUB_DEFINITIONS = (
                             "family investigate", "family quest", "family claim", "family conflict")),
         ),
     ),
+    # Abode and Inner World are one Home hub (v1.38.0): the places that are
+    # yours alone, founded on the ground or folded out of the Law of Space.
     HubDefinition(
-        name="abode",
-        title="🏡 Abode Hub",
-        description="Establish, enter, upgrade and manage access to your private player-owned location.",
+        name="home",
+        title="🏡 Home Hub",
+        description="Your own places: the property you found, who may come into it, and the personal world you stabilize.",
         pages=(
             _hub_page("abode", "Property", "The home itself: found it, enter and leave it, build and raise its facilities, and use one.",
                       only=("abode status", "abode establish", "abode enter", "abode leave",
@@ -477,21 +482,7 @@ _HUB_DEFINITIONS = (
             _hub_page("abode", "Access", "Who else may come in: invite, revoke, see your guests, visit another cultivator's home, and the private thread it uses.",
                       key="abode_access",
                       only=("abode visit", "abode invite", "abode guests", "abode revoke", "abode thread")),
-        ),
-    ),
-    HubDefinition(
-        name="innerworld",
-        title="🌌 Inner World Hub",
-        description="Create, enter and define rules for a stabilized personal world.",
-        pages=(_hub_page("innerworld", "Personal World", "Personal-world creation, rules and travel."),),
-    ),
-    HubDefinition(
-        name="realm",
-        title="🌀 Secret Realm Hub",
-        description="Secret realms, active expeditions and spatial keys.",
-        pages=(
-            _hub_page("secretrealm", "Secret Realms", "Available realms and active realm exploration."),
-            _hub_page("spatialkey", "Spatial Keys", "Use a key/token to open its linked dimension."),
+            _hub_page("innerworld", "Personal World", "Personal-world creation, rules and travel."),
         ),
     ),
 )
@@ -683,12 +674,15 @@ _MenuBase = discord.ui.LayoutView if LAYOUT_COMPONENTS_AVAILABLE else discord.ui
 # The menu's shape (v1.0.0-rc.3): four rows of four, grouped by what a player
 # is doing, instead of one sixteen-entry select. The hub names stay the hub
 # names; two get the label they should always have had.
-_HUB_LABELS = {"npc": "NPCs", "innerworld": "Inner World", "ascend": "Ascension"}
+# A hub whose menu label is not its title's noun. Empty since the fold
+# (v1.38.0): the three it named - NPCs, Inner World, Ascension - are pages now.
+_HUB_LABELS: dict[str, str] = {}
+# Four rows of three (v1.38.0; four of four before the fold).
 _MENU_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
-    ("You", "who you are and what you carry", ("character", "cultivation", "items", "ascend")),
-    ("World", "where you are and what is happening", ("world", "travel", "realm", "npc")),
-    ("Doing", "fighting, making, trading, taming", ("combat", "craft", "economy", "beast")),
-    ("Home", "the places that are yours", ("sect", "family", "abode", "innerworld")),
+    ("You", "who you are and what you carry", ("character", "cultivation", "items")),
+    ("World", "where you are and what is happening", ("world", "travel", "adventure")),
+    ("Doing", "making, trading, taming", ("craft", "economy", "beast")),
+    ("Home", "the places that are yours", ("sect", "family", "home")),
 )
 # The hub each player opened last, in process: the menu offers it back
 # first. Lost at restart, which costs one tap.
@@ -1431,7 +1425,7 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
         if row and int(row.get("active") or 0) and not int(row.get("completed") or 0):
             under_way = True
     if not under_way:
-        shut["perfection_path"] = "no Perfection path is under way — begin one at stage 9 with **/ascend → Perfection → Start**"
+        shut["perfection_path"] = "no Perfection path is under way — begin one at stage 9 with **/cultivation → Perfection → Start**"
     membership = await DB.get_sect_membership(uid)
     if not membership:
         shut["sect_member"] = "you are in no sect — see **/sect → Recruitment → Info**"
@@ -1470,11 +1464,11 @@ async def _progression_hidden_actions(interaction: discord.Interaction, c: dict)
             shut["sect_promote"] = f"{WORLD.sect_rank_name(rung[0])} asks {rung[1]} contribution earned; you have earned {earned}"
     abode = await DB.get_abode(uid)
     if not abode:
-        shut["abode"] = "you have no property yet — found one with **/abode → Property → Establish**"
+        shut["abode"] = "you have no property yet — found one with **/home → Property → Establish**"
     else:
         shut["abode_owner"] = "you already hold a property"
     if not await DB.get_personal_world(uid):
-        shut["innerworld"] = "you have no personal world yet — make one with **/innerworld → Personal World → Create**"
+        shut["innerworld"] = "you have no personal world yet — make one with **/home → Personal World → Create**"
     else:
         shut["innerworld_owner"] = "your personal world already exists"
     if PERSONAL_WORLD_FLOOR > 0 or PERSONAL_WORLD_LAW > 0:
@@ -1953,7 +1947,7 @@ TREE_COMMANDS: tuple[str, ...] = (
     # for `/stall buy` found nothing - the shape `/learn` had in rc.43.
     "stall",
     # The raids (v1.7.10): asked "where is the boss command located?", and the
-    # answer was a hub page - `/combat → Boss Raids` - because neither group
+    # answer was a hub page - `/adventure → Boss Raids` - because neither group
     # had ever been registered. The v1.7.4 shape, twice over.
     "boss", "party",
     # Body cultivation (v1.9.1): asked for "a player facing command for body
@@ -1972,6 +1966,13 @@ TREE_COMMANDS: tuple[str, ...] = (
     # was only ever `/cultivation → Main Progression → Breakthrough`; the
     # body's twin has been `/body breakthrough` since v1.9.1.
     "breakthrough",
+    # The Most-used commands card decides the rest (v1.38.0): a hub-only
+    # group earns a typed name at a hundred presses in thirty days. The first
+    # card showed three over the line - perfect (159), aptitude (126),
+    # meridian (113) - and two under it that stay hub-only: seclusion (88),
+    # alchemy (84). `tests/python/unit/test_auctions_and_stalls.py` holds each
+    # promoted group to the tree, and the lockout test lists them as acting.
+    "perfect", "aptitude", "meridian",
 )
 
 

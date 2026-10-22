@@ -26,12 +26,15 @@ class CommandCleanupTests(unittest.TestCase):
         self.assertEqual(
             set(hub_names),
             {
-                "character", "ascend", "cultivation", "items", "npc", "world",
-                "travel", "combat", "economy", "craft", "beast", "sect",
-                "family", "abode", "innerworld", "realm", "admin",
+                # Twelve player hubs and /admin (v1.38.0): ascend folded into
+                # cultivation, npc into world, combat and realm into adventure,
+                # abode and innerworld into home.
+                "character", "cultivation", "items", "world",
+                "travel", "adventure", "economy", "craft", "beast", "sect",
+                "family", "home", "admin",
             },
         )
-        self.assertEqual(len(hub_names), 17)
+        self.assertEqual(len(hub_names), 13)
         # /begin, /action and /check remain direct convenience roots.
         source = bot_package_source()
         for name in ("begin", "action", "check"):
@@ -56,7 +59,8 @@ class CommandCleanupTests(unittest.TestCase):
                                      "DATABASE_PATH": "data/test.sqlite3"}):
             surface = importlib.import_module("app.bot.surface")
         public_groups = {name for name in surface.TREE_COMMANDS if name in surface._GROUP_ACTION_ROOTS}
-        self.assertEqual(public_groups, {"stall", "boss", "party", "body", "profession", "flame", "spirit"})
+        self.assertEqual(public_groups, {"stall", "boss", "party", "body", "profession", "flame", "spirit",
+                                         "perfect", "aptitude", "meridian"})  # the last three: v1.38.0, by the card
         self.assertNotIn("bot.tree.add_command(admin_group, guild=GUILD)", source)
         self.assertIn('name="admin",', source)
         self.assertIn("async def admin_panel", source)

@@ -350,7 +350,7 @@ async def ensure_abode_thread(interaction: discord.Interaction, abode: dict) -> 
             f"Entrance: **{abode.get('base_location','Unknown')}**\n"
             f"Facilities: {facilities}\n\n"
             "This private thread is the persistent scene for this player-owned location. "
-            "Invited cultivators can be granted or revoked with **/abode → Invite** and **/abode → Revoke**.\n"
+            "Invited cultivators can be granted or revoked with **/home → Invite** and **/home → Revoke**.\n"
             "Physical travel still matters: guests must reach the property's entrance before they can enter. "
             "Use this scene for cultivation, crafting, beasts, family scenes, commerce, meetings and guided Scene Actions."
         )

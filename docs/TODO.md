@@ -18,17 +18,6 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
 
 ## Open
 
-- **deferred (design)** — *Ladder rounding at the upper posts.* The Immortal post sells the peach for
-  one immortal stone (10,000 stones' worth) against the Mortal post's 17,712, because `UnderworldBase`
-  rounds the Mortal base down when it carries it up the ladder (v1.36.0). No mint - every ceiling sits
-  under the post as a shelf - but an inversion a rounding rule (up, or to nearest) or a content pass
-  pricing upper-world goods would settle. Decided (v1.37.0): left for the content pass that will
-  also author upper-world demand; a rounding rule alone would move every upper shelf for one peach.
-- **deferred (design)** — *Upper-world keepers have thin boards.* 790 of the 1,154 keeper buy lines pay
-  nothing now: a Mortal-made good is worth under a whole coin up there once the ladder is read, so the
-  cheap half of an upper economy has no NPC buyer. That is the ceiling doing its job, and it is also a
-  content gap: a pass authoring upper-world demand for upper-world goods, or shelves priced on the
-  ladder, is the owner's call. Decided (v1.35.0): a content pass, later, not with this release.
 - **deferred (design)** — *Permanent qi that a settle already took.* Every `qi_max_bonus` starts at 0:
   the qi a settle rebuilt over before v1.34.0 is in no column and cannot be told from the body's own
   figure. The honest repair is a GM `set_resource_caps` per player, or a one-off replay of completed
@@ -84,14 +73,6 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   pair (`TestEveryShippedObjectiveIsMetByItsOwnTarget` would name it), and an engine `objective_id`
   path would be a second matching rule. Revisit only if a quest is authored with both. Decided again (v1.36.0): no change until
   a quest carries the pair.
-- **deferred (design)** — *A rival that held the gate when migration 74 ran was given the seat city.*
-  The migration's first statement copies the gate's banner onto a neutral seat whoever held the gate,
-  so a sect whose gate had been taken in a v1.12-v1.18 war lost its home city to the rival. The repair
-  cannot tell that from a city honestly held, and migration 74 is frozen. Only worlds that ran NPC wars
-  across those releases are affected, and it cannot be found from here; an audited
-  `admin.territory.set_controller` lever (a new operation, with playtest coverage and a dashboard
-  card) is how a GM would hand the city back, and is not built until a world shows the state.
-  Decided (v1.35.0): not built until one does.
 - **deferred (design)** — *A repaired street forgets what it paid.* Releasing a held part ends the
   tribute it paid (a lot a week, v1.29.0) and folds a sole holder into the whole city; a sect that
   held several streets of a city loses the extra lots. The city pays its own tribute once folded,
@@ -113,29 +94,10 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
   until the clock moves. A real-time column would fix it for this one effect at a schema change; it is
   left until a second effect wants a real-time end. Decided (v1.36.0): left until a second
   effect wants a real-time end.
-- **deferred (design)** — *The rest of the menu layout.* Two steps of the same research wait on the
-  owner, and on the dashboard's new Most-used commands card for what players actually press:
-  folding the seven one-action pages (Inventory, Use Item and Provenance into one Bag
-  page, Wallet into the Economy header, General Crafting into Alchemy); and sixteen hubs to twelve
-  (Ascension into Cultivation, NPCs into World, Combat and Secret Realms into Adventure, Abode and
-  Inner World into Home). The last renames printed hub paths - about 38 `/ascend`, 19 `/realm`,
-  5 `/npc` and 5 `/innerworld` in content and code - so it needs a migration of the quest terms
-  players already hold, the way migration 61 did, and a re-authored curriculum roster. Decided
-  (v1.35.0): waits on the Most-used commands card's data.
-- **deferred (design)** — *The other hub-only groups.* `_GROUP_ACTION_ROOTS` holds some fifty groups
-  and only `stall`, `boss` and `party` are slash commands; each more is one more entry in Discord's
-  command list, so which of them earn a typed name is the owner's call, not a wiring. Decided
-  (v1.35.0): none more until the Most-used commands card shows demand.
-- **deferred (known limit)** — *The leaf sweep counts a leaf pressed into a designed refusal as covered.*
-  Left open as a known limit on the owner's call (v1.3.4).
-  This is rc.58's finding on the Discord side, and it is the reason `/battle challenge` was green for
-  releases while no run had ever begun a battle: the sweep's contract is *"the reply is a result or a
-  designed refusal"*, and a leaf that has only ever been refused has had only its refusal proved.
-  rc.58 tightened the engine half from *called* to **resolved** with `REFUSAL_ONLY_OPERATIONS`, and
-  the Discord half cannot simply copy it. A refusal is the **correct** answer for most leaves under a
-  sweep — no sect, no beast, no lot, no partner — so the equivalent is not one allowlist but a
-  per-leaf statement of which ones must actually resolve, and the state each needs built first. That
-  is a roster and a decision, not a wiring, and inventing it unasked is what this file exists to
-  refuse. What v1.0.12 does instead is raise the player past the curriculum before the sweep, which
-  is what reached this one.
-  Decided again (v1.36.0): the per-leaf must-resolve roster stays unbuilt.
+- **deferred (design)** — *The merchant picker offers a merchant out of reach.* `/merchant buy`'s
+  picker lists every travelling merchant and the first it offers can be in another world, so the press
+  is refused with "is not within reach" - a surface offering what the engine will refuse (rc.46). The
+  sweep's refusal roster found it (v1.38.0) and accepts the refusal, because the reach rule is the
+  engine's and holds. The fix is one engine question, "who is within reach of me", read by the picker;
+  whether an out-of-reach merchant is left off or drawn disabled with the world named is the owner's
+  call. Decided (v1.38.0): recorded, not built with this release.

@@ -67,13 +67,13 @@ def _breakthrough_ready_line(result: dict[str, Any], phase: int, *, body: bool) 
     """
     if not result.get("ready"):
         return ""
-    breakthrough = "**/cultivation → Body → Breakthrough**" if body else "**/ascend → Main Progression → Breakthrough**"
+    breakthrough = "**/cultivation → Body → Breakthrough**" if body else "**/cultivation → Cultivate → Breakthrough**"
     if phase != 9:
         return f"\n✨ Your body is ready for {breakthrough}." if body else f"\n✨ You are ready to attempt {breakthrough}."
     full = "Body Stage 9 is full." if body else "Stage 9 is full."
     if result.get("perfection_active") is True:
-        return f"\n✨ {full} Continue the path under **/ascend → Perfection**, or attempt {breakthrough}."
-    return f"\n✨ {full} Choose **/ascend → Perfection → Start** or {breakthrough}."
+        return f"\n✨ {full} Continue the path under **/cultivation → Perfection**, or attempt {breakthrough}."
+    return f"\n✨ {full} Choose **/cultivation → Perfection → Start** or {breakthrough}."
 
 
 @registered_root_command(name="cultivate", description="Meditate and gather cultivation essence", guild=GUILD)
@@ -238,7 +238,7 @@ async def insight(interaction: discord.Interaction) -> None:
     except GameEngineError as exc:
         message = _explain_engine_error(exc)
         if "already banked" in message:
-            message = "An insight is already banked. It is spent when you cross the realm gate at **/ascend → Main Progression → Breakthrough**."
+            message = "An insight is already banked. It is spent when you cross the realm gate at **/cultivation → Cultivate → Breakthrough**."
         elif "costs" in message and "Insight XP" in message:
             message += " Insight XP comes from exploring, quests, battles and the Refine stance (**/cultivation → Cultivate → Stance**)."
         await interaction.followup.send(f"❌ {message}", ephemeral=False)
@@ -247,7 +247,7 @@ async def insight(interaction: discord.Interaction) -> None:
     await interaction.followup.send(
         f"💡 **{c['name']} banks an insight into {result.get('next_realm') or 'the next realm'}.**\n"
         f"Spent **{int(result.get('cost', 0))} Insight XP** (**{int(result.get('insight_xp', 0))}** left). "
-        f"The realm gate out of **{result.get('realm') or 'this realm'}** is open: fill Stage 9 and attempt **/ascend → Main Progression → Breakthrough**.",
+        f"The realm gate out of **{result.get('realm') or 'this realm'}** is open: fill Stage 9 and attempt **/cultivation → Cultivate → Breakthrough**.",
         ephemeral=False,
     )
 
@@ -442,13 +442,13 @@ async def breakthrough(interaction: discord.Interaction, confirm: bool = False, 
     except GameEngineError as exc:
         message = _explain_engine_error(exc)
         if "perfection choice requires explicit confirmation" in message:
-            message = "⚠️ **Stage 9 choice**\nYou can pursue **/ascend → Perfection → Start** for a stronger long-term foundation, or explicitly confirm this breakthrough to skip it."
+            message = "⚠️ **Stage 9 choice**\nYou can pursue **/cultivation → Perfection → Start** for a stronger long-term foundation, or explicitly confirm this breakthrough to skip it."
         elif "no moment to seize" in message or "seized once already" in message:
             message = "⚠️ **No moment to seize**\nA seized moment is one more roll after a failed attempt at this same stage, and only one. Fill the stage and attempt it again."
         elif "seizing the moment costs" in message:
             message += " Insight XP comes from exploring, quests, battles and the Refine stance (**/cultivation → Cultivate → Stance**)."
         elif "realm gate" in message:
-            message = f"⚠️ **The realm gate is closed**\n{message}\nBank the insight under **/cultivation → Cultivate → Insight**, or complete **/ascend → Perfection**. The sheet at **/cultivation** shows your Insight XP and the odds."
+            message = f"⚠️ **The realm gate is closed**\n{message}\nBank the insight under **/cultivation → Cultivate → Insight**, or complete **/cultivation → Perfection**. The sheet at **/cultivation** shows your Insight XP and the odds."
         await interaction.followup.send(f"❌ {message}" if not message.startswith("⚠️") else message, ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
@@ -574,7 +574,7 @@ async def body_sheet(interaction: discord.Interaction) -> None:
                 f"Quests {p['completed_quests']}/{WORLD.body_perfection_quest_count()}"
             )
         else:
-            lines.append("Stage 9 choice: **/ascend → Perfection → Start** or **/cultivation → Body → Breakthrough**.")
+            lines.append("Stage 9 choice: **/cultivation → Perfection → Start** or **/cultivation → Body → Breakthrough**.")
     await interaction.response.send_message("\n".join(lines), ephemeral=False)
 
 
@@ -632,7 +632,7 @@ async def body_breakthrough(interaction: discord.Interaction, confirm: bool = Fa
     except GameEngineError as exc:
         message = _explain_engine_error(exc)
         if "perfection choice requires explicit confirmation" in message:
-            message = "⚠️ **Body Stage 9 choice**\nPursue **/ascend → Perfection → Start** for a stronger physical foundation, or explicitly confirm this breakthrough to skip it."
+            message = "⚠️ **Body Stage 9 choice**\nPursue **/cultivation → Perfection → Start** for a stronger physical foundation, or explicitly confirm this breakthrough to skip it."
         await interaction.followup.send(f"❌ {message}" if not message.startswith("⚠️") else message, ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
@@ -776,7 +776,7 @@ async def perfect_start(interaction: discord.Interaction, path: app_commands.Cho
         f"{spec.noun} starts at **0%**. Training contributes at most **{spec.training_cap()}%**; "
         f"the rest comes from {spec.quest_count()} long quests.\n\n"
         f"**First Quest — {quest['title']}**\n{quest['description']}\n"
-        f"Preparation: 0/{quest['preparation_required']}\nUse **/ascend → Perfection → Quest**.",
+        f"Preparation: 0/{quest['preparation_required']}\nUse **/cultivation → Perfection → Quest**.",
         ephemeral=False,
     )
     await announce_quest_progress(interaction, progressed)
@@ -793,7 +793,7 @@ async def perfect_info(interaction: discord.Interaction, path: app_commands.Choi
     p = await spec.record(interaction.user.id, realm_index)
     if not p:
         await interaction.response.send_message(
-            f"No {spec.path_name} is recorded for this realm. At Stage 9 use **/ascend → Perfection → Start**.",
+            f"No {spec.path_name} is recorded for this realm. At Stage 9 use **/cultivation → Perfection → Start**.",
             ephemeral=False,
         )
         return
@@ -822,12 +822,12 @@ async def perfect_quest(interaction: discord.Interaction, path: app_commands.Cho
     if action.value == "info":
         if not p or not p["active"]:
             await interaction.response.send_message(
-                f"No active {spec.path_name}. Start it with **/ascend → Perfection → Start**.", ephemeral=False,
+                f"No active {spec.path_name}. Start it with **/cultivation → Perfection → Start**.", ephemeral=False,
             )
             return
         if p["quest_index"] >= spec.quest_count():
             await interaction.response.send_message(
-                f"All {spec.noun} quests are complete. Reach 100% and use **/ascend → Perfection → Trial**.",
+                f"All {spec.noun} quests are complete. Reach 100% and use **/cultivation → Perfection → Trial**.",
                 ephemeral=False,
             )
             return
@@ -858,7 +858,7 @@ async def perfect_quest(interaction: discord.Interaction, path: app_commands.Cho
         await interaction.response.send_message(
             f"🧭 **{result.get('title', spec.noun)} — Preparation**\n"
             f"Progress: **{min(prep, required)}/{required}**\n{result.get('clue','')}" +
-            ("\n✨ The trial is now available with **/ascend → Perfection → Quest**, Attempt."
+            ("\n✨ The trial is now available with **/cultivation → Perfection → Quest**, Attempt."
              if prep >= required else ""),
             ephemeral=False,
         )
@@ -1076,7 +1076,7 @@ async def tribulation_attempt(interaction: discord.Interaction, path: app_comman
         if result.get("quest_granted"):
             lines.append(
                 "🌀 The sky where the lightning stood is thin, and it will not stay that way: anchor the seam with "
-                "**/ascend → Tribulation / Ascension → Gate** and the crossing is yours — see **/quests**."
+                "**/cultivation → Tribulation / Ascension → Gate** and the crossing is yours — see **/quests**."
             )
     else:
         lines.append("\n💥 **Tribulation failed.** Preparation is consumed. Heal persistent injuries and prepare before trying again.")

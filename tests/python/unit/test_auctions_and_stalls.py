@@ -222,7 +222,14 @@ class TheRaidsHaveSlashCommands(unittest.TestCase):
     GROUPS = {"boss": {"list", "start", "status", "act", "claim"}, "party": {"create", "join", "leave"},
               # v1.9.1: body cultivation is a slash command of its own too.
               "body": {"cultivate", "sheet", "breakthrough"},
-              "profession": {"status", "exam"}}
+              "profession": {"status", "exam"},
+              # v1.38.0: the Most-used commands card's rule - a hub-only group
+              # is promoted at a hundred presses in thirty days; these three
+              # were over it (159, 126, 113) and seclusion (88) and alchemy
+              # (84) were not.
+              "perfect": {"start", "info", "quest", "clues", "trial", "abandon"},
+              "aptitude": {"temper", "evolve", "awaken", "status"},
+              "meridian": {"status", "open", "heal"}}
 
     def test_each_is_a_tree_command_resolving_to_the_hub_pages_group(self):
         surface = _surface()

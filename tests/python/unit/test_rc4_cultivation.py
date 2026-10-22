@@ -48,8 +48,11 @@ class FourPagesNamedAfterTheWork(unittest.TestCase):
         # splits Laws off Path - which was eleven actions on a page that shows
         # eight. The count is not the claim; the claim is that a page is a
         # thing you are doing, and that no page overflows.
+        # v1.38.0 folds `/ascend` in: the Perfection paths and the
+        # tribulations are the last two pages, the way up after the work.
         self.assertEqual([page.label for page in hub.pages],
-                         ["Cultivate", "Body", "Qi Body", "Ghost", "Path", "Laws", "Arts"])
+                         ["Cultivate", "Body", "Qi Body", "Ghost", "Path", "Laws", "Arts",
+                          "Perfection", "Tribulation / Ascension"])
         for page in hub.pages:
             self.assertLessEqual(len(hubs._leaf_actions(page)), hubs._LAYOUT_ACTION_LIMIT, page.label)
         paths = {action.path for page in hub.pages for action in hubs._leaf_actions(page)}

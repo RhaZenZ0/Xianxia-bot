@@ -102,6 +102,8 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 		result, err = adminWorldSetTravelPace(conn, req.ActorID, req.Payload)
 	case "admin.trade.void":
 		result, err = adminTradeVoid(conn, req.ActorID, req.Payload)
+	case "admin.territory.set_controller":
+		result, err = adminTerritorySetController(conn, catalog, req.ActorID, req.Payload)
 	case "admin.narration.set_chain":
 		result, err = adminNarrationSetChain(conn, req.ActorID, req.Payload)
 	case "admin.content.reload":

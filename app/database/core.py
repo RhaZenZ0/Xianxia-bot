@@ -27,7 +27,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 82
+SCHEMA_VERSION = 83
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -3362,6 +3362,38 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             # column. 0 for every pair that exists, so the first talk after
             # the upgrade pays its point.
             "ALTER TABLE npc_relationships ADD COLUMN last_talk_game_minute INTEGER NOT NULL DEFAULT 0",
+        ),
+    ),
+    (
+        83,
+        "the_hubs_a_quest_names_are_the_twelve",
+        (
+            # v1.38.0: sixteen hubs became twelve and a printed path names the
+            # hub a page is reached through - the Perfection page's Start is
+            # reached through cultivation now, not ascend; combat and realm
+            # are adventure; the npc hub's People page is world's; innerworld
+            # and abode are home; General Crafting is the Alchemy page and the
+            # Wallet the first leaf of City Shops. The
+            # content file says so for new worlds; the quest rows a running
+            # world holds are insert-only (migration 61's rule), so the same
+            # renames are made here, in the definitions and in the terms a
+            # player already holding the quest had pinned. The leaf names did
+            # not change, so a path is rewritten by its hub prefix alone and a
+            # text that names none is left as it was.
+            # Two spellings of one arrow: the Python seeding writes the
+            # definitions with json.dumps, which escapes the arrow to \\u2192,
+            # and the engine pins the terms with json.Marshal, which writes it
+            # raw - so each rename is made twice, once per spelling, and the
+            # test drives both (test_a_quest_term_names_the_twelve_hubs.py).
+            """UPDATE quest_definitions
+                  SET objectives_json=replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(objectives_json, '/ascend → Main Progression → Breakthrough', '/cultivation → Cultivate → Breakthrough'), '/ascend → Perfection', '/cultivation → Perfection'), '/ascend → Tribulation / Ascension', '/cultivation → Tribulation / Ascension'), '/combat → ', '/adventure → '), '/realm → Secret Realms', '/adventure → Secret Realms'), '/npc → People', '/world → People'), '/innerworld → Personal World', '/home → Personal World'), '/innerworld → Leave', '/home → Personal World → Leave'), '/abode → ', '/home → '), '/craft → General Crafting → Craft', '/craft → Alchemy → Craft'), '/economy → Wallet', '/economy → City Shops → Wallet'), '/ascend \\u2192 Main Progression \\u2192 Breakthrough', '/cultivation \\u2192 Cultivate \\u2192 Breakthrough'), '/ascend \\u2192 Perfection', '/cultivation \\u2192 Perfection'), '/ascend \\u2192 Tribulation / Ascension', '/cultivation \\u2192 Tribulation / Ascension'), '/combat \\u2192 ', '/adventure \\u2192 '), '/realm \\u2192 Secret Realms', '/adventure \\u2192 Secret Realms'), '/npc \\u2192 People', '/world \\u2192 People'), '/innerworld \\u2192 Personal World', '/home \\u2192 Personal World'), '/innerworld \\u2192 Leave', '/home \\u2192 Personal World \\u2192 Leave'), '/abode \\u2192 ', '/home \\u2192 '), '/craft \\u2192 General Crafting \\u2192 Craft', '/craft \\u2192 Alchemy \\u2192 Craft'), '/economy \\u2192 Wallet', '/economy \\u2192 City Shops \\u2192 Wallet')
+                WHERE objectives_json LIKE '%**/%'""",
+            """UPDATE quest_definitions
+                  SET description=replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(description, '/ascend → Main Progression → Breakthrough', '/cultivation → Cultivate → Breakthrough'), '/ascend → Perfection', '/cultivation → Perfection'), '/ascend → Tribulation / Ascension', '/cultivation → Tribulation / Ascension'), '/combat → ', '/adventure → '), '/realm → Secret Realms', '/adventure → Secret Realms'), '/npc → People', '/world → People'), '/innerworld → Personal World', '/home → Personal World'), '/innerworld → Leave', '/home → Personal World → Leave'), '/abode → ', '/home → '), '/craft → General Crafting → Craft', '/craft → Alchemy → Craft'), '/economy → Wallet', '/economy → City Shops → Wallet'), '/ascend \\u2192 Main Progression \\u2192 Breakthrough', '/cultivation \\u2192 Cultivate \\u2192 Breakthrough'), '/ascend \\u2192 Perfection', '/cultivation \\u2192 Perfection'), '/ascend \\u2192 Tribulation / Ascension', '/cultivation \\u2192 Tribulation / Ascension'), '/combat \\u2192 ', '/adventure \\u2192 '), '/realm \\u2192 Secret Realms', '/adventure \\u2192 Secret Realms'), '/npc \\u2192 People', '/world \\u2192 People'), '/innerworld \\u2192 Personal World', '/home \\u2192 Personal World'), '/innerworld \\u2192 Leave', '/home \\u2192 Personal World \\u2192 Leave'), '/abode \\u2192 ', '/home \\u2192 '), '/craft \\u2192 General Crafting \\u2192 Craft', '/craft \\u2192 Alchemy \\u2192 Craft'), '/economy \\u2192 Wallet', '/economy \\u2192 City Shops \\u2192 Wallet')
+                WHERE description LIKE '%**/%'""",
+            """UPDATE character_quests
+                  SET terms_json=replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(terms_json, '/ascend → Main Progression → Breakthrough', '/cultivation → Cultivate → Breakthrough'), '/ascend → Perfection', '/cultivation → Perfection'), '/ascend → Tribulation / Ascension', '/cultivation → Tribulation / Ascension'), '/combat → ', '/adventure → '), '/realm → Secret Realms', '/adventure → Secret Realms'), '/npc → People', '/world → People'), '/innerworld → Personal World', '/home → Personal World'), '/innerworld → Leave', '/home → Personal World → Leave'), '/abode → ', '/home → '), '/craft → General Crafting → Craft', '/craft → Alchemy → Craft'), '/economy → Wallet', '/economy → City Shops → Wallet'), '/ascend \\u2192 Main Progression \\u2192 Breakthrough', '/cultivation \\u2192 Cultivate \\u2192 Breakthrough'), '/ascend \\u2192 Perfection', '/cultivation \\u2192 Perfection'), '/ascend \\u2192 Tribulation / Ascension', '/cultivation \\u2192 Tribulation / Ascension'), '/combat \\u2192 ', '/adventure \\u2192 '), '/realm \\u2192 Secret Realms', '/adventure \\u2192 Secret Realms'), '/npc \\u2192 People', '/world \\u2192 People'), '/innerworld \\u2192 Personal World', '/home \\u2192 Personal World'), '/innerworld \\u2192 Leave', '/home \\u2192 Personal World \\u2192 Leave'), '/abode \\u2192 ', '/home \\u2192 '), '/craft \\u2192 General Crafting \\u2192 Craft', '/craft \\u2192 Alchemy \\u2192 Craft'), '/economy \\u2192 Wallet', '/economy \\u2192 City Shops \\u2192 Wallet')
+                WHERE terms_json LIKE '%**/%'""",
         ),
     ),
 )

@@ -56,7 +56,7 @@ CONTENT = json.loads((PROJECT_ROOT / "content" / "world.json").read_text(encodin
 STAGES = list(CONTENT.get("realm_road") or [])
 LEAVES: dict[str, int] = {str(k): int(v) for k, v in ((CONTENT.get("feature_unlocks") or {}).get("leaves") or {}).items()}
 GO = PROJECT_ROOT / "go_core" / "internal" / "game"
-# `**/combat → Boss Raids → Claim**`, as an objective label spells a command.
+# `**/adventure → Boss Raids → Claim**`, as an objective label spells a command.
 LABEL_PATH = re.compile(r"\*\*(/[^*]+)\*\*")
 BUDGET = {"max_xp": 1000, "max_stones": 1000, "max_items": 5}
 

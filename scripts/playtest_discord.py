@@ -95,6 +95,161 @@ DEFERRED_LEAVES: dict[str, str] = {
     ),
 }
 
+# The sweep's contract is "a result or a designed refusal", and a leaf that
+# has only ever been refused has had only its refusal proved (rc.58 on the
+# Discord side; the known limit v1.3.4 left open). v1.38.0 closes it with a
+# roster instead of an allowlist: every refusal the sweep meets is decided.
+# `MUST_RESOLVE` names the leaves whose refusal under the sweep was only a
+# missing state, with the state `STATE_BUILDERS` builds for each before the
+# press - through the engine, as the GM, never by writing a row - and the
+# press is a failure if it still answers "❌". `REFUSAL_ACCEPTED` names the
+# leaves whose refusal is the correct answer, with why. A refusal on a leaf
+# in neither is a failure that names both rosters, so a new refusal is a
+# decision, never a green line. `tests/python/contracts/test_playtest_coverage.py`
+# holds both to live leaves, disjoint from each other and from
+# `DEFERRED_LEAVES`, and every must-resolve leaf to a builder.
+MUST_RESOLVE: dict[str, str] = {
+    "/bond dual_cultivate": (
+        "a Dao partnership: the GM is given a cultivator, stood beside the "
+        "player, proposed to by the player and accepts - the one leaf of the "
+        "bond that no run had ever resolved."
+    ),
+    "/formation create": (
+        "an active party: the Party page's Leave leaf dissolves the one its "
+        "Create leaf made before the Formations page is reached, so one is "
+        "made again."
+    ),
+    "/market buy": (
+        "stones enough for the first listing: the sweep's player is poor, and "
+        "a buy that only ever met the purse proved nothing of the counter."
+    ),
+    "/spirit settle": (
+        "a spirit sense filled to its stage's need, read off spirit_sense.status "
+        "(the sweep's crafter is at 4/40 and the settle had never run)."
+    ),
+    "/abode establish": (
+        "standing in a public sect at the founding rank the content names, "
+        "outside any household - the one door to a homestead."
+    ),
+    "/insight": (
+        "Insight XP enough for the realm gate's insight: it is earned by "
+        "exploring and a run's explores may yield none, so one run banked "
+        "the insight and the next was refused for 0 XP."
+    ),
+}
+REFUSAL_ACCEPTED: dict[str, str] = {
+    "/cultivate": "the daily five (section 5) resolve it and leave it on cooldown; the refusal is the cooldown read back",
+    "/merchant buy": "the picker offers every merchant and the first is out of reach; the reach rule is the engine's and holds (recorded in docs/TODO.md)",
+    "/family enter": "the player's household stands in another city; entering it from here is the refusal",
+    "/family house invite": "the member picker is answered with a cultivator who has no character, by design (nothing here reaches the player)",
+    "/admin player erase": "the confirm word must be typed exactly; a generic answer is refused by design",
+    "/admin sect masterattention": "the member picker's cultivator has no master; the lever refuses a target with nothing to attend",
+    "/meridian heal": "a rupture is a battle's or a failed breakthrough's doing and the run's player may carry none; a heal with nothing to heal is the engine's refusal (it resolved in the runs whose raid left one)",
+}
+
+
+_BUILDER_SEQ = [0]
+
+
+def _builder_action_id(op: str) -> str:
+    """A player-side engine call is idempotency-keyed (an action_id) the way
+    the bot's own are; the GM levers are not."""
+    _BUILDER_SEQ[0] += 1
+    return f"playtest-discord:{_BUILDER_SEQ[0]}:{op}"
+
+
+async def _player_act(engine: Any, op: str, uid: int, payload: dict[str, Any]) -> dict[str, Any]:
+    envelope = await engine.authoritative_action(op, int(uid), payload, action_id=_builder_action_id(op))
+    return dict((envelope or {}).get("result") or {})
+
+
+async def _build_dao_partnership(player: Any, gm: Any, engine: Any, db: Any, world: Any) -> None:
+    """A partner for the player: the GM's cultivator, made through the same
+    character.create the bot calls, moved to the player, proposed to and
+    accepting. Idempotent across the two sweep parts that may build it."""
+    if not await db.get_character(int(gm.id)):
+        offers = await _player_act(engine, "character.family_options", int(gm.id), {})
+        families = list(offers.get("families") or [])
+        expect(families, "character.family_options offered the GM nothing")
+        path = world.normalize_path("Qi Refiner") or next(iter(world.paths))
+        await _player_act(engine, "character.create", int(gm.id), {
+            "discord_name": "GM", "name": "Playtest Partner", "concept": "stands beside the sweep's cultivator",
+            "gender": "female", "path": path, "family_choice_id": str(families[0].get("choice_id") or ""),
+        })
+    mine = dict(await db.get_character(int(player.id)) or {})
+    theirs = dict(await db.get_character(int(gm.id)) or {})
+    expect(mine.get("life_status") == "alive" and theirs.get("life_status") == "alive",
+           f"a partner needs two living incarnations: player {mine.get('life_status')!r}, GM {theirs.get('life_status')!r} ({theirs.get('name')!r})")
+    standing = str(mine.get("location") or "")
+    await engine.action("admin.player.teleport", int(gm.id), {"user_id": int(gm.id), "location": standing, "reason": "playtest: beside the player for the bond"})
+    pending = await _player_act(engine, "dao.propose", int(player.id), {"partner_user_id": int(gm.id)})
+    await _player_act(engine, "dao.respond", int(gm.id), {"partnership_id": int(pending.get("partnership_id") or 0), "accept": True})
+
+
+async def _build_party(player: Any, gm: Any, engine: Any, db: Any, world: Any) -> None:
+    try:
+        await _player_act(engine, "party.create", int(player.id), {"name": "playtest formation"})
+    except Exception as exc:  # noqa: BLE001 - already in one is the state wanted
+        if "already in an active party" not in str(exc):
+            raise
+
+
+async def _build_purse(player: Any, gm: Any, engine: Any, db: Any, world: Any) -> None:
+    """Stones for the dearest listing on the board here, read off the engine's
+    own market.rows (its buy_price is the counter's price): the harness
+    restates no price, and the picker may offer any row first."""
+    standing = str((await db.get_character(int(player.id)) or {}).get("location") or "")
+    rows = await engine.action("market.rows", int(player.id), {"location": standing})
+    rows = list(rows.get("rows") if isinstance(rows, dict) else rows or [])
+    priced = [r for r in rows if isinstance(r, dict) and int(r.get("buy_price") or 0) > 0]
+    expect(priced, f"market.rows at {standing!r} names no buy price: {rows[:2]}")
+    dearest = max(priced, key=lambda r: int(r["buy_price"]))
+    await engine.action("admin.player.grant_currency", int(gm.id), {
+        "user_id": int(player.id), "currency_id": str(dearest.get("currency_id") or "low_spirit_stone"), "amount": int(dearest["buy_price"]) + 1,
+        "reason": "playtest: stones for the market's dearest listing",
+    })
+
+
+async def _build_spirit_sense(player: Any, gm: Any, engine: Any, db: Any, world: Any) -> None:
+    status = dict(await engine.action("spirit_sense.status", int(player.id), {}) or {})
+    expect("need" in status, f"spirit_sense.status names no need: {status}")
+    await engine.action("admin.player.set_spirit_sense", int(gm.id), {
+        "user_id": int(player.id), "stage": int(status.get("stage") or 0), "progress": int(status["need"]),
+        "reason": "playtest: a sense filled to its stage's need",
+    })
+
+
+async def _build_homestead_standing(player: Any, gm: Any, engine: Any, db: Any, world: Any) -> None:
+    """The founding rank is the content's (abode_system.founding_rank_level),
+    and its name the sect ladder's: the harness restates neither."""
+    floor = int(world.data["abode_system"]["founding_rank_level"])
+    rank = next((r for r in world.data["sect_system"]["ranks"] if int(r["level"]) == floor), {"name": f"rank {floor}"})
+    sect = next(name for name, row in world.data["sects"].items() if not row.get("hidden"))
+    await engine.action("admin.player.set_sect", int(gm.id), {
+        "user_id": int(player.id), "sect_name": sect, "rank_name": str(rank["name"]), "rank_level": floor,
+        "reason": "playtest: standing for a homestead",
+    })
+    standing = str((await db.get_character(int(player.id)) or {}).get("location") or "")
+    if standing.startswith(("birth_family:", "abode:", "sect_abode:", "personal_world:")):
+        await engine.action("admin.player.teleport", int(gm.id), {"user_id": int(player.id), "location": "Greenriver Town", "reason": "playtest: ground a homestead can stand on"})
+
+
+async def _build_insight_xp(player: Any, gm: Any, engine: Any, db: Any, world: Any) -> None:
+    await engine.action("admin.player.cultivation_reward", int(gm.id), {
+        "user_id": int(player.id), "insight_xp": 1_000, "reason": "playtest: XP for the realm gate's insight",
+    })
+
+
+STATE_BUILDERS: dict[str, Any] = {
+    "/bond dual_cultivate": _build_dao_partnership,
+    "/formation create": _build_party,
+    "/market buy": _build_purse,
+    "/spirit settle": _build_spirit_sense,
+    "/abode establish": _build_homestead_standing,
+    "/insight": _build_insight_xp,
+}
+REFUSAL_MARK = "❌"
+
 # What the bot prints when a handler raised: never a designed refusal, which
 # always names what is missing. The gate reads these off the source.
 WIRING_FAILURE_TEXTS = (
@@ -1316,7 +1471,7 @@ async def run(url: str, token: str, db_path: str, shard: tuple[int, int] | None 
 
         async def talisman():
             items = await open_hub(player, channels["begin-here"], "items")
-            await items.goto("Use Item")
+            await items.goto("Bag")  # Inventory, Use Item and Provenance are one page since v1.38.0
             used = await answer_steps(player, await items.press("Use"), picks={"Choose item": "Hearth-Return Talisman"})
             await settle_patiently(env)
             text = result_text(used) + "\n" + items.text()
@@ -1583,10 +1738,27 @@ async def run(url: str, token: str, db_path: str, shard: tuple[int, int] | None 
                     continue
                 for action in leaves:
                     name = f"{action.path}  ({definition.name} → {page.label})"
+                    builder = STATE_BUILDERS.get(action.path)
+                    if builder is not None:
+                        try:
+                            await builder(player, gm, ENGINE, DB, WORLD)
+                        except Exception as exc:  # noqa: BLE001 - a playtest reports, it does not crash
+                            report.add("FAIL", name, f"building the state it must resolve in ({MUST_RESOLVE[action.path][:60]}…): {type(exc).__name__}: {exc}")
+                            continue
                     try:
                         status, note = await press_leaf(env, hub_registry, panel, action, member=other, channel=channels["begin-here"])
                     except Exception as exc:  # noqa: BLE001 - a playtest reports, it does not crash
                         report.add("FAIL", name, f"{type(exc).__name__}: {exc}")
+                        continue
+                    # A refusal is decided, never merely counted (v1.38.0).
+                    if status == "pressed" and REFUSAL_MARK in note:
+                        if action.path in MUST_RESOLVE:
+                            report.add("FAIL", name, f"refused where it must resolve: {note}")
+                        elif action.path not in REFUSAL_ACCEPTED:
+                            report.add("FAIL", name, f"a refusal in neither MUST_RESOLVE nor REFUSAL_ACCEPTED - decide it: {note}")
+                        else:
+                            report.add("PASS", name, f"{note}  [refusal accepted: {REFUSAL_ACCEPTED[action.path][:70]}]")
+                        pressed[action.path] = note
                         continue
                     report.add("PASS", name, note)
                     (pressed if status == "pressed" else locked)[action.path] = note

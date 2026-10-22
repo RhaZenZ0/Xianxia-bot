@@ -126,7 +126,7 @@ class NoPageOverflowsTheLayout(unittest.TestCase):
 class TheMergesThatRemovedDuplication(unittest.TestCase):
     def test_perfection_is_one_page_taking_a_path(self):
         surface, hubs = _modules()
-        pages = {p.label: p for p in surface._HUB_BY_NAME["ascend"].pages}
+        pages = {p.label: p for p in surface._HUB_BY_NAME["cultivation"].pages}  # the Perfection page is Cultivation's since v1.38.0
         self.assertIn("Perfection", pages)
         self.assertNotIn("Body Perfection", pages)
         labels = {a.label for a in hubs._leaf_actions(pages["Perfection"])}

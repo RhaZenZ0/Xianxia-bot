@@ -2792,6 +2792,10 @@ class AdminDashboardController:
         # Trades (v1.0.0-rc.2): void an open offer between cultivators. It
         # moves nothing - an offer never did - and audits in the engine.
         "trade.void": "admin.trade.void",
+        # Territory (v1.38.0): hand a territory to a sect or make it neutral,
+        # the repair for a seat city migration 74 gave a rival. Audited and
+        # reversible in the engine.
+        "territory.set_controller": "admin.territory.set_controller",
     }
 
     def __init__(self, store: ReadOnlyDashboardStore, engine_url: str, enabled: bool, actor_id: int = 1):
@@ -2990,6 +2994,12 @@ class AdminDashboardController:
             # to get exactly right.
             npc_names = [str(r["npc_name"]) for r in await self.store._fetchall(db, "SELECT npc_name FROM npc_civilization_state WHERE status='alive' ORDER BY npc_name")]
             active_events = await self.store._fetchall(db, "SELECT event_key,title FROM world_events WHERE active=1 ORDER BY title")
+            # The Territory card (v1.38.0): every territory row, with its holder.
+            territories = await self.store._fetchall_if_table(
+                db, "territory_state",
+                "SELECT territory_key,name,region,controller_type,controller_key FROM territory_state ORDER BY name,territory_key",
+                (),
+            )
             sects = [str(r["sect_name"]) for r in await self.store._fetchall(db, "SELECT sect_name FROM sect_politics_state ORDER BY sect_name")]
             if not sects:
                 try:
@@ -3020,6 +3030,7 @@ class AdminDashboardController:
             "npcs": npc_names,
             "active_events": active_events,
             "sects": sects,
+            "territories": territories,
             "backups": await self.transport.list_backups(),
             "database": await self.transport.status(),
         }

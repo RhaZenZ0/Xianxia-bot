@@ -118,8 +118,11 @@ var reversibleAdminActions = map[string]reverseFunc{
 		}
 		return stmts, nil
 	},
-	"admin.player.teleport":       reverseTeleport,
-	"admin.player.grant_currency": reverseGrantCurrency,
+	"admin.player.teleport": reverseTeleport,
+	// A territory's banner (v1.38.0): the two controller columns, from the
+	// snapshot; admin_territory.go.
+	"admin.territory.set_controller": reverseTerritoryController,
+	"admin.player.grant_currency":    reverseGrantCurrency,
 	// The reversal reads the audit row for what the lever wrote and restores that
 	// and nothing else; admin_undo_rows.go.
 	"admin.player.set_realm_perfection": reverseSetRealmPerfection,

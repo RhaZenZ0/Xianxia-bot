@@ -58,13 +58,13 @@ def flame(world: str) -> dict:
 
 def raid(world: str) -> dict:
     return {"id": "raid", "type": "raid_win", "target": bosses[world], "count": 1,
-            "label": f"Bring down the {bosses[world]} and claim your share - **/combat → Boss Raids → Claim**"}
+            "label": f"Bring down the {bosses[world]} and claim your share - **/adventure → Boss Raids → Claim**"}
 
 
 def enter(oid: str, realm_key: str) -> dict:
     r = secret[realm_key]
     return {"id": oid, "type": "realm_enter", "target": realm_key, "count": 1,
-            "label": f"Enter the {r['name']} at {r['location']} - **/realm → Secret Realms → Enter**"}
+            "label": f"Enter the {r['name']} at {r['location']} - **/adventure → Secret Realms → Enter**"}
 
 
 def law(oid: str, target: str | None, what: str) -> dict:
@@ -125,15 +125,15 @@ stage(12, "A Law Made Manifest",
 stage(13, "The Ninth Stage Again",
       f"The Perfect Path is open at the ninth stage of every realm, and this world's are worth perfecting. The {secret['broken_pagoda_sutra_hall']['name']} at {secret['broken_pagoda_sutra_hall']['location']} is the Spiritual World's first ruin.",
       "You have stood at a ninth stage before. This time you know what it is for.",
-      [plain("perfect", "perfection_start", "Begin a Perfect Path at the ninth stage - **/ascend → Perfection → Start**"), enter("pagoda", "broken_pagoda_sutra_hall")])
+      [plain("perfect", "perfection_start", "Begin a Perfect Path at the ninth stage - **/cultivation → Perfection → Start**"), enter("pagoda", "broken_pagoda_sutra_hall")])
 stage(14, "The Toppled Stele",
       f"The {secret['toppled_stele_sword_field']['name']} at {secret['toppled_stele_sword_field']['location']} is the deepest ruin of this world that needs no key, and its last room is where a swordsman's trial leaves its mark.",
       "One realm stands between you and the Transcendence Tribulation. The sword field is where the old ones went to be sure of themselves first.",
       [enter("stele", "toppled_stele_sword_field")])
 stage(15, "The Transcendence Tribulation",
-      "The Transcendence Realm is the last of this world. Prepare at the place you will stand with **/ascend → Tribulation / Ascension → Prepare** and survive the three waves; what survives them is told where the seam is.",
+      "The Transcendence Realm is the last of this world. Prepare at the place you will stand with **/cultivation → Tribulation / Ascension → Prepare** and survive the three waves; what survives them is told where the seam is.",
       "The sky over the Spiritual World is a different colour from the Mortal one, and it has noticed you all the same.",
-      [plain("heaven", "tribulation_cleared", "Survive the Transcendence Tribulation - **/ascend → Tribulation / Ascension → Attempt**")])
+      [plain("heaven", "tribulation_cleared", "Survive the Transcendence Tribulation - **/cultivation → Tribulation / Ascension → Attempt**")])
 
 # ---- Immortal World, 16-23 -------------------------------------------------
 stage(16, "The Immortal Court",
@@ -143,7 +143,7 @@ stage(16, "The Immortal Court",
 stage(17, "The Sun Flame and the Grandmasters",
       f"The {flames[I][1]['name']} on the {flames[I][1]['location']} is the first flame that opens the top grade. {jobs[I]} judges every craft made in its square and lends the roll its eye.",
       "What you make here is weighed by people who have made it better. That is the point of coming.",
-      [flame(I), plain("craft", "craft", f"Make something in your trade - in {jobs[I]} if you can - **/craft → General Crafting → Craft**")])
+      [flame(I), plain("craft", "craft", f"Make something in your trade - in {jobs[I]} if you can - **/craft → Alchemy → Craft**")])
 stage(18, "The Crater",
       f"{wilds[I]} lies in the wilds of {locations[wilds[I]]['wilds_of']}. The {secret['fallen_star_forge']['name']} opens there to a key the world's array workshops sell.",
       "Something fell here long before the court was built, and the court was built where it could keep an eye on the hole.",
@@ -165,9 +165,9 @@ stage(22, "The Cracked Altar",
       "The altar cracked when somebody asked the heavens a question they did not want answered. Ask a smaller one.",
       [enter("altar", "cracked_altar_sanctum")])
 stage(23, "The Celestial Ascension Tribulation",
-      "Immortal Sovereign is the last of this world. Prepare at the place you will stand with **/ascend → Tribulation / Ascension → Prepare** and survive the three waves.",
+      "Immortal Sovereign is the last of this world. Prepare at the place you will stand with **/cultivation → Tribulation / Ascension → Prepare** and survive the three waves.",
       "The heavens over the Immortal World are close enough to hear, and they are not pleased.",
-      [plain("heaven", "tribulation_cleared", "Survive the Celestial Ascension Tribulation - **/ascend → Tribulation / Ascension → Attempt**")])
+      [plain("heaven", "tribulation_cleared", "Survive the Celestial Ascension Tribulation - **/cultivation → Tribulation / Ascension → Attempt**")])
 
 # ---- Celestial World, 24-31 ------------------------------------------------
 stage(24, "The Mandate Palace",
@@ -193,12 +193,12 @@ stage(28, "The Buried Court",
 stage(29, "Nine Pillars",
       f"The {secret['nine_pillar_vault']['name']} at {secret['nine_pillar_vault']['location']} is the deepest ruin in the game that needs no key. The Perfect Path at this ninth stage is the last one worth walking before the Saint's.",
       "Nine pillars hold the vault up. Nobody remembers what the tenth held.",
-      [enter("pillars", "nine_pillar_vault"), plain("perfect", "perfection_start", "Begin a Perfect Path at the ninth stage - **/ascend → Perfection → Start**")])
+      [enter("pillars", "nine_pillar_vault"), plain("perfect", "perfection_start", "Begin a Perfect Path at the ninth stage - **/cultivation → Perfection → Start**")])
 stage(30, "A World of Your Own",
-      "A Dao Saint who holds the whole of the Law of Space folds a world of their own. Comprehend Space to Essence/Origin, then stabilize the world with **/innerworld → Personal World → Create**.",
+      "A Dao Saint who holds the whole of the Law of Space folds a world of their own. Comprehend Space to Essence/Origin, then stabilize the world with **/home → Personal World → Create**.",
       "Everything you have walked through was somebody's. This is where you make one.",
       [law("space", "space", "Comprehend the Law of Space to Essence/Origin"),
-       plain("world", "personal_world", "Stabilize a personal world - **/innerworld → Personal World → Create**")])
+       plain("world", "personal_world", "Stabilize a personal world - **/home → Personal World → Create**")])
 stage(31, "The Sovereign",
       "Dao Sovereign is the top of the ladder. World Collapse is the Law of Space's capstone, manifested inside a world you folded yourself; nothing stands above it, and nothing is handed over after it.",
       "There is no realm above this one. What you do here is the end of the road and the only reason it was built.",

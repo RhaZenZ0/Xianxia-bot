@@ -186,14 +186,14 @@ class EachPlayerSeesWhatIsTheirs(unittest.TestCase):
         self.assertNotIn("Start here", text)
 
     def test_a_hub_the_menu_leaves_off_is_left_off_and_named(self):
-        text, _ = _handler_text(_live_commands(), admin=False, hidden_hubs={"combat": 1, "abode": 4})
+        text, _ = _handler_text(_live_commands(), admin=False, hidden_hubs={"adventure": 1, "home": 4})
         panels = text[text.index("🧭 Panels"):text.index("✳️ Commands")]
-        self.assertNotIn("`/combat`", panels)
-        self.assertNotIn("`/abode`", panels)
+        self.assertNotIn("`/adventure`", panels)
+        self.assertNotIn("`/home`", panels)
         self.assertIn("`/world`", panels)
         not_yet = text[text.index("🔒 Not yet"):]
-        self.assertIn("/combat", not_yet)
-        self.assertIn("/abode", not_yet)
+        self.assertIn("/adventure", not_yet)
+        self.assertIn("/home", not_yet)
 
     def test_a_held_back_subcommand_is_left_off_and_counted(self):
         text, _ = _handler_text(_live_commands(), admin=False,
