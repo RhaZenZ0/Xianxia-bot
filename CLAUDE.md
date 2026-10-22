@@ -164,7 +164,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 81; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 82; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### Subsystem notes (`docs/ARCHITECTURE.md`)
@@ -212,7 +212,7 @@ wire missing, so before calling a change done, ask which door still does not rea
 - **State a player sits behind is settled by the action, not by a flag-gated sweep (rc.56, v1.0.4);** a lock on state only an action can clear self-clears unconditionally, and the way out stays open.
 - **Record before the reply, tell after it (v1.0.5, rc.28).** A quest report is written before the command answers and announced after it; a reply that raises after the engine committed tells the player nothing happened (v1.0.3), so key every result a formatter reads.
 - **A panel provider never raises (v1.0.10).** A line drawn beside everything else (the Here line, hidden doors, the seat lines) costs the line, not the card; an unreadable flag or roster fails towards play (rc.41, v1.0.9).
-- **Anything that deletes a person's rows collects their Discord threads and cards first and deletes them after the engine commits (v1.0.8, v1.7.0);** a table keyed on a person is classified in `erasureAnonymise`. Death, rebirth, a reset and an erasure settle what the person left open - a bidder's escrow, a lot, a caravan, a player-keyed `world_state` row - through the same functions (v1.34.0): four ways out of a life, one set of doors.
+- **Anything that deletes a person's rows collects their Discord threads and cards first and deletes them after the engine commits (v1.0.8, v1.7.0);** a table keyed on a person is classified in `erasureAnonymise`. Death, rebirth, a reset and an erasure settle what the person left open - a bidder's escrow, a lot, a caravan, a player-keyed `world_state` row, and since v1.37.0 the open trades, the Dao bond, the duel and the stall - through the same functions (v1.34.0): four ways out of a life, one set of doors.
 
 **Reach**
 

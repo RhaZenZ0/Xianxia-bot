@@ -28,6 +28,7 @@ CREATE TABLE currency_wallets(user_id INTEGER,currency_id TEXT,balance INTEGER,P
 CREATE TABLE inventory(user_id INTEGER,item_id TEXT,quantity INTEGER,PRIMARY KEY(user_id,item_id));
 CREATE TABLE event_log(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,event_type TEXT,payload_json TEXT,created_at REAL);
 CREATE TABLE world_state(key TEXT PRIMARY KEY,value_json TEXT NOT NULL,updated_at REAL NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS admin_audit_log(audit_id INTEGER PRIMARY KEY AUTOINCREMENT,admin_user_id INTEGER NOT NULL,action TEXT NOT NULL,target TEXT NOT NULL DEFAULT '',before_json TEXT NOT NULL DEFAULT '{}',after_json TEXT NOT NULL DEFAULT '{}',reason TEXT NOT NULL DEFAULT '',created_at REAL NOT NULL);
 INSERT INTO characters(user_id,vitality,vitality_max,cultivation,spirit_stones,insight_xp,updated_at) VALUES(42,20,20,5,0,0,0);
 INSERT INTO battles VALUES(7,42,20,20,'active',0,0);
 INSERT INTO character_quests(user_id,quest_key,status,progress_json,completed_game_minute,updated_at) VALUES(42,'first_steps','active','{"talk":0}',NULL,0);
@@ -36,6 +37,12 @@ INSERT INTO quest_definitions(quest_key,title,objectives_json) VALUES('first_ste
 		t.Fatal(err)
 	}
 	return path
+}
+
+func applyActionRaw(t *testing.T, path, op string, actor int64, payload map[string]any) (ActionResponse, error) {
+	t.Helper()
+	raw, _ := json.Marshal(payload)
+	return Apply(path, ActionRequest{Operation: op, ActorID: actor, Payload: raw})
 }
 
 func applyAction(t *testing.T, path, op string, actor int64, payload map[string]any) map[string]any {
@@ -69,15 +76,23 @@ func actionScalar(t *testing.T, path, sql string, params ...any) any {
 	return res.Rows[0][0]
 }
 
-func TestRelationshipUpdatePersistsAndClamps(t *testing.T) {
+// The three Python-era levers are the GM's, audited (v1.37.0): the actor is
+// the GM (99) and the player is named in the payload.
+func TestTheRelationshipLeverPersistsClampsAndAudits(t *testing.T) {
 	path := setupActionDB(t)
-	first := applyAction(t, path, "relationship.update", 42, map[string]any{"npc_name": "Elder Pine", "trust": 15, "respect": 20, "summary": "Greeting"})
+	first := applyAction(t, path, "admin.player.relationship", 99, map[string]any{"user_id": 42, "npc_name": "Elder Pine", "trust": 15, "respect": 20, "summary": "Greeting", "reason": "test"})
 	if storage.ParseInt(first["trust"]) != 15 || storage.ParseInt(first["encounter_count"]) != 1 {
 		t.Fatalf("first=%v", first)
 	}
-	second := applyAction(t, path, "relationship.update", 42, map[string]any{"npc_name": "Elder Pine", "trust": 500, "grudge": -500, "summary": "Service"})
+	second := applyAction(t, path, "admin.player.relationship", 99, map[string]any{"user_id": 42, "npc_name": "Elder Pine", "trust": 500, "grudge": -500, "summary": "Service", "reason": "test"})
 	if storage.ParseInt(second["trust"]) != 100 || storage.ParseInt(second["grudge"]) != -100 || storage.ParseInt(second["encounter_count"]) != 2 {
 		t.Fatalf("second=%v", second)
+	}
+	if n := storage.ParseInt(actionScalar(t, path, "SELECT COUNT(*) FROM admin_audit_log WHERE action='admin.player.relationship' AND admin_user_id=99")); n != 2 {
+		t.Fatalf("%d audit row(s) for two lever pulls; a GM lever that does not write admin_audit_log breaks repo rule 6", n)
+	}
+	if _, err := applyActionRaw(t, path, "admin.player.relationship", 99, map[string]any{"npc_name": "Elder Pine", "trust": 1}); err == nil {
+		t.Fatal("a relationship lever with no user_id was taken")
 	}
 }
 
@@ -112,7 +127,7 @@ func TestQuestProgressUpdatesPersistentQuestState(t *testing.T) {
 
 func TestCombatDamageKeepsBattleAndCharacterVitalityInSync(t *testing.T) {
 	path := setupActionDB(t)
-	result := applyAction(t, path, "combat.apply_damage", 42, map[string]any{"battle_id": 7, "damage": 6})
+	result := applyAction(t, path, "admin.player.apply_damage", 99, map[string]any{"user_id": 42, "battle_id": 7, "damage": 6, "reason": "test"})
 	if storage.ParseInt(result["vitality"]) != 14 {
 		t.Fatalf("result=%v", result)
 	}
@@ -126,7 +141,7 @@ func TestCombatDamageKeepsBattleAndCharacterVitalityInSync(t *testing.T) {
 
 func TestCultivationRewardCapsProgressAndCommitsWalletItemsAndEvent(t *testing.T) {
 	path := setupActionDB(t)
-	result := applyAction(t, path, "cultivation.reward", 42, map[string]any{"cultivation": 10, "cultivation_cap": 12, "spirit_stones": 3, "insight_xp": 2, "items": map[string]int64{"spirit_herb": 2}, "event_type": "cultivate"})
+	result := applyAction(t, path, "admin.player.cultivation_reward", 99, map[string]any{"user_id": 42, "cultivation": 10, "cultivation_cap": 12, "spirit_stones": 3, "insight_xp": 2, "items": map[string]int64{"spirit_herb": 2}, "event_type": "cultivate", "reason": "test"})
 	if storage.ParseInt(result["cultivation_awarded"]) != 7 {
 		t.Fatalf("result=%v", result)
 	}

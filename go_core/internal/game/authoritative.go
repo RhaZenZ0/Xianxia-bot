@@ -58,6 +58,7 @@ var authoritativeMutations = map[string]bool{
 	"ghost.appease":                   true,
 	"character.reset":                 true,
 	"lifecycle.true_death":            true,
+	"npc.talk":                        true,
 	"lifecycle.reincarnate":           true,
 	"combat.start":                    true,
 	"combat.turn":                     true,
@@ -566,6 +567,8 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			mutation, err = commissionResolveAction(conn, catalog, req.ActorID, req.Payload)
 		case "lifecycle.true_death":
 			mutation, err = trueDeathAction(conn, catalog, req.ActorID, req.Payload)
+		case "npc.talk":
+			mutation, err = npcTalkAction(conn, req.ActorID, req.Payload)
 		case "combat.start":
 			mutation, err = combatStartAction(conn, catalog, req.ActorID, req.Payload)
 		case "character.family_options":

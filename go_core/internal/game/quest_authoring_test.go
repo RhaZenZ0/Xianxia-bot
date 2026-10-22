@@ -94,6 +94,9 @@ func TestSavingAnApprovedQuestLeavesItApproved(t *testing.T) {
 // The default, and the only policy that cannot cost a player anything.
 func TestKeepingHoldersLeavesThemOnTheTermsTheyAccepted(t *testing.T) {
 	path := setupCommissionDB(t)
+	// The budget is TestTheEngineHoldsARaisedRewardToTheGMBudget's concern;
+	// this save raises the stones well past the default to tell the terms apart.
+	t.Setenv("QUEST_REWARD_MAX_STONES", "1000")
 	seedOrdinaryQuest(t, path, "first_steps", twoObjectiveQuest(), map[string]any{"spirit_stones": 25})
 	batch4SetCanonicalGameMinute(t, path, 100)
 	acceptQuest(t, path, 42, "first_steps", 100)
@@ -124,6 +127,7 @@ func TestKeepingHoldersLeavesThemOnTheTermsTheyAccepted(t *testing.T) {
 // quietly does the opposite of what it says.
 func TestKeepingHoldersPinsTheOldTermsForSomebodyWhoHadNoPin(t *testing.T) {
 	path := setupCommissionDB(t)
+	t.Setenv("QUEST_REWARD_MAX_STONES", "1000")
 	seedOrdinaryQuest(t, path, "first_steps",
 		[]map[string]any{{"id": "talk_1", "type": "talk", "target": "Steward Qiao", "count": 1}},
 		map[string]any{"spirit_stones": 25})
@@ -308,5 +312,53 @@ func TestQuestReviewApprovesADefinitionWithNoGiver(t *testing.T) {
 	}
 	if got := countRows(t, path, `SELECT COUNT(*) FROM admin_audit_log WHERE action='admin.quest.review'`); got != 1 {
 		t.Fatalf("audit rows=%d", got)
+	}
+}
+
+// The GM budget is the engine's (v1.37.0): a reward raised over it is refused
+// here, whoever asks, and a stored reward already above it saves unchanged.
+func TestTheEngineHoldsARaisedRewardToTheGMBudget(t *testing.T) {
+	path := setupCommissionDB(t)
+	batch4SetCanonicalGameMinute(t, path, 100)
+	over := map[string]any{
+		"quest_key": "the_generous_bell", "title": "The Generous Bell",
+		"objectives": twoObjectiveQuest(), "rewards": map[string]any{"insight_xp": 120}, "reason": "test",
+	}
+	_, err := questSave(t, path, 7, over)
+	if err == nil || err.Error() != "reward insight_xp=120 exceeds the GM budget (50)" {
+		t.Fatalf("a new quest paying 120 insight was saved, or refused with the wrong sentence: %v", err)
+	}
+	// A quest that already pays 120 (a shipped one above the budget) saves as
+	// it is, and is refused only when the reward is raised.
+	seedCommission(t, path, "the_generous_bell", nil)
+	batch4Exec(t, path, `UPDATE quest_definitions SET rewards_json='{"insight_xp":120,"items":{"spirit_herb":5}}' WHERE quest_key='the_generous_bell'`)
+	unchanged := map[string]any{
+		"quest_key": "the_generous_bell", "title": "The Generous Bell",
+		"objectives": twoObjectiveQuest(), "rewards": map[string]any{"insight_xp": 120, "items": map[string]any{"spirit_herb": 5}}, "reason": "test",
+	}
+	if _, err := questSave(t, path, 7, unchanged); err != nil {
+		t.Fatalf("a shipped quest above the budget cannot be saved unchanged: %v", err)
+	}
+	raised := map[string]any{
+		"quest_key": "the_generous_bell", "title": "The Generous Bell",
+		"objectives": twoObjectiveQuest(), "rewards": map[string]any{"insight_xp": 130}, "reason": "test",
+	}
+	if _, err := questSave(t, path, 7, raised); err == nil {
+		t.Fatal("a raise from 120 to 130 insight, over the budget of 50, was saved")
+	}
+	moreItems := map[string]any{
+		"quest_key": "the_generous_bell", "title": "The Generous Bell",
+		"objectives": twoObjectiveQuest(), "rewards": map[string]any{"insight_xp": 120, "items": map[string]any{"spirit_herb": 6}}, "reason": "test",
+	}
+	if _, err := questSave(t, path, 7, moreItems); err == nil {
+		t.Fatal("six items against a budget of three, more than the row paid, was saved")
+	}
+	// The operator's key raises the budget, and the engine reads it.
+	t.Setenv("QUEST_REWARD_MAX_XP", "200")
+	if _, err := questSave(t, path, 7, raised); err != nil {
+		t.Fatalf("with QUEST_REWARD_MAX_XP=200 a raise to 130 was refused: %v", err)
+	}
+	if got := definitionField(t, path, "the_generous_bell", "rewards_json"); got != `{"insight_xp":130}` {
+		t.Fatalf("rewards_json=%s after the raise", got)
 	}
 }

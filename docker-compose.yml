@@ -5,7 +5,7 @@ services:
       dockerfile: go_core/Dockerfile
     container_name: xianxia-game-engine
     labels:
-      xianxia.release: "1.36.0"
+      xianxia.release: "1.37.0"
     restart: unless-stopped
     # The engine drains in-flight requests on SIGTERM (default 20s, see
     # ENGINE_SHUTDOWN_GRACE_SECONDS). Docker's default grace is 10s, which
@@ -56,6 +56,11 @@ services:
       # used to send its own setting on every explore; the engine reads it
       # here now, so it has to be passed.
       UNEXPECTED_EVENT_CHANCE_PERCENT: "${UNEXPECTED_EVENT_CHANCE_PERCENT:-28}"
+      # The GM reward budget (v1.37.0): the engine refuses a quest save that
+      # raises a reward over it; the bot and the dashboard read the same keys.
+      QUEST_REWARD_MAX_XP: "${QUEST_REWARD_MAX_XP:-50}"
+      QUEST_REWARD_MAX_STONES: "${QUEST_REWARD_MAX_STONES:-200}"
+      QUEST_REWARD_MAX_ITEMS: "${QUEST_REWARD_MAX_ITEMS:-3}"
       # Backups (v0.32.0): retention, size cap and the optional key that
       # seals every backup. docs/CONFIGURATION.md, "Backups".
       XIANXIA_BACKUP_KEEP_DAILY: "${XIANXIA_BACKUP_KEEP_DAILY:-14}"
@@ -94,7 +99,7 @@ services:
     build: .
     container_name: xianxia-roleplay-bot
     labels:
-      xianxia.release: "1.36.0"
+      xianxia.release: "1.37.0"
     restart: unless-stopped
     env_file:
       - .env

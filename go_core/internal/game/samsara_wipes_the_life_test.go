@@ -189,3 +189,43 @@ func TestReincarnationClearsThroughTheOneWipe(t *testing.T) {
 		t.Error("reincarnateAction keeps its own wipe loop; a table added to one list and not the other is how a rebirth kept a flame")
 	}
 }
+
+// The owner's word on what v1.36.0's table gate named open (v1.37.0): the old
+// body's residue and its sect ties go with it, the failed recruitment attempts
+// stay. Each table is created on production's DDL, foreign keys included, where
+// the fixture does not already carry it.
+var rebirthWipesTheseToo = []struct {
+	Table, Insert string
+}{
+	{"character_qi_body", `INSERT INTO character_qi_body(user_id) VALUES(42),(43)`},
+	{"alchemy_state", `INSERT INTO alchemy_state(user_id,updated_at) VALUES(42,0),(43,0)`},
+	{"alchemy_batches", `INSERT INTO alchemy_batches(user_id,recipe_name,quality,created_at) VALUES(42,'recovery_pill','fine',0),(43,'recovery_pill','fine',0)`},
+	{"wild_beast_encounters", `INSERT INTO wild_beast_encounters(user_id,species,location,expires_game_minute,created_at,updated_at) VALUES(42,'Wolf','Greenriver Town',100,0,0),(43,'Wolf','Greenriver Town',100,0,0)`},
+	{"sect_abodes", `INSERT INTO sect_abodes(user_id,sect_name,name,location_key,base_location,created_at,updated_at) VALUES(42,'Azure Cloud Sect','Lin''s Abode','abode:42','Greenriver Town',0,0),(43,'Azure Cloud Sect','Other Abode','abode:43','Greenriver Town',0,0)`},
+	{"sect_recommendations", `INSERT INTO sect_recommendations(user_id,npc_name,sect_name,created_at,updated_at) VALUES(42,'Elder Test Qiu','Azure Cloud Sect',0,0),(43,'Elder Test Qiu','Azure Cloud Sect',0,0)`},
+	{"expedition_threads", `INSERT INTO expedition_threads(guild_id,user_id,thread_id,parent_channel_id,created_at,updated_at) VALUES(1,42,1001,1,0,0),(1,43,1002,1,0,0)`},
+}
+
+func TestARebirthLeavesNeitherTheBodysResidueNorItsSectTies(t *testing.T) {
+	path := setupIncarnationDB(t, true)
+	for _, each := range rebirthWipesTheseToo {
+		createProductionTable(t, path, each.Table)
+		batch4Exec(t, path, each.Insert)
+	}
+	createProductionTable(t, path, "sect_recruitment_attempts")
+	batch4Exec(t, path, `INSERT INTO sect_recruitment_attempts(user_id,sect_name,attempt_type,result,created_at) VALUES(42,'Azure Cloud Sect','trial','failed',0)`)
+	if err := wipeFor(t, path, 42); err != nil {
+		t.Fatal(err)
+	}
+	for _, each := range rebirthWipesTheseToo {
+		if n := rowsFor(t, path, each.Table, 42); n != 0 {
+			t.Errorf("%s: a reincarnation left %d row(s) of the old body for the reborn soul", each.Table, n)
+		}
+		if n := rowsFor(t, path, each.Table, 43); n != 1 {
+			t.Errorf("%s: somebody else holds %d row(s) after the wipe, want 1: it is scoped to one soul", each.Table, n)
+		}
+	}
+	if n := rowsFor(t, path, "sect_recruitment_attempts", 42); n != 1 {
+		t.Errorf("sect_recruitment_attempts: %d row(s) after the rebirth, want 1 - the failed attempts pace the next, and a reborn soul does not re-roll a gate that refused it", n)
+	}
+}

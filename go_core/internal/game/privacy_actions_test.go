@@ -35,7 +35,7 @@ func setupErasureDB(t *testing.T) string {
 CREATE TABLE characters(user_id INTEGER PRIMARY KEY, name TEXT NOT NULL);
 CREATE TABLE scene_history(id INTEGER PRIMARY KEY, channel_id INTEGER, user_id INTEGER, content TEXT);
 CREATE TABLE rag_memories(memory_id INTEGER PRIMARY KEY, user_id INTEGER, summary TEXT);
-CREATE TABLE trade_offers(id INTEGER PRIMARY KEY, from_user_id INTEGER, to_user_id INTEGER);
+CREATE TABLE trade_offers(offer_id INTEGER PRIMARY KEY AUTOINCREMENT, from_user_id INTEGER NOT NULL, to_user_id INTEGER NOT NULL, location TEXT NOT NULL DEFAULT '', give_json TEXT NOT NULL DEFAULT '{}', give_stones INTEGER NOT NULL DEFAULT 0, want_json TEXT NOT NULL DEFAULT '{}', want_stones INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'open', created_game_minute INTEGER NOT NULL DEFAULT 0, expires_game_minute INTEGER NOT NULL DEFAULT 0, resolved_at REAL, created_at REAL NOT NULL DEFAULT 0, updated_at REAL NOT NULL DEFAULT 0);
 CREATE TABLE world_history_events(history_id INTEGER PRIMARY KEY, title TEXT, related_user_id INTEGER);
 CREATE TABLE player_families(family_id INTEGER PRIMARY KEY, name TEXT, founder_user_id INTEGER NOT NULL);
 CREATE TABLE quest_definitions(quest_id INTEGER PRIMARY KEY, title TEXT, owner_user_id INTEGER);

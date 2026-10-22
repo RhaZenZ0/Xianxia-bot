@@ -31,6 +31,14 @@ class RecordingEngine:
     async def authoritative_action(self, operation, actor_id, payload, *, action_id, expected_version=None):
         payload = dict(payload)
         self.calls.append((str(operation), int(actor_id), payload))
+        # v1.37.0: a talk is the engine's rule; the fake answers the row shape.
+        if operation == "npc.talk":
+            return {"result": {
+                "user_id": int(actor_id), "npc_name": payload["npc_name"],
+                "trust": 12, "respect": 7, "fear": 0, "affection": 0,
+                "debt": 0, "grudge": 0, "encounter_count": 1,
+                "last_summary": payload.get("summary", ""), "trust_gained": True,
+            }}
         # v0.22.0: accepting a quest is `commission.accept`. The real rules -
         # one at a time, the deadline, the locked terms - are Go's and are
         # covered by go_core/internal/game/commission_actions_test.go; the fake
@@ -53,19 +61,8 @@ class RecordingEngine:
         self.calls.append((str(operation), int(actor_id), payload))
         if operation == "scene.transition":
             return {"user_id": int(actor_id), **payload}
-        if operation == "relationship.update":
-            return {
-                "user_id": int(actor_id), "npc_name": payload["npc_name"],
-                "trust": 12, "respect": 7, "fear": 0, "affection": 0,
-                "debt": 0, "grudge": 0, "encounter_count": 1,
-                "last_summary": payload.get("summary", ""),
-            }
         if operation == "quest.progress":
             return {"touched": False, "complete": False, "progress": {}, **self.quest_extra}
-        if operation == "combat.apply_damage":
-            return {"vitality": 9, "vitality_max": 20}
-        if operation == "cultivation.reward":
-            return {"cultivation_awarded": 4}
         raise AssertionError(f"Unexpected authoritative operation: {operation}")
 
 
@@ -125,24 +122,25 @@ class CoreServiceTests(unittest.IsolatedAsyncioTestCase):
 
 
     async def test_authoritative_services_route_to_go_boundary_without_reimplementing_rules(self):
-        relationship = await self.relationships.record_encounter(
-            7001, "Elder Pine", summary="A respectful greeting.", deltas={"trust": 15}
+        relationship = await self.relationships.talk(
+            7001, "Elder Pine", summary="A respectful greeting.", action_id="test:talk"
         )
         self.assertEqual(relationship["trust"], 12)
+        talk_payload = next(call[2] for call in self.engine.calls if call[0] == "npc.talk")
+        # The bot states no number (v1.37.0): what a talk is worth is the engine's rule.
+        self.assertEqual(sorted(talk_payload), ["npc_name", "summary"])
 
         await self.quests.accept(7001, "road_to_a_sect", action_id="test:accept")
         changed = await self.quests.progress(7001, "explore", game_minute=110)
         self.assertEqual(changed, [])
 
-        combat = CombatService(self.db, engine=self.engine)
-        self.assertEqual((await combat.apply_damage(9, 7001, -5))["vitality"], 9)
         operations = [call[0] for call in self.engine.calls]
-        self.assertIn("relationship.update", operations)
+        self.assertIn("npc.talk", operations)
         self.assertIn("commission.accept", operations)
         self.assertIn("quest.progress", operations)
-        self.assertIn("combat.apply_damage", operations)
-        combat_payload = next(call[2] for call in self.engine.calls if call[0] == "combat.apply_damage")
-        self.assertEqual(combat_payload["damage"], 0)
+        # The damage door is a GM lever now (admin.player.apply_damage); the
+        # service that carried the legacy path no longer offers it.
+        self.assertFalse(hasattr(CombatService, "apply_damage"))
 
     def test_player_and_info_interfaces_are_wired(self):
         root = PROJECT_ROOT

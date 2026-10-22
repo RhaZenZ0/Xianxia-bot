@@ -933,6 +933,24 @@ var incarnationScopedLinks = []struct{ Table, Column string }{
 	{"player_family_invites", "invitee_user_id"},
 	{"family_children", "parent_user_id"},
 	{"player_family_members", "user_id"},
+	// What the table gate named open and the owner said goes (v1.37.0): the
+	// old body's residue - its qi body, its furnace and the batch brewing in
+	// it, the beast it was facing - the sect residence and recommendation it
+	// earned, the bond with a master among the sect's people (ended here by
+	// severNPCMasterTx since v1.34.0, in a function the gate could not read,
+	// so it stood listed as open for a release), and the Discord thread of
+	// its expedition, which the bot collects before the rebirth and deletes
+	// after (character.py). The failed recruitment attempts stay: they pace
+	// the next attempt, and a reborn soul does not get to re-roll a gate that
+	// refused it (samsaraKept).
+	{"character_qi_body", "user_id"},
+	{"alchemy_state", "user_id"},
+	{"alchemy_batches", "user_id"},
+	{"wild_beast_encounters", "user_id"},
+	{"sect_abodes", "user_id"},
+	{"sect_recommendations", "user_id"},
+	{"npc_mentorships", "disciple_user_id"},
+	{"expedition_threads", "user_id"},
 }
 
 // incarnationColumn is a column of the `characters` row that belongs to the
@@ -1016,12 +1034,11 @@ func clearIncarnationStateTx(conn *storage.Conn, userID int64) error {
 			return err
 		}
 	}
-	// The master among the sect's people is the old life's: the bond names the
-	// disciple by account and not by body, so it would otherwise go on paying
-	// its terms to a child who never knelt to anyone.
-	if _, err := severNPCMasterTx(conn, userID); err != nil {
-		return err
-	}
+	// The master among the sect's people is the old life's (v1.34.0): the bond
+	// names the disciple by account and not by body, so it would otherwise go
+	// on paying its terms to a child who never knelt to anyone. It is a line
+	// in incarnationScopedLinks (npc_mentorships) since v1.37.0, where the
+	// table gate reads it.
 	// And the shelf of player-keyed world_state rows (v1.34.0): the insight
 	// the last body banked, the stance it held, the clock its lifespan counted
 	// from. None is a user_id column, so none of the lists above could name it.

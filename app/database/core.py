@@ -27,7 +27,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 81
+SCHEMA_VERSION = 82
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -3348,6 +3348,20 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             # at 0 for everyone: what a settle already took cannot be told from
             # the body's own figure, so it is not recovered.
             "ALTER TABLE characters ADD COLUMN qi_max_bonus INTEGER NOT NULL DEFAULT 0",
+        ),
+    ),
+    (
+        82,
+        "a_talk_is_worth_one_trust_a_day",
+        (
+            # v1.37.0: /talk sent `trust: 1` through relationship.update on
+            # every exchange, so the bot decided what a conversation was worth
+            # and sixty talks in an afternoon made an old friend. The rule is
+            # the engine's now (npc.talk): one point of trust the first time a
+            # cultivator speaks with an NPC in a world day, read off this
+            # column. 0 for every pair that exists, so the first talk after
+            # the upgrade pays its point.
+            "ALTER TABLE npc_relationships ADD COLUMN last_talk_game_minute INTEGER NOT NULL DEFAULT 0",
         ),
     ),
 )

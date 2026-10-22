@@ -290,10 +290,10 @@ async def talk(
         faction=str(npc_data.get("sect_affiliation") or ""), source="talk",
         game_minute=wt_now.total_minutes,
     )
-    await NPC_RELATIONSHIPS.record_encounter(
+    await NPC_RELATIONSHIPS.talk(
         interaction.user.id, npc,
         summary=f"Player: {message[:220]} | {npc}: {answer[:360]}",
-        deltas={"trust": 1},
+        action_id=f"discord:{interaction.id}:npc.talk",
     )
     try:
         progressed = await record_quest_progress(interaction.user.id, "talk", target=npc, game_minute=wt_now.total_minutes)
