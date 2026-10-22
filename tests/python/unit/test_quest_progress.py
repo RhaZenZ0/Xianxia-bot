@@ -192,8 +192,8 @@ class EveryObjectiveSaysWhere(unittest.TestCase):
 
     def test_a_label_without_a_path_is_given_one(self) -> None:
         label = labelled_objective({"id": "a", "type": "talk", "label": "Speak with Bo Tan"})
-        self.assertEqual(label, "Speak with Bo Tan - **/npc → People → Talk**")
-        self.assertIn("**/npc → People → Talk**", next_objective_label([{"id": "a", "type": "talk", "label": "Speak with Bo Tan"}], {}))
+        self.assertEqual(label, "Speak with Bo Tan - **/world → People → Talk**")
+        self.assertIn("**/world → People → Talk**", next_objective_label([{"id": "a", "type": "talk", "label": "Speak with Bo Tan"}], {}))
 
     def test_a_label_that_names_its_door_is_left_alone(self) -> None:
         written = "Learn where a sect takes applicants - **/world → City → Envoys**"

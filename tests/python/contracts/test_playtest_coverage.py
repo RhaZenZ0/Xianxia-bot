@@ -260,6 +260,50 @@ class TheDiscordHalfPressesEveryLeaf(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertGreaterEqual(len(str(reason).strip()), 12, "a deferral carries its reason")
 
+    def test_every_refusal_the_sweep_meets_is_decided(self):
+        """The known limit v1.3.4 left open, closed in v1.38.0: a leaf
+        pressed into a designed refusal had only its refusal proved. The
+        sweep now carries two rosters - the leaves that must resolve, with
+        the state built for each, and the leaves whose refusal is the right
+        answer, with why - and fails a refusal in neither. Both name live
+        leaves only, share none, and leave the deferred ones alone."""
+        must = module_constant(DISCORD_SCRIPT, "MUST_RESOLVE")
+        accepted = module_constant(DISCORD_SCRIPT, "REFUSAL_ACCEPTED")
+        deferred = module_constant(DISCORD_SCRIPT, "DEFERRED_LEAVES")
+        live = live_leaves()
+        self.assertGreaterEqual(len(must), 5, "five leaves had only ever been refused when the roster was written")
+        for roster, name in ((must, "MUST_RESOLVE"), (accepted, "REFUSAL_ACCEPTED")):
+            self.assertIsInstance(roster, dict)
+            self.assertEqual(sorted(set(roster) - live), [], f"{name} names a leaf no hub reaches: stale")
+            for path, reason in roster.items():
+                with self.subTest(roster=name, path=path):
+                    self.assertGreaterEqual(len(str(reason).strip()), 12, "a roster entry carries its reason")
+        self.assertEqual(sorted(set(must) & set(accepted)), [], "a leaf cannot both have to resolve and be allowed its refusal")
+        self.assertEqual(sorted((set(must) | set(accepted)) & set(deferred)), [], "a deferred leaf is never pressed, so it is in no refusal roster")
+
+    def test_every_must_resolve_leaf_has_a_state_builder_and_the_sweep_runs_it(self):
+        """`STATE_BUILDERS` maps each must-resolve leaf to the coroutine that
+        builds its state before the press; a leaf in one and not the other
+        is a promise nobody is holding. Read by AST: the values are
+        functions, not literals."""
+        tree = ast.parse(DISCORD_SCRIPT.read_text(encoding="utf-8"))
+        builders = None
+        for node in tree.body:
+            if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == "STATE_BUILDERS":
+                self.assertIsInstance(node.value, ast.Dict)
+                builders = {key.value: value.id for key, value in zip(node.value.keys, node.value.values, strict=True)
+                            if isinstance(key, ast.Constant) and isinstance(value, ast.Name)}
+        self.assertIsNotNone(builders, "playtest_discord.py has no module-level STATE_BUILDERS")
+        must = module_constant(DISCORD_SCRIPT, "MUST_RESOLVE")
+        self.assertEqual(sorted(builders), sorted(must), "MUST_RESOLVE and STATE_BUILDERS name different leaves")
+        defined = {node.name for node in tree.body if isinstance(node, ast.AsyncFunctionDef)}
+        self.assertEqual(sorted(set(builders.values()) - defined), [], "a builder that is not an async def at module level")
+        text = DISCORD_SCRIPT.read_text(encoding="utf-8")
+        for marker in ("STATE_BUILDERS.get(action.path)", "refused where it must resolve",
+                       "in neither MUST_RESOLVE nor REFUSAL_ACCEPTED", "REFUSAL_MARK in note"):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, text, "the sweep no longer decides its refusals")
+
     def test_the_sweep_walks_the_live_definitions_and_holds_the_wiring(self):
         """The sweep is generic: it presses whatever the hubs register, so a
         new leaf is covered the day it is registered. The run itself holds

@@ -17,6 +17,7 @@ import unittest
 from app.rules.item_grades import split_item_grade
 from app.rules.progression_systems import PROFESSIONS
 from tests.support import PROJECT_ROOT
+from tests.support import cheapest_shelf_in_coin
 
 WORLD = json.loads((PROJECT_ROOT / "content" / "world.json").read_text(encoding="utf-8"))
 NARRATOR_NPC_FIELDS = ("personality", "speech", "want", "fear", "secret")
@@ -500,9 +501,19 @@ class CraftedGoodsHaveAMarketTests(unittest.TestCase):
             for item_id in (shop.get("buys") or {}):
                 if item_id in crafted:
                     bought.setdefault(item_id, set()).add(shop["world"])
+        # Where no whole coin of a world can pay for the good - the cheapest
+        # shelf anywhere, carried up the ladder, asks less than one of that
+        # world's coin - no keeper there can buy it (v1.34.0's ceiling), and
+        # a buy line would be dead content; the engine's gate
+        # (TestEveryKeeperBuyLinePays, v1.38.0) refuses one. Such a world is
+        # not stranded, it is priced out.
+        base_coin = {str(d["world"]): key for key, d in WORLD["currencies"].items() if int(d.get("tier") or 0) == 1}
         for item_id in sorted(crafted):
             with self.subTest(item=item_id):
-                stranded = sold.get(item_id, set()) - bought.get(item_id, set())
+                stranded = {
+                    world for world in sold.get(item_id, set()) - bought.get(item_id, set())
+                    if (cheapest_shelf_in_coin(WORLD, item_id, base_coin[world]) or 0) >= 1
+                }
                 self.assertEqual(stranded, set(),
                                  f"{item_id} is stocked in {sorted(stranded)} and bought by nobody there")
 

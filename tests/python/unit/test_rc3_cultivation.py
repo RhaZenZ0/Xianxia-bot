@@ -57,18 +57,19 @@ def _buttons(view) -> list:
     return out
 
 
-class TheMenuIsFourRowsOfFour(unittest.TestCase):
+class TheMenuIsFourRowsOfThree(unittest.TestCase):
     def test_the_groups_cover_every_hub_once_with_the_right_labels(self):
         surface, _ = _modules()
         grouped = [name for _, _, names in surface._MENU_GROUPS for name in names]
         self.assertEqual(sorted(grouped), sorted(d.name for d in surface._HUB_DEFINITIONS))
         self.assertEqual(len(grouped), len(set(grouped)))
         for _, _, names in surface._MENU_GROUPS:
-            self.assertEqual(len(names), 4)
-        self.assertEqual(surface._hub_label("npc"), "NPCs")
-        self.assertEqual(surface._hub_label("innerworld"), "Inner World")
-        # rc.13: the hub is /ascend, and says so - the quests are /quests.
-        self.assertEqual(surface._hub_label("ascend"), "Ascension")
+            self.assertEqual(len(names), 3, "four rows of three since the fold (v1.38.0)")
+        # v1.38.0: the two merged hubs read as their nouns, and the three
+        # labels the old table overrode (NPCs, Inner World, Ascension) are pages.
+        self.assertEqual(surface._hub_label("adventure"), "Adventure")
+        self.assertEqual(surface._hub_label("home"), "Home")
+        self.assertEqual(surface._HUB_LABELS, {})
         for name in grouped:
             self.assertLessEqual(len(surface._hub_label(name)), 20, name)
 
@@ -77,11 +78,12 @@ class TheMenuIsFourRowsOfFour(unittest.TestCase):
         surface._LAST_HUB.pop(7, None)
         plain = hubs._MENU_BUILDER(owner_id=7, is_admin=False, owner_name="T", facts="📍 **Greenriver Town**")
         labels = [b.label for b in _buttons(plain)]
-        # Sixteen hubs, the daily five (v1.3.2) and the tools row (v1.22.0).
-        self.assertEqual(len(labels), 16 + len(surface.DAILY_ACTIONS) + len(surface.MENU_TOOLS))
+        # Twelve hubs (v1.38.0; sixteen before the fold), the daily five
+        # (v1.3.2) and the tools row (v1.22.0).
+        self.assertEqual(len(labels), 12 + len(surface.DAILY_ACTIONS) + len(surface.MENU_TOOLS))
         self.assertNotIn("Begin", labels)
         admin = hubs._MENU_BUILDER(owner_id=7, is_admin=True, owner_name="T", facts="")
-        self.assertEqual(len(_buttons(admin)), 17 + len(surface.DAILY_ACTIONS) + len(surface.MENU_TOOLS))
+        self.assertEqual(len(_buttons(admin)), 13 + len(surface.DAILY_ACTIONS) + len(surface.MENU_TOOLS))  # twelve hubs and /admin
         fresh = hubs._MENU_BUILDER(owner_id=7, is_admin=False, owner_name="T", facts="🌱 No cultivator yet.")
         self.assertIn("Begin", [b.label for b in _buttons(fresh)])
         surface._LAST_HUB[7] = "world"

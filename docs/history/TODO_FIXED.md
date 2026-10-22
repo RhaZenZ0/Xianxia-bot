@@ -9,6 +9,44 @@ section in it.
 
 ## Fixed
 
+- **fixed (v1.38.0)** — *The rest of the menu layout.* Sixteen hubs are twelve and the seven
+  one-leaf pages are folded, on the Most-used commands card's data (`/ascend` 92 presses in thirty
+  days against 317 for `/cultivation`): Ascension into Cultivation (its Main Progression page dropped,
+  Cultivate already held the breakthrough), NPCs into World, Combat and Secret Realms into Adventure,
+  Abode and Inner World into Home; Inventory, Use Item and Provenance one Bag page, the Wallet the
+  first leaf of City Shops, General Crafting on Alchemy. Every leaf kept its path and its group name,
+  about ninety printed paths in code, content and the authoring script were renamed, and migration 83
+  carries the quest definitions and the terms players hold - in both spellings of the arrow
+  (docs/FINDINGS.md, "Twelve hubs, and two spellings of an arrow").
+- **fixed (v1.38.0)** — *The other hub-only groups.* The card's rule: a hub-only group is promoted to a
+  slash command at a hundred presses in thirty days. The first card put `perfect` (159), `aptitude`
+  (126) and `meridian` (113) over the line and left `seclusion` (88) and `alchemy` (84) under it; the
+  three are in `TREE_COMMANDS`, held there by `TheRaidsHaveSlashCommands`, and listed as acting by the
+  lockout test. The rule is written beside the tuple so the next card is read against it, not re-decided.
+- **fixed (v1.38.0)** — *The leaf sweep counts a leaf pressed into a designed refusal as covered.* The
+  sweep carries two rosters: `MUST_RESOLVE`, six leaves that had only ever been refused, each with a
+  `STATE_BUILDERS` coroutine that builds its state through the engine as the GM before the press
+  (`/bond dual_cultivate`, `/formation create`, `/market buy`, `/spirit settle`, `/abode establish`,
+  `/insight`), and `REFUSAL_ACCEPTED`, seven whose refusal is the right answer with why. A must-resolve
+  leaf that answers "❌" fails, and so does a refusal on a leaf in neither roster, naming both; the
+  coverage gate holds the rosters to live leaves, disjoint from each other and from the deferred
+  leaves, and every must-resolve leaf to a builder (docs/FINDINGS.md, "A refusal is decided").
+- **fixed (v1.38.0)** — *Upper-world keepers have thin boards.* A content pass: the 790 buy lines
+  that paid nothing once the ladder was read are gone and 242 lines buying each world's own goods are
+  authored in their place, every upper shop paying for at least two things. `TestEveryKeeperBuyLinePays`
+  holds every line to a whole coin and `TestAKeeperBoardListsOnlyWhatTheCounterWillPay` to the
+  board; the price gates walk the new lines against every shelf and every crafted good's makings
+  (docs/FINDINGS.md, "The upper boards pay").
+- **fixed (v1.38.0)** — *Ladder rounding at the upper posts.* `UnderworldBase` carries a Mortal base
+  up the ladder through `shelfPriceAcrossUp`, which rounds up on the climb, so the Immortal post's
+  peach is no longer one coin against the Mortal post's 17,712 stones' worth;
+  `TestAPostNeverUndercutsTheWorldBelow` walks every post against the world below it.
+- **fixed (v1.38.0)** — *A rival that held the gate when migration 74 ran was given the seat city.*
+  `admin.territory.set_controller` is built: a GM hands a territory to a sect in the catalogue or
+  makes it neutral, audited with `undo_last` reversing it, refused while an active war contests the
+  ground (a war ends through `war.act` or `war.peace`), with a public history row, a Territory card
+  on the dashboard and the engine playtest driving the hand, the undo and the refusal
+  (docs/FINDINGS.md, "A GM hands a city back").
 - **fixed (v1.37.0)** — *What a rebirth leaves of the last life.* The twenty-three columns
   `samsaraOpen` named carry the owner's decision: the old body's qi body, furnace residue and batch,
   the beast it faced, its sect residence and recommendation, its expedition thread and the bond with

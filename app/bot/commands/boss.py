@@ -153,7 +153,7 @@ def raid_card(encounter: dict[str, Any], *, events: list[str] | None = None, not
             f" • Cohesion **{int(formation.get('cohesion') or 0)}/100**"
         )
     elif party and not alone:
-        party_lines.append("-# No formation active: **/combat → Formations** sets one")
+        party_lines.append("-# No formation active: **/adventure → Formations** sets one")
     if party_lines:
         card.fields.append(("Party", "\n".join(party_lines)))
 
@@ -629,7 +629,7 @@ async def boss_template_autocomplete(interaction: discord.Interaction, current: 
 register_hub_option_hint(
     boss_start,
     "boss",
-    "No boss encounter is defined in the world content. **/combat → Boss Raids → List** shows the catalogue when there is one.",
+    "No boss encounter is defined in the world content. **/adventure → Boss Raids → List** shows the catalogue when there is one.",
 )
 
 
@@ -723,7 +723,7 @@ register_hub_option_provider(boss_claim, "encounter_id", claim_hub_options)
 register_hub_option_hint(
     boss_claim,
     "encounter_id",
-    "No raid reward is waiting for you. Win a boss raid under **/combat → Boss Raids → Start** first; the reward is claimed here afterwards.",
+    "No raid reward is waiting for you. Win a boss raid under **/adventure → Boss Raids → Start** first; the reward is claimed here afterwards.",
 )
 
 

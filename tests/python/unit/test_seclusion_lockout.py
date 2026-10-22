@@ -143,7 +143,7 @@ class TheAllowlistIsTheRealSurface(unittest.TestCase):
     def test_every_hub_is_named_and_no_name_is_stale(self):
         hubs, _ = self._surface()
         live = {definition.name for definition in hubs.REGISTERED_HUBS}
-        self.assertGreaterEqual(len(live), 17)
+        self.assertGreaterEqual(len(live), 13)
         self.assertEqual(seclusion.HUB_ROOTS, live,
                          "a hub whose panel cannot be opened hides the way out of a retreat")
 
@@ -159,7 +159,9 @@ class TheAllowlistIsTheRealSurface(unittest.TestCase):
         # three that always were, and the daily five (v1.3.2), each a hub
         # leaf the panel gate already refuses on the press.
         self.assertEqual(sorted(registered - seclusion.OPEN_COMMANDS - {"admin"}),
-                         sorted(["action", "begin", "tribute", "stall", "boss", "party", "body", "profession", "flame", "spirit", "breakthrough", *surface.DAILY_ACTIONS]))
+                         sorted(["action", "begin", "tribute", "stall", "boss", "party", "body", "profession", "flame", "spirit", "breakthrough",
+                                 # v1.38.0: the three the Most-used card put over a hundred presses
+                                 "perfect", "aptitude", "meridian", *surface.DAILY_ACTIONS]))
 
     def test_the_way_out_is_a_leaf_every_hub_walk_can_reach(self):
         hubs, _ = self._surface()

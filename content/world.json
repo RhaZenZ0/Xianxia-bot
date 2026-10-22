@@ -34838,7 +34838,7 @@
             "type": "ascension_gate",
             "target": "Spiritual World",
             "count": 1,
-            "label": "Anchor the seam where you survived it - **/ascend → Tribulation / Ascension → Gate**"
+            "label": "Anchor the seam where you survived it - **/cultivation → Tribulation / Ascension → Gate**"
           },
           {
             "id": "cross",
@@ -34862,7 +34862,7 @@
             "type": "ascension_gate",
             "target": "Immortal World",
             "count": 1,
-            "label": "Anchor the seam where you survived it - **/ascend → Tribulation / Ascension → Gate**"
+            "label": "Anchor the seam where you survived it - **/cultivation → Tribulation / Ascension → Gate**"
           },
           {
             "id": "cross",
@@ -34886,7 +34886,7 @@
             "type": "ascension_gate",
             "target": "Celestial World",
             "count": 1,
-            "label": "Anchor the seam where you survived it - **/ascend → Tribulation / Ascension → Gate**"
+            "label": "Anchor the seam where you survived it - **/cultivation → Tribulation / Ascension → Gate**"
           },
           {
             "id": "cross",
@@ -60442,18 +60442,14 @@
         }
       ],
       "buys": {
-        "spirit_iron": 2,
-        "beast_core": 3,
-        "spirit_iron_sword": 6,
-        "spirit_iron_armor": 7,
-        "spirit_crystal_ore": 4,
-        "immortal_gold_ore": 9,
-        "spirit_crystal_sword": 22,
         "immortal_gold_sabre": 45,
-        "azure_flying_sword": 122,
-        "spirit_crystal_mail": 22,
         "immortal_gold_plate": 56,
-        "spirit_iron_greaves": 6
+        "immortal_gold_plate_method": 271,
+        "immortal_gold_sabre_method": 224,
+        "starsteel_aegis": 210,
+        "starsteel_glaive": 175,
+        "starsteel_ore": 40,
+        "starsteel_sky_treader_boots": 255
       }
     },
     "adamant_body_array_workshop": {
@@ -60518,14 +60514,10 @@
         }
       ],
       "buys": {
-        "array_disk_blank": 4,
-        "formation_flags": 6,
-        "minor_qi_gathering_array_disk": 13,
-        "minor_warding_array_disk": 15,
-        "spirit_crystal_ore": 4,
-        "immortal_gold_ore": 9,
         "guiding_chalk_array": 5,
-        "golden_bastion_array": 55
+        "golden_bastion_array": 55,
+        "golden_bastion_array_method": 264,
+        "starfall_core_seal": 240
       }
     },
     "ashenwall_array_workshop": {
@@ -61235,14 +61227,13 @@
         }
       ],
       "buys": {
-        "array_disk_blank": 3,
-        "formation_flags": 4,
         "minor_qi_gathering_array_disk": 10,
-        "minor_warding_array_disk": 12,
-        "spirit_crystal_ore": 3,
         "guiding_chalk_array": 5,
         "moonveil_concealment_array": 27,
-        "crystal_spirit_gathering_array": 37
+        "crystal_spirit_gathering_array": 37,
+        "crystal_spirit_gathering_array_method": 180,
+        "moonveil_concealment_array_method": 132,
+        "steppe_bone_token": 204
       }
     },
     "broken_halo_provisions": {
@@ -61301,13 +61292,10 @@
         }
       ],
       "buys": {
-        "spirit_herb": 1,
-        "spirit_iron": 1,
-        "beast_core": 3,
-        "talisman_paper": 1,
-        "moonveil_herb": 3,
         "wind_gourd": 45,
-        "moonveil_recovery_pill": 15
+        "dawnlotus_herb": 13,
+        "dawnlotus_vitality_pill": 56,
+        "spatial_pouch": 27
       }
     },
     "celestial_mandate_forge": {
@@ -61498,32 +61486,15 @@
         }
       ],
       "buys": {
-        "spirit_iron": 3,
-        "beast_core": 6,
-        "spirit_iron_sword": 10,
-        "spirit_iron_armor": 12,
-        "spirit_crystal_ore": 7,
-        "immortal_gold_ore": 15,
-        "starsteel_ore": 30,
-        "spirit_crystal_sword": 37,
-        "immortal_gold_sabre": 75,
         "starsteel_glaive": 150,
-        "azure_flying_sword": 189,
-        "spirit_crystal_mail": 22,
-        "immortal_gold_plate": 56,
         "starsteel_aegis": 140,
-        "spirit_iron_sword@mid": 20,
-        "spirit_iron_armor@mid": 24,
-        "spirit_crystal_sword@mid": 74,
-        "immortal_gold_sabre@mid": 150,
         "starsteel_glaive@mid": 300,
-        "spirit_crystal_mail@mid": 44,
-        "immortal_gold_plate@mid": 112,
         "starsteel_aegis@mid": 280,
-        "spirit_iron_greaves": 10,
         "starsteel_sky_treader_boots": 169,
-        "spirit_iron_greaves@mid": 20,
-        "starsteel_sky_treader_boots@mid": 338
+        "starsteel_sky_treader_boots@mid": 338,
+        "starsteel_aegis_method": 674,
+        "starsteel_glaive_method": 562,
+        "starsteel_sky_treader_boots_method": 816
       }
     },
     "celestial_mandate_apothecary": {
@@ -61726,38 +61697,16 @@
         }
       ],
       "buys": {
-        "spirit_herb": 2,
-        "fire_spirit_root_herb": 10,
-        "beast_core": 6,
-        "recovery_pill": 10,
-        "qi_pill": 10,
-        "moonveil_herb": 6,
-        "dawnlotus_herb": 12,
-        "heavenpetal_herb": 25,
-        "heart_calming_pill": 5,
-        "qi_replenishment_pill": 5,
         "longevity_pill": 117,
-        "moonveil_recovery_pill": 15,
-        "spirit_condensation_pill": 17,
-        "dawnlotus_vitality_pill": 37,
-        "immortal_marrow_pill": 44,
         "heavenpetal_elixir": 93,
         "starlight_dao_pill": 109,
-        "recovery_pill@mid": 20,
-        "qi_pill@mid": 20,
-        "heart_calming_pill@mid": 10,
-        "qi_replenishment_pill@mid": 10,
         "longevity_pill@mid": 234,
-        "moonveil_recovery_pill@mid": 30,
-        "spirit_condensation_pill@mid": 34,
-        "dawnlotus_vitality_pill@mid": 74,
-        "immortal_marrow_pill@mid": 88,
         "heavenpetal_elixir@mid": 186,
         "starlight_dao_pill@mid": 218,
         "marrow_tempering_pill": 40,
         "marrow_tempering_pill@mid": 80,
-        "bone_tempering_pill": 10,
-        "iron_blood_pill": 17
+        "heavenpetal_elixir_method": 448,
+        "starlight_dao_pill_method": 524
       }
     },
     "celestial_mandate_talisman_hall": {
@@ -61906,26 +61855,13 @@
         }
       ],
       "buys": {
-        "talisman_paper": 2,
-        "spirit_ink": 3,
-        "swift_wind_talisman": 10,
-        "stone_skin_talisman": 11,
-        "crystal_ward_talisman": 30,
-        "golden_edge_talisman": 60,
         "starfall_talisman": 96,
-        "paper_crane_charm": 52,
         "void_stride_talisman": 770,
-        "spirit_focus_talisman": 6,
-        "swift_wind_talisman@mid": 20,
-        "stone_skin_talisman@mid": 22,
-        "crystal_ward_talisman@mid": 60,
-        "golden_edge_talisman@mid": 120,
         "starfall_talisman@mid": 192,
-        "spirit_focus_talisman@mid": 12,
-        "gilded_heart_ward_talisman": 150,
         "heaven_stepping_talisman": 160,
-        "gilded_heart_ward_talisman@mid": 300,
-        "heaven_stepping_talisman@mid": 320
+        "heaven_stepping_talisman@mid": 320,
+        "heaven_stepping_talisman_method": 384,
+        "starfall_talisman_method": 230
       }
     },
     "celestial_mandate_provisions": {
@@ -62038,19 +61974,7 @@
         }
       ],
       "buys": {
-        "spirit_herb": 2,
-        "spirit_iron": 3,
-        "beast_core": 6,
-        "talisman_paper": 2,
-        "moonveil_herb": 6,
-        "dawnlotus_herb": 12,
-        "heavenpetal_herb": 25,
-        "wind_gourd": 94,
-        "moonveil_recovery_pill": 15,
-        "dawnlotus_vitality_pill": 37,
         "heavenpetal_elixir": 93,
-        "moonveil_recovery_pill@mid": 30,
-        "dawnlotus_vitality_pill@mid": 74,
         "heavenpetal_elixir@mid": 186
       }
     },
@@ -62116,13 +62040,8 @@
         }
       ],
       "buys": {
-        "beast_core": 5,
-        "spirit_herb": 2,
-        "fire_spirit_root_herb": 8,
-        "spirit_crystal_ore": 6,
-        "immortal_gold_ore": 12,
-        "starsteel_ore": 24,
-        "crane_saddle_token": 402
+        "crane_saddle_token": 402,
+        "heavenpetal_elixir": 1
       }
     },
     "celestial_river_apothecary": {
@@ -62259,26 +62178,12 @@
         }
       ],
       "buys": {
-        "spirit_herb": 2,
-        "fire_spirit_root_herb": 8,
-        "beast_core": 5,
-        "recovery_pill": 8,
-        "qi_pill": 8,
-        "moonveil_herb": 5,
-        "dawnlotus_herb": 10,
-        "heavenpetal_herb": 20,
-        "heart_calming_pill": 5,
-        "qi_replenishment_pill": 5,
         "longevity_pill": 117,
-        "moonveil_recovery_pill": 15,
-        "spirit_condensation_pill": 17,
-        "dawnlotus_vitality_pill": 37,
-        "immortal_marrow_pill": 44,
         "heavenpetal_elixir": 93,
         "starlight_dao_pill": 109,
         "marrow_tempering_pill": 40,
-        "bone_tempering_pill": 8,
-        "iron_blood_pill": 17
+        "heavenpetal_elixir_method": 448,
+        "starlight_dao_pill_method": 524
       }
     },
     "cloudblade_forge": {
@@ -62473,15 +62378,12 @@
         }
       ],
       "buys": {
-        "spirit_iron": 1,
-        "beast_core": 3,
-        "spirit_iron_sword": 4,
-        "spirit_iron_armor": 6,
-        "spirit_crystal_ore": 3,
-        "spirit_crystal_sword": 18,
         "azure_flying_sword": 91,
-        "spirit_crystal_mail": 22,
-        "spirit_iron_greaves": 5
+        "immortal_gold_ore": 16,
+        "immortal_gold_plate": 84,
+        "immortal_gold_sabre": 70,
+        "spirit_crystal_mail_method": 109,
+        "spirit_crystal_sword_method": 90
       }
     },
     "cloudedge_talisman_hall": {
@@ -62546,13 +62448,9 @@
         }
       ],
       "buys": {
-        "talisman_paper": 1,
-        "spirit_ink": 1,
-        "swift_wind_talisman": 4,
-        "stone_skin_talisman": 5,
-        "crystal_ward_talisman": 14,
-        "paper_crane_charm": 25,
-        "spirit_focus_talisman": 6
+        "crystal_ward_talisman_method": 57,
+        "gilded_heart_ward_talisman": 69,
+        "golden_edge_talisman": 46
       }
     },
     "divine_herb_apothecary": {
@@ -62689,26 +62587,12 @@
         }
       ],
       "buys": {
-        "spirit_herb": 2,
-        "fire_spirit_root_herb": 8,
-        "beast_core": 5,
-        "recovery_pill": 8,
-        "qi_pill": 8,
-        "moonveil_herb": 5,
-        "dawnlotus_herb": 10,
-        "heavenpetal_herb": 20,
-        "heart_calming_pill": 5,
-        "qi_replenishment_pill": 5,
         "longevity_pill": 117,
-        "moonveil_recovery_pill": 15,
-        "spirit_condensation_pill": 17,
-        "dawnlotus_vitality_pill": 37,
-        "immortal_marrow_pill": 44,
         "heavenpetal_elixir": 93,
         "starlight_dao_pill": 109,
         "marrow_tempering_pill": 40,
-        "bone_tempering_pill": 8,
-        "iron_blood_pill": 17
+        "heavenpetal_elixir_method": 448,
+        "starlight_dao_pill_method": 524
       }
     },
     "divine_herb_talisman_hall": {
@@ -62809,18 +62693,11 @@
         }
       ],
       "buys": {
-        "talisman_paper": 2,
-        "spirit_ink": 3,
-        "swift_wind_talisman": 8,
-        "stone_skin_talisman": 9,
-        "crystal_ward_talisman": 24,
-        "golden_edge_talisman": 48,
         "starfall_talisman": 96,
-        "paper_crane_charm": 42,
         "void_stride_talisman": 630,
-        "spirit_focus_talisman": 6,
-        "gilded_heart_ward_talisman": 120,
-        "heaven_stepping_talisman": 160
+        "heaven_stepping_talisman": 160,
+        "heaven_stepping_talisman_method": 384,
+        "starfall_talisman_method": 230
       }
     },
     "emberforge_smithy": {
@@ -62972,14 +62849,10 @@
         }
       ],
       "buys": {
-        "array_disk_blank": 4,
-        "formation_flags": 6,
-        "minor_qi_gathering_array_disk": 13,
-        "minor_warding_array_disk": 15,
-        "spirit_crystal_ore": 4,
-        "immortal_gold_ore": 9,
         "guiding_chalk_array": 5,
-        "golden_bastion_array": 55
+        "golden_bastion_array": 55,
+        "golden_bastion_array_method": 264,
+        "starfall_core_seal": 240
       }
     },
     "fallen_star_provisions": {
@@ -63056,15 +62929,8 @@
         }
       ],
       "buys": {
-        "spirit_herb": 1,
-        "spirit_iron": 2,
-        "beast_core": 3,
-        "talisman_paper": 1,
-        "moonveil_herb": 3,
-        "dawnlotus_herb": 7,
-        "wind_gourd": 61,
-        "moonveil_recovery_pill": 15,
-        "dawnlotus_vitality_pill": 37
+        "heavenpetal_elixir": 135,
+        "heavenpetal_herb": 34
       }
     },
     "firmament_blade_forge": {
@@ -63195,22 +63061,12 @@
         }
       ],
       "buys": {
-        "spirit_iron": 3,
-        "beast_core": 5,
-        "spirit_iron_sword": 8,
-        "spirit_iron_armor": 10,
-        "spirit_crystal_ore": 6,
-        "immortal_gold_ore": 12,
-        "starsteel_ore": 24,
-        "spirit_crystal_sword": 30,
-        "immortal_gold_sabre": 60,
         "starsteel_glaive": 120,
-        "azure_flying_sword": 154,
-        "spirit_crystal_mail": 22,
-        "immortal_gold_plate": 56,
         "starsteel_aegis": 140,
-        "spirit_iron_greaves": 8,
-        "starsteel_sky_treader_boots": 169
+        "starsteel_sky_treader_boots": 169,
+        "starsteel_aegis_method": 674,
+        "starsteel_glaive_method": 562,
+        "starsteel_sky_treader_boots_method": 816
       }
     },
     "firmament_blade_talisman_hall": {
@@ -63311,18 +63167,11 @@
         }
       ],
       "buys": {
-        "talisman_paper": 2,
-        "spirit_ink": 3,
-        "swift_wind_talisman": 8,
-        "stone_skin_talisman": 9,
-        "crystal_ward_talisman": 24,
-        "golden_edge_talisman": 48,
         "starfall_talisman": 96,
-        "paper_crane_charm": 42,
         "void_stride_talisman": 630,
-        "spirit_focus_talisman": 6,
-        "gilded_heart_ward_talisman": 120,
-        "heaven_stepping_talisman": 160
+        "heaven_stepping_talisman": 160,
+        "heaven_stepping_talisman_method": 384,
+        "starfall_talisman_method": 230
       }
     },
     "four_roads_provisions": {
@@ -63479,17 +63328,8 @@
         }
       ],
       "buys": {
-        "spirit_herb": 2,
-        "spirit_iron": 3,
-        "beast_core": 5,
-        "talisman_paper": 2,
-        "moonveil_herb": 5,
-        "dawnlotus_herb": 10,
-        "heavenpetal_herb": 20,
-        "wind_gourd": 77,
-        "moonveil_recovery_pill": 15,
-        "dawnlotus_vitality_pill": 37,
-        "heavenpetal_elixir": 93
+        "heavenpetal_elixir": 93,
+        "longevity_pill": 1
       }
     },
     "froststar_talisman_hall": {
@@ -63590,18 +63430,11 @@
         }
       ],
       "buys": {
-        "talisman_paper": 2,
-        "spirit_ink": 3,
-        "swift_wind_talisman": 8,
-        "stone_skin_talisman": 9,
-        "crystal_ward_talisman": 24,
-        "golden_edge_talisman": 48,
         "starfall_talisman": 96,
-        "paper_crane_charm": 42,
         "void_stride_talisman": 630,
-        "spirit_focus_talisman": 6,
-        "gilded_heart_ward_talisman": 120,
-        "heaven_stepping_talisman": 160
+        "heaven_stepping_talisman": 160,
+        "heaven_stepping_talisman_method": 384,
+        "starfall_talisman_method": 230
       }
     },
     "frostwatch_provisions": {
@@ -63767,13 +63600,10 @@
         }
       ],
       "buys": {
-        "spirit_herb": 1,
-        "spirit_iron": 1,
-        "beast_core": 3,
-        "talisman_paper": 1,
-        "moonveil_herb": 3,
         "wind_gourd": 45,
-        "moonveil_recovery_pill": 15
+        "dawnlotus_herb": 13,
+        "dawnlotus_vitality_pill": 56,
+        "spatial_pouch": 27
       }
     },
     "galevein_beast_hall": {
@@ -63820,10 +63650,8 @@
         }
       ],
       "buys": {
-        "beast_core": 3,
-        "spirit_herb": 1,
         "fire_spirit_root_herb": 4,
-        "spirit_crystal_ore": 3
+        "azure_flying_sword": 1
       }
     },
     "golden_spear_forge": {
@@ -63924,18 +63752,14 @@
         }
       ],
       "buys": {
-        "spirit_iron": 2,
-        "beast_core": 3,
-        "spirit_iron_sword": 6,
-        "spirit_iron_armor": 7,
-        "spirit_crystal_ore": 4,
-        "immortal_gold_ore": 9,
-        "spirit_crystal_sword": 22,
         "immortal_gold_sabre": 45,
-        "azure_flying_sword": 122,
-        "spirit_crystal_mail": 22,
         "immortal_gold_plate": 56,
-        "spirit_iron_greaves": 6
+        "immortal_gold_plate_method": 271,
+        "immortal_gold_sabre_method": 224,
+        "starsteel_aegis": 210,
+        "starsteel_glaive": 175,
+        "starsteel_ore": 40,
+        "starsteel_sky_treader_boots": 255
       }
     },
     "golden_spear_provisions": {
@@ -64012,15 +63836,8 @@
         }
       ],
       "buys": {
-        "spirit_herb": 1,
-        "spirit_iron": 2,
-        "beast_core": 3,
-        "talisman_paper": 1,
-        "moonveil_herb": 3,
-        "dawnlotus_herb": 7,
-        "wind_gourd": 61,
-        "moonveil_recovery_pill": 15,
-        "dawnlotus_vitality_pill": 37
+        "heavenpetal_elixir": 135,
+        "heavenpetal_herb": 34
       }
     },
     "greenriver_apothecary": {
@@ -64248,18 +64065,14 @@
         }
       ],
       "buys": {
-        "spirit_iron": 2,
-        "beast_core": 3,
-        "spirit_iron_sword": 6,
-        "spirit_iron_armor": 7,
-        "spirit_crystal_ore": 4,
-        "immortal_gold_ore": 9,
-        "spirit_crystal_sword": 22,
         "immortal_gold_sabre": 45,
-        "azure_flying_sword": 122,
-        "spirit_crystal_mail": 22,
         "immortal_gold_plate": 56,
-        "spirit_iron_greaves": 6
+        "immortal_gold_plate_method": 271,
+        "immortal_gold_sabre_method": 224,
+        "starsteel_aegis": 210,
+        "starsteel_glaive": 175,
+        "starsteel_ore": 40,
+        "starsteel_sky_treader_boots": 255
       }
     },
     "heavenblade_talisman_hall": {
@@ -64342,15 +64155,12 @@
         }
       ],
       "buys": {
-        "talisman_paper": 1,
-        "spirit_ink": 2,
-        "swift_wind_talisman": 6,
-        "stone_skin_talisman": 6,
-        "crystal_ward_talisman": 18,
-        "golden_edge_talisman": 36,
-        "paper_crane_charm": 33,
-        "spirit_focus_talisman": 6,
-        "gilded_heart_ward_talisman": 90
+        "gilded_heart_ward_talisman": 90,
+        "gilded_heart_ward_talisman_method": 288,
+        "golden_edge_talisman_method": 115,
+        "heaven_stepping_talisman": 160,
+        "starfall_talisman": 91,
+        "void_stride_talisman": 1080
       }
     },
     "hundred_herb_apothecary": {
@@ -64439,19 +64249,14 @@
         }
       ],
       "buys": {
-        "spirit_herb": 1,
         "fire_spirit_root_herb": 4,
-        "beast_core": 3,
-        "recovery_pill": 4,
-        "qi_pill": 4,
-        "moonveil_herb": 3,
-        "heart_calming_pill": 5,
-        "qi_replenishment_pill": 5,
-        "moonveil_recovery_pill": 15,
-        "spirit_condensation_pill": 17,
         "marrow_tempering_pill": 40,
-        "bone_tempering_pill": 4,
-        "iron_blood_pill": 17
+        "dawnlotus_herb": 13,
+        "dawnlotus_vitality_pill": 56,
+        "immortal_marrow_pill": 66,
+        "moonveil_recovery_pill_method": 73,
+        "purging_phoenix_pill": 9,
+        "spirit_condensation_pill_method": 84
       }
     },
     "hundred_herb_talisman_hall": {
@@ -64516,13 +64321,9 @@
         }
       ],
       "buys": {
-        "talisman_paper": 1,
-        "spirit_ink": 1,
-        "swift_wind_talisman": 4,
-        "stone_skin_talisman": 5,
-        "crystal_ward_talisman": 14,
-        "paper_crane_charm": 25,
-        "spirit_focus_talisman": 6
+        "crystal_ward_talisman_method": 57,
+        "gilded_heart_ward_talisman": 69,
+        "golden_edge_talisman": 46
       }
     },
     "immortal_river_beast_hall": {
@@ -64581,12 +64382,8 @@
         }
       ],
       "buys": {
-        "beast_core": 3,
-        "spirit_herb": 1,
-        "fire_spirit_root_herb": 6,
-        "spirit_crystal_ore": 4,
-        "immortal_gold_ore": 9,
-        "crane_saddle_token": 315
+        "crane_saddle_token": 315,
+        "gilded_heart_ward_talisman": 1
       }
     },
     "immortal_river_apothecary": {
@@ -64699,22 +64496,14 @@
         }
       ],
       "buys": {
-        "spirit_herb": 1,
-        "fire_spirit_root_herb": 6,
-        "beast_core": 3,
-        "recovery_pill": 6,
-        "qi_pill": 6,
-        "moonveil_herb": 3,
-        "dawnlotus_herb": 7,
-        "heart_calming_pill": 5,
-        "qi_replenishment_pill": 5,
-        "moonveil_recovery_pill": 15,
-        "spirit_condensation_pill": 17,
-        "dawnlotus_vitality_pill": 37,
         "immortal_marrow_pill": 44,
         "marrow_tempering_pill": 40,
-        "bone_tempering_pill": 6,
-        "iron_blood_pill": 17
+        "dawnlotus_vitality_pill_method": 180,
+        "heavenpetal_elixir": 135,
+        "heavenpetal_herb": 34,
+        "immortal_marrow_pill_method": 211,
+        "longevity_pill": 175,
+        "starlight_dao_pill": 163
       }
     },
     "ironbanner_forge": {
@@ -64914,22 +64703,14 @@
         }
       ],
       "buys": {
-        "spirit_herb": 1,
-        "fire_spirit_root_herb": 6,
-        "beast_core": 3,
-        "recovery_pill": 6,
-        "qi_pill": 6,
-        "moonveil_herb": 3,
-        "dawnlotus_herb": 7,
-        "heart_calming_pill": 5,
-        "qi_replenishment_pill": 5,
-        "moonveil_recovery_pill": 15,
-        "spirit_condensation_pill": 17,
-        "dawnlotus_vitality_pill": 37,
         "immortal_marrow_pill": 44,
         "marrow_tempering_pill": 40,
-        "bone_tempering_pill": 6,
-        "iron_blood_pill": 17
+        "dawnlotus_vitality_pill_method": 180,
+        "heavenpetal_elixir": 135,
+        "heavenpetal_herb": 34,
+        "immortal_marrow_pill_method": 211,
+        "longevity_pill": 175,
+        "starlight_dao_pill": 163
       }
     },
     "jade_cauldron_talisman_hall": {
@@ -65012,15 +64793,12 @@
         }
       ],
       "buys": {
-        "talisman_paper": 1,
-        "spirit_ink": 2,
-        "swift_wind_talisman": 6,
-        "stone_skin_talisman": 6,
-        "crystal_ward_talisman": 18,
-        "golden_edge_talisman": 36,
-        "paper_crane_charm": 33,
-        "spirit_focus_talisman": 6,
-        "gilded_heart_ward_talisman": 90
+        "gilded_heart_ward_talisman": 90,
+        "gilded_heart_ward_talisman_method": 288,
+        "golden_edge_talisman_method": 115,
+        "heaven_stepping_talisman": 160,
+        "starfall_talisman": 91,
+        "void_stride_talisman": 1080
       }
     },
     "jade_crown_provisions": {
@@ -65079,13 +64857,10 @@
         }
       ],
       "buys": {
-        "spirit_herb": 1,
-        "spirit_iron": 1,
-        "beast_core": 3,
-        "talisman_paper": 1,
-        "moonveil_herb": 3,
         "wind_gourd": 45,
-        "moonveil_recovery_pill": 15
+        "dawnlotus_herb": 13,
+        "dawnlotus_vitality_pill": 56,
+        "spatial_pouch": 27
       }
     },
     "jade_crown_talisman_hall": {
@@ -65150,13 +64925,9 @@
         }
       ],
       "buys": {
-        "talisman_paper": 1,
-        "spirit_ink": 1,
-        "swift_wind_talisman": 4,
-        "stone_skin_talisman": 5,
-        "crystal_ward_talisman": 14,
-        "paper_crane_charm": 25,
-        "spirit_focus_talisman": 6
+        "crystal_ward_talisman_method": 57,
+        "gilded_heart_ward_talisman": 69,
+        "golden_edge_talisman": 46
       }
     },
     "jadeflow_beast_hall": {
@@ -65203,10 +64974,8 @@
         }
       ],
       "buys": {
-        "beast_core": 3,
-        "spirit_herb": 1,
         "fire_spirit_root_herb": 4,
-        "spirit_crystal_ore": 3
+        "azure_flying_sword": 1
       }
     },
     "jadeflow_apothecary": {
@@ -65295,19 +65064,14 @@
         }
       ],
       "buys": {
-        "spirit_herb": 1,
         "fire_spirit_root_herb": 4,
-        "beast_core": 3,
-        "recovery_pill": 4,
-        "qi_pill": 4,
-        "moonveil_herb": 3,
-        "heart_calming_pill": 5,
-        "qi_replenishment_pill": 5,
-        "moonveil_recovery_pill": 15,
-        "spirit_condensation_pill": 17,
         "marrow_tempering_pill": 40,
-        "bone_tempering_pill": 4,
-        "iron_blood_pill": 17
+        "dawnlotus_herb": 13,
+        "dawnlotus_vitality_pill": 56,
+        "immortal_marrow_pill": 66,
+        "moonveil_recovery_pill_method": 73,
+        "purging_phoenix_pill": 9,
+        "spirit_condensation_pill_method": 84
       }
     },
     "jadewood_apothecary": {
@@ -65566,18 +65330,11 @@
         }
       ],
       "buys": {
-        "talisman_paper": 2,
-        "spirit_ink": 3,
-        "swift_wind_talisman": 8,
-        "stone_skin_talisman": 9,
-        "crystal_ward_talisman": 24,
-        "golden_edge_talisman": 48,
         "starfall_talisman": 96,
-        "paper_crane_charm": 42,
         "void_stride_talisman": 630,
-        "spirit_focus_talisman": 6,
-        "gilded_heart_ward_talisman": 120,
-        "heaven_stepping_talisman": 160
+        "heaven_stepping_talisman": 160,
+        "heaven_stepping_talisman_method": 384,
+        "starfall_talisman_method": 230
       }
     },
     "lunar_shadow_apothecary": {
@@ -65714,26 +65471,12 @@
         }
       ],
       "buys": {
-        "spirit_herb": 2,
-        "fire_spirit_root_herb": 8,
-        "beast_core": 5,
-        "recovery_pill": 8,
-        "qi_pill": 8,
-        "moonveil_herb": 5,
-        "dawnlotus_herb": 10,
-        "heavenpetal_herb": 20,
-        "heart_calming_pill": 5,
-        "qi_replenishment_pill": 5,
         "longevity_pill": 117,
-        "moonveil_recovery_pill": 15,
-        "spirit_condensation_pill": 17,
-        "dawnlotus_vitality_pill": 37,
-        "immortal_marrow_pill": 44,
         "heavenpetal_elixir": 93,
         "starlight_dao_pill": 109,
         "marrow_tempering_pill": 40,
-        "bone_tempering_pill": 8,
-        "iron_blood_pill": 17
+        "heavenpetal_elixir_method": 448,
+        "starlight_dao_pill_method": 524
       }
     },
     "lunar_veil_talisman_hall": {
@@ -65816,15 +65559,12 @@
         }
       ],
       "buys": {
-        "talisman_paper": 1,
-        "spirit_ink": 2,
-        "swift_wind_talisman": 6,
-        "stone_skin_talisman": 6,
-        "crystal_ward_talisman": 18,
-        "golden_edge_talisman": 36,
-        "paper_crane_charm": 33,
-        "spirit_focus_talisman": 6,
-        "gilded_heart_ward_talisman": 90
+        "gilded_heart_ward_talisman": 90,
+        "gilded_heart_ward_talisman_method": 288,
+        "golden_edge_talisman_method": 115,
+        "heaven_stepping_talisman": 160,
+        "starfall_talisman": 91,
+        "void_stride_talisman": 1080
       }
     },
     "lunar_veil_apothecary": {
@@ -65937,22 +65677,14 @@
         }
       ],
       "buys": {
-        "spirit_herb": 1,
-        "fire_spirit_root_herb": 6,
-        "beast_core": 3,
-        "recovery_pill": 6,
-        "qi_pill": 6,
-        "moonveil_herb": 3,
-        "dawnlotus_herb": 7,
-        "heart_calming_pill": 5,
-        "qi_replenishment_pill": 5,
-        "moonveil_recovery_pill": 15,
-        "spirit_condensation_pill": 17,
-        "dawnlotus_vitality_pill": 37,
         "immortal_marrow_pill": 44,
         "marrow_tempering_pill": 40,
-        "bone_tempering_pill": 6,
-        "iron_blood_pill": 17
+        "dawnlotus_vitality_pill_method": 180,
+        "heavenpetal_elixir": 135,
+        "heavenpetal_herb": 34,
+        "immortal_marrow_pill_method": 211,
+        "longevity_pill": 175,
+        "starlight_dao_pill": 163
       }
     },
     "mandate_crown_provisions": {
@@ -66041,17 +65773,8 @@
         }
       ],
       "buys": {
-        "spirit_herb": 2,
-        "spirit_iron": 3,
-        "beast_core": 5,
-        "talisman_paper": 2,
-        "moonveil_herb": 5,
-        "dawnlotus_herb": 10,
-        "heavenpetal_herb": 20,
-        "wind_gourd": 77,
-        "moonveil_recovery_pill": 15,
-        "dawnlotus_vitality_pill": 37,
-        "heavenpetal_elixir": 93
+        "heavenpetal_elixir": 93,
+        "longevity_pill": 1
       }
     },
     "mandate_crown_talisman_hall": {
@@ -66152,18 +65875,11 @@
         }
       ],
       "buys": {
-        "talisman_paper": 2,
-        "spirit_ink": 3,
-        "swift_wind_talisman": 8,
-        "stone_skin_talisman": 9,
-        "crystal_ward_talisman": 24,
-        "golden_edge_talisman": 48,
         "starfall_talisman": 96,
-        "paper_crane_charm": 42,
         "void_stride_talisman": 630,
-        "spirit_focus_talisman": 6,
-        "gilded_heart_ward_talisman": 120,
-        "heaven_stepping_talisman": 160
+        "heaven_stepping_talisman": 160,
+        "heaven_stepping_talisman_method": 384,
+        "starfall_talisman_method": 230
       }
     },
     "mandate_spear_forge": {
@@ -66294,22 +66010,12 @@
         }
       ],
       "buys": {
-        "spirit_iron": 3,
-        "beast_core": 5,
-        "spirit_iron_sword": 8,
-        "spirit_iron_armor": 10,
-        "spirit_crystal_ore": 6,
-        "immortal_gold_ore": 12,
-        "starsteel_ore": 24,
-        "spirit_crystal_sword": 30,
-        "immortal_gold_sabre": 60,
         "starsteel_glaive": 120,
-        "azure_flying_sword": 154,
-        "spirit_crystal_mail": 22,
-        "immortal_gold_plate": 56,
         "starsteel_aegis": 140,
-        "spirit_iron_greaves": 8,
-        "starsteel_sky_treader_boots": 169
+        "starsteel_sky_treader_boots": 169,
+        "starsteel_aegis_method": 674,
+        "starsteel_glaive_method": 562,
+        "starsteel_sky_treader_boots_method": 816
       }
     },
     "mandate_spear_provisions": {
@@ -66398,17 +66104,8 @@
         }
       ],
       "buys": {
-        "spirit_herb": 2,
-        "spirit_iron": 3,
-        "beast_core": 5,
-        "talisman_paper": 2,
-        "moonveil_herb": 5,
-        "dawnlotus_herb": 10,
-        "heavenpetal_herb": 20,
-        "wind_gourd": 77,
-        "moonveil_recovery_pill": 15,
-        "dawnlotus_vitality_pill": 37,
-        "heavenpetal_elixir": 93
+        "heavenpetal_elixir": 93,
+        "longevity_pill": 1
       }
     },
     "moonfen_talisman_hall": {
@@ -66631,13 +66328,9 @@
         }
       ],
       "buys": {
-        "talisman_paper": 1,
-        "spirit_ink": 1,
-        "swift_wind_talisman": 4,
-        "stone_skin_talisman": 5,
-        "crystal_ward_talisman": 14,
-        "paper_crane_charm": 25,
-        "spirit_focus_talisman": 6
+        "crystal_ward_talisman_method": 57,
+        "gilded_heart_ward_talisman": 69,
+        "golden_edge_talisman": 46
       }
     },
     "moonfrost_apothecary": {
@@ -66726,19 +66419,14 @@
         }
       ],
       "buys": {
-        "spirit_herb": 1,
         "fire_spirit_root_herb": 4,
-        "beast_core": 3,
-        "recovery_pill": 4,
-        "qi_pill": 4,
-        "moonveil_herb": 3,
-        "heart_calming_pill": 5,
-        "qi_replenishment_pill": 5,
-        "moonveil_recovery_pill": 15,
-        "spirit_condensation_pill": 17,
         "marrow_tempering_pill": 40,
-        "bone_tempering_pill": 4,
-        "iron_blood_pill": 17
+        "dawnlotus_herb": 13,
+        "dawnlotus_vitality_pill": 56,
+        "immortal_marrow_pill": 66,
+        "moonveil_recovery_pill_method": 73,
+        "purging_phoenix_pill": 9,
+        "spirit_condensation_pill_method": 84
       }
     },
     "nine_heavens_forge": {
@@ -66923,32 +66611,19 @@
         }
       ],
       "buys": {
-        "spirit_iron": 2,
-        "beast_core": 4,
-        "spirit_iron_sword": 7,
-        "spirit_iron_armor": 9,
-        "spirit_crystal_ore": 5,
-        "immortal_gold_ore": 11,
         "starsteel_ore": 22,
-        "spirit_crystal_sword": 28,
         "immortal_gold_sabre": 56,
         "starsteel_glaive": 112,
-        "azure_flying_sword": 154,
-        "spirit_crystal_mail": 22,
         "immortal_gold_plate": 56,
         "starsteel_aegis": 140,
-        "spirit_iron_sword@mid": 14,
-        "spirit_iron_armor@mid": 18,
-        "spirit_crystal_sword@mid": 56,
         "immortal_gold_sabre@mid": 112,
         "starsteel_glaive@mid": 224,
-        "spirit_crystal_mail@mid": 44,
         "immortal_gold_plate@mid": 112,
         "starsteel_aegis@mid": 280,
-        "spirit_iron_greaves": 8,
         "starsteel_sky_treader_boots": 169,
-        "spirit_iron_greaves@mid": 16,
-        "starsteel_sky_treader_boots@mid": 338
+        "starsteel_sky_treader_boots@mid": 338,
+        "immortal_gold_plate_method": 271,
+        "immortal_gold_sabre_method": 224
       }
     },
     "nine_heavens_apothecary": {
@@ -67151,38 +66826,20 @@
         }
       ],
       "buys": {
-        "spirit_herb": 1,
-        "fire_spirit_root_herb": 7,
-        "beast_core": 4,
-        "recovery_pill": 7,
-        "qi_pill": 7,
-        "moonveil_herb": 4,
-        "dawnlotus_herb": 9,
         "heavenpetal_herb": 18,
-        "heart_calming_pill": 5,
-        "qi_replenishment_pill": 5,
         "longevity_pill": 117,
-        "moonveil_recovery_pill": 15,
-        "spirit_condensation_pill": 17,
-        "dawnlotus_vitality_pill": 37,
         "immortal_marrow_pill": 44,
         "heavenpetal_elixir": 93,
         "starlight_dao_pill": 109,
-        "recovery_pill@mid": 14,
-        "qi_pill@mid": 14,
-        "heart_calming_pill@mid": 10,
-        "qi_replenishment_pill@mid": 10,
         "longevity_pill@mid": 234,
-        "moonveil_recovery_pill@mid": 30,
-        "spirit_condensation_pill@mid": 34,
         "dawnlotus_vitality_pill@mid": 74,
         "immortal_marrow_pill@mid": 88,
         "heavenpetal_elixir@mid": 186,
         "starlight_dao_pill@mid": 218,
         "marrow_tempering_pill": 40,
         "marrow_tempering_pill@mid": 80,
-        "bone_tempering_pill": 7,
-        "iron_blood_pill": 17
+        "dawnlotus_vitality_pill_method": 180,
+        "immortal_marrow_pill_method": 211
       }
     },
     "nine_heavens_talisman_hall": {
@@ -67331,26 +66988,16 @@
         }
       ],
       "buys": {
-        "talisman_paper": 1,
-        "spirit_ink": 2,
-        "swift_wind_talisman": 7,
-        "stone_skin_talisman": 8,
-        "crystal_ward_talisman": 22,
-        "golden_edge_talisman": 45,
         "starfall_talisman": 90,
-        "paper_crane_charm": 42,
         "void_stride_talisman": 630,
-        "spirit_focus_talisman": 6,
-        "swift_wind_talisman@mid": 14,
-        "stone_skin_talisman@mid": 16,
-        "crystal_ward_talisman@mid": 44,
         "golden_edge_talisman@mid": 90,
         "starfall_talisman@mid": 180,
-        "spirit_focus_talisman@mid": 12,
         "gilded_heart_ward_talisman": 112,
         "heaven_stepping_talisman": 150,
         "gilded_heart_ward_talisman@mid": 224,
-        "heaven_stepping_talisman@mid": 300
+        "heaven_stepping_talisman@mid": 300,
+        "gilded_heart_ward_talisman_method": 288,
+        "golden_edge_talisman_method": 115
       }
     },
     "nine_heavens_provisions": {
@@ -67463,18 +67110,8 @@
         }
       ],
       "buys": {
-        "spirit_herb": 1,
-        "spirit_iron": 2,
-        "beast_core": 4,
-        "talisman_paper": 1,
-        "moonveil_herb": 4,
-        "dawnlotus_herb": 9,
         "heavenpetal_herb": 18,
-        "wind_gourd": 77,
-        "moonveil_recovery_pill": 15,
-        "dawnlotus_vitality_pill": 37,
         "heavenpetal_elixir": 93,
-        "moonveil_recovery_pill@mid": 30,
         "dawnlotus_vitality_pill@mid": 74,
         "heavenpetal_elixir@mid": 186
       }
@@ -67553,15 +67190,8 @@
         }
       ],
       "buys": {
-        "spirit_herb": 1,
-        "spirit_iron": 2,
-        "beast_core": 3,
-        "talisman_paper": 1,
-        "moonveil_herb": 3,
-        "dawnlotus_herb": 7,
-        "wind_gourd": 61,
-        "moonveil_recovery_pill": 15,
-        "dawnlotus_vitality_pill": 37
+        "heavenpetal_elixir": 135,
+        "heavenpetal_herb": 34
       }
     },
     "ninefold_noble_talisman_hall": {
@@ -67644,15 +67274,12 @@
         }
       ],
       "buys": {
-        "talisman_paper": 1,
-        "spirit_ink": 2,
-        "swift_wind_talisman": 6,
-        "stone_skin_talisman": 6,
-        "crystal_ward_talisman": 18,
-        "golden_edge_talisman": 36,
-        "paper_crane_charm": 33,
-        "spirit_focus_talisman": 6,
-        "gilded_heart_ward_talisman": 90
+        "gilded_heart_ward_talisman": 90,
+        "gilded_heart_ward_talisman_method": 288,
+        "golden_edge_talisman_method": 115,
+        "heaven_stepping_talisman": 160,
+        "starfall_talisman": 91,
+        "void_stride_talisman": 1080
       }
     },
     "northwind_provisions": {
@@ -67711,13 +67338,10 @@
         }
       ],
       "buys": {
-        "spirit_herb": 1,
-        "spirit_iron": 1,
-        "beast_core": 3,
-        "talisman_paper": 1,
-        "moonveil_herb": 3,
         "wind_gourd": 45,
-        "moonveil_recovery_pill": 15
+        "dawnlotus_herb": 13,
+        "dawnlotus_vitality_pill": 56,
+        "spatial_pouch": 27
       }
     },
     "northwind_talisman_hall": {
@@ -67782,13 +67406,9 @@
         }
       ],
       "buys": {
-        "talisman_paper": 1,
-        "spirit_ink": 1,
-        "swift_wind_talisman": 4,
-        "stone_skin_talisman": 5,
-        "crystal_ward_talisman": 14,
-        "paper_crane_charm": 25,
-        "spirit_focus_talisman": 6
+        "crystal_ward_talisman_method": 57,
+        "gilded_heart_ward_talisman": 69,
+        "golden_edge_talisman": 46
       }
     },
     "polar_gate_provisions": {
@@ -67865,15 +67485,8 @@
         }
       ],
       "buys": {
-        "spirit_herb": 1,
-        "spirit_iron": 2,
-        "beast_core": 3,
-        "talisman_paper": 1,
-        "moonveil_herb": 3,
-        "dawnlotus_herb": 7,
-        "wind_gourd": 61,
-        "moonveil_recovery_pill": 15,
-        "dawnlotus_vitality_pill": 37
+        "heavenpetal_elixir": 135,
+        "heavenpetal_herb": 34
       }
     },
     "polar_gate_talisman_hall": {
@@ -67956,15 +67569,12 @@
         }
       ],
       "buys": {
-        "talisman_paper": 1,
-        "spirit_ink": 2,
-        "swift_wind_talisman": 6,
-        "stone_skin_talisman": 6,
-        "crystal_ward_talisman": 18,
-        "golden_edge_talisman": 36,
-        "paper_crane_charm": 33,
-        "spirit_focus_talisman": 6,
-        "gilded_heart_ward_talisman": 90
+        "gilded_heart_ward_talisman": 90,
+        "gilded_heart_ward_talisman_method": 288,
+        "golden_edge_talisman_method": 115,
+        "heaven_stepping_talisman": 160,
+        "starfall_talisman": 91,
+        "void_stride_talisman": 1080
       }
     },
     "riverguard_beast_hall": {
@@ -68160,16 +67770,12 @@
         }
       ],
       "buys": {
-        "array_disk_blank": 6,
-        "formation_flags": 8,
-        "minor_qi_gathering_array_disk": 18,
-        "minor_warding_array_disk": 20,
-        "spirit_crystal_ore": 6,
-        "immortal_gold_ore": 12,
-        "starsteel_ore": 24,
         "guiding_chalk_array": 5,
         "starfall_bulwark_array": 110,
-        "nine_star_heaven_lock_array": 160
+        "nine_star_heaven_lock_array": 160,
+        "firmament_shard_key": 288,
+        "nine_star_heaven_lock_array_method": 768,
+        "starfall_bulwark_array_method": 528
       }
     },
     "ruined_constellation_provisions": {
@@ -68258,17 +67864,8 @@
         }
       ],
       "buys": {
-        "spirit_herb": 2,
-        "spirit_iron": 3,
-        "beast_core": 5,
-        "talisman_paper": 2,
-        "moonveil_herb": 5,
-        "dawnlotus_herb": 10,
-        "heavenpetal_herb": 20,
-        "wind_gourd": 77,
-        "moonveil_recovery_pill": 15,
-        "dawnlotus_vitality_pill": 37,
-        "heavenpetal_elixir": 93
+        "heavenpetal_elixir": 93,
+        "longevity_pill": 1
       }
     },
     "skyroad_provisions": {
@@ -68345,15 +67942,8 @@
         }
       ],
       "buys": {
-        "spirit_herb": 1,
-        "spirit_iron": 2,
-        "beast_core": 3,
-        "talisman_paper": 1,
-        "moonveil_herb": 3,
-        "dawnlotus_herb": 7,
-        "wind_gourd": 61,
-        "moonveil_recovery_pill": 15,
-        "dawnlotus_vitality_pill": 37
+        "heavenpetal_elixir": 135,
+        "heavenpetal_herb": 34
       }
     },
     "skyroad_beast_hall": {
@@ -68412,12 +68002,8 @@
         }
       ],
       "buys": {
-        "beast_core": 3,
-        "spirit_herb": 1,
-        "fire_spirit_root_herb": 6,
-        "spirit_crystal_ore": 4,
-        "immortal_gold_ore": 9,
-        "crane_saddle_token": 315
+        "crane_saddle_token": 315,
+        "gilded_heart_ward_talisman": 1
       }
     },
     "solar_crucible_smithy": {
@@ -68548,22 +68134,12 @@
         }
       ],
       "buys": {
-        "spirit_iron": 3,
-        "beast_core": 5,
-        "spirit_iron_sword": 8,
-        "spirit_iron_armor": 10,
-        "spirit_crystal_ore": 6,
-        "immortal_gold_ore": 12,
-        "starsteel_ore": 24,
-        "spirit_crystal_sword": 30,
-        "immortal_gold_sabre": 60,
         "starsteel_glaive": 120,
-        "azure_flying_sword": 154,
-        "spirit_crystal_mail": 22,
-        "immortal_gold_plate": 56,
         "starsteel_aegis": 140,
-        "spirit_iron_greaves": 8,
-        "starsteel_sky_treader_boots": 169
+        "starsteel_sky_treader_boots": 169,
+        "starsteel_aegis_method": 674,
+        "starsteel_glaive_method": 562,
+        "starsteel_sky_treader_boots_method": 816
       }
     },
     "solar_crucible_provisions": {
@@ -68652,17 +68228,8 @@
         }
       ],
       "buys": {
-        "spirit_herb": 2,
-        "spirit_iron": 3,
-        "beast_core": 5,
-        "talisman_paper": 2,
-        "moonveil_herb": 5,
-        "dawnlotus_herb": 10,
-        "heavenpetal_herb": 20,
-        "wind_gourd": 77,
-        "moonveil_recovery_pill": 15,
-        "dawnlotus_vitality_pill": 37,
-        "heavenpetal_elixir": 93
+        "heavenpetal_elixir": 93,
+        "longevity_pill": 1
       }
     },
     "solar_furnace_smithy": {
@@ -68763,18 +68330,14 @@
         }
       ],
       "buys": {
-        "spirit_iron": 2,
-        "beast_core": 3,
-        "spirit_iron_sword": 6,
-        "spirit_iron_armor": 7,
-        "spirit_crystal_ore": 4,
-        "immortal_gold_ore": 9,
-        "spirit_crystal_sword": 22,
         "immortal_gold_sabre": 45,
-        "azure_flying_sword": 122,
-        "spirit_crystal_mail": 22,
         "immortal_gold_plate": 56,
-        "spirit_iron_greaves": 6
+        "immortal_gold_plate_method": 271,
+        "immortal_gold_sabre_method": 224,
+        "starsteel_aegis": 210,
+        "starsteel_glaive": 175,
+        "starsteel_ore": 40,
+        "starsteel_sky_treader_boots": 255
       }
     },
     "solar_furnace_provisions": {
@@ -68851,15 +68414,8 @@
         }
       ],
       "buys": {
-        "spirit_herb": 1,
-        "spirit_iron": 2,
-        "beast_core": 3,
-        "talisman_paper": 1,
-        "moonveil_herb": 3,
-        "dawnlotus_herb": 7,
-        "wind_gourd": 61,
-        "moonveil_recovery_pill": 15,
-        "dawnlotus_vitality_pill": 37
+        "heavenpetal_elixir": 135,
+        "heavenpetal_herb": 34
       }
     },
     "spearwall_forge": {
@@ -68936,15 +68492,12 @@
         }
       ],
       "buys": {
-        "spirit_iron": 1,
-        "beast_core": 3,
-        "spirit_iron_sword": 4,
-        "spirit_iron_armor": 6,
-        "spirit_crystal_ore": 3,
-        "spirit_crystal_sword": 18,
         "azure_flying_sword": 91,
-        "spirit_crystal_mail": 22,
-        "spirit_iron_greaves": 5
+        "immortal_gold_ore": 16,
+        "immortal_gold_plate": 84,
+        "immortal_gold_sabre": 70,
+        "spirit_crystal_mail_method": 109,
+        "spirit_crystal_sword_method": 90
       }
     },
     "spearwall_provisions": {
@@ -69003,13 +68556,10 @@
         }
       ],
       "buys": {
-        "spirit_herb": 1,
-        "spirit_iron": 1,
-        "beast_core": 3,
-        "talisman_paper": 1,
-        "moonveil_herb": 3,
         "wind_gourd": 45,
-        "moonveil_recovery_pill": 15
+        "dawnlotus_herb": 13,
+        "dawnlotus_vitality_pill": 56,
+        "spatial_pouch": 27
       }
     },
     "spirit_jade_forge": {
@@ -69152,25 +68702,15 @@
         }
       ],
       "buys": {
-        "spirit_iron": 2,
-        "beast_core": 3,
-        "spirit_iron_sword": 6,
-        "spirit_iron_armor": 7,
-        "spirit_crystal_ore": 4,
         "immortal_gold_ore": 9,
-        "spirit_crystal_sword": 22,
         "immortal_gold_sabre": 45,
         "azure_flying_sword": 122,
-        "spirit_crystal_mail": 22,
         "immortal_gold_plate": 56,
-        "spirit_iron_sword@mid": 12,
-        "spirit_iron_armor@mid": 14,
-        "spirit_crystal_sword@mid": 44,
         "immortal_gold_sabre@mid": 90,
         "spirit_crystal_mail@mid": 44,
         "immortal_gold_plate@mid": 112,
-        "spirit_iron_greaves": 6,
-        "spirit_iron_greaves@mid": 12
+        "spirit_crystal_mail_method": 109,
+        "spirit_crystal_sword_method": 90
       }
     },
     "spirit_jade_apothecary": {
@@ -69331,31 +68871,17 @@
         }
       ],
       "buys": {
-        "spirit_herb": 1,
         "fire_spirit_root_herb": 6,
-        "beast_core": 3,
-        "recovery_pill": 6,
-        "qi_pill": 6,
-        "moonveil_herb": 3,
         "dawnlotus_herb": 7,
-        "heart_calming_pill": 5,
-        "qi_replenishment_pill": 5,
-        "moonveil_recovery_pill": 15,
-        "spirit_condensation_pill": 17,
         "dawnlotus_vitality_pill": 37,
         "immortal_marrow_pill": 44,
-        "recovery_pill@mid": 12,
-        "qi_pill@mid": 12,
-        "heart_calming_pill@mid": 10,
-        "qi_replenishment_pill@mid": 10,
-        "moonveil_recovery_pill@mid": 30,
-        "spirit_condensation_pill@mid": 34,
         "dawnlotus_vitality_pill@mid": 74,
         "immortal_marrow_pill@mid": 88,
         "marrow_tempering_pill": 40,
         "marrow_tempering_pill@mid": 80,
-        "bone_tempering_pill": 6,
-        "iron_blood_pill": 17
+        "moonveil_recovery_pill_method": 73,
+        "purging_phoenix_pill": 9,
+        "spirit_condensation_pill_method": 84
       }
     },
     "spirit_jade_talisman_hall": {
@@ -69468,21 +68994,11 @@
         }
       ],
       "buys": {
-        "talisman_paper": 1,
-        "spirit_ink": 2,
-        "swift_wind_talisman": 6,
-        "stone_skin_talisman": 6,
-        "crystal_ward_talisman": 18,
         "golden_edge_talisman": 36,
-        "paper_crane_charm": 33,
-        "spirit_focus_talisman": 6,
-        "swift_wind_talisman@mid": 12,
-        "stone_skin_talisman@mid": 12,
-        "crystal_ward_talisman@mid": 36,
         "golden_edge_talisman@mid": 72,
-        "spirit_focus_talisman@mid": 12,
         "gilded_heart_ward_talisman": 90,
-        "gilded_heart_ward_talisman@mid": 180
+        "gilded_heart_ward_talisman@mid": 180,
+        "crystal_ward_talisman_method": 57
       }
     },
     "spirit_jade_provisions": {
@@ -69577,17 +69093,11 @@
         }
       ],
       "buys": {
-        "spirit_herb": 1,
-        "spirit_iron": 2,
-        "beast_core": 3,
-        "talisman_paper": 1,
-        "moonveil_herb": 3,
         "dawnlotus_herb": 7,
         "wind_gourd": 61,
-        "moonveil_recovery_pill": 15,
         "dawnlotus_vitality_pill": 37,
-        "moonveil_recovery_pill@mid": 30,
-        "dawnlotus_vitality_pill@mid": 74
+        "dawnlotus_vitality_pill@mid": 74,
+        "spatial_pouch": 27
       }
     },
     "starroad_provisions": {
@@ -69676,17 +69186,8 @@
         }
       ],
       "buys": {
-        "spirit_herb": 2,
-        "spirit_iron": 3,
-        "beast_core": 5,
-        "talisman_paper": 2,
-        "moonveil_herb": 5,
-        "dawnlotus_herb": 10,
-        "heavenpetal_herb": 20,
-        "wind_gourd": 77,
-        "moonveil_recovery_pill": 15,
-        "dawnlotus_vitality_pill": 37,
-        "heavenpetal_elixir": 93
+        "heavenpetal_elixir": 93,
+        "longevity_pill": 1
       }
     },
     "starroad_beast_hall": {
@@ -69751,13 +69252,8 @@
         }
       ],
       "buys": {
-        "beast_core": 5,
-        "spirit_herb": 2,
-        "fire_spirit_root_herb": 8,
-        "spirit_crystal_ore": 6,
-        "immortal_gold_ore": 12,
-        "starsteel_ore": 24,
-        "crane_saddle_token": 402
+        "crane_saddle_token": 402,
+        "heavenpetal_elixir": 1
       }
     },
     "stoneback_forge": {
@@ -69967,15 +69463,12 @@
         }
       ],
       "buys": {
-        "spirit_iron": 1,
-        "beast_core": 3,
-        "spirit_iron_sword": 4,
-        "spirit_iron_armor": 6,
-        "spirit_crystal_ore": 3,
-        "spirit_crystal_sword": 18,
         "azure_flying_sword": 91,
-        "spirit_crystal_mail": 22,
-        "spirit_iron_greaves": 5
+        "immortal_gold_ore": 16,
+        "immortal_gold_plate": 84,
+        "immortal_gold_sabre": 70,
+        "spirit_crystal_mail_method": 109,
+        "spirit_crystal_sword_method": 90
       }
     },
     "stoneheart_array_workshop": {
@@ -70040,14 +69533,13 @@
         }
       ],
       "buys": {
-        "array_disk_blank": 3,
-        "formation_flags": 4,
         "minor_qi_gathering_array_disk": 10,
-        "minor_warding_array_disk": 12,
-        "spirit_crystal_ore": 3,
         "guiding_chalk_array": 5,
         "moonveil_concealment_array": 27,
-        "crystal_spirit_gathering_array": 37
+        "crystal_spirit_gathering_array": 37,
+        "crystal_spirit_gathering_array_method": 180,
+        "moonveil_concealment_array_method": 132,
+        "steppe_bone_token": 204
       }
     },
     "vermilion_furnace_smithy": {
@@ -70124,15 +69616,12 @@
         }
       ],
       "buys": {
-        "spirit_iron": 1,
-        "beast_core": 3,
-        "spirit_iron_sword": 4,
-        "spirit_iron_armor": 6,
-        "spirit_crystal_ore": 3,
-        "spirit_crystal_sword": 18,
         "azure_flying_sword": 91,
-        "spirit_crystal_mail": 22,
-        "spirit_iron_greaves": 5
+        "immortal_gold_ore": 16,
+        "immortal_gold_plate": 84,
+        "immortal_gold_sabre": 70,
+        "spirit_crystal_mail_method": 109,
+        "spirit_crystal_sword_method": 90
       }
     },
     "vermilion_furnace_provisions": {
@@ -70191,13 +69680,10 @@
         }
       ],
       "buys": {
-        "spirit_herb": 1,
-        "spirit_iron": 1,
-        "beast_core": 3,
-        "talisman_paper": 1,
-        "moonveil_herb": 3,
         "wind_gourd": 45,
-        "moonveil_recovery_pill": 15
+        "dawnlotus_herb": 13,
+        "dawnlotus_vitality_pill": 56,
+        "spatial_pouch": 27
       }
     },
     "worldstone_forge": {
@@ -70328,22 +69814,12 @@
         }
       ],
       "buys": {
-        "spirit_iron": 3,
-        "beast_core": 5,
-        "spirit_iron_sword": 8,
-        "spirit_iron_armor": 10,
-        "spirit_crystal_ore": 6,
-        "immortal_gold_ore": 12,
-        "starsteel_ore": 24,
-        "spirit_crystal_sword": 30,
-        "immortal_gold_sabre": 60,
         "starsteel_glaive": 120,
-        "azure_flying_sword": 154,
-        "spirit_crystal_mail": 22,
-        "immortal_gold_plate": 56,
         "starsteel_aegis": 140,
-        "spirit_iron_greaves": 8,
-        "starsteel_sky_treader_boots": 169
+        "starsteel_sky_treader_boots": 169,
+        "starsteel_aegis_method": 674,
+        "starsteel_glaive_method": 562,
+        "starsteel_sky_treader_boots_method": 816
       }
     },
     "worldstone_array_workshop": {
@@ -70420,16 +69896,12 @@
         }
       ],
       "buys": {
-        "array_disk_blank": 6,
-        "formation_flags": 8,
-        "minor_qi_gathering_array_disk": 18,
-        "minor_warding_array_disk": 20,
-        "spirit_crystal_ore": 6,
-        "immortal_gold_ore": 12,
-        "starsteel_ore": 24,
         "guiding_chalk_array": 5,
         "starfall_bulwark_array": 110,
-        "nine_star_heaven_lock_array": 160
+        "nine_star_heaven_lock_array": 160,
+        "firmament_shard_key": 288,
+        "nine_star_heaven_lock_array_method": 768,
+        "starfall_bulwark_array_method": 528
       }
     },
     "halfmoon_waystation": {
@@ -70482,10 +69954,8 @@
         }
       ],
       "buys": {
-        "beast_core": 3,
-        "spirit_herb": 1,
-        "spirit_iron": 2,
-        "cloudskiff_boat": 182
+        "cloudskiff_boat": 182,
+        "gilded_heart_ward_talisman": 1
       }
     },
     "grey_mule_waystation": {
@@ -70630,9 +70100,8 @@
         }
       ],
       "buys": {
-        "beast_core": 2,
-        "spirit_herb": 1,
-        "spirit_iron": 1
+        "azure_flying_sword": 1,
+        "fire_spirit_root_herb": 9
       }
     },
     "broken_axle_waystation": {
@@ -70685,10 +70154,8 @@
         }
       ],
       "buys": {
-        "beast_core": 4,
-        "spirit_herb": 1,
-        "spirit_iron": 2,
-        "cloudskiff_boat": 227
+        "cloudskiff_boat": 227,
+        "heavenpetal_elixir": 1
       }
     },
     "red_kite_waystation": {
@@ -70741,10 +70208,8 @@
         }
       ],
       "buys": {
-        "beast_core": 4,
-        "spirit_herb": 1,
-        "spirit_iron": 2,
-        "cloudskiff_boat": 227
+        "cloudskiff_boat": 227,
+        "heavenpetal_elixir": 1
       }
     },
     "salt_cart_waystation": {
@@ -70846,10 +70311,8 @@
         }
       ],
       "buys": {
-        "beast_core": 4,
-        "spirit_herb": 1,
-        "spirit_iron": 2,
-        "cloudskiff_boat": 227
+        "cloudskiff_boat": 227,
+        "heavenpetal_elixir": 1
       }
     },
     "willow_ford_waystation": {
@@ -70896,9 +70359,8 @@
         }
       ],
       "buys": {
-        "beast_core": 2,
-        "spirit_herb": 1,
-        "spirit_iron": 1
+        "azure_flying_sword": 1,
+        "fire_spirit_root_herb": 9
       }
     },
     "iron_kettle_waystation": {
@@ -70951,10 +70413,8 @@
         }
       ],
       "buys": {
-        "beast_core": 3,
-        "spirit_herb": 1,
-        "spirit_iron": 2,
-        "cloudskiff_boat": 182
+        "cloudskiff_boat": 182,
+        "gilded_heart_ward_talisman": 1
       }
     },
     "dust_road_waystation": {
@@ -71007,10 +70467,8 @@
         }
       ],
       "buys": {
-        "beast_core": 3,
-        "spirit_herb": 1,
-        "spirit_iron": 2,
-        "cloudskiff_boat": 182
+        "cloudskiff_boat": 182,
+        "gilded_heart_ward_talisman": 1
       }
     },
     "blue_tile_waystation": {
@@ -71106,9 +70564,8 @@
         }
       ],
       "buys": {
-        "beast_core": 2,
-        "spirit_herb": 1,
-        "spirit_iron": 1
+        "azure_flying_sword": 1,
+        "fire_spirit_root_herb": 9
       }
     },
     "crow_s_rest_waystation": {
@@ -71161,10 +70618,8 @@
         }
       ],
       "buys": {
-        "beast_core": 3,
-        "spirit_herb": 1,
-        "spirit_iron": 2,
-        "cloudskiff_boat": 182
+        "cloudskiff_boat": 182,
+        "gilded_heart_ward_talisman": 1
       }
     },
     "two_bridges_waystation": {
@@ -71217,10 +70672,8 @@
         }
       ],
       "buys": {
-        "beast_core": 4,
-        "spirit_herb": 1,
-        "spirit_iron": 2,
-        "cloudskiff_boat": 227
+        "cloudskiff_boat": 227,
+        "heavenpetal_elixir": 1
       }
     },
     "yellow_gourd_waystation": {
@@ -71267,9 +70720,8 @@
         }
       ],
       "buys": {
-        "beast_core": 2,
-        "spirit_herb": 1,
-        "spirit_iron": 1
+        "azure_flying_sword": 1,
+        "fire_spirit_root_herb": 9
       }
     }
   },
@@ -73896,7 +73348,7 @@
           "id": "speak",
           "type": "talk",
           "count": 1,
-          "label": "Say something to somebody - **/npc → People → Talk**"
+          "label": "Say something to somebody - **/world → People → Talk**"
         },
         {
           "id": "deal",
@@ -73933,7 +73385,7 @@
           "id": "make",
           "type": "craft",
           "count": 1,
-          "label": "Make one thing from a method you know - **/craft → General Crafting → Craft**"
+          "label": "Make one thing from a method you know - **/craft → Alchemy → Craft**"
         },
         {
           "id": "stand",
@@ -73964,7 +73416,7 @@
           "id": "speak",
           "type": "talk",
           "count": 1,
-          "label": "Say something to somebody - **/npc → People → Talk**"
+          "label": "Say something to somebody - **/world → People → Talk**"
         },
         {
           "id": "sit",
@@ -74025,7 +73477,7 @@
           "type": "craft",
           "target": "Spirit-Iron Sword",
           "count": 1,
-          "label": "Forge a Spirit-Iron Sword - **/craft → General Crafting → Craft**"
+          "label": "Forge a Spirit-Iron Sword - **/craft → Alchemy → Craft**"
         },
         {
           "id": "sell",
@@ -74135,7 +73587,7 @@
       "quest_key": "realm_road_3",
       "realm_index": 3,
       "title": "The Boar King and the Dark Counter",
-      "description": "Core Formation is the realm things start to be worth stealing. The Iron-Tusk Boar King holds Greenriver Town's hills - raid it alone or with a party from **/combat → Boss Raids → Start** and claim your share when it falls. Then find the hidden post this world's rumours point at (**/economy → Black Market → Rumors**) and fence one thing through it.",
+      "description": "Core Formation is the realm things start to be worth stealing. The Iron-Tusk Boar King holds Greenriver Town's hills - raid it alone or with a party from **/adventure → Boss Raids → Start** and claim your share when it falls. Then find the hidden post this world's rumours point at (**/economy → Black Market → Rumors**) and fence one thing through it.",
       "opening": "A core forms where the qi used to swirl, and the world notices. Hunters ask for your name at the gates now, and the people who trade in things nobody should own have started asking too.",
       "objectives": [
         {
@@ -74150,7 +73602,7 @@
           "type": "raid_win",
           "target": "Iron-Tusk Boar King",
           "count": 1,
-          "label": "Bring down the Iron-Tusk Boar King and claim your share - **/combat → Boss Raids → Claim**"
+          "label": "Bring down the Iron-Tusk Boar King and claim your share - **/adventure → Boss Raids → Claim**"
         },
         {
           "id": "fence",
@@ -74191,7 +73643,7 @@
           "type": "raid_win",
           "target": "Moonfen Drowned Serpent",
           "count": 1,
-          "label": "Bring down the Moonfen Drowned Serpent and claim your share - **/combat → Boss Raids → Claim**"
+          "label": "Bring down the Moonfen Drowned Serpent and claim your share - **/adventure → Boss Raids → Claim**"
         }
       ],
       "rewards": {
@@ -74218,7 +73670,7 @@
           "id": "perfect",
           "type": "perfection_start",
           "count": 1,
-          "label": "Begin the Perfect Path at the ninth stage - **/ascend → Perfection → Start**"
+          "label": "Begin the Perfect Path at the ninth stage - **/cultivation → Perfection → Start**"
         }
       ],
       "rewards": {
@@ -74253,7 +73705,7 @@
           "type": "realm_enter",
           "target": "sword_grave_nine_echoes",
           "count": 1,
-          "label": "Enter the Sword Grave of Nine Echoes - **/realm → Secret Realms → Enter**"
+          "label": "Enter the Sword Grave of Nine Echoes - **/adventure → Secret Realms → Enter**"
         }
       ],
       "rewards": {
@@ -74266,7 +73718,7 @@
       "quest_key": "realm_road_7",
       "realm_index": 7,
       "title": "The Ninth Echo and the Seam",
-      "description": "The Ascension Realm is the last of this world. The Nine-Echo Sword Wraith waits on a floor beneath its grave for whoever carries the grave's inheritance - bring it down and claim what it leaves. Then face the heavens: prepare at the gate with **/ascend → Tribulation / Ascension → Prepare** and survive the three waves. What survives them is told where the seam is.",
+      "description": "The Ascension Realm is the last of this world. The Nine-Echo Sword Wraith waits on a floor beneath its grave for whoever carries the grave's inheritance - bring it down and claim what it leaves. Then face the heavens: prepare at the gate with **/cultivation → Tribulation / Ascension → Prepare** and survive the three waves. What survives them is told where the seam is.",
       "opening": "Nothing in the Mortal World is above you now except the sky, and the sky has noticed. Before it comes for you there is one echo left in the foothills that has never been answered.",
       "objectives": [
         {
@@ -74281,13 +73733,13 @@
           "type": "raid_win",
           "target": "Nine-Echo Sword Wraith",
           "count": 1,
-          "label": "Bring down the Nine-Echo Sword Wraith and claim your share - **/combat → Boss Raids → Claim**"
+          "label": "Bring down the Nine-Echo Sword Wraith and claim your share - **/adventure → Boss Raids → Claim**"
         },
         {
           "id": "heaven",
           "type": "tribulation_cleared",
           "count": 1,
-          "label": "Survive the Mortal Ascension Tribulation - **/ascend → Tribulation / Ascension → Attempt**"
+          "label": "Survive the Mortal Ascension Tribulation - **/cultivation → Tribulation / Ascension → Attempt**"
         }
       ],
       "rewards": {
@@ -74391,7 +73843,7 @@
           "type": "realm_enter",
           "target": "ancestor_stag_bone_hall",
           "count": 1,
-          "label": "Enter the Ancestor Stag's Bone Hall at Thousand Beast Steppe - **/realm → Secret Realms → Enter**"
+          "label": "Enter the Ancestor Stag's Bone Hall at Thousand Beast Steppe - **/adventure → Secret Realms → Enter**"
         }
       ],
       "rewards": {
@@ -74419,7 +73871,7 @@
           "type": "raid_win",
           "target": "Hundred-Horn Ancestor Stag",
           "count": 1,
-          "label": "Bring down the Hundred-Horn Ancestor Stag and claim your share - **/combat → Boss Raids → Claim**"
+          "label": "Bring down the Hundred-Horn Ancestor Stag and claim your share - **/adventure → Boss Raids → Claim**"
         },
         {
           "id": "space",
@@ -74460,7 +73912,7 @@
           "type": "realm_enter",
           "target": "last_lantern_wake",
           "count": 1,
-          "label": "Enter the Last Lantern Wake at Last Lantern Ruin - **/realm → Secret Realms → Enter**"
+          "label": "Enter the Last Lantern Wake at Last Lantern Ruin - **/adventure → Secret Realms → Enter**"
         }
       ],
       "rewards": {
@@ -74487,14 +73939,14 @@
           "id": "perfect",
           "type": "perfection_start",
           "count": 1,
-          "label": "Begin a Perfect Path at the ninth stage - **/ascend → Perfection → Start**"
+          "label": "Begin a Perfect Path at the ninth stage - **/cultivation → Perfection → Start**"
         },
         {
           "id": "pagoda",
           "type": "realm_enter",
           "target": "broken_pagoda_sutra_hall",
           "count": 1,
-          "label": "Enter the Broken Pagoda Sutra Hall at Broken Pagoda Ruin - **/realm → Secret Realms → Enter**"
+          "label": "Enter the Broken Pagoda Sutra Hall at Broken Pagoda Ruin - **/adventure → Secret Realms → Enter**"
         }
       ],
       "rewards": {
@@ -74522,7 +73974,7 @@
           "type": "realm_enter",
           "target": "toppled_stele_sword_field",
           "count": 1,
-          "label": "Enter the Toppled Stele Sword Field at Toppled Stele Ruin - **/realm → Secret Realms → Enter**"
+          "label": "Enter the Toppled Stele Sword Field at Toppled Stele Ruin - **/adventure → Secret Realms → Enter**"
         }
       ],
       "rewards": {
@@ -74535,7 +73987,7 @@
       "quest_key": "realm_road_15",
       "realm_index": 15,
       "title": "The Transcendence Tribulation",
-      "description": "The Transcendence Realm is the last of this world. Prepare at the place you will stand with **/ascend → Tribulation / Ascension → Prepare** and survive the three waves; what survives them is told where the seam is.",
+      "description": "The Transcendence Realm is the last of this world. Prepare at the place you will stand with **/cultivation → Tribulation / Ascension → Prepare** and survive the three waves; what survives them is told where the seam is.",
       "opening": "The sky over the Spiritual World is a different colour from the Mortal one, and it has noticed you all the same.",
       "objectives": [
         {
@@ -74549,7 +74001,7 @@
           "id": "heaven",
           "type": "tribulation_cleared",
           "count": 1,
-          "label": "Survive the Transcendence Tribulation - **/ascend → Tribulation / Ascension → Attempt**"
+          "label": "Survive the Transcendence Tribulation - **/cultivation → Tribulation / Ascension → Attempt**"
         }
       ],
       "rewards": {
@@ -74618,7 +74070,7 @@
           "id": "craft",
           "type": "craft",
           "count": 1,
-          "label": "Make something in your trade - in Ninefold Grandmasters' Court if you can - **/craft → General Crafting → Craft**"
+          "label": "Make something in your trade - in Ninefold Grandmasters' Court if you can - **/craft → Alchemy → Craft**"
         }
       ],
       "rewards": {
@@ -74653,7 +74105,7 @@
           "type": "realm_enter",
           "target": "fallen_star_forge",
           "count": 1,
-          "label": "Enter the The Fallen Star's Forge at Starfall Crater - **/realm → Secret Realms → Enter**"
+          "label": "Enter the The Fallen Star's Forge at Starfall Crater - **/adventure → Secret Realms → Enter**"
         }
       ],
       "rewards": {
@@ -74681,7 +74133,7 @@
           "type": "raid_win",
           "target": "Starfall Iron Colossus",
           "count": 1,
-          "label": "Bring down the Starfall Iron Colossus and claim your share - **/combat → Boss Raids → Claim**"
+          "label": "Bring down the Starfall Iron Colossus and claim your share - **/adventure → Boss Raids → Claim**"
         }
       ],
       "rewards": {
@@ -74715,7 +74167,7 @@
           "type": "realm_enter",
           "target": "weeping_wall_sanctum",
           "count": 1,
-          "label": "Enter the Weeping Wall Sanctum at Weeping Wall Ruin - **/realm → Secret Realms → Enter**"
+          "label": "Enter the Weeping Wall Sanctum at Weeping Wall Ruin - **/adventure → Secret Realms → Enter**"
         }
       ],
       "rewards": {
@@ -74743,7 +74195,7 @@
           "type": "realm_enter",
           "target": "ash_gate_threshold",
           "count": 1,
-          "label": "Enter the Ash Gate Threshold at Ash Gate Ruin - **/realm → Secret Realms → Enter**"
+          "label": "Enter the Ash Gate Threshold at Ash Gate Ruin - **/adventure → Secret Realms → Enter**"
         },
         {
           "id": "exam",
@@ -74777,7 +74229,7 @@
           "type": "realm_enter",
           "target": "cracked_altar_sanctum",
           "count": 1,
-          "label": "Enter the Cracked Altar Sanctum at Cracked Altar Ruin - **/realm → Secret Realms → Enter**"
+          "label": "Enter the Cracked Altar Sanctum at Cracked Altar Ruin - **/adventure → Secret Realms → Enter**"
         }
       ],
       "rewards": {
@@ -74790,7 +74242,7 @@
       "quest_key": "realm_road_23",
       "realm_index": 23,
       "title": "The Celestial Ascension Tribulation",
-      "description": "Immortal Sovereign is the last of this world. Prepare at the place you will stand with **/ascend → Tribulation / Ascension → Prepare** and survive the three waves.",
+      "description": "Immortal Sovereign is the last of this world. Prepare at the place you will stand with **/cultivation → Tribulation / Ascension → Prepare** and survive the three waves.",
       "opening": "The heavens over the Immortal World are close enough to hear, and they are not pleased.",
       "objectives": [
         {
@@ -74804,7 +74256,7 @@
           "id": "heaven",
           "type": "tribulation_cleared",
           "count": 1,
-          "label": "Survive the Celestial Ascension Tribulation - **/ascend → Tribulation / Ascension → Attempt**"
+          "label": "Survive the Celestial Ascension Tribulation - **/cultivation → Tribulation / Ascension → Attempt**"
         }
       ],
       "rewards": {
@@ -74874,7 +74326,7 @@
           "type": "realm_enter",
           "target": "hollow_throne_vault",
           "count": 1,
-          "label": "Enter the Hollow Throne Vault at Hollow Throne Ruin - **/realm → Secret Realms → Enter**"
+          "label": "Enter the Hollow Throne Vault at Hollow Throne Ruin - **/adventure → Secret Realms → Enter**"
         }
       ],
       "rewards": {
@@ -74909,7 +74361,7 @@
           "type": "realm_enter",
           "target": "unmoored_star_hollow",
           "count": 1,
-          "label": "Enter the The Unmoored Star's Hollow at Shattered Firmament - **/realm → Secret Realms → Enter**"
+          "label": "Enter the The Unmoored Star's Hollow at Shattered Firmament - **/adventure → Secret Realms → Enter**"
         }
       ],
       "rewards": {
@@ -74937,7 +74389,7 @@
           "type": "raid_win",
           "target": "Unmoored Star Leviathan",
           "count": 1,
-          "label": "Bring down the Unmoored Star Leviathan and claim your share - **/combat → Boss Raids → Claim**"
+          "label": "Bring down the Unmoored Star Leviathan and claim your share - **/adventure → Boss Raids → Claim**"
         }
       ],
       "rewards": {
@@ -74965,7 +74417,7 @@
           "type": "realm_enter",
           "target": "buried_court_assize",
           "count": 1,
-          "label": "Enter the Buried Court Assize at Buried Court Ruin - **/realm → Secret Realms → Enter**"
+          "label": "Enter the Buried Court Assize at Buried Court Ruin - **/adventure → Secret Realms → Enter**"
         },
         {
           "id": "deep",
@@ -74999,13 +74451,13 @@
           "type": "realm_enter",
           "target": "nine_pillar_vault",
           "count": 1,
-          "label": "Enter the Nine Pillar Vault at Nine Pillar Ruin - **/realm → Secret Realms → Enter**"
+          "label": "Enter the Nine Pillar Vault at Nine Pillar Ruin - **/adventure → Secret Realms → Enter**"
         },
         {
           "id": "perfect",
           "type": "perfection_start",
           "count": 1,
-          "label": "Begin a Perfect Path at the ninth stage - **/ascend → Perfection → Start**"
+          "label": "Begin a Perfect Path at the ninth stage - **/cultivation → Perfection → Start**"
         }
       ],
       "rewards": {
@@ -75018,7 +74470,7 @@
       "quest_key": "realm_road_30",
       "realm_index": 30,
       "title": "A World of Your Own",
-      "description": "A Dao Saint who holds the whole of the Law of Space folds a world of their own. Comprehend Space to Essence/Origin, then stabilize the world with **/innerworld → Personal World → Create**.",
+      "description": "A Dao Saint who holds the whole of the Law of Space folds a world of their own. Comprehend Space to Essence/Origin, then stabilize the world with **/home → Personal World → Create**.",
       "opening": "Everything you have walked through was somebody's. This is where you make one.",
       "objectives": [
         {
@@ -75039,7 +74491,7 @@
           "id": "world",
           "type": "personal_world",
           "count": 1,
-          "label": "Stabilize a personal world - **/innerworld → Personal World → Create**"
+          "label": "Stabilize a personal world - **/home → Personal World → Create**"
         }
       ],
       "rewards": {
@@ -75119,7 +74571,7 @@
             "type": "craft",
             "count": 1,
             "target": "Spirit-Iron Sword",
-            "label": "Forge a Spirit-Iron Sword - **/craft → General Crafting → Craft**"
+            "label": "Forge a Spirit-Iron Sword - **/craft → Alchemy → Craft**"
           },
           {
             "id": "home",
@@ -75214,7 +74666,7 @@
             "type": "craft",
             "count": 1,
             "target": "Swift-Wind Talisman",
-            "label": "Inscribe a Swift-Wind Talisman - **/craft → General Crafting → Craft**"
+            "label": "Inscribe a Swift-Wind Talisman - **/craft → Alchemy → Craft**"
           },
           {
             "id": "home",
@@ -75243,7 +74695,7 @@
             "type": "craft",
             "count": 1,
             "target": "Stone-Skin Talisman",
-            "label": "Inscribe a Stone-Skin Talisman - **/craft → General Crafting → Craft**"
+            "label": "Inscribe a Stone-Skin Talisman - **/craft → Alchemy → Craft**"
           },
           {
             "id": "deal",
@@ -75310,7 +74762,7 @@
             "type": "craft",
             "count": 1,
             "target": "Guiding Chalk Array",
-            "label": "Lay a Guiding Chalk Array - **/craft → General Crafting → Craft**"
+            "label": "Lay a Guiding Chalk Array - **/craft → Alchemy → Craft**"
           },
           {
             "id": "home",
@@ -75345,7 +74797,7 @@
             "type": "craft",
             "count": 1,
             "target": "Guiding Chalk Array",
-            "label": "Lay a Guiding Chalk Array - **/craft → General Crafting → Craft**"
+            "label": "Lay a Guiding Chalk Array - **/craft → Alchemy → Craft**"
           },
           {
             "id": "home",
@@ -75406,7 +74858,7 @@
             "type": "craft",
             "count": 1,
             "target": "Recovery Pill",
-            "label": "Refine a Recovery Pill - **/craft → General Crafting → Craft**"
+            "label": "Refine a Recovery Pill - **/craft → Alchemy → Craft**"
           },
           {
             "id": "home",
@@ -75435,7 +74887,7 @@
             "type": "craft",
             "count": 1,
             "target": "Qi Nourishing Pill",
-            "label": "Refine a Qi Nourishing Pill - **/craft → General Crafting → Craft**"
+            "label": "Refine a Qi Nourishing Pill - **/craft → Alchemy → Craft**"
           },
           {
             "id": "deal",
@@ -75824,19 +75276,19 @@
       "war peace": 4
     },
     "pages": {
-      "abode / Access": 3,
-      "abode / Property": 3,
+      "adventure / Active Battle": 1,
+      "adventure / Boss Raids": 3,
+      "adventure / Bounty Hunter": 3,
+      "adventure / Duels": 1,
+      "adventure / Formations": 1,
+      "adventure / Party": 1,
+      "adventure / Secret Realms": 1,
+      "adventure / Spatial Keys": 1,
       "character / Afflictions": 1,
       "character / Consequences": 3,
       "character / Dao Partnership": 4,
       "character / Fate": 4,
       "character / Samsara": 5,
-      "combat / Active Battle": 1,
-      "combat / Boss Raids": 3,
-      "combat / Bounty Hunter": 3,
-      "combat / Duels": 1,
-      "combat / Formations": 1,
-      "combat / Party": 1,
       "craft / Alchemy": 1,
       "craft / Flames": 1,
       "craft / Profession": 1,
@@ -75855,12 +75307,11 @@
       "family / Family": 1,
       "family / House": 4,
       "family / Legacy": 5,
-      "innerworld / Personal World": 30,
+      "home / Access": 3,
+      "home / Personal World": 30,
+      "home / Property": 3,
       "items / Artifacts": 1,
-      "items / Provenance": 1,
       "items / Storage": 1,
-      "realm / Secret Realms": 1,
-      "realm / Spatial Keys": 1,
       "sect / Discipleship": 1,
       "sect / Holdings": 1,
       "sect / Sect": 1,

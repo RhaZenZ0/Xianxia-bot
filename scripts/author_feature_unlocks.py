@@ -99,23 +99,25 @@ PAGES: dict[str, int] = {
     # of any realm, and a banked insight or a Perfection is what opens the
     # first gates. `_progression_hidden_actions` draws Start at stage 9 and the
     # rest while a path is under way, so the page is never a wall of refusals.
-    "ascend / Perfection": 0,
+    "cultivation / Perfection": 0,  # Cultivation's page since the fold (v1.38.0)
     "cultivation / Qi Body": 8,
     "cultivation / Ghost": 1,
     "cultivation / Path": 1,
     "cultivation / Arts": 1,
     "items / Storage": 1,
     "items / Artifacts": 1,
-    "items / Provenance": 1,
     "world / City": 1,
     "travel / Realm Capitals": 1,
     "travel / Teleportation Arrays": 1,
-    "combat / Active Battle": 1,
-    "combat / Duels": 1,
-    "combat / Party": 1,
-    "combat / Formations": 1,
-    "combat / Boss Raids": 3,
-    "combat / Bounty Hunter": 3,
+    # Combat and Secret Realms are the Adventure hub since v1.38.0.
+    "adventure / Active Battle": 1,
+    "adventure / Duels": 1,
+    "adventure / Party": 1,
+    "adventure / Formations": 1,
+    "adventure / Boss Raids": 3,
+    "adventure / Bounty Hunter": 3,
+    "adventure / Secret Realms": 1,
+    "adventure / Spatial Keys": 1,
     "economy / Local Market": 1,
     "economy / Market Stalls": 1,
     "economy / Auction House": 1,
@@ -140,15 +142,20 @@ PAGES: dict[str, int] = {
     "family / Family": 1,
     "family / House": 4,
     "family / Legacy": 5,
-    "abode / Property": 3,
-    "abode / Access": 3,
-    "innerworld / Personal World": PERSONAL_WORLD_FLOOR,
-    "realm / Secret Realms": 1,
-    "realm / Spatial Keys": 1,
+    # Abode and Inner World are the Home hub since v1.38.0.
+    "home / Property": 3,
+    "home / Access": 3,
+    "home / Personal World": PERSONAL_WORLD_FLOOR,
 }
 
 # Leaf -> the realm it opens at, overriding its page. Each says why.
 LEAVES: dict[str, int] = {
+    # General Crafting sits on the Alchemy page since v1.38.0, and that page
+    # opens at realm 1; the craft roll is a first-hour thing (120 presses in
+    # thirty days, the tenth most-used command) and stays open at 0, as it
+    # was on its own page. A fold never shortens what a player already had.
+    "craft": 0,
+    "craft_all": 0,
     # `character / Overview` is the sheet and six readings of a life that has
     # not happened yet. The sheet is the first thing anybody opens.
     "sheet": 0,

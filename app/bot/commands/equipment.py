@@ -255,7 +255,7 @@ register_hub_option_hint(
     "item",
     "You are not carrying anything that can be bound as equipment. Weapons, armour, "
     "boots and accessories can be bound — buy one with **/economy → Local Market → Buy**, or forge one with "
-    "**/craft → General Crafting → Craft**.",
+    "**/craft → Alchemy → Craft**.",
 )
 register_hub_option_hint(
     equipment_equip,

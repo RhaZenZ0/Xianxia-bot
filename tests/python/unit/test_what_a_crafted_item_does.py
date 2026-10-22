@@ -150,9 +150,10 @@ class TheBatchIsTheEnginesTests(unittest.TestCase):
         self.assertTrue("amount=max(1, successes)" in body,
                         "a batch advances a craft quest by one however many it made")
 
-    def test_craft_all_is_on_the_general_crafting_page(self):
+    def test_craft_all_is_on_the_crafting_page(self):
+        # The Alchemy page since v1.38.0, beside the craft roll it batches.
         surface = (PROJECT_ROOT / "app" / "bot" / "surface.py").read_text(encoding="utf-8")
-        self.assertRegex(surface, r'_hub_page\("craft", "General Crafting", "[^"]*", "craft_all"\)')
+        self.assertRegex(surface, r'_hub_page\("alchemy", "Alchemy", "[^"]*",\s*"craft", "craft_all"\)')
 
 
 class TheCraftMenuTests(unittest.TestCase):

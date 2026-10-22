@@ -34,10 +34,31 @@ HELPER = "open_expedition_thread_after_exit"
 
 
 def _exit_hubs() -> set[str]:
-    """The hub behind each entry of PRIVATE_LOCATION_EXITS, e.g. {'family', ...}."""
+    """The command group behind each Leave entry of PRIVATE_LOCATION_EXITS,
+    e.g. {'family', 'abode', 'innerworld'}: the `<group>_group` whose
+    name="leave" handler the path reaches. The hub a path is printed under is
+    not the group since the fold (v1.38.0: `/home → Property → Leave` is
+    `abode_group`'s leave), so each printed path is resolved through the live
+    hubs to the leaf it names, and the group is the leaf's root."""
     block = re.search(r"PRIVATE_LOCATION_EXITS[^=]*=\s*\((.*?)\n\)", RUNTIME, re.S)
     assert block, "PRIVATE_LOCATION_EXITS not found"
-    return set(re.findall(r"/([a-z]+)\s*(?:→|->)\s*Leave", block.group(1)))
+    import importlib
+    import os
+    from unittest.mock import patch
+
+    env = {"DISCORD_TOKEN": "test-token", "GUILD_ID": "123456789012345678",
+           "ENGINE_AUTH_TOKEN": "test-engine-token-1234567890", "DATABASE_PATH": "data/test.sqlite3"}
+    with patch.dict(os.environ, env):
+        hubs = importlib.import_module("app.bot.hubs")
+    groups: set[str] = set()
+    for hub, rest in re.findall(r"\*\*/([a-z]+)([^*]*)\*\*", block.group(1)):
+        steps = [step for step in re.split(r"\s*(?:→|->)\s*", rest) if step.strip()]
+        if not steps or steps[-1] != "Leave":
+            continue  # the sect residence's exit is a leaf named Abode, held by its own test
+        action = hubs._hint_action(hub, steps)
+        assert action is not None, f"the exit **/{hub} → {' → '.join(steps)}** resolves to no leaf"
+        groups.add(action.path.lstrip("/").split()[0])
+    return groups
 
 
 def _leave_handler(hub: str) -> tuple[str, str]:

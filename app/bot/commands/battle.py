@@ -207,7 +207,7 @@ class BattleView(CardView):
             battle=await DB.get_battle(self.battle_id,user_id=self.user_id,active_only=True)
             active=await DB.get_active_battle(self.user_id)
             if not battle or not active or int(active['battle_id'])!=self.battle_id:
-                await _battle_reply(interaction,content="⌛ This battle panel is stale. Use **/combat → Active Battle → Status** for the current battle.",view=None,edit_panel=True);return
+                await _battle_reply(interaction,content="⌛ This battle panel is stale. Use **/adventure → Active Battle → Status** for the current battle.",view=None,edit_panel=True);return
             if kind in {"attack","defend","flee","intent"}:
                 await _resolve_battle_turn(interaction,kind,expected_battle_id=self.battle_id,edit_panel=True);return
             c=await DB.get_character(self.user_id)

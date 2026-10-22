@@ -156,7 +156,7 @@ class ALabelIsAWord(unittest.TestCase):
 
     def test_a_path_printed_with_the_old_label_still_resolves(self):
         _, hubs, _ = _modules()
-        for text, path in (("**/npc → People → Npcinfo**", "/npcinfo"),
+        for text, path in (("**/world → People → Npcinfo**", "/npcinfo"),
                            ("**/world → Almanac → Worldevents**", "/worldevents"),
                            ("**/cultivation → Arts → Study**", "/manual study")):
             with self.subTest(text=text):

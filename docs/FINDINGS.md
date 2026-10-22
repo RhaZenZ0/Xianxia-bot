@@ -8820,3 +8820,142 @@ are stated in Go, in the bot's config and in the dashboard, and
 `test_the_quest_budget_is_the_engines_key_too` holds the three statements equal and the key to its
 four places. Drill: the check removed from `adminQuestSave` prints *"a new quest paying 120 insight
 was saved"*.
+
+### Twelve hubs, and two spellings of an arrow (v1.38.0)
+
+The menu research of v1.35.0 left two steps waiting on data, and the Most-used commands card
+(v1.22.0) supplied it: thirty days, fifty rows. `/cultivation` was pressed 317 times and `/ascend`,
+the hub that fed it, 92; `/npc`, `/innerworld`, `/realm` and `/abode` were not on the card at all.
+So sixteen hubs are twelve. Ascension is Cultivation's last two pages (its Main Progression page held
+the one breakthrough leaf the Cultivate page already draws, so it is gone rather than drawn twice),
+NPCs is World's People page, Combat and Secret Realms are one Adventure hub, Abode and Inner World
+one Home hub, and the seven one-leaf pages went with them: Inventory, Use Item and Provenance are one
+Bag page, the Wallet is the first leaf of City Shops, General Crafting sits on Alchemy. Every leaf
+kept its path and its group name - a typed `/perfect quest` is where it was - so the fold is a change
+of which hub a page is reached through, and nothing else.
+
+That is also why it is mostly a rename. A hub's name is printed in about ninety places - the quest
+objective labels in `content/world.json`, the reporters' `OBJECTIVE_PATHS`, the cooldown card, the
+next-step buttons, the engine's own refusal in `cultivation_actions.go`, the authoring script - and
+every one of them earns a button only if it resolves through `_hint_action`. The gates that hold
+this (`test_hint_paths.py`, `test_player_facing_command_hints.py`, `test_quest_progress.py`) failed
+on the first run with the two paths the rename script had not covered (`/abode → Upgrade`, `/abode →
+Revoke`: the rule had renamed only `/abode → Leave`), which is what they are for.
+
+The quest rows a running world holds are insert-only (migration 61's rule), so migration 83 makes
+the same renames in `quest_definitions.objectives_json`, `quest_definitions.description` and
+`character_quests.terms_json`. Its test built a world at schema 82, seeded one label per rename the
+Python way, ran the migration, and found the definitions untouched while the pinned terms were
+rewritten. The Python seeding writes the definitions with `json.dumps`, whose default escapes the
+arrow to `\u2192`; the engine pins a player's terms with Go's `json.Marshal`, which writes it raw.
+Both parse to the same text and nothing reads them back differently, so the difference had never
+mattered - until a `replace()` over the column had to match it. Migration 61's own `replace()` wrote
+new labels with raw arrows into escaped JSON, harmlessly. Migration 83 makes each rename twice, once
+per spelling, and its test seeds the definitions escaped and the terms raw so one statement has to
+rewrite both; dropping the escaped half fails it with the definition's label still naming `/ascend`.
+The lesson is in the standing rules under Migrations: a `replace()` over a JSON column matches both
+spellings of anything outside ASCII.
+
+The card also settled the other waiting step, which hub-only groups earn a typed name. The rule is
+written beside `TREE_COMMANDS` so the next card is read against it rather than re-decided: a hundred
+presses in thirty days. `perfect` (159), `aptitude` (126) and `meridian` (113) cleared it and are
+slash commands; `seclusion` (88) and `alchemy` (84) did not and stay hub-only.
+`TheRaidsHaveSlashCommands` holds each promoted group to the tree and the lockout test lists them as
+acting, the shape `/stall` set in v1.7.4.
+
+### A refusal is decided (v1.38.0)
+
+The known limit v1.3.4 left open: the sweep's contract is "a result or a designed refusal", and a
+leaf that has only ever been refused has had only its refusal proved - rc.58's finding on the
+Discord side, and why `/battle challenge` was green for releases while no run had begun a battle.
+The engine half closed it with `REFUSAL_ONLY_OPERATIONS`; the Discord half could not copy that,
+because a refusal is the correct answer for most leaves under a sweep (no sect, no beast, no lot).
+What the Discord half needed was a per-leaf statement, and v1.38.0 writes it: `MUST_RESOLVE`, the
+leaves whose refusal was only a missing state, each with a `STATE_BUILDERS` coroutine that builds
+the state through the engine as the GM before the press; `REFUSAL_ACCEPTED`, the leaves whose
+refusal is the right answer, with why; and a third rule that a refusal on a leaf in neither is a
+failure naming both rosters, so a new refusal is a decision and never a green line.
+
+The last full sweep had eleven refusals. Five were a missing state the harness can build: a Dao
+partner (the GM is given a cultivator through the same `character.create` the bot calls, stood
+beside the player, proposed to and accepting), a party (the Party page's Leave leaf had dissolved the
+one its Create leaf made before the Formations page was reached), stones for the market (read off
+`market.rows`' own `buy_price` for the dearest listing, in that board's own coin - the first attempt
+granted a round number in the Mortal coin and was refused, because a round number is a bound the
+harness made up), a spirit sense at its stage's need (read off `spirit_sense.status`), and a sect
+standing at the founding rank (read off `abode_system.founding_rank_level` and the sect ladder). The
+first run under the roster found a sixth the earlier sweeps had hidden: `/insight` had resolved
+before because that run's explores happened to pay Insight XP, and this one's did not - a
+run-variable refusal the roster now settles with `admin.player.cultivation_reward`. Seven refusals are
+accepted with their reason: the cultivate cooldown the daily five leave, a meridian heal with no
+rupture to heal (the raid leaves one some runs and not others), the confirm word `/admin player
+erase` demands, a household in another city, two member pickers answered with the cultivator who
+has no character, and `/merchant buy` offering a merchant out of reach - which is a finding of
+its own (rc.46's class, recorded in docs/TODO.md), not an accepted state of the world.
+
+The builders are player-side engine calls and the first run refused every one of them: `action_id
+must contain 1..160 characters`. A GM lever takes none; a player's action is idempotency-keyed, the
+way every call the bot makes is, and the harness had copied the lever shape. `_player_act` keys them
+now. The coverage gate holds both rosters to live leaves, disjoint from each other and from
+`DEFERRED_LEAVES`, every must-resolve leaf to a builder defined at module level, and the sweep's
+source to the three decisions; commenting a builder out fails it naming the leaf, and a leaf listed
+in both rosters fails it naming the leaf.
+
+### The upper boards pay (v1.38.0)
+
+790 of the 1,154 keeper buy lines paid nothing: a Mortal-made good is worth under a whole coin up
+the ladder, so the cheap half of an upper economy had no NPC buyer, and the Immortal post sold the
+peach for one coin against the Mortal post's 17,712 stones' worth because `UnderworldBase` rounded
+the Mortal base down on the climb. Both were decided for a content pass, and this is it. The
+unpayable lines are gone and 242 lines buying each world's own goods are authored in their place:
+a line buys only a good sold in that world, never a graded item outside a capital, at 60% of the
+cheapest shelf that sells it and under a crafted good's makings less one, and every shop (the
+waystations included) buys at least two things. Spiritual, Immortal and Celestial have 143, 159 and
+131 payable lines and none that refuse.
+
+Each of those rules was found by a gate the first pass failed: graded lines outside capitals, a
+crafted buy over its makings (Starfall at 140 against 92 - a mint, rc.44's class), empty waystations,
+and the flight buyback and crafted-good gates in Python, which assumed every world pays a whole coin
+for every good. `TestEveryKeeperBuyLinePays` now holds every line to a whole coin on the ladder and
+its reader is drilled (`TestTheDeadBuyLineReaderSeesOne` plants one on a copy of the catalogue -
+`shippedCatalog(t)` is shared across tests, so a test that mutates it leaks into the next, which the
+first draft did). `UnderworldBase` carries a Mortal base up through `shelfPriceAcrossUp`, which
+rounds up on the climb, and `TestAPostNeverUndercutsTheWorldBelow` walks every post against the
+world below it. The two Python price gates take the engine's own rule through
+`cheapest_shelf_in_coin` in `tests/support.py` rather than assuming the ladder pays.
+
+### A GM hands a city back (v1.38.0)
+
+Migration 74 (v1.19.0) copied the gate's banner onto a neutral seat whoever held the gate, so a sect
+whose gate had been taken in a v1.12-v1.18 war lost its home city to the rival; the migration is
+frozen and the state cannot be told from a city honestly held, so the repair was decided as a GM
+lever, built when a world showed the state. It is built now, ahead of one, because it is the kind of
+lever a running world asks for without warning. `admin.territory.set_controller` hands a territory
+to a sect in the catalogue or makes it neutral, writes `territory_state`, records a public
+`territory_claimed` history row, audits with a before snapshot `reverseTerritoryController` restores
+through `undo_last`, and refuses while an active war contests the ground - a war ends through
+`war.act` or `war.peace`, not a GM's hand. The dashboard has a Territory card and the engine playtest
+hands a territory, undoes it and is refused an unknown sect. The fixture carries production's
+`territory_state`, `territory_wars` and `world_history_events` DDL, per the v1.34.0 rule.
+
+### A snowflake through a float (v1.38.0)
+
+The Dao-partner builder was the first thing in six years of harness to pair two real ids, and it
+could not: `dao.propose` answered "both cultivators must be living incarnations" with both of them
+alive on the same street. Against small ids (111 and 222) it worked; against ids the size Discord
+mints it did not. `stage5CanonicalizeMutationPayload`, which writes the engine's game minute over
+every mutation payload, decoded the payload into `map[string]any` and marshalled it back, and a JSON
+number decoded into `any` is a float64. Every Discord snowflake since 2015 is above 2^53, so
+`987654321098765432` came out as `987654321098765400`, the partner it named did not exist, and so
+with every member a player names in a payload: `duel.challenge`'s target, `abode.invite` and
+`revoke`'s guest, `formation.assign`'s member. The admin levers never had the fault, because
+`decodeMap` decodes with `UseNumber`; the player gate's canonicaliser was the one path that did not,
+and it is the path every player action takes.
+
+Nothing in the engine's tests saw it because they pair small ids, and the Discord sweep's member
+pickers are answered with a cultivator who has no character, so the refusal they met was the right
+one for the wrong reason. The canonicaliser reads the payload as `map[string]json.RawMessage` now
+and writes the minute as a RawMessage of its own, so every other field goes through byte for byte;
+`TestCanonicalisingAPayloadKeepsASnowflakeExact` holds the id to its spelling and fails against the
+old path with the rounded digits in its message. The lesson joins the standing rules beside the
+other sentinels: a JSON number decoded into `any` is a float64, and an id is never read through one.

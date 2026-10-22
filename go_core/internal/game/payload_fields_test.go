@@ -132,15 +132,15 @@ var engineInjected = map[string]bool{"game_minute": true}
 // A handler that reads its payload as a map rather than a struct, keyed by
 // function name, with why a struct would not do.
 var rawMapReaders = map[string]string{
-	"rejectCallerGameMinute":            "the refusal itself: it reads the raw keys to find one of callerOwnedNothing and refuse the request",
-	"stage5CanonicalizeMutationPayload": "the canonicalizer: it reads the raw keys to write the engine's game_minute over whatever came",
-	"craftResolveAction":                "reads the raw keys beside its struct to refuse a caller-owned field by presence (v1.0.x: absent, never falsy); the struct is what this gate reads",
-	"forageResolveAction":               "reads the raw keys to refuse a caller-owned field by presence; the forage has no other payload",
-	"familyAddChildActionGo":            "reads the raw keys beside its struct to refuse a caller-owned field by presence; the struct is what this gate reads",
-	"validateCompanionPayload":          "reads the raw keys to refuse a caller-owned field by presence, for every beast and artifact action",
-	"createCharacterAuthoritative":      "reads the raw keys beside its struct to refuse a client-owned field by presence; the struct is what this gate reads",
-	"seclusionStartActionGo":            "probes the raw keys beside its struct to tell an old client's game-minute length from a new one's real-minute length; the struct is what this gate reads",
-	"adminTradeVoid":                    "a GM lever, audited: it reads the offer to void and the reason, and GM levers state what they state",
+	"rejectCallerGameMinute":         "the refusal itself: it reads the raw keys to find one of callerOwnedNothing and refuse the request",
+	"canonicalPayloadWithGameMinute": "the canonicalizer: it reads the raw keys as RawMessage, byte for byte, to write the engine's game_minute over whatever came (v1.38.0: a map[string]any here rounded every snowflake)",
+	"craftResolveAction":             "reads the raw keys beside its struct to refuse a caller-owned field by presence (v1.0.x: absent, never falsy); the struct is what this gate reads",
+	"forageResolveAction":            "reads the raw keys to refuse a caller-owned field by presence; the forage has no other payload",
+	"familyAddChildActionGo":         "reads the raw keys beside its struct to refuse a caller-owned field by presence; the struct is what this gate reads",
+	"validateCompanionPayload":       "reads the raw keys to refuse a caller-owned field by presence, for every beast and artifact action",
+	"createCharacterAuthoritative":   "reads the raw keys beside its struct to refuse a client-owned field by presence; the struct is what this gate reads",
+	"seclusionStartActionGo":         "probes the raw keys beside its struct to tell an old client's game-minute length from a new one's real-minute length; the struct is what this gate reads",
+	"adminTradeVoid":                 "a GM lever, audited: it reads the offer to void and the reason, and GM levers state what they state",
 }
 
 type payloadField struct {

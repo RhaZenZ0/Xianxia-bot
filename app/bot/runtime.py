@@ -143,15 +143,15 @@ async def carried_item_autocomplete(interaction: discord.Interaction, current: s
         if not needle or needle in name.casefold() or needle in item_id.casefold():
             out.append(app_commands.Choice(name=f"{name} x{qty}"[:100], value=item_id[:100]))
     return out[:25]
-# A sect residence's way out named `/abode → Leave` until v1.1.0, and
+# A sect residence's way out named `/home → Property → Leave` until v1.1.0, and
 # `abode.leave` reads `cave_abodes` - a residence is a `sect_abodes` row, so it
 # refused with "you are not inside a player-owned property". The residence's
 # own leaf is the way out.
 PRIVATE_LOCATION_EXITS: tuple[tuple[str, str, str], ...] = (
     ("birth_family:", "**/family → Leave**", "your birth household"),
     ("sect_abode:", "**/sect → Holdings → Abode** (Leave)", "your sect residence"),
-    ("abode:", "**/abode → Leave**", "your own property"),
-    ("personal_world:", "**/innerworld → Leave**", "your personal world"),
+    ("abode:", "**/home → Property → Leave**", "your own property"),
+    ("personal_world:", "**/home → Personal World → Leave**", "your personal world"),
 )
 # The prefixes of a place that is somebody's own rather than the world's - the
 # four `exploration_actions.go` refuses inside. Read off the exits above so
@@ -244,7 +244,7 @@ def _explain_engine_error(exc: Exception) -> str:
         ("below evolution requirement", "raise its loyalty with **/beast → Companions → Feed** or **/beast → Companions → Train**"),
         ("beast cores: missing", "beast cores come from **/hunt**"),
         ("not enough sect contribution points", "earn more with **/sect → Holdings → Contribute** or your sect's work on **/world → City → Board**"),
-        ("not in an active party", "**/combat → Party → Create**"),
+        ("not in an active party", "**/adventure → Party → Create**"),
         ("repair requires", "dig Spirit Iron with **/mine** or buy it with **/economy → City Shops → Buy**"),
         ("no flame burns here", "**/craft → Flames → Status** names where each world's flame burns"),
     ):
@@ -261,9 +261,9 @@ def _explain_engine_error(exc: Exception) -> str:
             "\n\nYou're **indoors** — exploring and hunting only work out in the shared world. "
             "Step outside first, then try again:\n"
             "**/family → Leave** (birth household) · "
-            "**/abode → Leave** (your property) · "
+            "**/home → Property → Leave** (your property) · "
             "**/sect → Holdings → Abode** (Leave, a sect residence) · "
-            "**/innerworld → Leave** (personal world)"
+            "**/home → Personal World → Leave** (personal world)"
         )
     return text
 async def settle_seclusion_for_user(user_id: int, current_game_minute: int | None = None) -> dict | None:

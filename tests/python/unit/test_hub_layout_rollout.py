@@ -35,14 +35,14 @@ def _layout_hub_names() -> set[str]:
 
 
 def _declared_hub_names() -> set[str]:
-    """Every hub name declared anywhere in app/bot: 16 player hubs plus /admin."""
+    """Every hub name declared anywhere in app/bot: 12 player hubs plus /admin (v1.38.0)."""
     return set(declared_hub_names())
 
 
 class HubLayoutRolloutTests(unittest.TestCase):
     def test_every_hub_uses_the_layout(self):
         declared, enabled = _declared_hub_names(), _layout_hub_names()
-        self.assertEqual(len(declared), 17, "expected 16 player hubs plus /admin")
+        self.assertEqual(len(declared), 13, "expected 12 player hubs plus /admin")
         missing = sorted(declared - enabled)
         self.assertEqual(missing, [], f"these hubs still fall back to the classic panel: {missing}")
         unknown = sorted(enabled - declared)

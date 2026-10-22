@@ -8,6 +8,7 @@ import (
 	"go/token"
 	"math/big"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -301,10 +302,13 @@ func TestAnUpperWorldKeeperHoldsItsLineUnderTheLowestShelfAnywhere(t *testing.T)
 }
 
 // A keeper is refused by the counter exactly where its board stops listing,
-// and a board never lists a line the counter would refuse.
+// and a board never lists a line the counter would refuse. Until v1.38.0 the
+// shipped content carried 790 such lines and this read them; the content pass
+// dropped every one (TestEveryKeeperBuyLinePays holds that), so the hidden
+// side is a Mortal herb put on a Celestial board here.
 func TestAKeeperBoardListsOnlyWhatTheCounterWillPay(t *testing.T) {
 	catalog := shippedCatalog(t)
-	listed, hidden := 0, 0
+	listed := 0
 	for _, shop := range catalog.Shops {
 		if catalog.Currencies[shop.Currency].World == "Mortal World" {
 			continue
@@ -313,12 +317,28 @@ func TestAKeeperBoardListsOnlyWhatTheCounterWillPay(t *testing.T) {
 			if _, pays := keeperBuyBase(catalog, shop, itemID); pays {
 				listed++
 			} else {
-				hidden++
+				t.Fatalf("%s buys %s and the counter refuses it: a line the board lists and nobody is paid on", shop.Name, itemID)
 			}
 		}
 	}
-	if listed == 0 || hidden == 0 {
-		t.Fatalf("%d lines listed and %d hidden in the upper worlds; the cap has stopped separating them", listed, hidden)
+	if listed < 300 {
+		t.Fatalf("%d lines listed in the upper worlds; the content pass left the boards thin again", listed)
+	}
+	hidden := 0
+	for key, shop := range catalog.Shops {
+		if catalog.Currencies[shop.Currency].World != "Celestial World" {
+			continue
+		}
+		// On a copy: shippedCatalog is shared across tests.
+		shop.Buys = map[string]int64{"spirit_herb": 2}
+		if _, pays := keeperBuyBase(catalog, shop, "spirit_herb"); pays {
+			t.Fatalf("%s pays for a Mortal herb no whole celestial crystal sits under", key)
+		}
+		hidden++
+		break
+	}
+	if hidden == 0 {
+		t.Fatal("no Celestial shop to put the herb on; the reader is broken, not the tree")
 	}
 }
 
@@ -586,26 +606,12 @@ func TestAPlayersClaimAndTheWorldsReadTheSameSeats(t *testing.T) {
 // of shopBuysRows and the board offers a Mortal herb at a Spiritual counter.
 func TestAnUpperWorldCounterRefusesWhatItsBoardDoesNotList(t *testing.T) {
 	path := setupShopDB(t)
-	world := batch4WorldPath(t)
-	catalog := shopCatalog(t)
-	var key string
-	keys := make([]string, 0, len(catalog.Shops))
-	for k := range catalog.Shops {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		shop := catalog.Shops[k]
-		if catalog.Currencies[shop.Currency].World != "Spiritual World" {
-			continue
-		}
-		if _, listed := shop.Buys["spirit_herb"]; listed {
-			key = k
-			break
-		}
-	}
-	if key == "" {
-		t.Fatal("no Spiritual keeper lists the spirit herb; pick another item that shows the cap")
+	// The shipped content carries no dead line any more (v1.38.0), so the herb
+	// is put on a Spiritual board in a copy of the world file the engine reads.
+	world, key := worldWithAHerbOnASpiritualBoard(t)
+	catalog, err := worlddata.Load(world)
+	if err != nil {
+		t.Fatal(err)
 	}
 	shop := catalog.Shops[key]
 	batch4SetCanonicalGameMinute(t, path, 1000)
@@ -629,11 +635,151 @@ func TestAnUpperWorldCounterRefusesWhatItsBoardDoesNotList(t *testing.T) {
 		t.Fatalf("the board lists %d lines and the counter pays for %d", len(listed), want)
 	}
 	raw, _ := json.Marshal(map[string]any{"item_id": "spirit_herb", "quantity": 1})
-	_, err := ApplyWithWorld(path, world, ActionRequest{APIVersion: authoritativeAPIVersion, ActionID: "upper-herb-sell", Operation: "shop.sell", ActorID: 42, Payload: raw})
+	_, err = ApplyWithWorld(path, world, ActionRequest{APIVersion: authoritativeAPIVersion, ActionID: "upper-herb-sell", Operation: "shop.sell", ActorID: 42, Payload: raw})
 	if err == nil || !strings.Contains(err.Error(), "will not pay for Spirit Herb") {
 		t.Fatalf("a Spiritual counter bought a Mortal herb: err=%v", err)
 	}
 	if got := escrowScalar(t, path, `SELECT quantity FROM inventory WHERE user_id=42 AND item_id='spirit_herb'`); got != 3 {
 		t.Fatalf("a refused sale took herbs: %d left", got)
 	}
+}
+
+// A post never undercuts the world below it (v1.38.0). UnderworldBase carried
+// the Mortal base up the ladder rounding down, so the Immortal post asked one
+// immortal stone (10,000 stones' worth) for a peach the Mortal post sold for
+// 17,712. Rounded up, every upper post's base, carried back down, is at least
+// the Mortal base.
+func TestAPostNeverUndercutsTheWorldBelow(t *testing.T) {
+	catalog := shippedCatalog(t)
+	mortal := worldBaseCurrency(catalog, "Mortal World")
+	checked := 0
+	for itemID, item := range catalog.Items {
+		if !UnderworldGood(item) {
+			continue
+		}
+		below, ok := UnderworldBase(catalog, itemID, mortal)
+		if !ok {
+			continue
+		}
+		for coin, def := range catalog.Currencies {
+			if def.Tier != 1 || coin == mortal {
+				continue
+			}
+			up, ok := UnderworldBase(catalog, itemID, coin)
+			if !ok {
+				continue
+			}
+			rates := map[string]shelfRate{}
+			back, ok := shelfPriceAcross(catalog, rates, coin, mortal, up)
+			if !ok {
+				t.Fatalf("%s: no ladder from %s back to %s", itemID, coin, mortal)
+			}
+			checked++
+			if back < below {
+				t.Errorf("%s: the %s post asks %d (%d stones' worth) against the Mortal post's %d - the upper post undercuts the world below", itemID, coin, up, back, below)
+			}
+		}
+	}
+	if checked < 30 {
+		t.Fatalf("checked %d post prices; the reader found too few underworld goods", checked)
+	}
+}
+
+// Every authored keeper buy line pays (v1.38.0). The upper worlds' boards
+// carried 790 lines for Mortal goods no whole coin of theirs could pay - the
+// ceiling refused each, the board never listed it, and the cheap half of an
+// upper economy had no NPC buyer. The content pass dropped them and gave each
+// upper keeper lines for what its own world sells; this holds the file to it,
+// so a dead line cannot come back.
+func TestEveryKeeperBuyLinePays(t *testing.T) {
+	catalog := shippedCatalog(t)
+	if faults := deadKeeperBuyLines(catalog); len(faults) > 0 {
+		t.Fatalf("%d keeper buy line(s) no whole coin can pay - a line the board never lists and nobody is paid on:\n  %s", len(faults), strings.Join(faults, "\n  "))
+	}
+}
+
+func deadKeeperBuyLines(catalog worlddata.Catalog) []string {
+	var faults []string
+	for key, shop := range catalog.Shops {
+		for itemID := range shop.Buys {
+			if _, ok := keeperBuyBase(catalog, shop, itemID); !ok {
+				faults = append(faults, fmt.Sprintf("%s buys %s: the cheapest shelf anywhere asks less than one %s", key, itemID, shop.Currency))
+			}
+		}
+	}
+	sort.Strings(faults)
+	return faults
+}
+
+// The reader sees a dead line: a Mortal herb on a Celestial board.
+func TestTheDeadBuyLineReaderSeesOne(t *testing.T) {
+	catalog := shippedCatalog(t)
+	// On copies of the shop map and the shop's lines: shippedCatalog is
+	// shared across tests, and a herb left on its board fails the gate above.
+	shops := make(map[string]worlddata.Shop, len(catalog.Shops))
+	for key, shop := range catalog.Shops {
+		shops[key] = shop
+	}
+	catalog.Shops = shops
+	for key, shop := range catalog.Shops {
+		if shop.World != "Celestial World" {
+			continue
+		}
+		buys := map[string]int64{"spirit_herb": 2}
+		for item, price := range shop.Buys {
+			buys[item] = price
+		}
+		shop.Buys = buys
+		catalog.Shops[key] = shop
+		break
+	}
+	if faults := deadKeeperBuyLines(catalog); len(faults) != 1 || !strings.Contains(faults[0], "spirit_herb") {
+		t.Fatalf("the reader did not see a Mortal herb on a Celestial board: %v", faults)
+	}
+}
+
+// worldWithAHerbOnASpiritualBoard writes a copy of the shipped world file in
+// which the first Spiritual shop (by key) buys the Mortal spirit herb, and
+// answers its path and that shop's key.
+func worldWithAHerbOnASpiritualBoard(t *testing.T) (string, string) {
+	t.Helper()
+	raw, err := os.ReadFile(batch4WorldPath(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var world map[string]any
+	if err := json.Unmarshal(raw, &world); err != nil {
+		t.Fatal(err)
+	}
+	shops, _ := world["shops"].(map[string]any)
+	currencies, _ := world["currencies"].(map[string]any)
+	keys := make([]string, 0, len(shops))
+	for k := range shops {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		shop, _ := shops[k].(map[string]any)
+		coin, _ := currencies[fmt.Sprint(shop["currency"])].(map[string]any)
+		if fmt.Sprint(coin["world"]) != "Spiritual World" {
+			continue
+		}
+		buys, _ := shop["buys"].(map[string]any)
+		if buys == nil {
+			buys = map[string]any{}
+		}
+		buys["spirit_herb"] = 40
+		shop["buys"] = buys
+		edited, err := json.Marshal(world)
+		if err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(t.TempDir(), "world.json")
+		if err := os.WriteFile(path, edited, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return path, k
+	}
+	t.Fatal("no Spiritual shop in the world file; the reader is broken, not the tree")
+	return "", ""
 }

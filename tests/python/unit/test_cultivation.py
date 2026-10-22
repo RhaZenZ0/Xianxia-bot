@@ -409,7 +409,7 @@ class TheCultivateReplyDoesNotTellATraineeToStop(unittest.TestCase):
         # its refusal names the path; the reply keeps no branch for a result
         # that can no longer arrive.
         self.assertIn("func perfectionCapped(", GO_CULTIVATION)
-        self.assertIn("**/ascend → Perfection**", GO_CULTIVATION, "the refusal does not point at the path")
+        self.assertIn("**/cultivation → Perfection**", GO_CULTIVATION, "the refusal does not point at the path")
         self.assertNotIn("as deep as meditation takes it", inspect.getsource(self.module._full_stage_line),
                          "the reply still carries a branch for a session the engine now refuses")
 
@@ -425,17 +425,17 @@ class TheCultivateReplyDoesNotTellATraineeToStop(unittest.TestCase):
             with self.subTest(body=body):
                 none = self.module._breakthrough_ready_line({"ready": True, "perfection_active": False}, 9, body=body)
                 self.assertIn(full, none)
-                self.assertIn("/ascend → Perfection → Start", none)
+                self.assertIn("/cultivation → Perfection → Start", none)
                 walking = self.module._breakthrough_ready_line({"ready": True, "perfection_active": True}, 9, body=body)
                 self.assertIn(full, walking)
-                self.assertIn("Continue the path under **/ascend → Perfection**", walking)
+                self.assertIn("Continue the path under **/cultivation → Perfection**", walking)
                 self.assertNotIn("Start", walking, "the reply tells somebody walking the path to start it")
                 # An engine that does not say is read as having none: the line this reply always printed.
                 self.assertEqual(self.module._breakthrough_ready_line({"ready": True}, 9, body=body), none)
 
     def test_below_stage_nine_and_unready_the_lines_are_as_they_were(self):
         self.assertEqual(self.module._breakthrough_ready_line({"ready": False, "perfection_active": True}, 9, body=False), "")
-        self.assertIn("You are ready to attempt **/ascend → Main Progression → Breakthrough**",
+        self.assertIn("You are ready to attempt **/cultivation → Cultivate → Breakthrough**",
                       self.module._breakthrough_ready_line({"ready": True}, 4, body=False))
         self.assertIn("Your body is ready for **/cultivation → Body → Breakthrough**",
                       self.module._breakthrough_ready_line({"ready": True}, 4, body=True))

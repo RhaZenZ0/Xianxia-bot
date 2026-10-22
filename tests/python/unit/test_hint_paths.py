@@ -103,7 +103,7 @@ class AStepMayNameAnActionOrAPage(unittest.TestCase):
         for hub, step, expected in (
             ("family", "Leave", "/family leave"),
             ("family", "Investigate", "/family investigate"),  # a different page
-            ("abode", "Revoke", "/abode revoke"),
+            ("home", "Revoke", "/abode revoke"),  # the Home hub since v1.38.0
             ("beast", "Tame", "/beast tame"),
         ):
             with self.subTest(hub=hub, step=step):

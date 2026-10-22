@@ -468,7 +468,7 @@ async def sect_recruitment_recommendation(interaction: discord.Interaction, npc:
     else:
         lines=[
             f"**{npc}** will not vouch for you yet. You may ask again after a world day.",
-            f"Standing with the **{sect_name}** makes a sponsor likelier to agree: whoever keeps its gate has entry-level work open to those in no sect (**/npc → People → Talk** there).",
+            f"Standing with the **{sect_name}** makes a sponsor likelier to agree: whoever keeps its gate has entry-level work open to those in no sect (**/world → People → Talk** there).",
         ]
     progressed=[]
     if r.get('new_sect'):

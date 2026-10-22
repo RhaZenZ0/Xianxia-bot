@@ -403,7 +403,7 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 			return authoritativeMutation{}, err
 		}
 		if capped {
-			return authoritativeMutation{}, errors.New("this stage is full and your Perfection path is as deep as meditation takes it; work the path under **/ascend → Perfection** - its quest or its trial - or abandon it, before meditating again")
+			return authoritativeMutation{}, errors.New("this stage is full and your Perfection path is as deep as meditation takes it; work the path under **/cultivation → Perfection** - its quest or its trial - or abandon it, before meditating again")
 		}
 	}
 	gain := attempted

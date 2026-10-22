@@ -118,10 +118,10 @@ class TheContentReaches(unittest.TestCase):
 
     def test_the_personal_world_page_opens_where_the_engine_does(self):
         pages = CONTENT["feature_unlocks"]["pages"]
-        self.assertEqual(int(pages.get("innerworld / Personal World") or 0), int(CONTENT["personal_world_system"]["min_realm_index"]),
+        self.assertEqual(int(pages.get("home / Personal World") or 0), int(CONTENT["personal_world_system"]["min_realm_index"]),
                          "the Personal World page opens at a realm the engine refuses the world at")
         script = code_only((PROJECT_ROOT / "scripts" / "author_feature_unlocks.py").read_text(encoding="utf-8"))
-        self.assertIn('"innerworld / Personal World": PERSONAL_WORLD_FLOOR', script, "the authoring script writes the page's floor by hand again")
+        self.assertIn('"home / Personal World": PERSONAL_WORLD_FLOOR', script, "the authoring script writes the page's floor by hand again")
         self.assertIn("personal_world_system", script, "the authoring script no longer reads the floor off the content")
 
 

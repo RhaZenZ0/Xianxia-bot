@@ -1,4 +1,4 @@
-"""Player property: /abode, /array, /innerworld and spatialkey.
+"""Player property: the abode and innerworld groups (the Home hub since v1.38.0), /array and spatialkey.
 
 Split phase 9b (v0.19.45, docs/history/MAIN_SPLIT_PLAN.md). Cut verbatim from
 main.py in definition order; reads only modules below main.py.
@@ -40,7 +40,7 @@ async def abode_establish(interaction:discord.Interaction,name:str)->None:
     wt=await current_world_time()
     # One home, one shape (v0.30.1): the engine founds the homestead - a
     # cultivation chamber and a storeroom - and everything else is built
-    # with /abode → Upgrade. There is no type to choose at the door.
+    # with /home → Upgrade. There is no type to choose at the door.
     try:
         envelope=await ENGINE.authoritative_action("abode.establish",interaction.user.id,{"name":name},action_id=f"discord:{interaction.id}:abode.establish")
         result=dict(envelope.get("result") or {})
@@ -49,7 +49,7 @@ async def abode_establish(interaction:discord.Interaction,name:str)->None:
     unbuilt=player_property_unbuilt(result)
     await interaction.followup.send(
         f"🏡 **{result.get('name',name)}** founded at **{result.get('base_location','your location')}**: a cultivation chamber and a storeroom.\n"
-        + (f"Not yet built: {', '.join(unbuilt)}. Use **/abode → Upgrade** to build one." if unbuilt else ""),
+        + (f"Not yet built: {', '.join(unbuilt)}. Use **/home → Upgrade** to build one." if unbuilt else ""),
         ephemeral=False,
     )
 
@@ -71,7 +71,7 @@ async def abode_status(interaction:discord.Interaction)->None:
     if not c:return
     a=await DB.get_abode(interaction.user.id)
     if not a:
-        await interaction.response.send_message("You do not own a player property yet. Use **/abode → Establish**.",ephemeral=False);return
+        await interaction.response.send_message("You do not own a player property yet. Use **/home → Establish**.",ephemeral=False);return
     await interaction.response.defer(ephemeral=False)
     guests=await DB.get_abode_guests(interaction.user.id)
     thread_text=f"<#{a['thread_id']}>" if a.get('thread_id') else "not created"
@@ -89,7 +89,7 @@ async def abode_status(interaction:discord.Interaction)->None:
         f"{player_property_emoji(a)} **{a['name']} — {player_property_label(a)}**\n"
         f"Entrance: **{a['base_location']}** • Grade: **{a['grade']}** • Invited guests: **{len(guests)}**\n"
         f"{body}\n"
-        "A facility is built or raised with **/abode → Upgrade**; Focus grants a room's effect for a while.\n"
+        "A facility is built or raised with **/home → Upgrade**; Focus grants a room's effect for a while.\n"
         f"Private location thread: {thread_text}",
         ephemeral=False,
     )
@@ -351,7 +351,7 @@ async def spatial_key_command(interaction:discord.Interaction,item:str)->None:
         event_key=str(r.get("event_key") or ""),expires_at=float(r.get("ends_at") or time.time()+7200),
         announcement=(
             f"🗝️ **SPATIAL KEY — {name}**\n📍 Entrance: **{r.get('location') or 'Unknown'}**\n{r.get('description','')}\n\n"
-            "Travel there, then use **/realm → Secret Realms → Enter**. The thread below is the shared expedition scene."
+            "Travel there, then use **/adventure → Secret Realms → Enter**. The thread below is the shared expedition scene."
         ),
     )
     where=f"\n💬 **Live event thread:** {thread.mention}" if thread is not None else ""

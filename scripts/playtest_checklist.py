@@ -411,8 +411,8 @@ def build() -> str:
               "The pages moved. These are the ones a player reaches differently than they did "
               "last release, so they are worth one pass each even where the mechanic is untouched.", "",
               "| Loop | Live |", "|---|---|",
-              "| `/ascend` opens; `/quests` is the other thing and still opens | [ ] |",
-              "| `/ascend -> Perfection -> Start` asks Realm or Body, and the Body path still starts | [ ] |",
+              "| `/cultivation` opens on the way up (Perfection, Tribulation / Ascension); `/quests` is the other thing and still opens | [ ] |",
+              "| `/cultivation -> Perfection -> Start` asks Realm or Body, and the Body path still starts | [ ] |",
               "| `/character -> Overview` shows sheet, lifespan, karma, Dao heart, standing, inheritances and soul in one read | [ ] |",
               "| `/character -> Afflictions` shows a buff, a curse and a persistent injury together, and treats one | [ ] |",
               "| `/character -> Consequences` shows an open crime, a bounty and a grudge | [ ] |",

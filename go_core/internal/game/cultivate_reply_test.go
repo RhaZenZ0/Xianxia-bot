@@ -85,7 +85,7 @@ func TestTheCultivateReplyKnowsWhetherAPerfectionPathIsOpen(t *testing.T) {
 			// the path (v1.35.0). It used to gather nothing, bank nothing and
 			// spend the cooldown, and the reply said so afterwards.
 			_, err := trainAtAFullStageNineErr(t, tc.op, tc.body, open(1000000))
-			if err == nil || !strings.Contains(err.Error(), "as deep as meditation takes it") || !strings.Contains(err.Error(), "/ascend → Perfection") {
+			if err == nil || !strings.Contains(err.Error(), "as deep as meditation takes it") || !strings.Contains(err.Error(), "/cultivation → Perfection") {
 				t.Fatalf("a path trained to its cap: err=%v, want the session refused and pointed at the path", err)
 			}
 		})

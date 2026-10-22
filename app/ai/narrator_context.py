@@ -853,7 +853,7 @@ class NarratorContextBuilder:
                 f"gate {_clip(sect_abode.get('base_location'), 120)}. This is a private residence, not a public realm-capital scene."
             )
         if personal_world:
-            lines.append("Personal-world rule: local laws may only change through canonical /innerworld mechanics; narration cannot invent new world laws.")
+            lines.append("Personal-world rule: local laws may only change through canonical /home → Personal World mechanics; narration cannot invent new world laws.")
 
         deployed_array = state.get("deployed_array")
         if deployed_array:

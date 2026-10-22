@@ -109,7 +109,7 @@ async def secret_enter(interaction: discord.Interaction, realm: str) -> None:
     await interaction.followup.send(
         f"🌀 **{c['name']} enters {info.get('name', result.get('realm_id', 'the secret realm'))}.**\n"
         f"{info.get('description', '')}\n\nFirst area: **{first.get('name', 'Unknown Chamber')}**\n"
-        f"{first.get('description', '')}\nUse **/realm → Secret Realms → Explore**.{thread_ref}",
+        f"{first.get('description', '')}\nUse **/adventure → Secret Realms → Explore**.{thread_ref}",
         ephemeral=False,
     )
     await announce_quest_progress(interaction, progressed)

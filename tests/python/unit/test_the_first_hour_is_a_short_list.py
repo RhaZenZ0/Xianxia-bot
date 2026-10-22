@@ -211,18 +211,19 @@ class TheMenuDrawsTheShape(unittest.TestCase):
     def test_hidden_hubs_are_left_off_and_named_and_the_step_is_at_the_top(self):
         surface, hubs = _modules()
         surface._LAST_HUB.pop(7, None)
-        shape = {"hidden_hubs": {"combat": 2, "abode": 3}, "tutorial": "🧭 Next: **Iron from the Seam** — Break spirit iron out of a seam"}
+        shape = {"hidden_hubs": {"adventure": 2, "home": 3}, "tutorial": "🧭 Next: **Iron from the Seam** — Break spirit iron out of a seam"}
         view = hubs._MENU_BUILDER(owner_id=7, is_admin=False, owner_name="T", facts="📍 **Greenriver Town**", shape=shape)
         buttons, texts = _walk(view)
         labels = [b.label for b in buttons]
-        # Fourteen hubs, the daily five (v1.3.2) and the tools row (v1.22.0);
-        # this tutorial line names no path, so there is no Next button.
-        self.assertEqual(len(labels), 14 + len(surface.DAILY_ACTIONS) + len(surface.MENU_TOOLS), labels)
-        self.assertNotIn("Combat", labels)
-        self.assertNotIn("Abode", labels)
+        # Ten of the twelve hubs (v1.38.0), the daily five (v1.3.2) and the
+        # tools row (v1.22.0); this tutorial line names no path, so there is
+        # no Next button.
+        self.assertEqual(len(labels), 10 + len(surface.DAILY_ACTIONS) + len(surface.MENU_TOOLS), labels)
+        self.assertNotIn("Adventure", labels)
+        self.assertNotIn("Home", labels)
         joined = "\n".join(texts)
-        self.assertIn("**Combat**", joined)
-        self.assertIn("**Abode**", joined)
+        self.assertIn("**Adventure**", joined)
+        self.assertIn("**Home**", joined)
         self.assertIn("/locked", joined)
         self.assertIn("Iron from the Seam", joined)
         self.assertIn("Foundation Establishment", joined)
@@ -231,7 +232,7 @@ class TheMenuDrawsTheShape(unittest.TestCase):
         surface, hubs = _modules()
         surface._LAST_HUB.pop(7, None)
         buttons, texts = _walk(hubs._MENU_BUILDER(owner_id=7, is_admin=False, owner_name="T", facts="x"))
-        self.assertEqual(len(buttons), 16 + len(surface.DAILY_ACTIONS) + len(surface.MENU_TOOLS))
+        self.assertEqual(len(buttons), 12 + len(surface.DAILY_ACTIONS) + len(surface.MENU_TOOLS))  # twelve hubs since v1.38.0
         self.assertNotIn("/locked", "\n".join(texts))
 
     def test_both_doors_into_the_menu_ask_the_one_provider(self):
@@ -259,7 +260,7 @@ class TheMenuDrawsTheShape(unittest.TestCase):
         self.assertIn("Iron from the Seam", shape["tutorial"])
         self.assertIn("Hunt", shape["tutorial"])
         self.assertNotIn("Mine**", shape["tutorial"])
-        self.assertIn("combat", shape["hidden_hubs"])
+        self.assertIn("adventure", shape["hidden_hubs"])
 
     def test_nobody_without_a_character_is_shown_less(self):
         surface, _ = _modules()

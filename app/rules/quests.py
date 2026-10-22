@@ -365,7 +365,7 @@ OBJECTIVE_TYPES: dict[str, dict[str, Any]] = {
     "black_market": {"target": None, "label": "", "untargeted": "Buy or fence something at a hidden post"},
     "perfection_start": {"target": None, "label": "", "untargeted": "Begin a Perfect Path at the ninth stage"},
     "realm_enter": {"target": "secret_realm", "label": "Enter the {target}", "untargeted": "Enter an open secret realm"},
-    # Reported by `/ascend → Tribulation / Ascension → Attempt` only when the
+    # Reported by `/cultivation → Tribulation / Ascension → Attempt` only when the
     # three waves are survived; the ascension quest the engine then hands over
     # asks for the seam, so this stops where that one starts.
     "tribulation_cleared": {"target": None, "label": "", "untargeted": "Survive a world-crossing tribulation"},
@@ -378,7 +378,7 @@ OBJECTIVE_TYPES: dict[str, dict[str, Any]] = {
     # own, a generated name no catalogue could validate.
     "family_lesson": {"target": None, "label": "", "untargeted": "Take the head of the house's last lesson and pass its test"},
     # The two halves of an ascension (v1.0.0-rc.44), reported by
-    # `/ascend -> Tribulation / Ascension -> Gate` and by `/travel ->
+    # `/cultivation -> Tribulation / Ascension -> Gate` and by `/travel ->
     # Teleportation Arrays -> Use` when the transit changed world. A crossing
     # is anchored wherever the cultivator was standing when the lightning found
     # them, so no location can be named in advance; the world crossed into can
@@ -405,7 +405,7 @@ OBJECTIVE_TYPES: dict[str, dict[str, Any]] = {
     # door on the ladder. `law_comprehend` is reported by `/cultivation → Laws
     # → Comprehend` on any gain, `law_technique` by Technique when one
     # manifests (out of a battle) or lands (in one), `personal_world` by
-    # `/innerworld → Create` once the engine has made it.
+    # `/home → Personal World → Create` once the engine has made it.
     "law_comprehend": {"target": "law", "label": "Comprehend the Law of {target}", "untargeted": "Comprehend a Law"},
     "law_technique": {"target": "law_technique", "label": "Manifest {target}", "untargeted": "Manifest a Law technique"},
     "personal_world": {"target": None, "label": "", "untargeted": "Stabilize a personal world"},
@@ -432,37 +432,37 @@ OBJECTIVE_TYPES: dict[str, dict[str, Any]] = {
 # holds each type here and every path to one a panel resolves.
 OBJECTIVE_PATHS: dict[str, str] = {
     "explore": "**/world → Act → Explore**",
-    "talk": "**/npc → People → Talk**",
+    "talk": "**/world → People → Talk**",
     "scene_action": "**/action**",
     "sect_discovery": "**/world → City → Envoys**",
     "sect_trial": "**/sect → Recruitment → Trial**",
     "cultivate": "**/cultivate**",
     "travel": "**/travel → Destinations → Go**",
     "combat_win": "**/hunt**",
-    "craft": "**/craft → General Crafting → Craft**",
+    "craft": "**/craft → Alchemy → Craft**",
     "trade": "**/economy → City Shops → Buy**",
     "gather": "**/forage**",
     "breakthrough": "**/breakthrough**",
     "flame_capture": "**/craft → Flames → Capture**",
-    "raid_win": "**/combat → Boss Raids → Claim**",
+    "raid_win": "**/adventure → Boss Raids → Claim**",
     "black_market": "**/economy → Black Market → Buy**",
-    "perfection_start": "**/ascend → Perfection → Start**",
-    "realm_enter": "**/realm → Secret Realms → Enter**",
-    "tribulation_cleared": "**/ascend → Tribulation / Ascension → Attempt**",
+    "perfection_start": "**/cultivation → Perfection → Start**",
+    "realm_enter": "**/adventure → Secret Realms → Enter**",
+    "tribulation_cleared": "**/cultivation → Tribulation / Ascension → Attempt**",
     "return_home": "**/family → Enter**",
     "family_lesson": "**/family → Hearth → Lesson**",
-    "ascension_gate": "**/ascend → Tribulation / Ascension → Gate**",
+    "ascension_gate": "**/cultivation → Tribulation / Ascension → Gate**",
     "world_cross": "**/travel → Teleportation Arrays → Use**",
     "profession_exam": "**/craft → Profession → Profession Exam**",
     "law_comprehend": "**/cultivation → Laws → Comprehend**",
     "law_technique": "**/cultivation → Laws → Technique**",
-    "personal_world": "**/innerworld → Personal World → Create**",
+    "personal_world": "**/home → Personal World → Create**",
     "beast_tame": "**/beast → Companions → Tame**",
     "beast_evolve": "**/beast → Companions → Evolve**",
     "flame_refine": "**/craft → Flames → Refine**",
     "spirit_settle": "**/craft → Spirit Sense → Settle**",
-    "perfection_complete": "**/ascend → Perfection → Trial**",
-    "abode_upgrade": "**/abode → Property → Upgrade**",
+    "perfection_complete": "**/cultivation → Perfection → Trial**",
+    "abode_upgrade": "**/home → Property → Upgrade**",
 }
 
 
@@ -489,7 +489,7 @@ HOUSEHOLD_STANDING_REWARD_MAX = 25
 MAX_OBJECTIVES = 4
 MAX_OBJECTIVE_COUNT = 5
 # A label is the line a card prints for an objective. The realm road's carry the
-# command to press in bold ("**/craft → General Crafting → Craft**") and the
+# command to press in bold ("**/craft → Alchemy → Craft**") and the
 # longest runs to 113; a cap below that cut the closing ** off the saved copy of
 # a quest a GM merely opened and saved. A gate holds every shipped label under it.
 MAX_OBJECTIVE_LABEL = 200

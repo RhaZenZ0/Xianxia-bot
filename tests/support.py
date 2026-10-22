@@ -936,3 +936,45 @@ def suite_test_files() -> list[str]:
     """Every test file pytest collects, relative to the repository, in a
     stable order - the deck `shard_assignment` deals."""
     return sorted(p.relative_to(PROJECT_ROOT).as_posix() for p in TESTS_ROOT.rglob("test_*.py"))
+
+
+def cheapest_shelf_in_coin(world: dict, item_id: str, currency: str) -> int | None:
+    """The cheapest shelf anywhere for `item_id`, in whole coins of `currency`,
+    carried along the currency ladder rounding down - the content twin of the
+    engine's `cheapestShelfPrice` (v1.34.0), for content gates that must know
+    whether any whole coin of a world can pay for a thing (v1.38.0). None when
+    nothing sells it. The ladder is read off the content file: each world's
+    tier-2 coin's `base_ratio` is the rung, as `worldLadderRung` reads it.
+    """
+    currencies = world["currencies"]
+    worlds: list[str] = []
+    for definition in currencies.values():
+        if definition.get("world") not in worlds:
+            worlds.append(str(definition["world"]))
+    rung = {}
+    for definition in currencies.values():
+        if int(definition.get("tier") or 0) == 2 and definition.get("base_ratio"):
+            rung[str(definition["world"])] = int(definition["base_ratio"])
+    coin_world = {key: str(definition["world"]) for key, definition in currencies.items()}
+
+    def convert(price: int, frm: str, to: str) -> int:
+        steps = worlds.index(coin_world[to]) - worlds.index(coin_world[frm])
+        if steps == 0:
+            return price
+        lower = coin_world[frm] if steps > 0 else coin_world[to]
+        rate = rung.get(lower, 100) ** abs(steps)
+        return price // rate if steps > 0 else price * rate
+
+    best: int | None = None
+    merchants = world.get("merchants") or {}
+    for merchant in (merchants.values() if isinstance(merchants, dict) else merchants):
+        for ware in merchant.get("wares") or []:
+            if ware.get("item_id") == item_id and int(ware.get("price") or 0) > 0:
+                value = convert(int(ware["price"]), merchant["currency"], currency)
+                best = value if best is None else min(best, value)
+    for shop in world["shops"].values():
+        for line in shop.get("sells") or []:
+            if line["item_id"] == item_id and int(line.get("price") or 0) > 0:
+                value = convert(int(line["price"]), shop["currency"], currency)
+                best = value if best is None else min(best, value)
+    return best

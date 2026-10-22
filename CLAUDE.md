@@ -164,7 +164,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 82; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 83; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### Subsystem notes (`docs/ARCHITECTURE.md`)
@@ -206,7 +206,7 @@ wire missing, so before calling a change done, ask which door still does not rea
 
 **Values and failures**
 
-- **A fallback that looks like a value is not a sentinel (rc.28).** `seller_user_id=0`, `gradeIndex` (rc.55), `0 or 50` (v1.0.13), a missing era key read as 0 (v1.0.7): ask whether a field is absent, never whether it is falsy; an unknown key refuses or answers 1, never the bottom rung; an unreadable reading says "unknown", never a zero (v1.0.8).
+- **A fallback that looks like a value is not a sentinel (rc.28).** `seller_user_id=0`, `gradeIndex` (rc.55), `0 or 50` (v1.0.13), a missing era key read as 0 (v1.0.7): ask whether a field is absent, never whether it is falsy; an unknown key refuses or answers 1, never the bottom rung; an unreadable reading says "unknown", never a zero (v1.0.8). A JSON number decoded into `any` is a float64 and a Discord id is above 2^53: a payload map is read with `UseNumber` or as `RawMessage`, never `map[string]any` (v1.38.0).
 - **One system's error ends the tick (`npc_consignments`, rc.28).** `runSystems` returns on the first error and takes every batch ordered after it; a batch skips a bad row and never returns an error over one row's data. What the systems before the error committed is reported beside it, not thrown away (v1.34.0): a run that answers 400 with the spawned events inside it leaves rows nobody is told to open.
 - **Read back on a fresh connection (rc.38).** A test that writes and reads on one open connection cannot see a handler that never committed (`npcFound`); drive the production dispatch with the real world file (v1.0.11).
 - **State a player sits behind is settled by the action, not by a flag-gated sweep (rc.56, v1.0.4);** a lock on state only an action can clear self-clears unconditionally, and the way out stays open.
@@ -221,7 +221,7 @@ wire missing, so before calling a change done, ask which door still does not rea
 - **A browser id is a window property (v1.34.0).** An element whose id spells a name the window already owns (`setInterval`) is unreachable by bare reference and its control is silently dead; a gate holds every dashboard id off the Window properties.
 - **Fix every site of a rule, not the one reported.** Craft and forage (v1.0.3), the picker's three siblings (v1.0.8), `/stall` then `/boss` (v1.7.4, v1.7.10), five channel helpers (rc.59), nine doors (v1.12.3): grep for the siblings before calling it fixed.
 - **A change reaches the worlds already running.** Re-parent, migrate or grandfather (rc.51, rc.59, migrations 55 and 62), and a new rule never shortens what a player has already committed to (rc.56).
-- **Migrations.** A shipped one is frozen and carries frozen copies of the content it rewrites (migration 46, v1.19.1); a column a migration adds is not also in the base DDL (rc.57); a chain changed in content needs a migration (v1.23.2); a read of a newer table or column is guarded so the migration window degrades instead of failing (v1.1.0).
+- **Migrations.** A shipped one is frozen and carries frozen copies of the content it rewrites (migration 46, v1.19.1); a column a migration adds is not also in the base DDL (rc.57); a chain changed in content needs a migration (v1.23.2); a read of a newer table or column is guarded so the migration window degrades instead of failing (v1.1.0). A `replace()` over a JSON column matches both spellings of anything outside ASCII: the Python seeding escapes an arrow to `\u2192` and the engine writes it raw (v1.38.0).
 - **An engine `.env` key needs a compose passthrough (rc.39).** The engine service has an explicit `environment:` allowlist and no `env_file`; a default stated in the Go table, `.env.example` and compose must agree (v1.0.13).
 - **The bot allows itself before it denies anybody (rc.52).** Discord overwrites are merged, never replaced (v1.0.11), and reach channels that already exist (rc.59, v1.7.1).
 

@@ -141,7 +141,7 @@ register_hub_option_hint(
     artifact_bond,
     "item",
     "You are carrying nothing to bond with. Pick something up first — buy it with "
-    "**/economy → Local Market → Buy**, forge it with **/craft → General Crafting → Craft**, or find it exploring.",
+    "**/economy → Local Market → Buy**, forge it with **/craft → Alchemy → Craft**, or find it exploring.",
 )
 register_hub_option_hint(
     artifact_awaken,

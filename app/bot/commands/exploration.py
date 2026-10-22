@@ -267,7 +267,7 @@ def _wilds_lines(location: str) -> str:
     lines = f"\nIt lies in the wilds of **{city}**; no road runs there, and **/travel** takes you straight to it."
     for boss in BOSS_TEMPLATES.values():
         if boss_lair(boss, WORLD.secret_realms)[0] == location:
-            lines += f"\n👹 **{boss['name']}** keeps its lair here - a party raid from **{WORLD.realm_name(int(boss['realm_index']))}** (**/combat → Boss Raids**)."
+            lines += f"\n👹 **{boss['name']}** keeps its lair here - a party raid from **{WORLD.realm_name(int(boss['realm_index']))}** (**/adventure → Boss Raids**)."
     return lines
 
 
@@ -432,7 +432,7 @@ async def explore(interaction: discord.Interaction) -> None:
                 surprise_text += (
                     f"\n🌀 **Secret Realm Opened: {surprise.get('realm_name') or surprise.get('title','Secret Realm')}**\n"
                     f"{surprise.get('realm_description','')}\nThe entrance remains unstable for about **{int(surprise.get('open_hours') or 8)}h**. "
-                    "Use **/realm → Secret Realms → Enter**."
+                    "Use **/adventure → Secret Realms → Enter**."
                 )
                 event_thread = await spawn_event_thread(
                     interaction,title=str(surprise.get("realm_name") or surprise.get("title") or "Secret Realm"),event_type="secret_realm",
@@ -441,7 +441,7 @@ async def explore(interaction: discord.Interaction) -> None:
                         f"🌀 **{str(surprise.get('category') or 'SECRET REALM').upper()} — {surprise.get('realm_name') or surprise.get('title','Secret Realm')}**\n"
                         f"📍 Entrance: **{surprise.get('location') or c['location']}**\n{surprise.get('description','')}\n{surprise.get('realm_description','')}\n\n"
                         f"The entrance remains open for about **{int(surprise.get('open_hours') or 8)}h**. "
-                        "Travel there, then use **/realm → Secret Realms → Enter**. The thread below is the shared expedition scene."
+                        "Travel there, then use **/adventure → Secret Realms → Enter**. The thread below is the shared expedition scene."
                     ),
                 )
         if event_thread is not None:

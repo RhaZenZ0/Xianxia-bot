@@ -54,7 +54,7 @@ async def duel_challenge(interaction: discord.Interaction, member: discord.Membe
     window = f"**{ttl // 60} minutes**" if ttl >= 60 else f"**{ttl} seconds**"
     await interaction.response.send_message(
         f"⚔️ <@{member.id}> receives consent duel challenge `#{challenge_id}` from <@{interaction.user.id}>. "
-        f"Stakes: **{stakes[:200]}**. It expires in {window}; use **/combat → Duels → Respond**."
+        f"Stakes: **{stakes[:200]}**. It expires in {window}; use **/adventure → Duels → Respond**."
     )
 
 
@@ -85,7 +85,7 @@ async def duel_respond(interaction: discord.Interaction, challenge_id: int, deci
         )
     elif decision.value == "accept":
         await interaction.followup.send(
-            f"⚔️ Duel accepted. Nonlethal PvP match **#{result['match_id']}** begins; challenger acts first. Use **/combat → Duels → Act**."
+            f"⚔️ Duel accepted. Nonlethal PvP match **#{result['match_id']}** begins; challenger acts first. Use **/adventure → Duels → Act**."
         )
     else:
         await interaction.followup.send("🤝 Duel rejected. No combat state was created.")

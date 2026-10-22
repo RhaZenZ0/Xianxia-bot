@@ -19,6 +19,7 @@ import json
 import unittest
 
 from tests.support import PROJECT_ROOT
+from tests.support import cheapest_shelf_in_coin
 
 EXPLORATION = (PROJECT_ROOT / "app" / "bot" / "commands" / "exploration.py").read_text(encoding="utf-8")
 GO = PROJECT_ROOT / "go_core" / "internal"
@@ -140,6 +141,12 @@ class TheArtifactsAreRealGoods(unittest.TestCase):
                 if line["item_id"] not in FLIGHT:
                     continue
                 with self.subTest(shop=key, item=line["item_id"]):
+                    # A keeper whose coin cannot pay a whole unit for the artifact
+                    # (the cheapest shelf anywhere, carried up the ladder, asks
+                    # under one coin) buys it back nowhere: the engine refuses the
+                    # line and the content gate forbids a dead one (v1.38.0).
+                    if (cheapest_shelf_in_coin(WORLD, line["item_id"], shop["currency"]) or 0) < 1:
+                        continue
                     self.assertIn(line["item_id"], shop["buys"], "sold but not bought back")
                     self.assertLess(int(shop["buys"][line["item_id"]]), int(line["price"]), "a keeper does not pay retail")
 
