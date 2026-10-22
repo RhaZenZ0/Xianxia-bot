@@ -139,7 +139,7 @@ MUST_RESOLVE: dict[str, str] = {
 }
 REFUSAL_ACCEPTED: dict[str, str] = {
     "/cultivate": "the daily five (section 5) resolve it and leave it on cooldown; the refusal is the cooldown read back",
-    "/merchant buy": "the picker offers every merchant and the first is out of reach; the reach rule is the engine's and holds (recorded in docs/TODO.md)",
+    "/merchant buy": "no merchant walks within reach of the sweep's player; since v1.39.0 the picker offers only who is meetable, so the press meets an empty picker with its hint, and a merchant that does stand here is refused by nothing",
     "/family enter": "the player's household stands in another city; entering it from here is the refusal",
     "/family house invite": "the member picker is answered with a cultivator who has no character, by design (nothing here reaches the player)",
     "/admin player erase": "the confirm word must be typed exactly; a generic answer is refused by design",
