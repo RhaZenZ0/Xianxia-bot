@@ -164,8 +164,7 @@ func qiStormBonus(conn *storage.Conn, location string, now float64) (int64, erro
 		return 0, err
 	}
 	for _, r := range res.Rows {
-		var p map[string]any
-		if json.Unmarshal([]byte(fmt.Sprint(r[0])), &p) == nil && fmt.Sprint(p["definition_id"]) == "qi_storm" {
+		if p, err := decodeJSONMapStrict(fmt.Sprint(r[0])); err == nil && fmt.Sprint(p["definition_id"]) == "qi_storm" {
 			return 4, nil
 		}
 	}

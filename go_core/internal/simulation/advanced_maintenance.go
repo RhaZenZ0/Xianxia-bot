@@ -755,8 +755,13 @@ func (r *Runner) advanceCaravans(conn *storage.Conn, gm int64) (int64, error) {
 		}
 		// A caravan's risk is the age of the world its road departs from.
 		rm := r.eraTermFor(byWorld, fmt.Sprint(c["origin"]), "caravan_risk", .25)
+		// Decoded with UseNumber (v1.39.0): a number read into `any` through
+		// encoding/json is a float64, and the gate that holds every payload
+		// decode to that rule reads this one too. ParseInt reads a json.Number.
 		cargo := map[string]any{}
-		_ = json.Unmarshal([]byte(fmt.Sprint(c["cargo_json"])), &cargo)
+		cargoDecoder := json.NewDecoder(strings.NewReader(fmt.Sprint(c["cargo_json"])))
+		cargoDecoder.UseNumber()
+		_ = cargoDecoder.Decode(&cargo)
 		payout := max64(0, i64(cargo["_payout"]))
 		currency := fmt.Sprint(cargo["_currency"])
 		if currency == "" {

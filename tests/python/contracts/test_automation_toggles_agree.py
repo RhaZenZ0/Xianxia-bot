@@ -51,6 +51,10 @@ def _function(tree: ast.AST, name: str) -> ast.AST:
 
 def _first_dict_assigned(fn: ast.AST, target: str) -> dict[str, bool]:
     for node in ast.walk(fn):
+        # A plain or an annotated assignment (`X: dict[str, bool] = {...}`,
+        # the module-level shape since v1.39.0).
+        if isinstance(node, ast.AnnAssign) and isinstance(node.value, ast.Dict) and isinstance(node.target, ast.Name) and node.target.id == target:
+            return _dict_of_bools(node.value)
         if isinstance(node, ast.Assign) and isinstance(node.value, ast.Dict):
             if any(isinstance(t, ast.Name) and t.id == target for t in node.targets):
                 return _dict_of_bools(node.value)
@@ -63,14 +67,10 @@ def core_defaults() -> dict[str, bool]:
 
 
 def dashboard_defaults() -> dict[str, bool]:
+    # One module-level dict since v1.39.0 (AUTOMATION_DEFAULTS): the overview
+    # page and the attention feed both read the toggles through it.
     tree = ast.parse((PROJECT_ROOT / "app" / "dashboard" / "server.py").read_text(encoding="utf-8"))
-    found: dict[str, bool] = {}
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            got = _first_dict_assigned(node, "automation")
-            if got:
-                found = got
-    return found
+    return _first_dict_assigned(tree, "AUTOMATION_DEFAULTS")
 
 
 def discord_choices() -> set[str]:

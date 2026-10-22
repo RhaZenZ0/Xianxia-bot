@@ -5,6 +5,7 @@ import base64
 import hmac
 import difflib
 import json
+import math
 from functools import lru_cache
 import logging
 import os
@@ -34,6 +35,7 @@ from ..version import INSTALLED_VERSION
 from ..database.core import COMMAND_USAGE_DAYS, _usage_cutoff_day
 from ..database.remote import GoDatabaseTransport, RemoteDatabaseError
 from ..ops.game_engine import GameEngineClient, GameEngineError
+from ..ops.config import SIMULATION_PASS_SECONDS
 
 # Release-blocking browser/API/schema contract shared with the standard checker.
 from .contract import (
@@ -349,6 +351,55 @@ def _quest_source(row: dict[str, Any]) -> str:
     if str(row.get("source_key") or "").startswith("history:") or str(row.get("origin") or "") == "world_event":
         return "world_event"
     return "forge"
+
+
+# Every system the engine's adminAutomationSet accepts, at its default (every
+# system on; routine narration off). tests/python/contracts/test_automation_toggles_agree.py
+# holds the Go table, core.py, the Discord choices and this dict equal.
+AUTOMATION_DEFAULTS: dict[str, bool] = {
+    "event_expiry": True,
+    "auction_settlement": True,
+    "unexpected_events": True,
+    "maintenance_cleanup": True,
+    "npc_civilization": True,
+    "npc_life": True,
+    "sect_politics": True,
+    "dynamic_economy": True,
+    "clan_dynamics": True,
+    "background_seclusion": True,
+    "black_markets": True,
+    "autonomous_world_events": True,
+    "npc_consignments": True,
+    "merchants": True,
+    "secret_realms": True,
+    "ai_routine_narration": False,
+}
+
+
+def _simulation_behind(row: dict[str, Any], automation: dict[str, bool], scale: Any) -> bool:
+    """Whether a simulation system has missed a tick of its own (v1.39.0).
+
+    `lag_game_minutes` is the engine's reading: game minutes since the system
+    last ran. A system is due once that passes its interval, and the bot's
+    worker runs the due systems every SIMULATION_PASS_SECONDS, so between two
+    passes a healthy system reads a little past its interval - at ×4 time the
+    header said "1 system behind" for one that was fine and cleared a minute
+    later. Behind means further past the interval than two passes at the
+    clock's scale. A system the GM switched off is never behind: its clock
+    stands still on purpose, and the feed would otherwise cry wolf forever."""
+    system = str(row.get("system") or "")
+    if not automation.get(system, True):
+        return False
+    interval = int(row.get("interval_game_minutes") or 0)
+    lag = int(row.get("lag_game_minutes") or 0)
+    if interval <= 0:
+        return False
+    try:
+        minutes_per_real_minute = max(1.0, float(scale or 1))
+    except (TypeError, ValueError):
+        minutes_per_real_minute = 1.0
+    grace = math.ceil(2 * SIMULATION_PASS_SECONDS / 60.0 * minutes_per_real_minute)
+    return lag > interval + grace
 
 
 class _QuestWorld:
@@ -753,6 +804,20 @@ class ReadOnlyDashboardStore:
             return {"schema_version": schema, "clock": clock, "counts": counts, "simulations": sims,
                     "active_eras": eras, "recent_history": recent, "attention": attention}
 
+    async def _automation_settings(self, db) -> dict[str, bool]:
+        """The GM's automation toggles as stored, over the engine's defaults
+        (every system on; narration off). The attention feed reads them so a
+        system switched off is not reported as behind."""
+        automation = dict(AUTOMATION_DEFAULTS)
+        try:
+            row = await self._fetchone(db, "SELECT value_json FROM world_state WHERE key='automation_settings'")
+            if row:
+                stored = json.loads(str(row.get("value_json") or "{}"))
+                automation = {k: bool(stored.get(k, v)) for k, v in automation.items()}
+        except Exception:  # noqa: BLE001 - a feed line costs the line, not the card
+            pass
+        return automation
+
     async def _attention(self, db, clock: dict[str, Any], sims: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """The handful of rows a GM would otherwise have to go looking for (v0.25.0).
 
@@ -786,13 +851,18 @@ class ReadOnlyDashboardStore:
                     "view": "quests", "action": "Review",
                 })
 
-        # A system that is further behind than its own interval has missed a
-        # tick, which is the only lag reading that means anything: a 720-minute
-        # system 200 minutes behind is early, not late.
+        # A system that has missed a whole tick of its own, which is the only
+        # lag reading that means anything: a 720-minute system 200 minutes
+        # behind is early, not late. And a system between two ticks is not
+        # late either (v1.39.0): at ×4 time the lag passes the interval a
+        # minute or two before the scheduler's next pass clears it, and the
+        # header said "1 system behind" for a system that was fine. A system
+        # the GM switched off is never late: its clock stands still on purpose.
+        automation = await self._automation_settings(db)
         for row in sims:
-            interval = int(row.get("interval_game_minutes") or 0)
-            lag = int(row.get("lag_game_minutes") or 0)
-            if interval and lag > interval:
+            if _simulation_behind(row, automation, clock.get("scale")):
+                interval = int(row.get("interval_game_minutes") or 0)
+                lag = int(row.get("lag_game_minutes") or 0)
                 items.append({
                     "kind": "simulation_lag", "severity": "bad", "count": lag,
                     "text": f"{row.get('system')} is {lag} game-minutes behind a {interval}-minute interval",
@@ -2929,31 +2999,7 @@ class AdminDashboardController:
             # Every system the engine's adminAutomationSet accepts, at its default;
             # tests/python/contracts/test_automation_toggles_agree.py holds the Go
             # table, core.py, the Discord choices and this list equal.
-            automation = {
-                "event_expiry": True,
-                "auction_settlement": True,
-                "unexpected_events": True,
-                "maintenance_cleanup": True,
-                "npc_civilization": True,
-                "npc_life": True,
-                "sect_politics": True,
-                "dynamic_economy": True,
-                "clan_dynamics": True,
-                "background_seclusion": True,
-                "black_markets": True,
-                "autonomous_world_events": True,
-                "npc_consignments": True,
-                "merchants": True,
-                "secret_realms": True,
-                "ai_routine_narration": False,
-            }
-            row = await self.store._fetchone(db, "SELECT value_json FROM world_state WHERE key='automation_settings'")
-            if row:
-                try:
-                    stored = json.loads(str(row.get("value_json") or "{}"))
-                    automation = {k: bool(stored.get(k, v)) for k, v in automation.items()}
-                except Exception:
-                    pass
+            automation = await self.store._automation_settings(db)
             maintenance_mode = {"enabled": False, "reason": ""}
             row = await self.store._fetchone(db, "SELECT value_json FROM world_state WHERE key='maintenance_mode'")
             if row:

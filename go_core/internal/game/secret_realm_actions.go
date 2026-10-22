@@ -68,8 +68,8 @@ func secretRealmStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 		if len(row) < 5 {
 			continue
 		}
-		var payload map[string]any
-		if json.Unmarshal([]byte(fmt.Sprint(row[2])), &payload) != nil {
+		payload, err := decodeJSONMapStrict(fmt.Sprint(row[2]))
+		if err != nil {
 			continue
 		}
 		rid := fmt.Sprint(payload["realm_id"])
@@ -134,8 +134,8 @@ func secretRealmEnterAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 		if len(pr.Rows) == 0 {
 			continue
 		}
-		var payload map[string]any
-		if json.Unmarshal([]byte(fmt.Sprint(pr.Rows[0][0])), &payload) != nil {
+		payload, err := decodeJSONMapStrict(fmt.Sprint(pr.Rows[0][0]))
+		if err != nil {
 			continue
 		}
 		if fmt.Sprint(payload["realm_id"]) == rid {

@@ -505,12 +505,17 @@ async def merchant_buy_merchant_autocomplete(interaction:discord.Interaction,cur
     except Exception:
         rows=[]
     needle=current.lower().strip()
+    # Only the merchants within reach (v1.39.0): the engine's merchant.status
+    # answers `meetable` per merchant, and a picker that offered the rest -
+    # labelled, after the reachable ones - offered what merchant.buy refuses
+    # (rc.46). Where none is within reach the picker is empty and its hint
+    # says where they walk; the status page lists them all.
     reachable=[r for r in rows if bool(r.get("meetable"))]
     choices=[]
-    for row in reachable+[r for r in rows if not bool(r.get("meetable"))]:
+    for row in reachable:
         name=str(row.get("name") or row.get("merchant"))
         if needle and needle not in name.lower():continue
-        label=f"{name} — {'within reach' if bool(row.get('meetable')) else str(row.get('whereabouts') or '')}"
+        label=f"{name} — within reach, {_merchant_where(row)}"
         choices.append(app_commands.Choice(name=label[:100],value=str(row.get("merchant"))))
     return choices[:25]
 
@@ -995,6 +1000,11 @@ async def stall_close(interaction:discord.Interaction)->None:
     await refresh_stall(interaction.guild,interaction.user.id)
 
 
+register_hub_option_hint(
+    merchant_buy,
+    "merchant",
+    "No travelling merchant is within reach of where you stand. **/economy → Merchants → Status** says where each one walks and which road they are on; meet them on their road or in their city.",
+)
 register_hub_option_hint(
     stall_list,
     "item",

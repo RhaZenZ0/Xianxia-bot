@@ -1,7 +1,6 @@
 package game
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"xianxia/core/internal/storage"
@@ -44,8 +43,7 @@ func questRewardCurrencyTx(conn *storage.Conn, catalog worlddata.Catalog, userID
 				world = catalog.Locations[home].World
 			}
 			if world == "" {
-				seed := map[string]any{}
-				_ = json.Unmarshal([]byte(fmt.Sprint(r.Rows[0][1])), &seed)
+				seed := decodeJSONMap(r.Rows[0][1])
 				// Asked whether the key is present, not whether it is zero:
 				// realm 0 is a realm.
 				if idx, has := seed["realm_index"]; has {

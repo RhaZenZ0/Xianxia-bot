@@ -75,10 +75,7 @@ func commissionOutsiderStanding(questKey, requiresSect, seedJSON string) int64 {
 	if !strings.HasPrefix(questKey, sectCommissionPrefix) || strings.TrimSpace(requiresSect) == "" {
 		return 0
 	}
-	seed := map[string]any{}
-	if strings.TrimSpace(seedJSON) != "" {
-		_ = json.Unmarshal([]byte(seedJSON), &seed)
-	}
+	seed := decodeJSONMap(seedJSON)
 	return clampI64(i64(seed["outsider_standing"]), 0, outsiderStandingCap)
 }
 

@@ -728,3 +728,27 @@ func TestAReversalDeletesARowOnlyThroughDeleteIfIdle(t *testing.T) {
 		}
 	}
 }
+
+// A lever and its undo on an id the size Discord mints (v1.39.0). The undo
+// reads the player off the audit row's target string, which never rounded, and
+// since v1.39.0 reads the snapshot through the UseNumber door too; this holds
+// the whole round trip - grant, snapshot, reverse - on a real-sized id, so a
+// lever that one day carries an id in its snapshot is covered by the same walk.
+// It is a hold on the wiring, not a drill: the old snapshot decode passes it,
+// because no reverse lever reads an id off a snapshot today.
+func TestAdminUndoLastReachesAPlayerWithASnowflakeId(t *testing.T) {
+	const uid = int64(987654321098765432)
+	path := setupAdminDB(t)
+	batch4Exec(t, path, fmt.Sprintf(`INSERT INTO characters(user_id,name,life_status,location,karma_score,vitality,vitality_max,qi,qi_max,spirit_stones,realm_index,phase) VALUES(%d,'Snowflake','alive','Old Place',0,10,10,10,10,10,0,1)`, uid))
+	applyAdmin(t, path, "admin.player.grant_currency", map[string]any{"user_id": uid, "currency_id": "low_spirit_stone", "amount": 500, "reason": "reward"})
+	if got := storage.ParseInt(scalar(t, path, fmt.Sprintf("SELECT balance FROM currency_wallets WHERE user_id=%d AND currency_id='low_spirit_stone'", uid))); got != 500 {
+		t.Fatalf("the grant reached balance %d, want 500: the forward lever lost the id", got)
+	}
+	undoLast(t, path)
+	if got := storage.ParseInt(scalar(t, path, fmt.Sprintf("SELECT balance FROM currency_wallets WHERE user_id=%d AND currency_id='low_spirit_stone'", uid))); got != 0 {
+		t.Fatalf("after the undo the balance is %d, want 0: the snapshot's user_id was rounded and the reverse lever reached nobody", got)
+	}
+	if got := storage.ParseInt(scalar(t, path, fmt.Sprintf("SELECT spirit_stones FROM characters WHERE user_id=%d", uid))); got != 10 {
+		t.Fatalf("spirit_stones=%d, want the seed's 10 restored", got)
+	}
+}

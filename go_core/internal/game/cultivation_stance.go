@@ -149,8 +149,8 @@ func readWorldStateMap(conn *storage.Conn, key string) (map[string]any, error) {
 	if len(res.Rows) == 0 || len(res.Rows[0]) == 0 {
 		return nil, nil
 	}
-	out := map[string]any{}
-	if err := json.Unmarshal([]byte(fmt.Sprint(res.Rows[0][0])), &out); err != nil {
+	out, err := decodeJSONMapStrict(fmt.Sprint(res.Rows[0][0]))
+	if err != nil {
 		return nil, fmt.Errorf("invalid world_state %s: %w", key, err)
 	}
 	return out, nil

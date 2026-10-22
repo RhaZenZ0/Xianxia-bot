@@ -115,13 +115,35 @@ func inventoryQuantityTx(conn *storage.Conn, userID int64, itemID string) (int64
 }
 
 func decodeJSONMap(raw any) map[string]any {
-	s := strings.TrimSpace(fmt.Sprint(raw))
-	if s == "" || s == "<nil>" {
-		return map[string]any{}
-	}
-	var out map[string]any
-	if json.Unmarshal([]byte(s), &out) != nil || out == nil {
+	out, err := decodeJSONMapStrict(fmt.Sprint(raw))
+	if err != nil || out == nil {
 		return map[string]any{}
 	}
 	return out
+}
+
+// decodeJSONMapStrict is the one door from a stored JSON object to a map
+// (v1.39.0): it decodes with UseNumber, so a number comes back as a
+// json.Number and never through float64. A Discord id is above 2^53, and an
+// undo snapshot, an event payload or a seed that carried one through
+// encoding/json's default float64 came back rounded - the same fault the
+// payload canonicaliser had (v1.38.0), one layer down. storage.ParseInt and
+// parseFloat read a json.Number; `TestNoPayloadIsDecodedIntoAPlainMap`
+// refuses any other decode into a map[string]any. An empty or "<nil>" text
+// is an empty map, as it always was.
+func decodeJSONMapStrict(text string) (map[string]any, error) {
+	s := strings.TrimSpace(text)
+	if s == "" || s == "<nil>" {
+		return map[string]any{}, nil
+	}
+	decoder := json.NewDecoder(strings.NewReader(s))
+	decoder.UseNumber()
+	var out map[string]any
+	if err := decoder.Decode(&out); err != nil {
+		return nil, err
+	}
+	if out == nil {
+		return map[string]any{}, nil
+	}
+	return out, nil
 }

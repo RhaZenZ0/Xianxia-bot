@@ -282,7 +282,7 @@ func adminQuestSave(conn *storage.Conn, adminUserID int64, raw json.RawMessage) 
 	var baseline map[string]any
 	if before != nil {
 		if text, ok := before["rewards_json"].(string); ok && text != "" {
-			_ = json.Unmarshal([]byte(text), &baseline)
+			baseline = decodeJSONMap(text)
 		}
 	}
 	if err := checkQuestRewardBudget(p.Rewards, baseline, questRewardBudgetFromEnv()); err != nil {

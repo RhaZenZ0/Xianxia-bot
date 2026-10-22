@@ -55,6 +55,12 @@ def _typed_play_prefix(value: str | None) -> str:
 # for this reason; the shorthand may be a word, so it refuses the words that
 # would swallow speech instead - "i explore the ravine" must stay speech even
 # for an operator who sets the shorthand to "i".
+# How often the bot's worker asks the engine for the due simulation systems,
+# in real seconds (`event_expiry_worker` in app/bot/bot.py). The dashboard reads
+# it too (v1.39.0): a system whose lag has passed its interval by less than two
+# of these passes, at the clock's scale, is between ticks, not behind.
+SIMULATION_PASS_SECONDS = 30
+
 _SPEECH_WORDS = frozenset({
     "a", "an", "and", "as", "at", "but", "do", "for", "he", "her", "his", "i",
     "if", "in", "is", "it", "its", "me", "my", "no", "not", "of", "ok", "on",

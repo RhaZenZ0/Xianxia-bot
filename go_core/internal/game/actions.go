@@ -784,14 +784,16 @@ func adminAdvanceTime(conn *storage.Conn, adminUserID int64, raw json.RawMessage
 	state := map[string]any{"anchor_game_minute": seed.AnchorGameMinute, "anchor_real_ts": seed.AnchorRealTS, "scale": seed.Scale}
 	if row := firstRowMap(res); row != nil {
 		if text, ok := row["value_json"].(string); ok {
-			_ = json.Unmarshal([]byte(text), &state)
+			if stored, err := decodeJSONMapStrict(text); err == nil {
+				state = stored
+			}
 		}
 	}
 	stored := canonicalWorldClock{
 		AnchorGameMinute: storage.ParseInt(state["anchor_game_minute"]),
 		Scale:            storage.ParseInt(state["scale"]),
 	}
-	stored.AnchorRealTS, _ = state["anchor_real_ts"].(float64)
+	stored.AnchorRealTS = parseFloat(state["anchor_real_ts"])
 	if stored.Scale < 0 {
 		stored.Scale = 0
 	}
@@ -3070,7 +3072,7 @@ func adminNarrationSetChain(conn *storage.Conn, adminUserID int64, raw json.RawM
 	stored := map[string]any{}
 	if row := firstRowMap(res); row != nil {
 		if text, ok := row["value_json"].(string); ok {
-			_ = json.Unmarshal([]byte(text), &stored)
+			stored = decodeJSONMap(text)
 		}
 	}
 	before := map[string]any{}
@@ -3106,8 +3108,11 @@ func adminNarrationSetChain(conn *storage.Conn, adminUserID int64, raw json.RawM
 // dashboard. Nothing has moved - an offer moves nothing until its accept -
 // so voiding it is a status change and an audit row, never a refund.
 func adminTradeVoid(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (map[string]any, error) {
-	var p map[string]any
-	if err := json.Unmarshal(raw, &p); err != nil {
+	// decodeMap, never json.Unmarshal into a plain map (v1.39.0): a number
+	// decoded into `any` is a float64, and the one lever left reading its
+	// payload that way is the one a gate now holds with the rest.
+	p, err := decodeMap(raw)
+	if err != nil {
 		return nil, err
 	}
 	offerID := storage.ParseInt(p["offer_id"])

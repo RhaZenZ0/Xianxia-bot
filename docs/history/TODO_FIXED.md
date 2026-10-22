@@ -9,6 +9,11 @@ section in it.
 
 ## Fixed
 
+- **fixed (v1.39.0)** — *The merchant picker offers a merchant out of reach.* The engine's
+  `merchant.status` already answers `meetable` per merchant; the picker offers those and nobody else,
+  and `register_hub_option_hint` says where the rest walk when none is within reach
+  (`test_the_merchant_picker_offers_only_who_is_within_reach`). An out-of-reach merchant is read on
+  the status page, which lists them all, not offered to a buy that will refuse it (rc.46).
 - **fixed (v1.38.0)** — *The rest of the menu layout.* Sixteen hubs are twelve and the seven
   one-leaf pages are folded, on the Most-used commands card's data (`/ascend` 92 presses in thirty
   days against 317 for `/cultivation`): Ascension into Cultivation (its Main Progression page dropped,

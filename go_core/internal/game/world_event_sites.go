@@ -588,8 +588,7 @@ func FillSecretRealmSitesTx(conn *storage.Conn, catalog worlddata.Catalog, now f
 	}
 	filled := int64(0)
 	for _, row := range rowsToMaps(res) {
-		var payload map[string]any
-		_ = json.Unmarshal([]byte(fmt.Sprint(row["payload_json"])), &payload)
+		payload := decodeJSONMap(row["payload_json"])
 		realmID, _ := payload["realm_id"].(string)
 		spawned, err := SpawnSecretRealmSite(conn, catalog, fmt.Sprint(row["event_key"]), realmID, fmt.Sprint(row["location"]), now)
 		if err != nil {

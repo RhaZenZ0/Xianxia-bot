@@ -1,7 +1,6 @@
 package game
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -92,8 +91,8 @@ func pathEdge(catalog worlddata.Catalog, realm, phase int64) int64 {
 // decodeStoredAttributes is the one decoder of `attributes_json`.
 func decodeStoredAttributes(raw any) map[string]int64 {
 	out := map[string]int64{}
-	var parsed map[string]any
-	if err := json.Unmarshal([]byte(fmt.Sprint(raw)), &parsed); err != nil {
+	parsed, err := decodeJSONMapStrict(fmt.Sprint(raw))
+	if err != nil {
 		return out
 	}
 	for name, value := range parsed {

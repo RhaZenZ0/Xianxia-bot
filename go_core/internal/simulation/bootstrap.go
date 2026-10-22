@@ -68,6 +68,34 @@ func realmIndexFromName(name string, realms []Realm) int64 {
 	return 0
 }
 
+// worldGoods is, per world, every item a shop of that world sells or buys:
+// the goods a local market may carry. A shop names its world; one that does
+// not is read off its location, the Mortal World by default.
+func worldGoods(catalog worlddata.Catalog) map[string]map[string]bool {
+	out := map[string]map[string]bool{}
+	for _, shop := range catalog.Shops {
+		world := strings.TrimSpace(shop.World)
+		if world == "" {
+			if loc, ok := catalog.Locations[shop.Location]; ok {
+				world = strings.TrimSpace(loc.World)
+			}
+		}
+		if world == "" {
+			world = "Mortal World"
+		}
+		if out[world] == nil {
+			out[world] = map[string]bool{}
+		}
+		for _, line := range shop.Sells {
+			out[world][line.ItemID] = true
+		}
+		for itemID := range shop.Buys {
+			out[world][itemID] = true
+		}
+	}
+	return out
+}
+
 func marketTradeable(item Item) bool {
 	return worlddata.MarketTradeable(item.MarketExcluded, item.SpatialKey != nil, item.AuctionInterest)
 }
@@ -362,13 +390,20 @@ VALUES(?,?,?,?,?,?) ON CONFLICT(sect_a,sect_b) DO NOTHING`, []any{a, b, score, "
 		}
 	}
 
+	goods := worldGoods(r.World)
 	for location, loc := range r.Catalog.Locations {
 		world := strings.TrimSpace(loc.World)
 		if world == "" {
 			world = "Mortal World"
 		}
 		for itemID, item := range r.Catalog.Items {
-			if !marketTradeable(item) {
+			// A board carries its own world's goods (v1.39.0): what a shop of
+			// that world sells or buys. Every tradeable item used to be stocked
+			// in every city, so a Mortal market listed a Celestial method slip,
+			// and the buy floor - the cheapest shelf anywhere, read along the
+			// ladder - priced it at 1,359,999,999 stones against a sell of 317.
+			// The delete reaches the boards a running world already has.
+			if !marketTradeable(item) || !goods[world][itemID] {
 				if _, err := conn.Execute(`DELETE FROM economy_markets WHERE location=? AND item_id=?`, []any{location, itemID}); err != nil {
 					return err
 				}

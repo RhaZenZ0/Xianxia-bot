@@ -67,8 +67,7 @@ func ActiveEra(conn *storage.Conn, world string) (string, map[string]float64, er
 		return "", map[string]float64{}, nil
 	}
 	name := fmt.Sprint(res.Rows[0][0])
-	raw := map[string]any{}
-	_ = json.Unmarshal([]byte(fmt.Sprint(res.Rows[0][1])), &raw)
+	raw := decodeJSONMap(res.Rows[0][1])
 	mods := make(map[string]float64, len(raw))
 	for key, value := range raw {
 		switch x := value.(type) {
@@ -76,6 +75,10 @@ func ActiveEra(conn *storage.Conn, world string) (string, map[string]float64, er
 			mods[key] = x
 		case int64:
 			mods[key] = float64(x)
+		case json.Number:
+			if f, err := x.Float64(); err == nil {
+				mods[key] = f
+			}
 		}
 	}
 	return name, mods, nil

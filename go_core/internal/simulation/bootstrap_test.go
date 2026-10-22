@@ -1,6 +1,7 @@
 package simulation
 
 import (
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -93,18 +94,9 @@ VALUES(1,'Han Clan','Han',2,'Han Patriarch',3,2,12,'active');
 // Sect (materialised from the advanced catalog). A hidden lineage has no
 // public politics row, no relations, and never becomes an NPC's faction; and
 // the 142 generated manuals are inheritances, never town-market stock.
-func TestBootstrapSkipsHiddenSectsAndKeepsManualsOffTheMarket(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "bootstrap-hidden.sqlite3")
-	conn, err := storage.Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// `world_state` carries the canonical clock, which Bootstrap reads for the
-	// minute it stamps every household, anchor and clan with (v1.0.0-rc.48).
-	// Production always has it - Python's migration makes it before the engine
-	// is ever asked to bootstrap - so a fixture without it is a fixture that
-	// cannot fail the way production fails.
-	if err := conn.ExecScript(simulationClockSchema + `
+// The tables a bootstrap writes, as the hidden-sects test and the world-goods
+// test both need them (v1.39.0).
+const bootstrapMarketTables = `
 CREATE TABLE world_simulation_state(system TEXT PRIMARY KEY,last_game_minute INTEGER,interval_game_minutes INTEGER,last_run_real REAL,runs INTEGER);
 CREATE TABLE civilization_regions(location TEXT PRIMARY KEY,world_name TEXT,population INTEGER,prosperity INTEGER,security INTEGER,spirit_resources INTEGER,food_supply INTEGER,migration_pressure INTEGER,unrest INTEGER,last_game_minute INTEGER,updated_at REAL);
 CREATE TABLE npc_civilization_state(npc_name TEXT PRIMARY KEY,home_location TEXT,current_location TEXT,world_name TEXT,profession TEXT,faction TEXT,wealth INTEGER,influence INTEGER,ambition INTEGER,realm_index INTEGER,phase INTEGER,status TEXT,activity TEXT,missing_since_game_minute INTEGER DEFAULT 0,last_game_minute INTEGER,updated_at REAL);
@@ -124,7 +116,20 @@ CREATE TABLE world_history_events(
 	target_key TEXT,target_name TEXT,related_user_id INTEGER,related_npc_name TEXT,tags TEXT,game_minute INTEGER,
 	metadata_json TEXT,created_at REAL,updated_at REAL
 );
-`); err != nil {
+`
+
+func TestBootstrapSkipsHiddenSectsAndKeepsManualsOffTheMarket(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "bootstrap-hidden.sqlite3")
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// `world_state` carries the canonical clock, which Bootstrap reads for the
+	// minute it stamps every household, anchor and clan with (v1.0.0-rc.48).
+	// Production always has it - Python's migration makes it before the engine
+	// is ever asked to bootstrap - so a fixture without it is a fixture that
+	// cannot fail the way production fails.
+	if err := conn.ExecScript(simulationClockSchema + bootstrapMarketTables); err != nil {
 		_ = conn.Close()
 		t.Fatal(err)
 	}
@@ -182,5 +187,77 @@ CREATE TABLE world_history_events(
 	}
 	if got := storage.ParseInt(simScalar(t, path, `SELECT COUNT(*) FROM economy_markets WHERE item_id LIKE '%_manual'`)); got != 0 {
 		t.Fatalf("manuals are stocked on town markets: %d rows", got)
+	}
+}
+
+// A board carries its own world's goods (v1.39.0). Every tradeable item used
+// to be stocked in every city, so Azure Crown's Mortal market listed the
+// Celestial method slip for Starsteel Sky-Treader Boots - and the market's
+// buy floor, which reads the cheapest shelf anywhere along the currency
+// ladder, priced it at 1,359,999,999 Mortal stones against a sell of 317.
+// Bootstrap stocks a location only with what a shop of its world sells or
+// buys, and deletes the rest, which is how a running world's boards are
+// corrected at the next boot.
+func TestAMarketCarriesOnlyItsOwnWorldsGoods(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "bootstrap-world-goods.sqlite3")
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.ExecScript(simulationClockSchema + bootstrapMarketTables); err != nil {
+		_ = conn.Close()
+		t.Fatal(err)
+	}
+	// A row a running world already holds, wrongly: the Celestial slip on a
+	// Mortal board, the shape the v1.38.0 sweep bought.
+	if _, err := conn.Execute(`INSERT INTO economy_markets(location,item_id,world_name,currency_id,base_price,supply,demand,price_index,last_game_minute,updated_at) VALUES('Azure Crown Imperial City','starsteel_sky_treader_boots_method','Mortal World','low_spirit_stone',453,10,10,1.0,0,0)`, nil); err != nil {
+		_ = conn.Close()
+		t.Fatal(err)
+	}
+	if err := conn.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	_ = conn.Close()
+	runner, err := NewRunner(path, bootstrapWorldPath(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	setSimulationGameMinute(t, path, 100)
+	if _, err := runner.Bootstrap(BootstrapRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	goods := worldGoods(runner.World)
+	for _, world := range []string{"Mortal World", "Spiritual World", "Immortal World", "Celestial World"} {
+		if len(goods[world]) < 20 {
+			t.Fatalf("%s's shops sell or buy only %d goods; the reader is broken, not the content", world, len(goods[world]))
+		}
+	}
+	if got := storage.ParseInt(simScalar(t, path, `SELECT COUNT(*) FROM economy_markets WHERE location='Azure Crown Imperial City' AND item_id='starsteel_sky_treader_boots_method'`)); got != 0 {
+		t.Fatalf("the Celestial method slip is still on a Mortal board: %d rows", got)
+	}
+	rows, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	res, err := rows.Execute(`SELECT location,item_id,world_name FROM economy_markets`, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Rows) < 500 {
+		t.Fatalf("the boards hold only %d rows after the rule; the markets were emptied, not trimmed", len(res.Rows))
+	}
+	perWorld := map[string]int{}
+	for _, row := range res.Rows {
+		location, item, world := fmt.Sprint(row[0]), fmt.Sprint(row[1]), fmt.Sprint(row[2])
+		perWorld[world]++
+		if !goods[world][item] {
+			t.Fatalf("%s's board at %s lists %s, which no shop of that world sells or buys", world, location, item)
+		}
+	}
+	for _, world := range []string{"Mortal World", "Spiritual World", "Immortal World", "Celestial World"} {
+		if perWorld[world] == 0 {
+			t.Fatalf("%s has no market rows at all", world)
+		}
 	}
 }

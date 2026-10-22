@@ -1060,8 +1060,8 @@ func unexpectedEventsEnabledTx(conn *storage.Conn) (bool, error) {
 	if len(r.Rows) == 0 {
 		return true, nil
 	}
-	var settings map[string]any
-	if json.Unmarshal([]byte(fmt.Sprint(r.Rows[0][0])), &settings) != nil {
+	settings, err := decodeJSONMapStrict(fmt.Sprint(r.Rows[0][0]))
+	if err != nil {
 		return true, nil
 	}
 	v, ok := settings["unexpected_events"]
@@ -1229,8 +1229,8 @@ func claimActiveEventParticipationTx(conn *storage.Conn, catalog worlddata.Catal
 		if len(row) < 3 {
 			continue
 		}
-		var payload map[string]any
-		if json.Unmarshal([]byte(fmt.Sprint(row[2])), &payload) != nil {
+		payload, err := decodeJSONMapStrict(fmt.Sprint(row[2]))
+		if err != nil {
 			continue
 		}
 		reward, _ := payload["player_reward"].(map[string]any)

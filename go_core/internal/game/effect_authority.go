@@ -204,8 +204,8 @@ func pillToxicityEffectView(userID, toxicity, gameMinute int64) (map[string]any,
 	if err != nil {
 		return nil, err
 	}
-	payload := map[string]any{}
-	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+	payload, err := decodeJSONMapStrict(raw)
+	if err != nil {
 		return nil, err
 	}
 	payload["effect_key"] = "pill_toxicity"
