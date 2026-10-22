@@ -112,7 +112,10 @@ class MigrationEightyThreeRenamesTheHubsAQuestNames(unittest.IsolatedAsyncioTest
         return definition_labels, description, term_labels, empty
 
     def _resolves(self, hubs, label: str) -> bool:
-        match = re.search(r"\*\*/([a-z]+)((?:\s*→\s*[^*]+?)*)\*\*", label)
+        # One linear pass over the bold path: the hub, then everything up to
+        # the closing stars, split on the arrows below (CodeQL flagged the
+        # nested-quantifier form of this as backtracking-prone).
+        match = re.search(r"\*\*/([a-z]+)([^*]*)\*\*", label)
         self.assertIsNotNone(match, f"{label!r} prints no path; the fixture is broken")
         steps = [s for s in re.split(r"\s*→\s*", match.group(2) or "") if s.strip()]
         return hubs._hint_action(match.group(1), steps) is not None
