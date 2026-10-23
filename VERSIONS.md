@@ -1,8 +1,9 @@
 # Xianxia RP Discord Bot — Version History
 
 The changelog, one paragraph per minor. The per-release entries as they were written are in
-`docs/history/CHANGELOG_0_18_TO_0_40.md`, and the earlier per-release notes (`V018_RELEASE_NOTES.md`
-… `V023_RELEASE_NOTES.md`) beside it. `README.md` describes the current release.
+`docs/history/CHANGELOG_0_18_TO_0_40.md`, and the earlier per-release notes beside it
+(`docs/history/RELEASE_NOTES_0_19_TO_0_25.md`, with the v0.15 to v0.18 authority migration in
+`docs/history/AUTHORITY_MIGRATION_0_15_TO_0_18.md`). `README.md` describes the current release.
 
 ## Changelog
 
@@ -2146,6 +2147,7 @@ See `docs/history/CHANGELOG_0_18_TO_0_40.md` for the per-release detail.
 
 ## Release notes
 
-See `docs/history/V019_RELEASE_NOTES.md` for the current release's cultivation-depth audit, dashboard coverage gaps, and
-combat authority-migration fixes. See `docs/history/V018_RELEASE_NOTES.md` for the complete staged-authority, road/caravan,
-setup, cleanup, migration, security, and upgrade summary that v0.19 builds on.
+See `docs/history/RELEASE_NOTES_0_19_TO_0_25.md` (its `V019_RELEASE_NOTES.md` section) for v0.19's cultivation-depth
+audit, dashboard coverage gaps, and combat authority-migration fixes. See `docs/history/AUTHORITY_MIGRATION_0_15_TO_0_18.md`
+(its `V018_RELEASE_NOTES.md` section) for the complete staged-authority, road/caravan, setup, cleanup, migration, security,
+and upgrade summary that v0.19 builds on.

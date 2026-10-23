@@ -1,4 +1,29 @@
-# Xianxia RP v0.19 — Cultivation Depth & Consistency Pass
+# Release notes, v0.19 to v0.25
+
+The per-release notes of the point-release era, v0.19 to v0.25, as they were written. Nine files -
+one per minor, the v0.23.1 review fixes, and the plain-text `RELEASE.txt` that shipped at the root
+of v0.19.24 - were merged into this one file after v1.39.0, each kept whole as a section below under
+its original filename. The one-paragraph summaries of the same releases are in
+`CHANGELOG_0_18_TO_0_40.md` beside this file; `VERSIONS.md` is the changelog and nothing here
+describes the current release.
+
+## Contents
+
+- `V019_RELEASE_NOTES.md`
+- `V019_24_RELEASE.txt`
+- `V020_RELEASE_NOTES.md`
+- `V021_RELEASE_NOTES.md`
+- `V022_RELEASE_NOTES.md`
+- `V023_RELEASE_NOTES.md`
+- `V023_1_REVIEW_FIXES.md`
+- `V024_RELEASE_NOTES.md`
+- `V025_RELEASE_NOTES.md`
+
+---
+
+## `V019_RELEASE_NOTES.md`
+
+## Xianxia RP v0.19 — Cultivation Depth & Consistency Pass
 
 The v0.19 line ends at **v0.19.48**; v0.20.0 (the `main.py` split completed) and later are in
 `docs/history/V020_RELEASE_NOTES.md`. This file covers the whole v0.19 line: v0.19 itself, the v0.19.5
@@ -46,7 +71,7 @@ logic-only — until the "GM-authored per-channel messages" entry below added sc
 Prior release: see `V018_RELEASE_NOTES.md` and `V018_BUILD_HISTORY.md` for the
 full v0.18 authority migration and its post-release additions.
 
-## Verification standard
+### Verification standard
 
 This release was built without a Go compiler or pytest available in the build
 environment — every fix was a traced static read, not compiler-verified, at
@@ -68,7 +93,7 @@ run directly and repeatedly during this release, independent of the above,
 is `dashboard_implementation_issues()` (pure-stdlib Python, no toolchain
 required) — every dashboard change in this release passed that gate live.
 
-## Bot container crashed on every single startup with `KeyError: 'act'`
+### Bot container crashed on every single startup with `KeyError: 'act'`
 
 Also reported live, one step further into the same deployment: `xianxia-game-engine`
 and `xianxia-db-init` came up clean, but `xianxia-roleplay-bot` crashed immediately on
@@ -88,7 +113,7 @@ up with this code path in place. Fixed by dropping the stray `"act"` entry from 
 tuple; the five group subcommands it was presumably confused with are untouched and
 still register normally through their own groups.
 
-## Engine container couldn't open its own database on first real deployment
+### Engine container couldn't open its own database on first real deployment
 
 Reported live from an actual QNAP `docker compose up`: `xianxia-game-engine` logged
 `open authoritative sqlite: unable to open database file` and never came up.
@@ -114,7 +139,7 @@ the reported failure by running it as an unprivileged user against a root-owned
 directory, got the identical `unable to open database file` error, then confirmed a
 `chown` ahead of the same run lets it start cleanly.
 
-## Player old-age death (was display-only, now enforced)
+### Player old-age death (was display-only, now enforced)
 
 Player lifespan status has shown an activity-paused clock since the v0.18
 patch line, but nothing ever actually killed a player for exceeding their
@@ -130,7 +155,7 @@ authoritative-action dispatch path:
   taken an action for longer than the configured grace period never counts
   toward their own aging clock.
 
-## Ancestral Dynasty balance fix
+### Ancestral Dynasty balance fix
 
 `dynastyConflictAction`'s rounds-based escalation applied to the opposition
 side twice at once (once in its base gain, once again in its roll modifier)
@@ -140,7 +165,7 @@ Replaced with a single, shared escalation term applied equally to both sides,
 so a long fight still trends toward resolution without structurally favoring
 either party.
 
-## Fate system: the grant path had zero callers
+### Fate system: the grant path had zero callers
 
 `fate.adjust` was fully implemented in Go and completely unreachable from
 Discord or the dashboard — no way for anyone to grant fate outside the
@@ -150,7 +175,7 @@ transaction, bounds-checked delta, full audit trail) and a matching GM
 dashboard control. The automatic triggers (`spendFateGo`/`addFateGo` in
 combat and tribulations) were already correct and untouched.
 
-## Dashboard coverage gaps closed
+### Dashboard coverage gaps closed
 
 Five gaps found via a full operation × Discord × dashboard cross-reference:
 household Discord-thread mapping and current household occupants (folded
@@ -163,7 +188,7 @@ orphaned query was wired into the existing `/admin npc npcinspect` command
 rather than reimplemented in Python, specifically to avoid duplicating the
 Go lifespan model in a second language.
 
-## Cultivation Depth audit (this release's main body of work)
+### Cultivation Depth audit (this release's main body of work)
 
 A full pass through realm progression, tribulations, spiritual-root/
 bloodline/physique aptitude, and technique/dao/manual systems. Findings:
@@ -204,7 +229,7 @@ bloodline/physique aptitude, and technique/dao/manual systems. Findings:
   milestone rewards correctly split between both partners), and the shared
   `progressionProblems` gate.
 
-## Markdown cleanup
+### Markdown cleanup
 
 32 root-level docs consolidated to 14. Kept the six `V018_STAGE*_NOTES.md`
 files (accurate design rationale) and the roadmap/release docs; folded 19
@@ -221,7 +246,7 @@ and fixed `README.md`, which had drifted to a mix of "v0.18" section
 headings and schema **21**/**22** references despite the code being on
 schema **24** and the `VERSION` file already reading 0.19.
 
-## Docker build was broken end-to-end (found via an actual `docker build`)
+### Docker build was broken end-to-end (found via an actual `docker build`)
 
 The "all Go tests now pass on merged main" claim above was not reproducible in a real
 container build - `docker build -f go_core/Dockerfile .` failed at the `go test ./...`
@@ -259,7 +284,7 @@ Verified for real this time: `docker build -f go_core/Dockerfile .` was simulate
 daemon available in the build environment, and both steps now pass clean with no
 remaining failures anywhere in `go_core`.
 
-## Combat authority migration (this session's follow-on pass)
+### Combat authority migration (this session's follow-on pass)
 
 A further pass over the same "Go owns canonical mechanics, Python owns Discord/presentation" boundary,
 targeted at the remaining Python-side mutation of canonical battle state:
@@ -296,7 +321,7 @@ targeted at the remaining Python-side mutation of canonical battle state:
   `CombatService.recovery_item()`, falling back to the original `consume_item`/`restore_resources` path
   unchanged when there is no active battle. Item consumption happens exactly once on either path.
 
-## Dashboard "Full Setup"/"Repair" now actually creates missing Discord channels
+### Dashboard "Full Setup"/"Repair" now actually creates missing Discord channels
 
 Reported live: clicking "Full Setup" in the web GM dashboard's Discord Server Setup
 panel visibly did nothing when the base/realm-hub channels didn't already exist in the
@@ -357,7 +382,7 @@ for it":
   entry is left as-is since it's a dated log of what was true at that point in the
   project's history, not a living spec.
 
-## `/me` showed the raw internal location key instead of a place name
+### `/me` showed the raw internal location key instead of a place name
 
 Reported live: the character sheet's "Location" field showed literally `birth_family:10`
 instead of a readable place. `location_display` (the `/me` command, `app/bot/main.py`)
@@ -379,7 +404,7 @@ print `location`/`start_location` the same unresolved way and could show the sam
 locations specifically — not fixed here since it wasn't the reported case, flagged for
 a follow-up pass if it comes up.
 
-## Full Setup's new channel-creation code crashed immediately: "overwrites parameter expects a dict"
+### Full Setup's new channel-creation code crashed immediately: "overwrites parameter expects a dict"
 
 Reported live on the first real run of the previous fix: clicking Full Setup with
 Manage Channels granted failed the whole action with `Discord bot control rejected
@@ -394,7 +419,7 @@ meaning "no overwrites") instead of `None` for the non-read-only case; behavior 
 otherwise unchanged. `ensure_realm_hub_channels`'s own `create_text_channel` call never
 passed `overwrites` at all, so it was never affected by this bug.
 
-## Exploring from the birth-family household crashed with a confusing engine error
+### Exploring from the birth-family household crashed with a confusing engine error
 
 Reported live: a player's private Expedition Journal showed `Current location:
 birth_family:2` (the raw DB key, not a place name), and using `/world → Explore` as the
@@ -450,7 +475,7 @@ parses fine; one file's tests are plain pytest-style functions `python -m unitte
 doesn't collect but all 5 pass when invoked directly; and a stale `VERSION == "0.18"`
 assertion left over from before this release, unrelated to this fix).
 
-## The raw location leak also lived in the hub panels' shared status header
+### The raw location leak also lived in the hub panels' shared status header
 
 Reported live via a screenshot: the World Hub panel (and, it turns out, every other hub
 panel - Cultivation, Items, Combat, Travel, all of them) showed `📍 Location:
@@ -477,7 +502,7 @@ text) that weren't part of any reported issue and haven't been individually audi
 flagged here rather than swept blind, since distinguishing "needs translating" from
 "correctly wants the raw key" requires reading each call site's context.
 
-## Swept the rest of the `birth_family:`/private-location leak
+### Swept the rest of the `birth_family:`/private-location leak
 
 Asked to chase down the remaining display spots flagged (but not yet fixed) in the
 previous two rounds. Grepped every `c.get('location')`/`c['location']` site in
@@ -535,7 +560,7 @@ that's a sandbox-only gap and neither interpreter is the "real" one) turned up z
 regressions - the only failure anywhere is the same pre-existing, unrelated stale
 `VERSION == "0.18"` assertion noted in the previous round.
 
-## GM dashboard's Teleport (and five other player-targeting actions) always failed with "character not found"
+### GM dashboard's Teleport (and five other player-targeting actions) always failed with "character not found"
 
 Reported live: clicking **Teleport Player** on the GM web dashboard, after picking a
 real player from the dropdown and a valid location, failed every time with
@@ -572,7 +597,7 @@ prove this specific fix and isn't a permanent regression case. Confirmed no test
 `tests/python/**` references `dashboard/app.js` content at all, so no existing test
 needed updating for this change.
 
-## New: GM dashboard "Threads" page — one place to monitor every Discord thread the bot manages
+### New: GM dashboard "Threads" page — one place to monitor every Discord thread the bot manages
 
 Requested feature: a way to monitor the bot's Discord threads from the GM dashboard.
 Previously there was no single place to see them - the Exploration page showed a raw
@@ -624,7 +649,7 @@ the same pre-existing, unrelated sandbox gaps already noted earlier in this docu
 `VERSION == "0.18"` assertion; `test_authority_boundary`'s bare pytest-style functions not
 collected by plain `unittest`).
 
-## New: `reset_database.sh` — a safe way to wipe the world and start over
+### New: `reset_database.sh` — a safe way to wipe the world and start over
 
 Requested: a script to reset the database. Previously the only way to do this was to stop
 the stack and delete `data/xianxia.sqlite3` by hand, which the README explicitly warns
@@ -665,7 +690,7 @@ rather than silently reading stray stdin as a confirmation), `--no-backup` (skip
 backup step entirely, no `data/backups/` created), and `--help`. Every case produced the
 expected file-system state and exit code.
 
-## `reset_database.sh` and a new dashboard button now also clean up Discord
+### `reset_database.sh` and a new dashboard button now also clean up Discord
 
 Requested follow-up to the reset script above: both `reset_database.sh` and a dashboard
 button should also remove every Discord thread the bot was tracking and post an
@@ -721,7 +746,7 @@ safety backup and still stopping the stack). Full repo-wide Python test sweep re
 afterward: same pre-existing, unrelated sandbox gaps as every other round this release,
 no new regressions.
 
-## GM-authored per-channel welcome messages (schema 25)
+### GM-authored per-channel welcome messages (schema 25)
 
 Requested: "can we set a message for every channel" — a way for the GM to post a
 persistent, editable welcome/orientation message in each of the game's shared channels,
@@ -795,7 +820,7 @@ added to that list - plus `test_startup_health`'s "latest migration name" assert
 from `ancestral_sites_dynasty_claims_conflicts` to `gm_authored_channel_messages`. No other
 regressions; same pre-existing, unrelated sandbox gaps as every other round this release.
 
-## New: #bugs forum channel for player bug reports (schema 26)
+### New: #bugs forum channel for player bug reports (schema 26)
 
 Requested: "Make a bugs channel with the forum option and make text info for the user. Make
 it so we can get info from it" — a dedicated Discord forum channel where players report
@@ -874,7 +899,7 @@ this sandbox allows; the actual `discord.py` API calls used here (`guild.create_
 `discord.ForumTag`, `ForumChannel.threads`/`.archived_threads()`, `Thread.applied_tags`) all
 match documented `discord.py` 2.7.1 (the version this project pins) behavior.
 
-## New: dashboard "Fresh Start" button — wipe channel messages without touching the database
+### New: dashboard "Fresh Start" button — wipe channel messages without touching the database
 
 Requested: "delete all message in the server at repair server for fresh look." Two design
 questions needed the user's own call before building anything destructive and irreversible:
@@ -940,7 +965,7 @@ Discord call it makes (`channel.delete()`, then the already-tested `_run_complet
 `ensure_xianxia_info_guide`/`ensure_all_channel_messages`) is either a single documented
 `discord.py` method or code this release already verified in the two features above.
 
-## Fixed: every new character was silently routed into an exploration dead-end
+### Fixed: every new character was silently routed into an exploration dead-end
 
 Reported with two Discord screenshots: a freshly-created character's private thread showed
 "Current location: Qin Clan Household," the bot's own onboarding text said to use `/world →
@@ -1005,7 +1030,7 @@ thread, the World Hub panel round-trip) couldn't be exercised end-to-end in this
 above plus reusing `ensure_birth_family_household_thread`, which this release didn't write and
 which was already exercised by the existing `/family enter` command path.
 
-## New: Components V2 hub layout, piloted on `/character`
+### New: Components V2 hub layout, piloted on `/character`
 
 The interactive hub panel put every action behind two dropdowns. A player opening
 `/character` saw a card and two closed menus: pick a system from the first, pick an
@@ -1068,7 +1093,7 @@ fail on both, byte-identical results, so the pre-existing sandbox import gaps ar
 unchanged and nothing regressed. What could not be verified here is how Discord itself
 renders the layout — that is what piloting a single hub is for.
 
-## Release stamp corrected (v0.19.5)
+### Release stamp corrected (v0.19.5)
 
 Setting the GUI release exposed that the version stamp had already drifted apart. `VERSION`
 read `0.19`, while `app/version.py`, the `Dockerfile` label and both `xianxia.release` labels
@@ -1095,14 +1120,14 @@ been failing before this change; the assertion that all four stamps agree is wha
 meaningful. Full 49-module suite re-run afterward with no change to the pre-existing sandbox
 import failures.
 
-## v0.19.6 — external audit findings, fixed
+### v0.19.6 — external audit findings, fixed
 
 An independent review of the shipped v0.19 archive produced seven findings. Every one was
 reproduced against the source before anything was changed, and every fix carries a
 regression test that was confirmed to fail on the old code. One finding — the release
 metadata inconsistency — had already been fixed in v0.19.5 and is not repeated here.
 
-### Data loss: `/v1/db/batch` discarded writes when `transaction:false`
+#### Data loss: `/v1/db/batch` discarded writes when `transaction:false`
 
 The worst of the batch. `storage.Conn.Execute` calls `maybeBeginImplicitLocked`, which
 issues `BEGIN;` before any `INSERT`/`UPDATE`/`DELETE`/`REPLACE` when the connection is in
@@ -1127,7 +1152,7 @@ Worth stating plainly: the only in-repo caller (`flush_slow_query_log`) passes
 `transaction=True`, so shipped code was never losing data. The endpoint's contract was
 broken, not the game.
 
-### High: Discord snowflakes were rounded before the dashboard ever saw them
+#### High: Discord snowflakes were rounded before the dashboard ever saw them
 
 Every Discord ID is a snowflake — a 17–19 digit integer, far past
 `Number.MAX_SAFE_INTEGER` (2^53−1 = 9007199254740991). JSON has no integer type of its own,
@@ -1154,7 +1179,7 @@ separators to them.
 Emitting ids as strings is what Discord's own API does, for exactly this reason, and costs
 the front end nothing: these values are only ever compared, displayed and echoed back.
 
-### Medium: a cleared channel message came back on the next Repair
+#### Medium: a cleared channel message came back on the next Repair
 
 Introduced by the schema-25 feature in this very release line. The dashboard offers "clear a
 box and save to remove that channel's message", which stores `content=""`. But both
@@ -1175,7 +1200,7 @@ while the edit survives. The dashboard labels a cleared slot "(cleared — stays
 Repair)" and offers a "Restore default text" button, since the default text is otherwise
 unreachable once cleared.
 
-### Medium: `RELEASE_MANIFEST.sha256` was stale and nothing checked it
+#### Medium: `RELEASE_MANIFEST.sha256` was stale and nothing checked it
 
 Measured on this tree before regenerating: 42 wrong hashes, 14 entries pointing at files
 that no longer existed, 22 packaged files listed nowhere. The 14 "missing" turned out to be
@@ -1193,7 +1218,7 @@ neither `sha256sum` nor `shasum` exists. `tests/python/contracts/test_release_ma
 gates the whole thing, so the manifest cannot silently drift again — if it does, the test
 says exactly which command regenerates it.
 
-### Medium: backups taken in the same second overwrote each other
+#### Medium: backups taken in the same second overwrote each other
 
 `"xianxia-" + time.Now().UTC().Format("20060102-150405")` has second resolution, so two
 backups inside one second resolved to one filename — reachable by double-clicking the
@@ -1205,7 +1230,7 @@ place rather than removed, because a zero-length file is a valid empty SQLite da
 `sqlite3_open_v2(..., CREATE)` will happily write into — removing it would have reopened a
 narrower version of the same race.
 
-### Low: an adopted `#bugs` forum never got its tags
+#### Low: an adopted `#bugs` forum never got its tags
 
 Only newly *created* forums received `available_tags`. When setup adopted an existing
 `#bugs` channel it synced the topic and nothing else, while the dashboard reported
@@ -1216,7 +1241,7 @@ the GM added themselves and stopping short of Discord's 20-tag cap rather than c
 them. The snapshot reports the forum's real `available_tags` plus a `missing_tags` list, and
 the dashboard surfaces the gap with a prompt to run Repair.
 
-### Test coverage
+#### Test coverage
 
 The audit's closing observation was that none of the schema-25/26 dashboard operations had
 tests, which is how the cleared-message bug coexisted with a green suite. Added:
@@ -1228,7 +1253,7 @@ lifted out of `main.py` by AST so they run without `discord.py`), and
 `test_release_manifest.py` (4 tests). Each was confirmed to fail with its fix reverted —
 they are regression tests, not just coverage.
 
-### Verification
+#### Verification
 
 `go vet ./...` clean; all 7 Go packages pass. Python: the full 52-module suite was run
 against both a pristine extract of the previous build and this one under two interpreters,
@@ -1241,7 +1266,7 @@ only movement is tests that did not exist before. `node --check dashboard/app.js
 `dashboard_implementation_issues()` all pass. Not verifiable here, as ever: live Discord
 rendering, since `discord.py` cannot be installed in this sandbox.
 
-## v0.19.7 — hub layout, corrected against the live panel
+### v0.19.7 — hub layout, corrected against the live panel
 
 v0.19.6 was the first build anyone could actually *see* the Components V2 layout in.
 Four things only became decidable once it was on screen in a real Discord client, and
@@ -1287,7 +1312,7 @@ The Dao Partnership page was rendered through the real `rebuild()` and inspected
 component by component to confirm each of the four fixes landed. Full Python suite
 re-run against a pristine extract of v0.19.6 with byte-identical results.
 
-## v0.19.8 — onboarding copy that points at commands players can reach
+### v0.19.8 — onboarding copy that points at commands players can reach
 
 A player who cannot explore and is told to "use **/family leave**" is stuck twice: once by
 the rule, and once by the instruction, because `/family leave` is not a command. Only 21
@@ -1340,7 +1365,7 @@ expedition opener, the `sect_abode:`/`abode:` ordering, and an unrelated engine 
 passing through untouched. Full Python suite re-run against a pristine extract of v0.19.7
 with byte-identical results under both interpreters.
 
-## v0.19.9 — the integrity check refused a good package on real hardware
+### v0.19.9 — the integrity check refused a good package on real hardware
 
 Reported from the NAS, installing v0.19.8 over v0.19.6:
 
@@ -1386,7 +1411,7 @@ one-line patch below applied to a real copy of the v0.19.6 updater and re-parsed
 portability claim rests on which flags are GNU extensions rather than on an executed
 BusyBox run.
 
-## v0.19.10 — the layout rolled out to every hub, in four stages
+### v0.19.10 — the layout rolled out to every hub, in four stages
 
 `/character` had been the pilot since v0.19.5. All 17 hubs now use the Components V2
 layout: the 16 player hubs and `/admin`. Rolled out in four stages, easiest shape first,
@@ -1445,9 +1470,9 @@ packages passing; static gates (`node --check`, `sh -n` on all four scripts, the
 contract check) clean. Not verifiable here, as always: how Discord renders 16 further
 hubs — `/character` is the only one seen live so far.
 
-## v0.19.11 — action ordering by relevance, and an external review answered
+### v0.19.11 — action ordering by relevance, and an external review answered
 
-### Actions sort by usefulness now, not alphabetically
+#### Actions sort by usefulness now, not alphabetically
 
 Staging the rollout surfaced this: `/family` has 14 actions, alphabetical order put
 **Leave** tenth, and the 8-action window meant a new player following v0.19.8's onboarding
@@ -1478,7 +1503,7 @@ game; anything unlisted stays in band 2 and alphabetical, which keeps the table 
 enough to stay honest, with no per-hub tuning. Ordering is shared with the classic panel,
 so its dropdown improves too.
 
-### An external review of v0.19.7, answered
+#### An external review of v0.19.7, answered
 
 **Rejected — "Components V2 allows only 30 total components, drop the limit to 6."**
 The limit is 40, and 0.19.10's rollout stands. Three primary sources, checked directly:
@@ -1539,7 +1564,7 @@ against a pristine extract of v0.19.10 under both interpreters. Not verifiable h
 container user drop, since Docker cannot run in this sandbox — the reasoning is spelled out
 above, and it is the one change in this release I would watch on first start.
 
-## v0.19.12 — main.py decomposition, stage 1: the shared runtime
+### v0.19.12 — main.py decomposition, stage 1: the shared runtime
 
 The split named in `V015_REVIEW_STATUS.md` ("bot/main.py / database decomposition ...
 remain after authority migration") and unblocked since v0.18 finally starts. This is stage
@@ -1601,7 +1626,7 @@ extract of v0.19.11 on every pre-existing module under both interpreters; `go ve
 and rewrites no logic, and `app/bot/__init__.py`'s imports are asserted, but the first start
 after this upgrade is the real test.
 
-## v0.19.13 — the split's ordering bug, and the check that was missing
+### v0.19.13 — the split's ordering bug, and the check that was missing
 
 v0.19.12 did not start. The bot container went unhealthy, the updater rolled the NAS back
 from 0.19.12 to 0.19.6 on its own, and the database backup was restored. The safety net
@@ -1655,7 +1680,7 @@ The lesson worth keeping for stages 2 and beyond: when moving module-level code,
 part of the contract, and "the names all resolve" is not the same claim as "the module
 imports".
 
-## v0.19.14 — the second split failure: a decorator moved its annotation namespace
+### v0.19.14 — the second split failure: a decorator moved its annotation namespace
 
 v0.19.13 fixed the ordering bug and still did not start. The real traceback, captured by
 running the bot image in the foreground:
@@ -1723,7 +1748,7 @@ Also corrected: `runtime.py` no longer has unused imports trimmed automatically.
 trimming pass is what caused this, and "unused" is not a property a static reader can
 determine for a module whose job includes hosting other modules' annotation namespace.
 
-## Semantic audits run against the wider package
+### Semantic audits run against the wider package
 
 - **RNG audit**: checked every `authoritativeMutation`-returning action for
   a displayed danger/risk/chance value with no roll behind it (the pattern
@@ -1767,14 +1792,14 @@ determine for a module whose job includes hosting other modules' annotation name
   stale again.
 
 
-## v0.19.15 — Administrator AI monitor (narrator health + chat digest)
+### v0.19.15 — Administrator AI monitor (narrator health + chat digest)
 
 Two new GM-only actions under `/admin → Server`. Neither is a typable command;
 both go through the existing `admin_server_group` metadata surface and re-check
 `require_admin` in their own body, so a panel that outlives an administrator's
 role cannot be used.
 
-### Why the bot could not already read its own channels
+#### Why the bot could not already read its own channels
 
 Two independent blockers, both worth writing down because both look like
 features that already existed.
@@ -1805,7 +1830,7 @@ messages into `scene_history` and replies "Create your cultivator first with
 `AUTO_NARRATE_EVENT_THREADS` stay `false`, so it does not begin narrating on its
 own.
 
-### `ai_status`
+#### `ai_status`
 
 Narrator and route health, from counters only — no prompts, no player text, no
 API key (a test asserts the snapshot contains none of them). It reports how many
@@ -1824,7 +1849,7 @@ cooling down is counted as `skipped_cooling`, not as an attempt. Without that,
 a route that is failing constantly looks healthy in the panel — zero recent
 failures — while actually serving nothing.
 
-### `chat_digest`
+#### `chat_digest`
 
 Reads a channel (optionally its threads) over a configurable window and reports
 what players did, where they got stuck, possible bugs, mood, and what deserves
@@ -1847,7 +1872,7 @@ synthesis pass on the epic tier) rather than in one shot.
 Overflow keeps the **newest** chunks, not the first ones, and says so in the
 report — an operator asking about a channel is asking about recent play.
 
-### The transcript is untrusted input
+#### The transcript is untrusted input
 
 It is player-authored text going into a model prompt. The blast radius is small
 (administrator-only output, text rather than actions), but it is fenced anyway,
@@ -1856,7 +1881,7 @@ instructions, and a player who types the closing fence themselves has it
 neutralised — otherwise the rest of their message escapes the fenced region and
 is read as prompt text.
 
-### The prompt-leak guard is now opt-out, and only the monitor opts out
+#### The prompt-leak guard is now opt-out, and only the monitor opts out
 
 `_validate_generated_text` rejects model output containing "game engine",
 "system prompt", "canonical context block" and similar. That is a *player-facing*
@@ -1869,14 +1894,14 @@ So `generate()` gained `leak_guard: bool = True`. Narration never passes the
 flag; `narrator.py` does not contain the string at all. A contract test asserts
 `chat_monitor.py` is the only file under `app/` that sets `leak_guard=False`.
 
-### Every AI failure degrades, never raises
+#### Every AI failure degrades, never raises
 
 If one chunk fails the rest still report. If synthesis fails the part notes are
 shown. If every route fails, or the router is not configured at all, the
 deterministic counts — messages, humans vs bots, per-author, per-channel, time
 span — are still returned. That half of the report never needed a model.
 
-### New settings
+#### New settings
 
 All bounded in `config.py`: `MONITOR_MAX_MESSAGES` (400, 20–5000),
 `MONITOR_LOOKBACK_HOURS` (24, 1–720), `MONITOR_CHUNK_CHARS` (6000, 1000–20000),
@@ -1884,7 +1909,7 @@ All bounded in `config.py`: `MONITOR_MAX_MESSAGES` (400, 20–5000),
 narrator's 20 req/min limiter: an unbounded transcript would starve narration for
 a whole minute.
 
-### Verification
+#### Verification
 
 59 new tests (47 unit, 12 contract). Eight independent mutations were applied to
 a copy of the tree to prove the new tests fail without their fixes — the
@@ -1902,13 +1927,13 @@ against this tree, and both new command callbacks and their annotations
 (`discord.TextChannel | None`, `int | None`, `bool`) resolve clean.
 
 
-## v0.19.16 — openai 2.52.1 → 3.7.0 (dependency bump, shipped alone)
+### v0.19.16 — openai 2.52.1 → 3.7.0 (dependency bump, shipped alone)
 
 Nothing else is in this build. It is isolated so that a startup failure has
 exactly one candidate cause, and so the rollback target (v0.19.15) is otherwise
 byte-identical in behaviour.
 
-### Why the bump is a no-op for this codebase
+#### Why the bump is a no-op for this codebase
 
 openai 3.0.0's single documented breaking change is that **HTTPX2 replaced httpx
 as the HTTP client**, and the project's own `httpx2.md` states the condition
@@ -1924,7 +1949,7 @@ This codebase's entire openai surface is five lines — `AsyncOpenAI(...)` in
 asserts that, because it is the whole basis for calling this safe rather than an
 incidental detail.
 
-### The httpx trap, which we survive by having pinned it already
+#### The httpx trap, which we survive by having pinned it already
 
 openai 3.x installs `httpx2` and **no longer installs `httpx` at all**.
 `app/database/remote.py` and `app/game_engine.py` import `httpx` directly for the
@@ -1937,7 +1962,7 @@ right. `httpx2` is a separate package name rather than httpx 2.x, so the two
 coexist without a resolver conflict. A contract test now holds that invariant in
 place, with the reason written next to it.
 
-### The one genuine risk: TLS trust store
+#### The one genuine risk: TLS trust store
 
 HTTPX2 verifies against the **operating system trust store** instead of the
 certifi bundle httpx 0.x used. On `python:3.12-slim` that store is whatever
@@ -1966,7 +1991,7 @@ remediation, and `ai_status` prints a banner. The cycle-safe walk is tested, and
 so is the negative case — "results were empty" and "rate limited" must not be
 mistaken for TLS.
 
-### What this verification does *not* cover
+#### What this verification does *not* cover
 
 The build sandbox has no PyPI access. openai 3.7.0 could not be installed,
 imported or called once here. The stub-import harness *stubs* the `openai`
@@ -1981,17 +2006,17 @@ neither 3.7.0 nor its release date could be independently confirmed here — v3.
 was confirmed. If 3.7.0 does not exist, `pip install` fails during `docker build`
 and `update.sh` rolls back before anything reaches the running stack.
 
-### After deploying
+#### After deploying
 
 Open `/admin → Server → ai_status`. A TLS banner, or a procedural-fallback rate
 that was not there on v0.19.15, means roll back to v0.19.15.
 
 
-## v0.19.17 — the "0 stones" bug, and the four others beside it
+### v0.19.17 — the "0 stones" bug, and the four others beside it
 
 Two player reports from the test server, both real, both wider than reported.
 
-### "Bought **Spirit-Iron Sword x1** for **0** stones" — while the wallet *was* debited
+#### "Bought **Spirit-Iron Sword x1** for **0** stones" — while the wallet *was* debited
 
 Not a wallet bug and not a pricing bug. A **key mismatch across the language
 boundary**.
@@ -2027,7 +2052,7 @@ The receipt also fixes three smaller lies it was sitting on. The engine returns
 message dropped it. And black-market trades return `detected` — whether the
 player was caught committing a crime — which the player was simply never told.
 
-### The whole boundary was then audited
+#### The whole boundary was then audited
 
 One instance of a bug class this invisible is not worth fixing alone. A new
 contract test (`tests/python/contracts/test_engine_result_keys.py`) parses the Go
@@ -2041,7 +2066,7 @@ the Go key set is over-collected, so it under-reports rather than crying wolf �
 and it now runs in the suite. It also asserts that its own parsers matched
 something, because a silently-empty parser is a test that passes forever.
 
-### Equip asked for an "Equipment Id" that was never shown to the player
+#### Equip asked for an "Equipment Id" that was never shown to the player
 
 The hub falls back to a text modal whenever a parameter has no option provider.
 `equipment_id` is a plain `int` with no autocomplete, so **Equip, Unequip and
@@ -2059,7 +2084,7 @@ reachable only through the `/items` hub — so the hub is the only consumer, and
 this keeps the change entirely inside code the build sandbox can exercise rather
 than relying on discord.py behaviour that cannot be verified here.
 
-### Verification
+#### Verification
 
 33 new tests (22 unit, 11 contract). Six mutations proved they fail without their
 fixes — including **restoring the original bug verbatim**, which fails three of
@@ -2068,11 +2093,11 @@ Suite baseline-diffed against v0.19.14: 395 tests versus 289, zero new failures,
 identical pre-existing sandbox loader errors.
 
 
-## v0.19.18 — Scene Action: no dropdowns, and it travels with the player
+### v0.19.18 — Scene Action: no dropdowns, and it travels with the player
 
 Two halves of one report, both correct.
 
-### The dropdowns were a rollout gap, not a decision
+#### The dropdowns were a rollout gap, not a decision
 
 The 17 command hubs moved to the Components V2 action-list layout across
 v0.19.5–v0.19.7. **The Scene Action panel is not a hub**, so nothing carried it
@@ -2090,7 +2115,7 @@ nested inside a V2 `Container` has no precedent in this codebase —
 in the build sandbox. Everything here uses only the patterns the 17 hubs already
 prove in production.
 
-### The panel didn't travel because it never looked again
+#### The panel didn't travel because it never looked again
 
 The old view snapshotted character, location and the NPC/player target list at
 construction. `_resolve_scene_action` *does* re-read the character and rejects a
@@ -2109,7 +2134,7 @@ Every interaction now re-reads first:
 - Panel lifetime went from 5 to 15 minutes — only reasonable now that it stays
   current rather than getting staler
 
-### The panel is its own module now, and that is the point
+#### The panel is its own module now, and that is the point
 
 `app/bot/scene_layout.py` imports `discord` and **nothing else from the
 project**; everything game-specific (the action profiles, how to re-read a
@@ -2126,7 +2151,7 @@ discord.py is present**. The same tests therefore exercise the real library on a
 machine that has it and the shim everywhere else, and the shim enforces
 Discord's own five-components-per-row rule while building.
 
-### Verification
+#### Verification
 
 41 new tests (27 unit, 14 contract). Seven mutations proved they fail without
 their fixes: a stale target left selected after travel, `reload` dropped from
@@ -2144,7 +2169,7 @@ Suite baseline-diffed against v0.19.14: 436 tests versus 289, zero new failures,
 identical pre-existing sandbox errors.
 
 
-## v0.19.19 — unauthenticated slow-header DoS in both HTTP listeners (security)
+### v0.19.19 — unauthenticated slow-header DoS in both HTTP listeners (security)
 
 Reported against `app/dashboard.py` and `app/health.py`: both parse HTTP by hand
 with a loop of `await asyncio.wait_for(reader.readline(), timeout=N)`, with a
@@ -2171,7 +2196,7 @@ attacker opened. And an oversized line raised `ValueError` out of `readline()`
 straight into `except Exception: log.exception(...)`, writing a stack trace per
 line — the same attack amplified into log flooding.
 
-### Demonstrated rather than assumed
+#### Demonstrated rather than assumed
 
 The v0.19.18 health server, as shipped, run on a real socket and fed one header
 every 1.5 seconds:
@@ -2186,7 +2211,7 @@ The same script against this build:
 server answered after 10.0s: HTTP/1.1 408 Request Timeout {"error":"header_timeout"}
 ```
 
-### The fix
+#### The fix
 
 A new `app/http_limits.py`, shared by both servers:
 
@@ -2205,7 +2230,7 @@ what ends the slow attack; the count and byte caps end the fast one. They are
 deliberately independent — closing only one leaves the other open, and the tests
 exercise each in isolation.
 
-### Two decisions worth writing down
+#### Two decisions worth writing down
 
 **The stream limit is now stated, and stays above the body cap.** Bounding each
 header line directly means lowering asyncio's stream limit — and that
@@ -2221,7 +2246,7 @@ correct answer.
 out as `HTTP/1.1 408 OK`, because the reason-phrase map had no entry for 408 and
 fell through to its default.
 
-### Exposure, for sizing the urgency
+#### Exposure, for sizing the urgency
 
 The dashboard publishes to `${DASHBOARD_BIND_ADDRESS:-127.0.0.1}:8090`, so by
 default it is loopback-only on the NAS. **If you set
@@ -2230,7 +2255,7 @@ unauthenticated from the whole LAN. The health listener binds `0.0.0.0` inside
 its container and is not published, so it was reachable from other containers on
 the compose network.
 
-### Verification
+#### Verification
 
 48 new tests. The integration tests start the **real** `HealthServer` on a real
 port and dribble headers at it over a socket; they run in 2.7 s and were checked
@@ -2243,7 +2268,7 @@ Suite baseline-diffed against v0.19.14: 473 tests versus 289, zero new failures,
 identical pre-existing sandbox errors.
 
 
-## v0.19.20 — acting on what `ai_status` found: 90.9% procedural fallback
+### v0.19.20 — acting on what `ai_status` found: 90.9% procedural fallback
 
 The panel shipped in v0.19.15 did its job on day one. Production numbers:
 **11 narration requests, 1 served by AI, 10 procedural fallbacks.**
@@ -2251,7 +2276,7 @@ The panel shipped in v0.19.15 did its job on day one. Production numbers:
 And `granted 15, refused 0` — our own 20/min ceiling never fired once. Every 429
 came from OpenRouter's shared free pool, not from us.
 
-### Two failures, one label
+#### Two failures, one label
 
 **Both Gemma routes** returned 429 "temporarily rate-limited upstream", four
 failures each, and — the expensive part — **`skipped while cooling 6` each**. A
@@ -2262,7 +2287,7 @@ procedural prose.
 its error was not a 429 at all: `ValueError: AI provider returned an empty
 response`. The last-resort route in the chain was a delay and a wasted request.
 
-### The arithmetic nobody was tracking
+#### The arithmetic nobody was tracking
 
 OpenRouter's free tier is **20 requests per minute *and* 50 requests per day**
 under $10 of lifetime credits — 1000/day at $10 or more. Only the per-minute half
@@ -2272,7 +2297,7 @@ Eleven narrations cost **fifteen upstream attempts**, because every failed route
 walks to the next one and each walk spends a daily slot. That is 30% of a 50/day
 allowance for eleven narrations, nine of which produced nothing.
 
-### Why the dynamic router returns nothing
+#### Why the dynamic router returns nothing
 
 `openrouter/free` is a **random router over the free model pool**, and that pool
 is now largely *reasoning* models. Routine narration asks for 165–190
@@ -2293,13 +2318,13 @@ set the scene." is *worse* than the deterministic procedural fallback. Reasoning
 text that reads as scratchpad is discarded and the chain moves on. Tested both
 ways — prose is kept, thinking-out-loud is refused.
 
-### `Retry-After` instead of a guess
+#### `Retry-After` instead of a guess
 
 OpenRouter sends a `Retry-After` header when a provider offers a retry hint. The
 router now uses it (clamped to 300s), falling back to the old multiplier only
 when no hint is given. A three-second hint no longer parks a route for sixty.
 
-### Daily budget: track and stop
+#### Daily budget: track and stop
 
 New `OPENROUTER_MAX_REQUESTS_PER_DAY`, defaulting to **50** — the real free-tier
 floor, not an optimistic guess. Once spent, the router refuses locally with a
@@ -2310,7 +2335,7 @@ It is a **cost saver, not an authority**: the counter lives in memory and resets
 when the bot restarts, while the real limit does not. Upstream stays the source
 of truth; this only stops us paying for requests we already know will be refused.
 
-### What `ai_status` now distinguishes
+#### What `ai_status` now distinguishes
 
 - Daily budget used and remaining, with a bar and an 80% warning
 - **`NEVER SUCCEEDED`** on any route with attempts but no successes — a route
@@ -2318,7 +2343,7 @@ of truth; this only stops us paying for requests we already know will be refused
 - Empty replies counted **separately from failures**, with how many were
   recovered from reasoning
 
-### The two things no code change can do
+#### The two things no code change can do
 
 1. **Put $10 of credits on the account**: 50/day → 1000/day, then set
    `OPENROUTER_MAX_REQUESTS_PER_DAY=1000`.
@@ -2326,13 +2351,13 @@ of truth; this only stops us paying for requests we already know will be refused
    message says so itself. A Google AI Studio key routes the Gemma models through
    your own Google quota instead of the shared pool, and it has its own free tier.
 
-### Nothing was ever broken
+#### Nothing was ever broken
 
 Canonical mechanics resolved, players received deterministic prose, no error
 reached anyone. This is a quality degradation — precisely the failure mode
 `ai_status` exists to expose, and it was completely invisible before v0.19.15.
 
-### Verification
+#### Verification
 
 23 new tests. Eight mutations proved every fix is load-bearing: the daily cap,
 the `Retry-After` read, its clamp, reading the reasoning field, the scratchpad
@@ -2340,7 +2365,7 @@ guard, the token bump, empty-response counting, and the never-succeeded flag.
 Suite baseline-diffed against v0.19.14: 496 tests versus 289, zero new failures.
 
 
-## v0.19.21 — the equipment dead end, and the wrong path a new test found
+### v0.19.21 — the equipment dead end, and the wrong path a new test found
 
 A player carrying a Spirit-Iron Sword clicked **Equip** and got:
 
@@ -2350,7 +2375,7 @@ True, and useless. Equip operates on **bound** equipment; the sword was still a
 carried item. The real answer — "run Bind first" — was something the panel had no
 way to say.
 
-### The chain was unreachable end to end
+#### The chain was unreachable end to end
 
 v0.19.17 gave Equip, Unequip and Repair live pickers. **Bind did not get one** —
 and Bind is the first rung, the action that creates bound equipment at all. It
@@ -2364,14 +2389,14 @@ Bind now lists the carried items that are **actually equipment** (present in
 `EQUIPMENT_DEFINITIONS` — a Spirit Herb is not offered), with quantity, slot,
 stat bonuses and durability.
 
-### Empty pickers now name the prerequisite
+#### Empty pickers now name the prerequisite
 
 New `register_hub_option_hint()` in `hubs.py`, so an empty live picker can
 explain itself rather than stating a fact the player cannot act on. All four
 equipment actions use it: Bind points at Market and Craft, Equip points at Bind,
 Unequip says nothing is equipped, Repair points at Bind.
 
-### The new test caught shipped copy pointing at a command that doesn't exist
+#### The new test caught shipped copy pointing at a command that doesn't exist
 
 Writing those hints I got a page label wrong myself — `/economy → Market → Buy`
 when the page is called **Local Market**. The existing hint test only catches the
@@ -2388,7 +2413,7 @@ Initiation". The real path is **`/sect → Sect → Shadow`**, then choose "Acce
 initiation". That line sits at the hidden-sect initiation gate: precisely where a
 player who has finally met a karma requirement goes looking for what to do next.
 
-### One pre-existing test error removed
+#### One pre-existing test error removed
 
 Both hint tests parse every bot module with `ast`. `main.py` uses a PEP 701
 f-string that Python 3.11 cannot parse, so the older test **errored** on 3.11 —
@@ -2397,7 +2422,7 @@ cannot parse, assert that something *was* parsed so the scan can never go
 silently empty, and still re-raise on 3.12, the interpreter the bot actually
 ships on. Baseline errors on 3.11: **14 → 13**.
 
-### Verification
+#### Verification
 
 Six mutations proved each fix load-bearing: the bind provider, bind offering
 non-equipment items, each empty hint, and a wrong page label in a hint. Suite
@@ -2405,7 +2430,7 @@ baseline-diffed against v0.19.14: 501 tests versus 289, zero new failures, one
 fewer pre-existing error.
 
 
-## v0.19.22 — the expedition journal opens when you step back into the world
+### v0.19.22 — the expedition journal opens when you step back into the world
 
 Reported by a player well before the GUI work: leave the birth household, and
 there is no personal thread. It only turned up later, after running `/explore`.
@@ -2415,7 +2440,7 @@ written into simply did not exist yet.
 This was queued and then genuinely forgotten while other reports came in. Not a
 regression; it had never worked.
 
-### It was three handlers, not one
+#### It was three handlers, not one
 
 `PRIVATE_LOCATION_EXITS` lists four private locations and the command that steps
 out of each — birth household, sect residence, own property, personal world. All
@@ -2431,7 +2456,7 @@ it**:
 
 One shared helper now runs at the end of each.
 
-### Three deliberate choices in that helper
+#### Three deliberate choices in that helper
 
 **The character is re-read.** Every caller fetched its copy *before* the engine
 moved them, so reusing it would stamp the journal with the household they just
@@ -2445,7 +2470,7 @@ into another private place, and the world journal is not the right room yet.
 committed canonically by then; a thread that cannot be created deserves a quiet
 log, not a failed action or a stalled interaction.
 
-### The test derives its own scope
+#### The test derives its own scope
 
 Rather than naming the three handlers, the contract test reads
 `PRIVATE_LOCATION_EXITS` and checks the leave handler behind each entry. A fifth
@@ -2459,7 +2484,7 @@ precedes the helper no matter where the helper sits. It passed whatever the code
 did. It now measures the **last** reply, and a mutation that moves the helper
 before the confirmation is correctly caught.
 
-### Verification
+#### Verification
 
 8 new tests. Seven mutations proved each part load-bearing: each of the three
 handlers dropping the call, the stale-character reuse, the private-location
@@ -2467,13 +2492,13 @@ guard, the never-raises guard, and the ordering. Suite baseline-diffed against
 v0.19.14: 509 tests versus 289, zero new failures, one fewer pre-existing error.
 
 
-## v0.19.23 — split stage 2: `/family` leaves main.py
+### v0.19.23 — split stage 2: `/family` leaves main.py
 
 A move, not a change. `main.py` 13,177 → **12,786** lines; `runtime.py` 340;
 the new `app/bot/commands/family.py` 600, holding the group, 14 leaf commands
 and one helper.
 
-### Stage 1 cost two failed deploys, and both shaped this one
+#### Stage 1 cost two failed deploys, and both shaped this one
 
 **v0.19.12** — a module-level name used above its assignment. Everything moved
 here is a function or a literal in its original order, and `DefinitionOrderTests`
@@ -2499,7 +2524,7 @@ Every annotation they use — `discord.Interaction`, `app_commands.Choice[str]`,
 `app_commands.Range[int, 1, 20]`, `int`, `str` — resolves in runtime.py. Checked
 explicitly rather than assumed.
 
-### The footprint was measured before anything moved
+#### The footprint was measured before anything moved
 
 23 free names in the block: 8 already in `runtime.py`, 7 ordinary package
 imports, and 8 defined in `main.py`. Only the last group needed a decision:
@@ -2527,7 +2552,7 @@ ImportError: cannot import name 'SIM' from partially initialized module
 
 Two independent guards: the harness and the test.
 
-### A test caught the move, for the wrong reason
+#### A test caught the move, for the wrong reason
 
 `test_private_location_exits` went red. It scanned `main.py` only, so when
 `birth_family_leave` moved it concluded `/family` had stopped opening the
@@ -2540,7 +2565,7 @@ repeated two releases later. Both that test and the engine-result-key boundary
 scan now read the whole `app/bot` package, so stage 3 cannot silently drop
 coverage the way this one nearly did.
 
-### Verification
+#### Verification
 
 9 new tests. Five mutations proved them load-bearing: a module-level main import,
 a promoted deferred import, a duplicated `GENDER_CHOICES`, a stale group left in
@@ -2548,7 +2573,7 @@ main, and a handler left behind. Suite baseline-diffed against v0.19.14: 518
 tests versus 289, zero new failures, one fewer pre-existing error.
 
 
-## v0.19.24 — per-route rate limits
+### v0.19.24 — per-route rate limits
 
 Provider caps are **per model**. Google allows Gemma 4 roughly **15 requests
 per minute and 1500 per day, per model**. This build had a single account-wide
@@ -2568,7 +2593,7 @@ provider key: with a Google key each route is entitled to 1500/day, so our own
 counter would have cut narration off at 50 — the feature added to *save*
 requests becoming the only thing refusing them.
 
-### Two layers, because the topology has two
+#### Two layers, because the topology has two
 
 | | Per minute | Per day | Enforced by |
 | --- | --- | --- | --- |
@@ -2577,7 +2602,7 @@ requests becoming the only thing refusing them.
 
 Both are real and both are kept.
 
-### A capped route is skipped, not called
+#### A capped route is skipped, not called
 
 Previously the only way to discover a cap was to spend an upstream attempt and be
 refused — which also spent a daily slot *and* started a 60-second cooldown.
@@ -2590,14 +2615,14 @@ its turn. That keeps the "never succeeded" flag from v0.19.20 honest.
 `ai_status` now prints each route's own ceiling, which of the two is closest, the
 headroom left, and how many calls were held back before dialling out.
 
-### Defaults right in both regimes
+#### Defaults right in both regimes
 
 15/min and 1500/day are the documented Gemma free-tier figures. On the shared
 pool the account daily cap of 50 binds first and these never fire; with your own
 provider key they *are* the ceiling. One set of numbers works either way, because
 the account layer covers the first case and the route layer the second.
 
-### What no code change can do
+#### What no code change can do
 
 None of this raises a provider cap. A key at
 `openrouter.ai/settings/integrations` moves these models off OpenRouter's shared
@@ -2605,14 +2630,14 @@ pool and onto your own Google quota — which is what the 429s were asking for. 
 you add one, raise `OPENROUTER_MAX_REQUESTS_PER_DAY` as well: at 1500 per route,
 the account default of 50 becomes the binding constraint.
 
-### Verification
+#### Verification
 
 9 new tests. Seven mutations proved them load-bearing: the route check removed,
 one shared window instead of per-route, a capped route counted as a failure, each
 ceiling ignored in turn, drifted defaults, and a mis-reported binding ceiling.
 Suite baseline-diffed against v0.19.14: 527 tests versus 289, zero new failures.
 
-## v0.19.25 — ack-before-mutate, `/explore` road frontier, and live travel countdowns
+### v0.19.25 — ack-before-mutate, `/explore` road frontier, and live travel countdowns
 
 A production-review pass covering five things: a real Discord interaction-ack
 architecture bug across 84 handlers, three smaller findings from the same
@@ -2622,7 +2647,7 @@ world instead of the road network, and converting `/travel`'s displayed time
 from raw game-minutes to a live, self-updating Discord timestamp plus a new
 `/travel status` command.
 
-### 84 interaction handlers could commit a mutation and never tell the player
+#### 84 interaction handlers could commit a mutation and never tell the player
 
 Discord invalidates an interaction token if it receives no initial response
 (`response.send_message`/`defer`/`send_modal`) within roughly three seconds.
@@ -2662,7 +2687,7 @@ itself). Mutation-tested: manually removing a single handler's `defer()`
 correctly fails the guard, confirming it actually detects the shape rather
 than passing regardless.
 
-### A pre-existing contract test had been silently broken since the `/family` split
+#### A pre-existing contract test had been silently broken since the `/family` split
 
 While verifying the above, `tests/python/contracts/test_authority_boundary.py`
 turned out to have been asserting nothing since `/family`'s handlers moved
@@ -2680,7 +2705,7 @@ already documented in "A test caught the move, for the wrong reason" above,
 now repeated a second time in a different test), and a second file-discovery
 script now runs bare pytest-style test modules that the primary runner drops.
 
-### Three smaller findings from the same review
+#### Three smaller findings from the same review
 
 - **`EventSceneView`'s timeout cap was shorter than some events it serves.**
   Its remaining-time clamp was `max(300, min(21600, ...))` — a 6-hour ceiling
@@ -2706,7 +2731,7 @@ script now runs bare pytest-style test modules that the primary runner drops.
   Reworded to tell the player to check their actual state before retrying,
   rather than assert a guarantee the code can't back up.
 
-### `/explore` discovered locations from anywhere in the world, not the road network
+#### `/explore` discovered locations from anywhere in the world, not the road network
 
 `discoverNextLocationTx` (Go) picked a random unknown location from the
 *entire current world* on a successful exploration roll — so exploring from a
@@ -2729,7 +2754,7 @@ one); the second proved the frontier legitimately expands once a first-ring
 city is known. Mutation-tested against the old whole-catalog-scan behavior —
 both fail correctly when reverted.
 
-### `/travel` now shows a live Discord timestamp instead of a bare game-minute
+#### `/travel` now shows a live Discord timestamp instead of a bare game-minute
 
 Requested directly: travel time was displayed as a raw game-minute figure
 ("Arrival **game minute 4830**"), which means nothing to a player without
@@ -2752,7 +2777,7 @@ own timestamp markup, which renders live and auto-updating, in each viewer's
 own local timezone, entirely client-side — falling back to the old
 "game minute N" text only when no timestamp could be resolved.
 
-### New `/travel status`
+#### New `/travel status`
 
 A new query, `exploration.travel_status`, reads the same in-transit state
 `/travel`'s road-journey gate already tracks (`road_transit:{userID}` in
@@ -2778,7 +2803,7 @@ conversion is actually exercised. On the Python side, the new
 by construction — it's a read-only query, calls no `authoritative_action`,
 and the guard confirms it isn't mistakenly flagged.
 
-### Verification
+#### Verification
 
 Go: `go build ./...`, `go vet ./...` and `go test ./... -count=1` all clean,
 including 6 new Go tests across two new files (`road_frontier_discovery_test.go`,
@@ -2796,7 +2821,7 @@ sandbox's `unittest`-based runner silently drops) independently confirmed
 passing directly under python3.12, which is also the interpreter this
 codebase's own `requirements.txt`/CI actually target.
 
-## v0.19.26 — a better GM admin dashboard: 9 new Admin Console controls
+### v0.19.26 — a better GM admin dashboard: 9 new Admin Console controls
 
 Requested directly ("better admin dashboard"), narrowed through follow-up to: the web
 GM dashboard's Admin Console tab specifically needed more controls — GM actions that
@@ -2813,7 +2838,7 @@ in `app/dashboard.py`, with a matching form section in `dashboard/app.js`'s
 `loadAdmin()`. Every control below follows that same pattern — no new plumbing, just
 more instances of the existing one.
 
-### Character-sheet editing — 3 new operations
+#### Character-sheet editing — 3 new operations
 
 - **`admin.player.set_realm`** — directly sets a character's `realm_index` and `phase`
   (a story correction), bypassing normal breakthrough gating. Validated against the
@@ -2826,7 +2851,7 @@ more instances of the existing one.
   quantity delta in one op (mirroring how karma/fate already take signed deltas),
   floored at 0 on removal rather than erroring.
 
-### NPC / world-state editing — 2 new operations
+#### NPC / world-state editing — 2 new operations
 
 - **`admin.npc.relocate`** — force-moves an NPC's `current_location`. NPCs were
   previously entirely simulation-owned with zero admin write path at all.
@@ -2840,7 +2865,7 @@ than a simple single-table mutation like everything else here), and editing sect
 family/faction political state directly. Both are real gaps, flagged for a future pass
 rather than shipped half-built.
 
-### Player moderation — 3 items, no schema change
+#### Player moderation — 3 items, no schema change
 
 - **`admin.player.reset_cooldowns`** — clears all of a player's `cooldowns` rows, or
   just one named action.
@@ -2863,7 +2888,7 @@ anywhere in this architecture — only an append-only event ledger, not a revers
 one; the practical equivalent for "a mistake happened" is the existing/new karma, fate,
 currency, realm, and resource-cap correction tools above).
 
-### Bulk / server-wide actions — 2 new operations
+#### Bulk / server-wide actions — 2 new operations
 
 - **`admin.bulk.grant_currency`** — applies a currency grant to every character in one
   transaction, with a single `admin_audit_log` row (`target="all"`) rather than N
@@ -2874,7 +2899,7 @@ currency, realm, and resource-cap correction tools above).
 No bulk primitive existed before this pass — `admin.world.advance_time` only *looks*
 bulk because it's one shared clock row, not a per-character loop.
 
-### New `GET /api/player?user_id=` detail endpoint
+#### New `GET /api/player?user_id=` detail endpoint
 
 A GM needs to see what they're about to edit before editing it. This new endpoint
 mirrors the existing `GET /api/npc?name=` drawer pattern: the full `characters` row,
@@ -2900,7 +2925,7 @@ baseline-diffed against the pre-change tree with zero new failures (same pre-exi
 python3.11/3.12 PEP-701 split documented above, plus the expected release-manifest
 mismatch ahead of this release's own manifest regeneration).
 
-## v0.19.27 — sect membership/rank and progression-detail admin controls
+### v0.19.27 — sect membership/rank and progression-detail admin controls
 
 Requested directly, narrowed through follow-up to two of the gaps flagged by a
 system-wide audit after v0.19.26: **player sect membership & rank** (sect political
@@ -2915,7 +2940,7 @@ section in `dashboard/app.js`'s `loadAdmin()`. All six data points already had
 full-column tables with no `CHECK` constraints, so this pass needed no schema
 migration — six new operations on the existing shape.
 
-### 6 new operations
+#### 6 new operations
 
 - **`admin.player.set_sect`** — assigns, re-ranks, or removes a player's
   `sect_membership` row (a `remove:true` payload flag picks the remove branch, the
@@ -2967,7 +2992,7 @@ faction reassignment. `sect_membership.contribution_points`/`influence` and
 write path, same philosophy `admin.player.revive` already uses by not replicating
 every gameplay side effect.
 
-### Dashboard
+#### Dashboard
 
 Six new `<section>` controls in the Admin Console: Sect Membership (with a `<datalist>`
 of known sect names, since sect names aren't DB-enforced and a GM might reference a
@@ -2995,14 +3020,14 @@ full suite was re-run and baseline-diffed against the pre-change tree with zero 
 failures (same pre-existing python3.11/3.12 PEP-701 split documented above, plus the
 expected release-manifest mismatch ahead of this release's own manifest regeneration).
 
-## v0.19.28 — database restore and a debuff/condition clear control
+### v0.19.28 — database restore and a debuff/condition clear control
 
 Requested directly, picking two items off a system-wide gap audit: a working restore
 path to go with the Admin Console's existing backup button (previously backup-only,
 with no automated way back), and a way to clear a stuck debuff/condition without
 touching the database by hand.
 
-### `POST /v1/db/restore` — the Go engine's first online restore
+#### `POST /v1/db/restore` — the Go engine's first online restore
 
 Every earlier release in this line only ever *created* backups
 (`Conn.BackupTo`/`POST /v1/db/backups`) — nothing ever read one back in. The new
@@ -3049,7 +3074,7 @@ backup filename blind in a Discord command is exactly the kind of error this fea
 exists to protect against, whereas the dashboard shows the real, current list of
 backups to click from.
 
-### `admin.player.clear_condition`
+#### `admin.player.clear_condition`
 
 Mirrors the exact resolve semantics ordinary gameplay already uses when a condition
 clears on its own (`progression_actions.go`'s "cleared" branch):
@@ -3083,7 +3108,7 @@ suite re-run and baseline-diffed against the pre-change tree with zero new failu
 (same pre-existing python3.11/3.12 PEP-701 split documented above, plus the expected
 release-manifest mismatch ahead of this release's own manifest regeneration).
 
-## v0.19.29 — dashboard attribution, world-time scale, dynasty/crafting write paths, mute/freeze, undo
+### v0.19.29 — dashboard attribution, world-time scale, dynasty/crafting write paths, mute/freeze, undo
 
 Six items picked off the same running gap audit as the previous two releases: a
 dashboard write-attribution bug, wiring the dashboard up to an already-shipped Go
@@ -3096,7 +3121,7 @@ the real complications and how they were resolved. A seventh, unplanned fix rode
 along: a real privacy bug in `#xianxia-info`'s guide dropdown, found and fixed in the
 same session.
 
-### Dashboard write attribution
+#### Dashboard write attribution
 
 Every dashboard-originated write and audit entry was logged with `ActorID=0`
 ("unattributed") no matter who actually clicked the button — `AdminDashboardController`
@@ -3111,7 +3136,7 @@ rows attribute to the same identity) replaces the hardcoded `0` everywhere
 `AdminDashboardController` writes. Authentication still answers "can this request
 proceed"; attribution now just stops lying about who did it.
 
-### World-time scale, wired up
+#### World-time scale, wired up
 
 `admin.world.advance_time` already accepted an optional `scale` parameter in Go
 (game-minutes elapsed per real-world minute going forward; `scale=0` freezes game-time
@@ -3119,7 +3144,7 @@ drift entirely) — the dashboard's World Time card just never sent it. Added a 
 scale" field (blank = unchanged, preserving today's "just jump time" behavior) and a
 live display of the current scale next to it.
 
-### `admin.player.force_reincarnation_ready` — unstick a soul waiting on real-world time
+#### `admin.player.force_reincarnation_ready` — unstick a soul waiting on real-world time
 
 The dynasty/samsara system was fully read-only before this release. Auditing every
 handler for a genuine "stuck player" case (rather than adding CRUD across all seven
@@ -3133,7 +3158,7 @@ six dynasty/samsara tables (`soul_legacy`, `samsara_dynasty_history`,
 `samsara_dynasty_conflicts`) untouched and still read-only — they're procedurally
 generated narrative/history records with no identified "stuck" bug class.
 
-### Four crafting-adjacent admin controls
+#### Four crafting-adjacent admin controls
 
 Also previously read-only: `alchemy_state` (pill toxicity — the one state that
 persists across every other reincarnation wipe, since it's conspicuously absent from
@@ -3146,7 +3171,7 @@ fields actually supplied), `admin.player.remove_equipment` (force-delete one equ
 row, for the partial-unique-index "stuck unable to re-equip a slot" case), and
 `admin.player.set_abode_access` (grant or revoke one `(owner, guest)` access row).
 
-### Mute/freeze a player
+#### Mute/freeze a player
 
 The one item where "just add a check" wasn't the whole story. Every earlier admin
 write path in this line goes through Go's `applyAuthoritative` dispatch — but Python's
@@ -3180,7 +3205,7 @@ package's wide `characters` fixture (`batch4_authority_test.go`,
 — fixed by widening those two fixtures with the three new columns (all
 default-valued, so no existing `INSERT` in either file needed to change).
 
-### `admin.audit.undo_last` — undo the most recent admin action
+#### `admin.audit.undo_last` — undo the most recent admin action
 
 `admin_audit_log`'s before/after snapshots are not uniformly reversible, so this is a
 deliberately narrow allowlist, not "undo anything." An action qualifies only when its
@@ -3224,7 +3249,7 @@ always targets the single most recent row in the log, full stop. The dashboard g
 one "Undo most recent action" button near the Recent Admin Audit table, with a confirm
 dialog stating the allowlist boundary plainly.
 
-### `#xianxia-info` guide dropdown was posting publicly, and leaking admin instructions
+#### `#xianxia-info` guide dropdown was posting publicly, and leaking admin instructions
 
 Found during this session while explaining the plan above, not part of the original
 audit: `XianxiaInfoSelect.callback` (`app/bot/main.py`) sent every guide-topic reply
@@ -3267,7 +3292,7 @@ tests directly under python3.12, where they pass — plus the expected release-m
 mismatch ahead of this release's own manifest regeneration).
 
 
-## v0.19.30 — split stage 3: `/sect` leaves main.py
+### v0.19.30 — split stage 3: `/sect` leaves main.py
 
 A move, not a change. `main.py` 12,980 → **12,174** lines; the new
 `app/bot/commands/sect.py` 895, holding the base `sect` group plus its
@@ -3277,7 +3302,7 @@ split the same way — a leaner `README.md` (architecture, setup, operations)
 plus a new `VERSIONS.md` holding the full v0.18/v0.19.x changelog, release
 status and schema history that used to live at the bottom of the README.
 
-### The footprint was measured before anything moved, same as stage 2
+#### The footprint was measured before anything moved, same as stage 2
 
 29 free names read by the block. Most resolved the way stage 2's did:
 
@@ -3290,7 +3315,7 @@ status and schema history that used to live at the bottom of the README.
 | `SIM`, `_known_locations`, `current_npc_location`, `ensure_sect_abode_record`, `ensure_sect_abode_thread_for` | used far more elsewhere in main.py — deferred `from ..main import` inside the one function that needs each, same pattern as `_get_thread` in stage 2 |
 | `_sect_recruitment_at_location` | the mirror image: **defined** in the moving block but used once elsewhere in main.py (`/explore`'s road-discovery flow) — main.py imports it back at module level, same as `sect_group` |
 
-### One name stage 2 never had to deal with
+#### One name stage 2 never had to deal with
 
 `carried_item_autocomplete` is referenced as a bare
 `@app_commands.autocomplete(item=carried_item_autocomplete)` decorator
@@ -3304,7 +3329,7 @@ already in runtime.py, so it moved there instead of being duplicated —
 exactly the reasoning stage 2 used for `GENDER_CHOICES`, applied to a new
 failure mode this stage introduced.
 
-### Verification
+#### Verification
 
 `ModuleResolutionTests`, `DefinitionOrderTests`, `WrappingDecoratorAnnotationTests`
 and `ImportDirectionTests` in `test_bot_module_split.py` cover `commands/sect.py`
@@ -3339,7 +3364,7 @@ directly by calling each `test_*` function and asserting no exception, all
 five passing including `test_sect_recruitment_does_not_send_caller_computed_rolls`
 against its new location.
 
-## v0.19.31 — ephemeral-visibility merge
+### v0.19.31 — ephemeral-visibility merge
 
 A community member submitted a patch (`xianxia_ephemeral_patch.diff`, touching
 `app/bot/hubs.py`, `app/bot/runtime.py` and
@@ -3347,7 +3372,7 @@ A community member submitted a patch (`xianxia_ephemeral_patch.diff`, touching
 that should be private but were not. Rather than apply it verbatim, it was
 reviewed against the running suite, and merged with two parts held back.
 
-### The real bug it fixes
+#### The real bug it fixes
 
 `reply_long()` (`app/bot/runtime.py`) takes an `ephemeral` keyword but never
 used it — every chunk of a long reply was sent with the literal
@@ -3358,7 +3383,7 @@ Fixed to forward the caller's own choice; a new test
 reads the function body via `ast` and asserts all three call sites use
 `ephemeral=ephemeral` and none use the old hardcoded `ephemeral=False`.
 
-### Accepted: routing hub-only feedback privately
+#### Accepted: routing hub-only feedback privately
 
 The bulk of the patch adds `_response_is_ephemeral()` / `_send_ephemeral_followup()`
 helpers to `app/bot/hubs.py` and threads them through
@@ -3398,7 +3423,7 @@ intentional, matching the existing `XianxiaInfoSelect` entry's style. Each
 entry was confirmed load-bearing by temporarily removing it and checking the
 test fails on exactly the violations that entry was covering.
 
-### Rejected: two changes that would have broken the public hub panel
+#### Rejected: two changes that would have broken the public hub panel
 
 Running the full suite with the patch applied surfaced one genuine new
 failure beyond the expected baseline:
@@ -3439,7 +3464,7 @@ confirmed to fail when the corresponding patch behavior is reintroduced and
 to pass again once reverted — so a future patch touching this code gets
 caught by the suite instead of requiring another manual review pass.
 
-### Verification
+#### Verification
 
 `go build ./...`/`go vet ./...` are not applicable (no Go code touched).
 Full Python suite baseline-diffed against v0.19.30: 543 tests versus 537 (4
@@ -3457,9 +3482,9 @@ allowlist entries were each mutation-tested (temporarily reintroducing the
 rejected patch behavior, or removing an allowlist entry, confirming the
 relevant test fails, then restoring and reconfirming green).
 
-## v0.19.32 — the Bugslayer Sword, `/admin player grant` hardening, and a startup fix
+### v0.19.32 — the Bugslayer Sword, `/admin player grant` hardening, and a startup fix
 
-### Where this release came from
+#### Where this release came from
 
 A community patch (`xianxia_grant_and_bugslayer_passive.patch`) arrived
 claiming to *extend* an existing "Bugslayer Sword" reward item, an existing
@@ -3484,7 +3509,7 @@ an explicit `httpx` pin in `requirements.txt`, and a `Makefile`,
 Actions workflow. Those are described here only as far as this release had
 to touch them.
 
-### The bot could not start (fixed)
+#### The bot could not start (fixed)
 
 Split stage 4 moved `boss_status`, `hunter_status` and `formation_status`
 into `app/bot/commands/boss.py`/`formation.py` but did not import them back
@@ -3496,7 +3521,7 @@ reads all three **at import time**, so `from app.bot import main` raised
 'formation_status', 'hunter_status']`). Fixed by importing the three
 handlers; that test is green again.
 
-### Tests the command split broke (repaired, not deleted)
+#### Tests the command split broke (repaired, not deleted)
 
 - `EquipmentOptionTests` in `tests/python/contracts/test_engine_result_keys.py`
   scanned `main.py` for the equipment option providers, hints and
@@ -3513,7 +3538,7 @@ handlers; that test is green again.
   `result`, which is what first put it in front of the regex. Added the four
   keys to `ALLOWED_MISSING` with that reason (the allowlist had been empty).
 
-### Bugslayer Sword — a one-of-a-kind, indestructible GM reward
+#### Bugslayer Sword — a one-of-a-kind, indestructible GM reward
 
 `bugslayer_sword` (weapon; +5 ATK, +1 DEF, +1 Spirit, +1 Agility; passive
 **Heavenly Flawfinder**). It exists only to be granted by the GM: it has no
@@ -3577,7 +3602,7 @@ building against the real code:
 `/equipment status` shows **indestructible** in place of a durability
 fraction for such gear and names the passive.
 
-### `/admin player grant` — one command for items and currency
+#### `/admin player grant` — one command for items and currency
 
 The project update already carried a `/admin player grant` (`kind`
 Item/Currency, `target`, `amount`, `reason`) beside the older
@@ -3601,7 +3626,7 @@ shape and adds what a one-of-a-kind reward needs:
 `grantcurrency` is left in place; the update's author kept it and removing a
 command is a separate decision.
 
-### Verification
+#### Verification
 
 Go: `go build ./...`, `go vet ./...`, `gofmt -l` clean, `go test ./...
 -count=1` all packages passing. Nine new tests in
@@ -3637,14 +3662,14 @@ one survivor found and fixed along the way, where a substring check could
 not see an `if False and …` prefix; that assertion is now anchored to the
 line.
 
-## v0.19.33 — main.py split, phase 1: the tests move first
+### v0.19.33 — main.py split, phase 1: the tests move first
 
 No code under `app/` changes in this release. It is the scaffolding phase of
 `docs/history/MAIN_SPLIT_PLAN.md` (shipped with this release): everything that has to be
 true of the test suite *before* any more code leaves `app/bot/main.py`, done as
 its own release so the later phases are pure cut-and-paste moves.
 
-### Why tests first
+#### Why tests first
 
 Split stage 4 (the v0.19.32 tree) moved `/equipment` out of `main.py` and
 `EquipmentOptionTests` — which read `main.py` by path and searched it for the
@@ -3653,7 +3678,7 @@ because the code it was looking for was no longer in the file it was reading.
 Nineteen test files read `main.py` by path in the same way. Every later phase
 of the split would have silently defused a few more of them.
 
-### What changed
+#### What changed
 
 **`tests/support.py`** gains four helpers that every bot-facing test now uses
 instead of a path: `bot_source_files()`, `bot_package_source()` (all of
@@ -3705,14 +3730,14 @@ never imported at module level — the package-wide form of the per-file checks
 in `FamilySplitTests`/`SectSplitTests`, so future modules are covered without a
 new class each.
 
-### What is left pinned to `main.py`, deliberately
+#### What is left pinned to `main.py`, deliberately
 
 `test_bot_module_split.py` names `main.py` because it is *about* `main.py`.
 `test_command_cleanup.test_refactored_packages_have_no_legacy_module_shims`
 asserts the file exists. Everything else that reads bot source now reads the
 package or locates a definition by name.
 
-### Verification
+#### Verification
 
 Go untouched (`go build ./...` confirmed). Python full suite under python3.12
 against v0.19.32: 572 tests versus 571 (+1, the new import-direction guard),
@@ -3721,14 +3746,14 @@ and the nine `httpcore[asyncio]` environment errors documented in v0.19.32).
 Every converted test was run against the unchanged `app/` tree and passes;
 the widened checks were mutation-tested as described above.
 
-## v0.19.34 — main.py split, phase 2: `services.py` and `formatting.py`
+### v0.19.34 — main.py split, phase 2: `services.py` and `formatting.py`
 
 The first phase of `docs/history/MAIN_SPLIT_PLAN.md` that moves code. Two new modules
 below `main.py`, 89 lines out of it, and the shape of every later phase
 established: measure the block's footprint, cut it verbatim in definition
 order, import the names back, add the module to `MODULES`, guard the move.
 
-### What moved
+#### What moved
 
 **`app/bot/services.py`** — the twelve service singletons (`GUILD`, `SCENES`,
 `NPC_RELATIONSHIPS`, `QUESTS`, `EXPLORATION`, `COMBAT`, `NARRATOR_QUEUE`,
@@ -3754,7 +3779,7 @@ orphaned — only those; three imports that were already unused before this
 release (`BOSS_TEMPLATES`, `GameEngineClient`, `array_definition`) are left
 alone, per the plan's "no reorganising while moving" rule.
 
-### Hooks and copies removed
+#### Hooks and copies removed
 
 The plan's reason for moving infrastructure first was the call-time
 `from ..main import …` hooks in the modules already split out. Three of the
@@ -3768,7 +3793,7 @@ into `commands/beast.py` and `commands/duel.py` rather than importing
 by `from ..formatting import roll_line`; `test_roll_line_is_no_longer_duplicated`
 asserts there is exactly one definition in the package.
 
-### Guards
+#### Guards
 
 `services.py` and `formatting.py` are in `MODULES`, so the resolution,
 definition-order and annotation checks cover them. New `Phase2SplitTests`
@@ -3783,14 +3808,14 @@ to the deferred hook; `roll_line` re-duplicated in `duel.py`. The
 `FamilySplitTests`/`SectSplitTests` deferred-import lists were updated to the
 new counts, not loosened.
 
-### Verification
+#### Verification
 
 Go untouched. Python full suite under python3.12 against v0.19.33: 579 tests
 versus 572 (+7, `Phase2SplitTests`), identical failure set (the nine
 `httpcore[asyncio]` environment errors; the manifest regenerated on packaging).
 `main.py`: 11,650 → 11,578 lines (net of the 27-line import-back block).
 
-## v0.19.35 — main.py split, phase 3: `locations.py`
+### v0.19.35 — main.py split, phase 3: `locations.py`
 
 The plan's highest-leverage single move. The scope-accurate dependency scan
 behind `docs/history/MAIN_SPLIT_PLAN.md` found the 18 player-command sub-domains still
@@ -3798,7 +3823,7 @@ in `main.py` have only 19 edges between them, and 15 of those point at the
 same six location helpers buried in the travel section. With those below
 `main.py`, the sub-domains can be cut out one at a time without cross-imports.
 
-### What moved
+#### What moved
 
 **`app/bot/locations.py`** — `_world_min_realm_index`, `_world_is_unlocked`,
 `_known_locations`, `_location_is_visible`, `location_autocomplete`,
@@ -3817,13 +3842,13 @@ That is exactly why they could never have been served by a deferred
 `from ..main import` from a command module, and why `sect.py` had to keep its
 `_known_locations` hook until now.
 
-### Hooks removed
+#### Hooks removed
 
 `sect.py`'s `_known_locations` hook and both `current_npc_location` hooks are
 now one module-level `from ..locations import`. Five of the original ten
 remain (`family.py` 3, `sect.py` 2), all thread helpers, all phase 4.
 
-### Guards
+#### Guards
 
 `locations.py` is in `MODULES`. `Phase3SplitTests` (6 tests): each helper
 defined in `locations.py` and nowhere else; `main.py` imports all seven back;
@@ -3835,14 +3860,14 @@ suite: a name left out of the import-back; `locations` importing `main`;
 `current_world_time` dropped from its runtime import; `sect.py`'s import
 removed; `_world_is_unlocked` left behind in `main.py`.
 
-### Verification
+#### Verification
 
 Go untouched. Python full suite under python3.12 against v0.19.34: 585 tests
 versus 579 (+6), identical failure set. `main.py`: 11,578 → 11,497 lines.
 
-## v0.19.36 — the narrator posted its own reasoning as the narration
+### v0.19.36 — the narrator posted its own reasoning as the narration
 
-### What a player saw
+#### What a player saw
 
 In a private expedition thread, after "Discover roads", the bot posted:
 
@@ -3858,7 +3883,7 @@ In a private expedition thread, after "Discover roads", the bot posted:
 That is a reasoning model's scratchpad — including a paraphrase of the system
 prompt's constraints — delivered as prose.
 
-### Why it got through
+#### Why it got through
 
 `app/ai_router.py` already had a guard for exactly this: `_looks_like_scratchpad`,
 with the comment *"Narration that starts 'Okay, the user wants...' is worse than
@@ -3875,7 +3900,7 @@ the deterministic procedural fallback."* Two gaps let this one past it:
    shipped v0.19.35 module — `_looks_like_scratchpad` returned `False` and the
    validator passed it through.
 
-### The fix
+#### The fix
 
 - `_validate_generated_text` now runs the scratchpad guard on `content` for
   every player-facing route (`leak_guard=True`; the GM chat digest, which
@@ -3898,7 +3923,7 @@ the deterministic procedural fallback."* Two gaps let this one past it:
   then the next free route, then the procedural fallback. A player never sees
   scratchpad text; at worst they see the deterministic fallback line.
 
-### Tests
+#### Tests
 
 `ScratchpadInContentTests` (10 tests) in `tests/python/unit/test_ai_router_health.py`,
 built around the verbatim leaked reply: recognised as scratchpad; rejected by
@@ -3911,14 +3936,14 @@ new pattern. Mutants confirmed to fail the suite: guard disabled, the
 "thinking process" pattern removed (isolated by its own case), the counter
 dropped, unclosed-tag stripping dropped.
 
-### Verification
+#### Verification
 
 Go untouched. Python full suite under python3.12 against v0.19.35: 595 tests
 versus 585 (+10), identical failure set.
 
-## v0.19.37 — dead free routes were eating the daily budget; ai_status shows whose key served
+### v0.19.37 — dead free routes were eating the daily budget; ai_status shows whose key served
 
-### What the GM saw
+#### What the GM saw
 
 `/admin server ai_status`: both Gemma free routes at **NEVER SUCCEEDED**,
 15 attempts, 15 failures each, every one a 429 reading *"google/gemma-4-…:free
@@ -3929,7 +3954,7 @@ free-tier budget at **50/50** after only **23** narrations.
 The GM had added a Google key on OpenRouter's Integrations page and reasonably
 asked why Google "never responds".
 
-### Two separate things
+#### Two separate things
 
 **1. The budget.** A 429 put a route on a fixed 60-second cooldown
 (`OPENROUTER_FAILURE_COOLDOWN_SECONDS` × 3). A route that is dead all day was
@@ -3973,7 +3998,7 @@ narrates its instructions; with v0.19.36 the scratchpad guard will usually
 catch the same replies first. Not changed here — it is the configured epic
 primary, and the fix is `OPENROUTER_EPIC_MODEL`, not code.
 
-### Tests
+#### Tests
 
 `EscalatingBackoffTests` (4): doubling sequence 60/120/240/480 for 429s;
 the cap; a success resets streak and cooldown; a `Retry-After` hint is
@@ -3984,14 +4009,14 @@ lookup never breaks narration. Five mutants confirmed to fail the suite:
 escalation disabled, cap removed, streak not reset, provider not recorded,
 lookup not called.
 
-### Verification
+#### Verification
 
 Go untouched. Python full suite under python3.12 against v0.19.36: 603 tests
 versus 595 (+8), identical failure set.
 
-## v0.19.38 — reasoning off on every narration request; new fallback chains
+### v0.19.38 — reasoning off on every narration request; new fallback chains
 
-### Reasoning off
+#### Reasoning off
 
 Both production failures of the free narration chain were reasoning: models
 spending a 180-token budget thinking and returning empty content (v0.19.20),
@@ -4005,7 +4030,7 @@ and — because the constructor default is `True` — a separate check that
 `services.py` actually passes the setting through (dropping the kwarg would
 have left the env var silently ignored; confirmed by mutation).
 
-### The chains
+#### The chains
 
 The GM's Google routes had failed 30 of 30 times; the cause turned out to be
 that the Google AI Studio key had not been saved on OpenRouter's Integrations
@@ -4035,19 +4060,19 @@ and the README explain when Gemma should *not* be primary (no AI Studio key
 saved → put MiniMax first) and how to make a failing key surface Google's
 own error instead of the pool's 429.
 
-### Verification
+#### Verification
 
 Go untouched. Python full suite under python3.12 against v0.19.37: 607 tests
 versus 603 (+4), identical failure set.
 
-## v0.19.39 — main.py split, phase 4: the rest of the plumbing
+### v0.19.39 — main.py split, phase 4: the rest of the plumbing
 
 The last infrastructure phase of `docs/history/MAIN_SPLIT_PLAN.md`. 644 lines out of
 `main.py` into four modules, and the last call-time `from ..main import`
 anywhere in the package deleted. From here on, a command module that needs
 `main.py` is a bug, not a workaround — and a test says so.
 
-### What moved
+#### What moved
 
 Footprint measured per function before the cut: none of the 33 definitions
 reads anything from the rest of `main.py`; the only intra-region edges are
@@ -4077,7 +4102,7 @@ move orphaned (`medicine_toxicity_effect`, `aptitude_effects`,
 `scene_memory_summary`, `recruitment_definition`, `private_location_exit`).
 `trial_outcome` was already unused before this release and is left alone.
 
-### The hooks are gone
+#### The hooks are gone
 
 `family.py`'s three (`_get_thread`, `ensure_birth_family_household_thread`,
 `open_expedition_thread_after_exit`) and `sect.py`'s two
@@ -4087,7 +4112,7 @@ split, zero now. Both modules' docstrings, which explained the hooks, carry
 a dated update rather than a rewrite — the reasoning they record is why the
 split was ordered as it was.
 
-### Guards
+#### Guards
 
 All four modules are in `MODULES`. `Phase4SplitTests` (7): each name
 defined in its module and nowhere else; `main.py` imports every one back;
@@ -4102,12 +4127,12 @@ dropped from `channels`' import; `family.py`'s and `sect.py`'s new imports
 removed; a hook reintroduced through a wrapper function; `post_server_log`
 left behind in `main.py`.
 
-### Verification
+#### Verification
 
 Go untouched. Python full suite under python3.12 against v0.19.38: 614 tests
 versus 607 (+7), identical failure set. `main.py`: 11,497 → 10,894 lines.
 
-## v0.19.40 — main.py split, phase 5: `admin/core.py`
+### v0.19.40 — main.py split, phase 5: `admin/core.py`
 
 Small and strictly bounded: the admin permission gate, the two audit trails
 and the eight `/admin` group objects (135 lines) move into a new
@@ -4129,7 +4154,7 @@ the import-back, `require_admin` left behind in `main.py`.
 Go untouched. Python full suite against v0.19.39: 620 tests versus 614
 (+6), identical failure set. `main.py`: 10,894 → 10,774 lines.
 
-## v0.19.41 — main.py split, phase 6: the admin server layer
+### v0.19.41 — main.py split, phase 6: the admin server layer
 
 The largest single move of the split so far: 1,563 lines out of `main.py`
 into three modules in the `admin` package.
@@ -4173,7 +4198,7 @@ class reads — dropping that line would make the eight commands vanish from
 role helpers); the phase-2 and phase-4 import-back guards are updated to say
 so rather than loosened.
 
-### Guards
+#### Guards
 
 Three new `MODULES` entries. `Phase6SplitTests` (6): the layering (leaves
 import neither each other nor `server_setup`/`core`/`main`; `server_setup`
@@ -4185,12 +4210,12 @@ a leaf importing `server_setup` (cycle); `server_setup` taking the core from
 `main`; `GUILD` dropped from its imports; `clear_managed_channel_messages`
 renamed.
 
-### Verification
+#### Verification
 
 Go untouched. Python full suite against v0.19.40: 626 tests versus 620
 (+6), identical failure set. `main.py`: 10,774 → 9,208 lines.
 
-## v0.19.42 — main.py split, phase 7: the admin operations
+### v0.19.42 — main.py split, phase 7: the admin operations
 
 768 lines out of `main.py`: 32 `/admin` commands and their choice lists,
 autocompletes and hub option providers, into two modules in the `admin`
@@ -4222,7 +4247,7 @@ the package.
 same way as phase 6's `server_setup` import. Six imports orphaned by the
 move are dropped.
 
-### Guards
+#### Guards
 
 Three new `MODULES` entries. `Phase7SplitTests` (6): each command where the
 plan says; all 43 admin commands registered exactly once across the
@@ -4233,12 +4258,12 @@ import dropped from `main.py`; a command renamed on the move; `world_ops`
 taking a picker from `main`; `pickers` importing `main`; a thread helper
 dropped from `world_ops`' imports.
 
-### Verification
+#### Verification
 
 Go untouched. Python full suite against v0.19.41: 632 tests versus 626
 (+6), identical failure set. `main.py`: 9,208 → 8,443 lines.
 
-## v0.19.43 — main.py split, phase 8: the shared UI and the bot class
+### v0.19.43 — main.py split, phase 8: the shared UI and the bot class
 
 1,534 lines out of `main.py`. After this release `main.py` still holds the
 player-command blocks (phase 9) but no longer owns the bot class, the
@@ -4260,7 +4285,7 @@ character-creation flow, the event-scene panel, or any `/admin` command.
   `spawn_event_thread` and the `bot` instance, both importable from below
   now. All 43 admin commands are out of `main.py`.
 
-### The five back-edges
+#### The five back-edges
 
 The plan's dependency graph found exactly five places in the file that
 referenced a later definition, all inside function bodies. Two were
@@ -4276,7 +4301,7 @@ import edge, no deferred import — and a test asserts the view never calls
 any of the three directly and that `main.py` binds all three names. The
 bindings move with the helpers in phase 9.
 
-### Guards
+#### Guards
 
 Three new `MODULES` entries (`ui/event_scene.py`, `ui/creation.py`,
 `bot.py`). `Phase8SplitTests` (6): `main.py` defines none of the moved
@@ -4295,12 +4320,12 @@ dropped; the hub-error-reporter wiring removed; a world command renamed.
 `main.py` drops 19 imports the move orphaned; the two `server_setup` /
 `channel_messages` imports stay as the documented registration side effect.
 
-### Verification
+#### Verification
 
 Go untouched. Python full suite against v0.19.42: 638 tests versus 632
 (+6), identical failure set. `main.py`: 8,443 → 6,910 lines.
 
-## v0.19.44 — main.py split, phase 9a: the first four player-command domains
+### v0.19.44 — main.py split, phase 9a: the first four player-command domains
 
 Phase 9 is the player commands — eighteen sub-domains, most of what is
 left in `main.py` — taken in several releases. This first one cuts the four
@@ -4324,7 +4349,7 @@ domains the scope-accurate scan showed nothing else still in the file reads
 hub wiring and `register_event_handlers()` read, and drops nine `app.*`
 imports the move orphaned.
 
-### Guards
+#### Guards
 
 Four new `MODULES` entries. `Phase9aSplitTests` (6): each domain owns its
 group and leaves and `main.py` no longer defines them; all eleven group
@@ -4337,12 +4362,12 @@ dropped from the import-back (`register_event_handlers` would `NameError`);
 renamed; `roll_line` re-duplicated in `aptitude.py`; a group object left
 behind in `main.py`.
 
-### Verification
+#### Verification
 
 Go untouched. Python full suite against v0.19.43: 644 tests versus 638
 (+6), identical failure set. `main.py`: 6,910 → 5,625 lines.
 
-## v0.19.45 — main.py split, phase 9b: character, economy, abode
+### v0.19.45 — main.py split, phase 9b: character, economy, abode
 
 Second cut of the player commands: the three domains that share only the
 runtime/services layer with what remains, 1,553 lines.
@@ -4372,7 +4397,7 @@ runtime/services layer with what remains, 1,553 lines.
 move orphaned — including the last `black_market.access_reason` alias and
 the last `Path` use.
 
-### Guards
+#### Guards
 
 Three new `MODULES` entries. `Phase9bSplitTests` (5): each domain owns its
 groups and root commands and `main.py` no longer defines them; `main.py`
@@ -4388,12 +4413,12 @@ dropped from the import-back; `abode.py` taking the picker from
 `main`; `reincarnate` renamed; `usable_item_autocomplete` left behind in
 `main.py`.
 
-### Verification
+#### Verification
 
 Go untouched. Python full suite against v0.19.44: 649 tests versus 644
 (+5), identical failure set. `main.py`: 5,625 → 4,064 lines.
 
-## v0.19.46 — main.py split, phase 9c: exploration, craft and alchemy
+### v0.19.46 — main.py split, phase 9c: exploration, craft and alchemy
 
 Third cut of the player commands. The §2 row "exploration + craft +
 alchemy" turned out to be one contiguous block of `main.py` (lines 575–1426)
@@ -4414,7 +4439,7 @@ sixteen imports the move orphaned, among them the last uses of
 `location_autocomplete`, `spawn_event_thread`, the discovery-art helpers and
 `_sect_recruitment_at_location`.
 
-### A guard the split had been missing
+#### A guard the split had been missing
 
 The first draft of the header wrote `from .runtime import DB` — one dot
 short, in a module one package deeper — and every existing guard passed:
@@ -4427,7 +4452,7 @@ Five mutants confirmed to fail: the one-dot header; a two-dot `app.*`
 import; a misspelled name; `..main` in place of `..runtime`; a misspelled
 module.
 
-### Guards
+#### Guards
 
 One new `MODULES` entry. `Phase9cSplitTests` (5): exploration owns the three
 groups and the three root commands and `main.py` no longer defines them;
@@ -4441,12 +4466,12 @@ phase mutants confirmed to fail: `travel_group` dropped from the
 import-back; the sect helper taken from `main`; `hunt` renamed; the module
 reading `..main` for the runtime; the picker alias trick.
 
-### Verification
+#### Verification
 
 Go untouched. Python full suite against v0.19.45: 655 tests versus 649
 (+6), identical failure set. `main.py`: 4,064 → 3,199 lines.
 
-## v0.19.47 — main.py split, phase 9d: battle and law
+### v0.19.47 — main.py split, phase 9d: battle and law
 
 Fourth cut of the player commands, and the first with a real edge between
 the two domains: `/law technique` and `/manual technique` open the battle
@@ -4474,7 +4499,7 @@ the bottom of `battle.py`. It runs when the module is imported, which
 before. `main.py` imports back the six groups and `battle_status` and drops
 the fourteen imports the move orphaned, `asyncio` among them.
 
-### Guards
+#### Guards
 
 Two new `MODULES` entries. `Phase9dSplitTests` (6): each domain owns its
 groups and roots and `worldrules` stayed behind; every leaf arrived under
@@ -4491,12 +4516,12 @@ from `main`; `battle.py` importing `law`; `profession_group` dropped from
 the import-back; a leaf renamed (`atone` → `atone2`, which no guard in the
 package had caught before the leaf-name pin).
 
-### Verification
+#### Verification
 
 Go untouched. Python full suite against v0.19.46: 661 tests versus 655
 (+6), identical failure set. `main.py`: 3,199 → 2,339 lines.
 
-## v0.19.48 — main.py split, phase 9e: scene and sense — phase 9 complete
+### v0.19.48 — main.py split, phase 9e: scene and sense — phase 9 complete
 
 The last two player domains, 1,056 lines. With them, every player command
 has left `main.py`.
@@ -4524,7 +4549,7 @@ left at 1,283 lines: the hub definitions, the `/admin` hub root,
 defines no `app_commands.Group` and no group command. That is the state
 phase 10 (the final sweep) starts from.
 
-### Guards
+#### Guards
 
 Two new `MODULES` entries. `Phase9eSplitTests` (5): each domain owns its
 roots (eleven names pinned) and `/scene status`; `main.py` defines no group,
@@ -4542,8 +4567,3107 @@ dropped from the import-back; the `sense` side-effect import removed;
 `sense.py` taking the location helpers from `main`; `npcinfo` renamed;
 `sense.py` importing `scene`.
 
-### Verification
+#### Verification
 
 Go untouched. Python full suite against v0.19.47: 666 tests versus 661
 (+5), identical failure set. `main.py`: 2,339 → 1,283 lines (11,650 at
 v0.19.32).
+
+---
+
+## `V019_24_RELEASE.txt`
+
+```text
+Xianxia RP v0.19.24 RECOMMENDED RELEASE
+
+Release date: 2026-09-03
+Schema: 26 (unchanged from v0.19)
+
+v0.19.24 gives every route its own rate window. The single account-wide ceiling could
+not express what the providers actually enforce.
+
+THE MISMATCH
+  Provider caps are PER MODEL. Google allows Gemma 4 roughly 15 requests/minute and
+  1500/day PER MODEL. This build had one global ceiling of 20/min, which is at once
+
+    TOO HIGH for a single route   (20 > 15 -> we call out and get refused)
+    TOO LOW  for the fleet        (two Gemma routes are entitled to 30)
+
+  Production showed exactly that: both Gemma routes cooling down independently while
+  the account limiter reported "granted 15, refused 0" - it had never fired once.
+  The thing throttling narration was invisible to the thing meant to prevent it.
+
+  And v0.19.20's daily budget default of 50 was correct for OpenRouter's shared free
+  pool but 30x too low for a provider key: with a Google key each Gemma route is
+  entitled to 1500/day, and our own counter would have cut narration off at 50 - the
+  feature added to save requests becoming the only thing refusing them.
+
+WHAT CHANGED
+  New RouteLimiter: one RPM + RPD window PER MODEL, alongside the account-wide pair.
+  Both are real and both are kept, because the topology genuinely has two layers:
+
+    account-wide   20/min, 50/day   OpenRouter's own free-tier limits
+    per route      15/min, 1500/day what the provider enforces per model
+
+  A route at ITS OWN ceiling is now SKIPPED, not called. Previously the only way to
+  discover a cap was to spend an upstream attempt and be refused - which also spent a
+  daily slot and started a 60-second cooldown. Skipping costs nothing and moves
+  straight to the next model, which has a separate quota.
+
+  A skipped route is NOT recorded as a failure: it has not failed, it is simply not
+  this route's turn. It keeps its never-succeeded status honest.
+
+  ai_status now prints each route's own ceiling, which of the two is closest, the
+  headroom left, and how many calls were held back before dialling out.
+
+DEFAULTS THAT ARE RIGHT IN BOTH REGIMES
+  15/min and 1500/day - the documented Gemma free-tier figures. On OpenRouter's shared
+  pool the account daily cap of 50 binds first and these never fire. With your own
+  provider key they ARE the ceiling. One set of numbers, correct either way, because
+  the account layer handles the first case and the route layer the second.
+
+  New: OPENROUTER_ROUTE_REQUESTS_PER_MINUTE=15, OPENROUTER_ROUTE_REQUESTS_PER_DAY=1500.
+
+STILL THE OPERATOR'S CALL
+  None of this raises a provider cap. A key at openrouter.ai/settings/integrations
+  moves these models off OpenRouter's shared pool and onto your own Google quota,
+  which is what the 429s were asking for. If you add one, raise
+  OPENROUTER_MAX_REQUESTS_PER_DAY too - at 1500 per route the account default of 50
+  becomes the binding constraint.
+
+Tests: 9 new. Seven mutations proved them load-bearing: the route check removed, one
+shared window instead of per-route, a capped route counted as a failure, each ceiling
+ignored in turn, drifted defaults, and a mis-reported binding ceiling.
+
+Suite baseline-diffed against v0.19.14: 527 tests vs 289, zero new failures, one fewer
+pre-existing error.
+
+NOTE: contains v0.19.15 through v0.19.23.
+
+
+v0.19.23 is SPLIT STAGE 2: /family moves out of main.py into
+app/bot/commands/family.py. Behaviour is unchanged - this is a move.
+
+  main.py     12786 lines (was 13177 before stage 1)
+  runtime.py    340
+  family.py     600   14 leaf commands, the group, and one helper
+
+STAGE 1 COST TWO FAILED DEPLOYS. BOTH SHAPED THIS ONE.
+  v0.19.12: a module-level name used above its assignment (DB built from ROOT
+  before ROOT existed). Everything moved here is a function or a literal, kept in
+  its original order, and DefinitionOrderTests covers the new module.
+
+  v0.19.13: NameError: name 'app_commands' is not defined. functools.wraps cannot
+  copy __globals__, so a callback wrapped by a decorator from another module
+  carries THAT module's namespace - and discord.py evaluates annotation STRINGS
+  against it. That is live here: EIGHT of the 14 family handlers are wrapped by
+  serialized_user_action, and the import check confirms their callbacks carry
+  app.bot.runtime's globals, not family.py's:
+
+    birth_family_child        callback globals = app.bot.runtime
+    birth_family_leave        callback globals = app.bot.runtime
+    ... 6 more ...
+    birth_family_view         callback globals = app.bot.commands.family
+
+  Every annotation they use - discord.Interaction, app_commands.Choice[str],
+  app_commands.Range[int, 1, 20], int, str - resolves in runtime.py. Checked
+  explicitly, not assumed.
+
+THE DEPENDENCY FOOTPRINT WAS MEASURED, NOT GUESSED
+  23 free names in the block: 8 already in runtime.py, 7 ordinary package
+  imports, 8 defined in main.py. The last group is the only interesting one:
+
+    family_group                        -> moves to family.py; main imports it
+    _current_birth_family               -> used ONLY by /family; moves with it
+    CHILD_CULTIVATION_AWAKENING_AGE     -> used ONLY by /family; moves with it
+    GENDER_CHOICES                      -> also used by /begin and the admin
+                                           override, so it moves to runtime.py
+                                           rather than being duplicated
+    SIM (31 other uses in main)         -> stays; imported inside the one
+    _get_thread (5)                        function that needs each
+    ensure_birth_family_household_thread (3)
+    open_expedition_thread_after_exit (3)
+
+  Those last four are imported INSIDE the function bodies on purpose. A
+  module-level "from ..main import" would be a genuine cycle; a call-time import
+  runs long after main.py has finished importing. There are exactly four, one use
+  each, and a test asserts both the list and that they are not at module level.
+
+  Proof that the distinction is real, not stylistic: promoting one of them to a
+  module-level import reproduces
+
+    ImportError: cannot import name 'SIM' from partially initialized module
+    'app.bot.main' (most likely due to a circular import)
+
+  in the stub-import harness. Two independent guards - the harness and the test.
+
+A TEST CAUGHT THE MOVE, FOR THE WRONG REASON
+  test_private_location_exits went red: it scanned main.py only, so when
+  birth_family_leave moved it concluded /family had stopped opening the expedition
+  journal. The code was fine; the test's scope was stale.
+
+  That is the exact mistake documented at the top of
+  test_player_facing_command_hints.py ("a check anchored to one file would quietly
+  stop covering them the moment they move") - which I wrote, and then repeated two
+  releases later. Both that test and the engine-result-key boundary scan now read
+  the whole app/bot package, so the next stage cannot silently drop coverage.
+
+Tests: 9 new. Five mutations proved them load-bearing: a module-level main import,
+a promoted deferred import, a duplicated GENDER_CHOICES, a stale group left in
+main, and a handler left behind.
+
+Suite baseline-diffed against v0.19.14: 518 tests vs 289, zero new failures, one
+fewer pre-existing error.
+
+NOTE: contains v0.19.15 through v0.19.22.
+
+
+v0.19.22 makes the expedition journal appear when you step back out into the world,
+instead of whenever you next happen to run /explore.
+
+THE REPORT
+  Arceus, before the GUI work: leave the birth household, and there is no personal
+  thread. It only appeared later, after exploring. The exit worked and the location was
+  right - the room a player's own scenes get written into simply did not exist yet.
+
+  This was queued and then genuinely forgotten while other reports came in. It was not a
+  regression; it had never worked.
+
+IT WAS THREE HANDLERS, NOT ONE
+  PRIVATE_LOCATION_EXITS lists four private locations and the command that steps out of
+  each: birth household, sect residence, own property, personal world. All of them land
+  the player back in the shared world, so all of them need the journal. Only the family
+  one was reported. NONE of the three handlers had it:
+
+    /family -> Leave       birth_family_leave    (11126)
+    /abode  -> Leave       abode_leave           (10035)  - covers abode: and sect_abode:
+    /innerworld -> Leave   innerworld_leave      (10208)
+
+  One shared helper now runs at the end of each.
+
+THREE DELIBERATE CHOICES IN THAT HELPER
+  1. THE CHARACTER IS RE-READ. Every caller fetched its copy BEFORE the engine moved
+     them, so reusing it would stamp the journal with the household they just walked out
+     of - the exact stale-snapshot bug fixed in the Scene Action panel in v0.19.18.
+  2. IF THEY ARE STILL IN A PRIVATE LOCATION, nothing opens. That exit stepped into
+     another private place and the world journal is not the right room yet.
+  3. IT RUNS AFTER THE CONFIRMATION AND NEVER RAISES. The exit is already committed
+     canonically at that point; a thread that cannot be created is worth a quiet log,
+     not a failed action or a stalled interaction. The test enforces the ordering.
+
+TEST DERIVES ITS OWN SCOPE
+  The new contract test reads PRIVATE_LOCATION_EXITS and checks the leave handler behind
+  each entry, rather than naming the three by hand. A fifth private location added
+  without wiring its exit fails here instead of in a player's face.
+
+  One test bug found and fixed while writing it: the ordering check first measured the
+  FIRST reply in each handler, which is always the GameEngineError branch - so it passed
+  no matter where the helper sat. It now measures the LAST reply, and a mutation moving
+  the helper before the confirmation is correctly caught.
+
+Tests: 8 new. Seven mutations proved each part is load-bearing: each of the three
+handlers dropping the call, the stale-character reuse, the private-location guard, the
+never-raises guard, and the ordering.
+
+Suite baseline-diffed against v0.19.14: 509 tests vs 289, zero new failures, one fewer
+pre-existing error.
+
+NOTE: contains v0.19.15 through v0.19.21.
+
+
+v0.19.21 fixes the equipment dead end a player hit while holding the sword he had just
+bought, and the wrong command path a new test then found sitting in shipped copy.
+
+THE DEAD END
+  Arceus: carried Spirit-Iron Sword x1. Clicked Equip. Got:
+
+    "Equip has no available equipment id options right now."
+
+  That message was TRUE and USELESS. Equip operates on BOUND equipment; the sword was
+  still a carried item. The real answer was "run Bind first" - which the panel had no way
+  to say.
+
+  Worse, Bind could not be run either. v0.19.17 gave Equip, Unequip and Repair live
+  option pickers, but BIND - the first rung of the ladder, the one that creates bound
+  equipment in the first place - still had no option provider at all, so it opened a text
+  box asking the player to type an internal item id like "spirit_iron_sword". The whole
+  chain was unreachable through the GUI:
+
+    Bind asks for a typed id -> nothing gets bound -> Equip is permanently empty ->
+    the empty message does not mention Bind.
+
+  Bind now lists the carried items that are ACTUALLY equipment (present in
+  EQUIPMENT_DEFINITIONS - a Spirit Herb is not offered), with quantity, slot, stat
+  bonuses and durability.
+
+EVERY EMPTY PICKER NOW NAMES THE PREREQUISITE
+  New register_hub_option_hint() in hubs.py, so an empty live picker can explain itself
+  instead of stating a fact the player cannot act on. All four equipment actions use it:
+  Bind points at Market/Craft, Equip points at Bind, Unequip says nothing is equipped,
+  Repair points at Bind.
+
+A NEW TEST IMMEDIATELY FOUND SHIPPED COPY POINTING AT A COMMAND THAT DOES NOT EXIST
+  Writing those hints, I got a page label wrong myself - "/economy -> Market -> Buy" when
+  the page is called "Local Market". The existing hint test only catches the arrow-LESS
+  form ("/family leave"); a wrong label after an arrow looks correct to a reviewer and is
+  a dead end to a player.
+
+  So the test now validates every "/hub -> Page -> ..." reference against the real hub
+  definitions. It caught my mistake, and one that had already shipped:
+
+    "You may use **/sect -> Shadow / Special -> Accept Initiation**"
+
+  /sect has three pages - Sect, Territory, War - and no action called Accept Initiation.
+  The real path is /sect -> Sect -> Shadow, then choose "Accept initiation". That text
+  sits at the hidden-sect initiation gate: exactly where a player who has finally met a
+  karma requirement goes looking. Fixed.
+
+ONE PRE-EXISTING TEST ERROR REMOVED
+  Both hint tests parse every bot module with ast. main.py uses a PEP 701 f-string that
+  Python 3.11 cannot parse, so the older test ERRORED on 3.11 (it is in the 14 baseline
+  errors). Both now skip what the running interpreter cannot parse, assert that something
+  WAS parsed so the scan can never go silently empty, and still re-raise on 3.12 - the
+  interpreter the bot actually ships on, per the Dockerfile. Baseline errors on 3.11:
+  14 -> 13.
+
+Tests: 5 new plus the arrow-path validator. Six mutations proved each fix is
+load-bearing: the bind provider, bind offering non-equipment, each empty hint, and a
+wrong page label in a hint.
+
+Suite baseline-diffed against v0.19.14: 501 tests vs 289, zero new failures, and one
+FEWER pre-existing error.
+
+NOTE: contains v0.19.15 through v0.19.20.
+
+
+v0.19.20 acts on what the new ai_status panel found in production: a 90.9% procedural
+fallback rate, and TWO different failures that had been wearing the same label.
+
+WHAT THE PANEL SHOWED
+  11 narration requests, 1 served by AI, 10 procedural fallbacks.
+  Local limiter: granted 15, refused 0 - so OUR ceiling never fired once. Every 429 came
+  from OpenRouter's shared free pool.
+
+  1. Both Gemma routes: 429 "temporarily rate-limited upstream", 4 failures each, and
+     "skipped while cooling 6" each - our blanket 60s cooldown turning a transient
+     provider blip into a minute of procedural prose.
+  2. openrouter/free: 6 attempts, ZERO successes, and its error was not a 429 at all -
+     "ValueError: AI provider returned an empty response". A last-resort route that had
+     never once worked.
+
+THE ARITHMETIC NOBODY WAS TRACKING
+  OpenRouter's free tier is 20 requests/MINUTE and 50 requests/DAY under $10 of lifetime
+  credits (1000/day at $10 or more). Only the per-minute half was ever tracked.
+
+  11 narrations cost 15 upstream attempts, because every failed route walks to the next
+  one and each walk spends a daily slot. That is 30% of a 50/day allowance for eleven
+  narrations, nine of which produced nothing.
+
+WHY openrouter/free RETURNS NOTHING
+  It is a RANDOM ROUTER over the free model pool, and that pool is now largely reasoning
+  models. Routine narration asks for 165-190 max_tokens. A reasoning model given 180
+  tokens spends all of them on reasoning and returns EMPTY content, with the text - if
+  any - in a separate reasoning field this code never read.
+
+  Two fixes, in that order of importance:
+    - The dynamic route now gets at least 700 output tokens, so content can exist.
+    - If content is STILL empty, prose is salvaged from the reasoning field.
+
+  Salvage is guarded. Raw chain-of-thought starting "Okay, the user wants a marsh
+  description. Let me set the scene." is WORSE than the deterministic procedural
+  fallback, so reasoning text that reads as scratchpad is discarded and the chain moves
+  on. This is judgement, not a rule Discord enforces, and it is tested both ways.
+
+RETRY-AFTER INSTEAD OF A GUESS
+  OpenRouter sends a Retry-After header when a provider offers a retry hint. The router
+  now uses it (clamped to 300s) and falls back to the old multiplier only when no hint is
+  given. A 3-second hint no longer parks a route for 60.
+
+DAILY BUDGET: TRACK AND STOP
+  New OPENROUTER_MAX_REQUESTS_PER_DAY, default 50 - the real free-tier floor. Once spent,
+  the router refuses locally with a named error instead of walking three routes to
+  discover the same thing three times. ai_status shows a usage bar and, when spent, says
+  exactly what to do.
+
+  This counter is a COST SAVER, NOT AN AUTHORITY: it lives in memory and resets on
+  restart, while the real limit does not. Upstream stays the source of truth.
+
+ai_status NOW DISTINGUISHES
+  - daily budget used/remaining, with a bar and an 80% warning
+  - "NEVER SUCCEEDED" on any route with attempts but no successes
+  - empty replies counted separately from failures, and how many were recovered
+
+TWO THINGS ONLY THE OPERATOR CAN DO - both bigger than anything above
+  1. Put $10 of credits on the OpenRouter account: 50/day -> 1000/day. Then set
+     OPENROUTER_MAX_REQUESTS_PER_DAY=1000.
+  2. Add a provider key at https://openrouter.ai/settings/integrations - the 429 message
+     says so itself. A Google AI Studio key routes the Gemma models through your own
+     Google quota instead of OpenRouter's shared pool, and Google AI Studio has its own
+     free tier.
+
+NOTHING WAS EVER BROKEN. Canonical mechanics resolved, players got deterministic prose,
+no error reached anyone. This is a quality degradation - exactly the failure ai_status
+exists to make visible, and it was invisible until v0.19.15 shipped.
+
+Tests: 23 new. Eight mutations proved each fix is load-bearing: the daily cap, the
+Retry-After read, its clamp, reading the reasoning field, the scratchpad guard, the token
+bump, empty-response counting, and the never-succeeded flag.
+
+Suite baseline-diffed against v0.19.14: 496 tests vs 289, zero new failures.
+
+NOTE: contains v0.19.15 through v0.19.19, including the v0.19.19 security fix.
+
+
+v0.19.19 closes an unauthenticated denial-of-service in both hand-rolled HTTP listeners.
+SECURITY FIX - deploy this one.
+
+THE REPORT WAS CORRECT, AND THE HOLE WAS WIDER THAN FOUR MISSING LIMITS
+  app/health.py and app/dashboard.py both parse HTTP with a loop of
+  "await asyncio.wait_for(reader.readline(), timeout=N)". There was a timeout per line
+  and nothing else. Missing: max request-line bytes, max header count, max cumulative
+  header bytes, absolute header deadline. All four confirmed.
+
+  Two things make it worse than the list suggests:
+
+  1. EVERY BYTE OF THIS RUNS BEFORE AUTHENTICATION. On the dashboard the header loop
+     completes before _authorized() is ever called, so no credential is needed.
+
+  2. IT IS TWO ATTACKS, NOT ONE.
+       - Slow: the per-line timeout RESETS on every line. One header just under the
+         limit (1.9s on health, 4.9s on the dashboard) holds a connection open forever.
+       - Fast: headers[key] = value grows a dict with no cap. Distinct short header
+         names are a memory-exhaustion vector that has nothing to do with holding
+         connections. Only bounded by asyncio's DEFAULT 64 KiB stream limit per line -
+         an accident of the library, not a decision.
+
+  A fifth gap sat underneath both: neither server capped concurrent connections, so
+  everything above multiplied by however many sockets were opened. And an oversized line
+  raised ValueError out of readline() into "except Exception: log.exception(...)",
+  writing a stack trace per line - the same attack amplified into log flooding.
+
+DEMONSTRATED, NOT ASSUMED
+  The pre-fix v0.19.18 health server was run on a real socket and fed one header every
+  1.5 seconds:
+
+    VULNERABLE: held open 15.0s, 10 header lines sent, no response, connection still live
+
+  The same script against this build:
+
+    server answered after 10.0s: HTTP/1.1 408 Request Timeout {"error":"header_timeout"}
+
+WHAT CHANGED
+  New app/http_limits.py, shared by both servers:
+    - max_request_line_bytes  (8192)   -> 414 URI Too Long
+    - max_header_lines        (100)    -> 431 Request Header Fields Too Large
+    - max_header_bytes        (16384)  -> 431
+    - header_deadline_seconds (10)     -> 408 Request Timeout  <- kills the slow attack
+    - line_timeout_seconds    (5)      -> 408
+    - max_connections         (64)     -> 503 too_many_connections
+  Each read gets whichever is smaller, the per-line timeout or the time left on the whole
+  head. That is the part a resetting timeout could never do.
+
+  Also: asyncio's stream limit is now STATED (131072) rather than inherited. It is
+  deliberately ABOVE the 65536 request-body cap - lowering it to bound header lines
+  directly would deadlock readexactly() for bodies, because _maybe_resume_transport
+  refuses to resume while the buffer exceeds the limit. Cumulative bytes are therefore
+  checked AFTER each line, so one line can overshoot by at most the stream limit. That
+  is bounded, and it is the cheaper correct answer.
+
+  Rejections now answer a real status line. Before, a rejected request went out as
+  "HTTP/1.1 408 OK" because the reason map had no entry for it and defaulted to OK.
+
+  Six new env knobs, same names on both servers: HTTP_MAX_REQUEST_LINE_BYTES,
+  HTTP_MAX_HEADER_LINES, HTTP_MAX_HEADER_BYTES, HTTP_HEADER_DEADLINE_SECONDS,
+  HTTP_HEADER_LINE_TIMEOUT_SECONDS, HTTP_MAX_CONNECTIONS. Defaults are generous for a
+  browser (Chrome sends ~15 headers, 1-2 KiB) and mean for an attacker.
+
+EXPOSURE, FOR SIZING THE URGENCY
+  The dashboard publishes to ${DASHBOARD_BIND_ADDRESS:-127.0.0.1}:8090, so by default it
+  is loopback-only on the NAS. If you have set DASHBOARD_BIND_ADDRESS=0.0.0.0 to reach it
+  from a laptop, this was reachable unauthenticated from your whole LAN. The health
+  listener binds 0.0.0.0 inside the container and is not published, so it was reachable
+  from other containers on the compose network.
+
+Tests: 48 new (24 unit, 5 socket-level integration, 19 contract incl. existing).
+The integration tests start the REAL HealthServer on a real port and dribble headers at
+it. Eight mutations proved every limit is load-bearing: the absolute deadline, the header
+count cap, the cumulative byte cap, the request-line cap, the ValueError mapping, the
+connection cap, releasing the slot in finally, and the explicit stream limit.
+
+Suite baseline-diffed against v0.19.14: 473 tests vs 289, zero new failures, identical
+pre-existing sandbox errors.
+
+NOTE: contains v0.19.15 through v0.19.18.
+
+
+v0.19.18 rebuilds the Scene Action panel: no dropdowns, and it follows the player when
+they travel.
+
+"SCENE ACTION STILL HAVE A DROP-DOWN MENU"
+  Correct, and it was a rollout gap rather than a decision. The 17 command hubs moved to
+  the Components V2 action-list layout in v0.19.5-v0.19.7. The Scene Action panel is not
+  a hub, so nothing carried it along and it kept both dropdowns - "Choose what you are
+  trying to do" and "Choose a target" - the exact shape that redesign existed to remove.
+
+  Both are now buttons. Eight action buttons across two rows with the selected one
+  highlighted, then target buttons (Environment, Self, and everyone present), then
+  Describe & Resolve and Refresh. Target lists longer than ten page with a More targets
+  button.
+
+  NO SELECT MENUS ANYWHERE IN IT, deliberately: a Select nested inside a V2 Container has
+  no precedent in this codebase - HubLayoutSystemSelect was deleted rather than kept - and
+  cannot be exercised in the build sandbox. Everything here uses only patterns the 17 hubs
+  already prove in production.
+
+"SCENE ACTION NEED TO TRAVEL WITH THE PLAYER"
+  The old panel snapshotted character, location and the NPC/player target list at
+  construction and never looked again. _resolve_scene_action DOES re-read the character
+  and rejects a target who is no longer present - so a player who travelled could still
+  pick a stale NPC off the panel and only find out AFTER writing their attempt into the
+  modal, with the panel still showing the location they had left.
+
+  Every interaction now re-reads the scene first. Travel updates the location line and
+  says so. A target who is no longer present is reset to Environment with a note, rather
+  than being left selected to fail later. Describe & Resolve re-checks before opening the
+  modal, so nobody types a paragraph about a scene they are not in. Panel lifetime went
+  from 5 to 15 minutes, which is only reasonable now that it stays current.
+
+THE PANEL MOVED TO ITS OWN MODULE
+  app/bot/scene_layout.py imports discord and NOTHING else from the project - everything
+  game-specific is injected from main.py. That is what lets the whole component tree be
+  built and counted in a sandbox with no discord.py installed. Discord's 40-component
+  limit counts nested components, so a panel that looks fine in source is rejected at
+  send time; measured worst case here is 33/40 with 30 people in the scene. Before this,
+  that limit could only have been discovered by a player hitting it.
+
+  tests/support.py gained install_discord_ui_shim(), which NO-OPS when real discord.py is
+  present - so the same tests exercise the real library on a machine that has it.
+
+Tests: 41 new (27 unit, 14 contract). Seven mutations proved they fail without their
+fixes: a stale target left selected after travel, reload dropped from refresh, resolve
+skipping the reload check, the travel notice suppressed, a row overflowing five buttons,
+a player id shown instead of a name, and a Select creeping back into the panel.
+
+One pre-existing assertion in test_gui_integrity was updated: it checked that the event
+thread's Scene Action button pre-selects its action by looking for
+"view.action_key = default_action". That is now passed into the factory as
+action_key=default_action - same intent, new shape.
+
+Suite baseline-diffed against v0.19.14: 436 tests vs 289, zero new failures, identical
+pre-existing sandbox errors.
+
+NOTE: v0.19.18 contains everything from v0.19.15 (chat monitor), v0.19.16 (openai 3.7.0)
+and v0.19.17 (the trade and equipment fixes).
+
+
+v0.19.17 fixes the two bugs Arceus found on the test server, and the four that were
+sitting next to them.
+
+BUG 1 - "Bought Spirit-Iron Sword x1 for 0 stones" while the wallet WAS debited.
+  Not a wallet bug. The Go engine returns the charge under the key "total". Every
+  Python trade handler read result.get("total_price", 0) - a key the engine has never
+  returned - and the DEFAULT turned a missing key into a specific, confident, wrong
+  number about someone's money.
+
+  It was in all FOUR trade handlers, not one: market buy, market sell, black market buy,
+  black market sell. Only buy was ever reported, because "you paid 0" reads as free money
+  while "you were paid 0" reads as a balance bug and gets shrugged off.
+
+  Receipts now go through app/trade_receipt.py, whose rule is: A PRICE THAT IS NOT
+  PRESENT IS REPORTED AS MISSING, NEVER AS ZERO. A real zero still prints as zero - a
+  free trade is a fact. A missing total prints a warning telling the player to check
+  their balance and report it. Receipts also now name the actual currency (the engine
+  returns currency_id; the message said "stones" regardless), show the balance after the
+  trade, show unit price on multi-buys, and say so when a black-market trade was
+  DETECTED - which the engine has always returned and the player was never told.
+
+  THE WHOLE BOUNDARY WAS THEN AUDITED. A new contract test parses the Go dispatch
+  switches, maps each action to its handler, transitively collects every string that
+  handler and its helpers can use as a result key, and compares that to every
+  result.get("...") in the matching Python handler. Across ~180 actions the ONLY
+  mismatch was total_price, in those four handlers. That test now runs in the suite, so
+  the next mismatch fails a build instead of lying to a player.
+
+BUG 2 - Equip opened a form asking for an "Equipment Id" that was never shown.
+  That is what the hub does when a parameter has no option provider: it falls back to a
+  text modal and asks the player to type the value. equipment_id is a plain int with no
+  autocomplete, so Equip, Unequip AND Repair were all asking players to type a database
+  row id.
+
+  All three now offer live dropdowns of the player's own equipment, showing name, slot,
+  durability and quality. Equip lists only unequipped items; Unequip only equipped ones;
+  Repair lists everything, most damaged first. Confirmations name the item instead of
+  saying "Equipped item #7".
+
+  These are registered through the hub's own provider registry rather than discord.py
+  autocomplete, deliberately: /equipment is not typable - it is reachable only through
+  the /items hub - so the hub is the only consumer, and this keeps the change entirely
+  inside code the build sandbox can exercise.
+
+Tests: 33 new (22 unit for the receipt, 11 contract for the boundary and the hub wiring).
+Six mutations proved they fail without their fixes - including RESTORING THE ORIGINAL
+BUG VERBATIM, which fails three of the new tests. Suite baseline-diffed against v0.19.14:
+395 tests vs 289, zero new failures, identical pre-existing sandbox errors.
+
+NOTE: v0.19.17 includes the v0.19.16 openai 3.7.0 bump. If you have not deployed 0.19.16
+yet and want the pin change isolated, deploy 0.19.16 first. Rollback for the dependency
+bump is still v0.19.15.
+
+
+v0.19.16 is a DEPENDENCY BUMP AND NOTHING ELSE: openai 2.52.1 -> 3.7.0. It is shipped on
+its own precisely so that if the container fails to start, the cause is unambiguous.
+Rollback is v0.19.15, which pins openai==2.52.1 and is otherwise identical.
+
+WHAT 3.x CHANGES
+  openai 3.0.0 replaced httpx with HTTPX2 as its HTTP client. Per the project's own
+  httpx2.md: "If you construct an OpenAI or AsyncOpenAI client without providing
+  http_client, your existing API calls, parsed response models, streaming APIs,
+  authentication, retries, and numeric timeouts continue to work."
+
+  This build never passes http_client. The entire openai surface in this codebase is five
+  lines: AsyncOpenAI(...) in ai_router.py and narrator.py, chat.completions.create,
+  responses.create, and output_text. A contract test now asserts http_client appears in
+  neither module, because that condition is the whole basis for calling the bump safe.
+
+  httpx: openai 3.x installs httpx2 and NO LONGER INSTALLS httpx. app/database/remote.py
+  and app/game_engine.py import httpx directly for the Go engine transport - the path
+  every piece of game state travels. That survives only because requirements.txt pins
+  httpx>=0.28,<1 itself rather than relying on openai's transitive install. httpx2 is a
+  separate package name, not httpx 2.x, so the two coexist with no version conflict. A
+  contract test now pins that invariant down.
+
+THE REAL RISK, AND WHAT WAS DONE ABOUT IT
+  HTTPX2 verifies certificates against the OPERATING SYSTEM trust store instead of the
+  certifi bundle httpx 0.x used. On python:3.12-slim that store is whatever
+  ca-certificates provides.
+
+  If it were missing, every OpenRouter call would fail with a TLS error - and NOTHING
+  WOULD RAISE. Narration is descriptive only; canonical mechanics resolve before it runs,
+  so a total failure just returns procedural prose. Players notice the writing going flat.
+  No log says why. That is the worst shape a failure can have.
+
+  Two defences:
+    1. The Dockerfile now installs ca-certificates, runs update-ca-certificates, asserts
+       the bundle is non-empty with `test -s`, and sets SSL_CERT_FILE to it - all BEFORE
+       pip install. A missing bundle is now a loud build failure, not a silent runtime
+       one. go_core/Dockerfile already did this; the Python image did not.
+    2. The router now classifies TLS/certificate failures by walking the exception cause
+       chain (the openai client wraps transport errors, so an SSLError is never the
+       outermost exception). It counts them, flags the offending route, logs once at
+       ERROR level with the remediation, and /admin -> Server -> ai_status prints a
+       loud banner. The failure is now named rather than invisible.
+
+HONEST LIMITS OF THIS VERIFICATION
+  The build sandbox has no PyPI access, so openai 3.7.0 could not be installed, imported,
+  or called even once here. The stub-import harness STUBS the openai module, so it would
+  pass green regardless and proves nothing about this change. Everything above is a traced
+  read of the published migration note against this codebase's five call sites, plus
+  defences for the one runtime failure mode that reading identified.
+
+  Also: 3.7.0 is the version supplied by the operator. PyPI's JSON API, the GitHub tags
+  page and the releases Atom feed are all robots-blocked to this build environment, and
+  the releases page returned inconsistent partial views across fetches, so the release
+  date and the existence of 3.7.0 specifically could not be independently confirmed.
+  v3.0.0 WAS confirmed to exist. If 3.7.0 does not exist, pip fails during docker build
+  and update.sh rolls back before anything is deployed - a safe failure mode.
+
+WATCH AFTER DEPLOY
+  Run /admin -> Server -> ai_status. If it shows a TLS banner or a non-zero procedural
+  fallback rate that was not there on 0.19.15, roll back to 0.19.15.
+
+Tests: 16 new (8 unit TLS-detection, 5 contract for the bump, plus 3 supporting). Eight
+mutations proved they fail without their fixes: the cause-chain walk, the TLS counter, the
+loud log, the per-model TLS flag, the Dockerfile CA assertion, the openai 3.x pin, the
+explicit httpx pin, and CA-install ordering before pip. Suite baseline-diffed against
+v0.19.15: zero new failures.
+
+
+v0.19.15 adds the administrator AI monitor: narrator/route health counters, and a chat
+digest that reads a channel's real Discord history and reports what players are doing.
+
+WHY THE BOT COULD NOT ALREADY DO THIS
+  scene_history is not a chat log. Database.add_history hard-deletes everything past the
+  newest 60 rows PER CHANNEL on every insert - its job is to feed the narrator a rolling
+  context window, not to archive play. "Analyse everything in the channel" therefore has
+  to read Discord's own message history, which nothing in the codebase did: there was no
+  channel.history() call anywhere in app/.
+
+  It also could not READ that history. MESSAGE_CONTENT_INTENT was false, so Discord
+  returns empty content for every message the bot was not mentioned in. This release
+  ships .env / .env.example with MESSAGE_CONTENT_INTENT=true, but that alone is not
+  enough: Message Content Intent must ALSO be enabled in the Discord Developer Portal
+  under Bot -> Privileged Gateway Intents. Under 100 servers this needs no verification,
+  just the toggle. If it is off, the digest says so explicitly instead of quietly
+  reporting an empty channel.
+
+  Turning the intent on also wakes the existing on_message path: the bot begins writing
+  RP messages into scene_history, and replies "Create your cultivator first with /begin"
+  to anyone who @-mentions it without a character. AUTO_NARRATE and
+  AUTO_NARRATE_EVENT_THREADS remain false, so it does not start narrating on its own.
+
+NEW ADMIN ACTIONS (both under /admin -> Server; neither is a typable command)
+  ai_status     Narrator health: how many narrations were served by AI vs silently
+                fell back to procedural prose, the per-route attempt/success/failure
+                counts, which routes are cooling down and why, and how often the local
+                20/min ceiling refused a request. A silent procedural fallback is the
+                failure players notice ("the narration went flat") and operators do not,
+                because nothing errors - this makes it visible.
+  chat_digest   Reads a channel (optionally its threads) over a configurable window and
+                reports what players did, where they got stuck, possible bugs, mood, and
+                what deserves attention. Options: channel, hours, include_threads.
+
+COST: ZERO. Fusion (OpenRouter's openrouter:fusion server tool) was evaluated and
+deliberately NOT used. Fusion fans a prompt out to a panel of 1-8 models and bills for
+every one of them; this build keeps OPENROUTER_REQUIRE_FREE=true and routes the monitor
+through the SAME AITaskRouter free chain as narration, so the monitor cannot start
+spending money. A contract test asserts chat_monitor.py contains no client, no base URL,
+no model string and no "openrouter:fusion" anywhere in the tree. The cost of that choice
+is a small context window, which is why the transcript is chunked and analysed
+map-reduce style rather than in one shot.
+
+TWO SAFETY PROPERTIES WORTH KNOWING
+  1. The transcript is untrusted input. It is player-authored text going into a model
+     prompt, so it is fenced, the system prompt states that fenced content is data and
+     never instructions, and a player who types the closing fence themselves has it
+     neutralised - otherwise the rest of their message escapes the fence and is read as
+     prompt text.
+  2. The player-facing prompt-leak guard is now opt-out, and only the monitor opts out.
+     That guard rejects model output containing "game engine", "system prompt" and
+     similar, so players are never shown implementation detail. A bug digest has to be
+     able to say "the game engine returned an error", and is only ever shown to someone
+     who already holds administrator on the guild. generate() defaults to leak_guard=True
+     and narrator.py never passes the flag at all; a contract test asserts chat_monitor.py
+     is the only file in app/ that sets leak_guard=False.
+
+EVERY AI FAILURE DEGRADES, NEVER RAISES. If a chunk fails, the rest still report. If the
+synthesis fails, the part notes are shown. If every route fails, or the router is not
+configured, the deterministic counts (messages, humans vs bots, per-author, per-channel,
+time span) are still returned - that half of the report never needs a model.
+
+New settings, all bounded in config.py: MONITOR_MAX_MESSAGES (400), MONITOR_LOOKBACK_HOURS
+(24), MONITOR_CHUNK_CHARS (6000), MONITOR_MAX_CHUNKS (6). The ceilings exist because the
+monitor shares the narrator's 20 req/min limiter - an unbounded transcript would starve
+narration for a whole minute.
+
+Tests: 59 new (47 unit, 12 contract). Eight independent mutations were applied to prove
+the new tests fail without their fixes: the leak-guard split, limiter counters, route
+attempt counters, the cooling-skip counter, fence neutralisation, newest-chunks-kept,
+degrade-not-raise, and the monitor's own leak_guard=False. The full suite was baseline-
+diffed against a pristine v0.19.14 extract: same 27 pre-existing sandbox loader errors on
+both, zero new failures. The v0.19.14 stub-import harness was re-run and the whole package,
+including both new command callbacks and their annotations, imports clean.
+
+
+v0.19.14 fixes the SECOND split-stage-1 failure. v0.19.13 fixed the ordering bug and still
+did not start:
+
+  NameError: name 'app_commands' is not defined
+
+main.py imports app_commands on line 13, but that is not the namespace being searched.
+serialized_user_action moved to runtime.py in v0.19.12 and wraps 119 command callbacks;
+functools.wraps cannot copy __globals__, so discord.py receives callbacks carrying
+runtime.py's globals. main.py uses `from __future__ import annotations`, so
+`target: app_commands.Choice[str]` arrives as a STRING that discord.py evals against those
+globals. The import had been there - a static "unused imports" cleanup removed it, because
+nothing in runtime.py's own code uses it.
+
+RULE: a module defining a wrapping decorator must import every name used in the ANNOTATIONS
+of the functions it decorates, not just the names its own code runs. runtime.py imports
+app_commands again, under a comment saying so, and a new test enforces it across the package.
+
+Verification is now much stronger: a stub discord module lets the whole package be IMPORTED
+in the build sandbox, and the stub reproduces discord.py's annotation resolution. Importing
+the v0.19.13 tree under it reproduces the production NameError exactly; this tree imports
+clean.
+
+v0.19.13 fixes the split-stage-1 bug that stopped v0.19.12 starting.
+
+runtime.py built DB with `Database(ROOT / ...)` ABOVE the line that assigns ROOT, so the bot
+raised NameError at import and never came up. The updater rolled back on its own and restored
+the database - it behaved correctly, it just should not have had to.
+
+Cause: the extraction ran in three passes and the follow-up passes inserted definitions at a
+marker instead of restoring their original position. Module-level code runs top-down, so
+position is semantics. runtime.py is now regenerated from the pre-split main.py in original
+line order, so ordering is correct by construction.
+
+The static check that passed anyway proved every name resolves SOMEWHERE in the module; it
+never asked whether the name is assigned YET at the point of use. A new DefinitionOrderTests
+walks module-level statements in order and fails on use-before-assignment; reinstating the
+bad ordering makes it name both offending lines.
+
+Not the cause: v0.19.11's non-root container drop landed in the same jump (0.19.6 -> 0.19.12)
+but is not implicated - the failure was a Python NameError, and xianxia-db-init, same image
+and same user, exited cleanly first.
+
+v0.19.12 begins the main.py decomposition documented since v0.15. Stage 1 of several, each
+shipped separately so a failure is attributable.
+
+- NEW app/bot/runtime.py (323 lines): the shared singletons (SETTINGS, DB, ENGINE, WORLD,
+  ROOT, log) and the session helpers every command needs (require_character, reply_long,
+  serialized_user_action, current_world_time, character_location_display, the per-user
+  action lock, the private-location exit table). main.py goes 13,177 -> 12,923 lines.
+- No behaviour change. Nothing was rewritten, only relocated. No command moved yet.
+- runtime.py imports nothing from main.py - that is what makes the later stages possible,
+  and a test asserts it.
+- Verification uses symtable scope analysis to prove every module resolves every name it
+  reads, because this sandbox cannot import main.py (no discord.py). It caught three names
+  left behind on the first cut (ROOT, _player_property_types, WORLD), each of which would
+  have been a NameError at import and a dead bot on deploy.
+
+WATCH ON FIRST START: this is a code-movement release validated statically, not by running
+the bot. If it fails to start, docker compose logs xianxia-bot will show a NameError or
+ImportError naming the symbol, and that is the whole diagnosis.
+
+v0.19.11 orders hub actions by relevance instead of alphabetically, and answers an external
+review of v0.19.7.
+
+- Actions sort into bands - orienting (status/view/history), primary (enter/leave/join/
+  create), everything else alphabetical, irreversible last (sever/disband/reset). /family's
+  "Leave" was tenth of fourteen and sat on the second chunk while the onboarding copy told
+  new players to use it; it is now fifth and visible. This is a different axis from button
+  colour: "Leave" stays red but sorts high, "Sever" is red AND rare so it sorts last.
+- REJECTED from the review: the claim that Components V2 allows only 30 components and the
+  action limit must drop to 8 -> 6. The limit is 40, confirmed against Discord's Component
+  Reference, discord.py's own view.py, and the discord.js guide. v0.19.10 stands as shipped.
+- FIXED: first-run setup told you to fill in three secrets, then failed on a fourth
+  (DASHBOARD_TOKEN) that .env.example requires by default. The message now names it and
+  gives the command to generate one.
+- FIXED: DASHBOARD_ENABLED=yes started the dashboard but suppressed its log-command hint,
+  because acceptance and reporting used different comparisons.
+- FIXED: the Python containers (bot, db-init, dashboard) ran as root while the Go engine
+  dropped to uid 10001. They now run as 10001 too. Watch the first start after upgrading:
+  this is the one change here that a container can fail on, though the data directory the
+  code unconditionally creates is pre-made and chowned in the image for exactly that reason.
+
+v0.19.10 rolls the Components V2 layout out to EVERY hub - all 16 player hubs and /admin -
+in four staged groups (simple multi-page, then single-page, then chunking, then admin last).
+Staging paid for itself: /admin needed a code change first. The classic panel re-checks the
+administrator permission on every interaction, not just at invoke, and the layout view only
+checked ownership - so an admin whose role was removed while their panel was open would have
+kept a working GM console for 15 minutes. That guard is ported and both views now deny
+identically. Every hub, page and action chunk was rendered through the real view code:
+worst case 36/40 components (/admin and /sect). Rollback is one line - remove a hub name
+from LAYOUT_HUB_NAMES and it returns to the classic panel.
+
+Known, not fixed: /family sorts actions alphabetically, so "Leave" is 10th of 14 and sits on
+the second chunk - a new player following the onboarding copy must press "More actions" to
+find it. Ordering actions by relevance affects every hub and both panels, so it is left as a
+deliberate decision rather than slipped into this release.
+
+v0.19.9 fixes the release integrity check, which refused good packages on QNAP hardware.
+--quiet and --strict are GNU coreutils flags; BusyBox rejects them, so the check exited
+non-zero without ever verifying anything and reported "the package does not match its own
+manifest". Only -c is portable and that is all it uses now.
+
+IMPORTANT - this one is self-blocking. The updater that runs is the INSTALLED one, so a
+fixed update.sh inside this archive cannot fix the installation attempting to use it. If
+you are on v0.19.6, v0.19.7 or v0.19.8, patch your installed updater once, first:
+
+    cd /path/to/bot
+    sed -i 's/ -c --quiet --strict / -c /; s/ -c --quiet / -c /' update.sh
+    sh -n update.sh && ./update.sh --install
+
+After v0.19.9 is installed the corrected updater is in place and no further patching is
+needed.
+
+v0.19.8 fixes onboarding copy that pointed at commands players cannot type. Only the 21
+registered slash commands exist to type - the 16 hubs plus /begin, /me, /quests, /action,
+/check and /admin - so "/family leave" was a dead end, and it had shipped in both places a
+stuck player looks: the birth-household thread opener and the blocked-exploration hint. All
+six occurrences now read "/family -> Leave", the household and expedition openers lead with
+how to get out instead of burying it, the expedition journal is location-aware (it names the
+exit for where you actually are rather than telling you to explore, which would fail), and a
+new test gates the whole shape so it cannot ship a third time - it found four further
+instances nobody had noticed.
+
+v0.19.7 corrects the Components V2 hub layout against how it actually renders in Discord,
+now that v0.19.6 put it on screen. No structural change - same layout, same fallbacks:
+- action rows no longer show a generic glyph; every row on a page was rendering the same
+  fallback emoji because leaf command names are not in the hub-root emoji table;
+- the status header puts each resource on its own line instead of one run-on sentence, and
+  its bars are halved to five segments (ten read as a solid rule at 100%);
+- danger-styled buttons carry their own verb ("Sever") instead of a red button reading
+  "Open"; every other row keeps the single consistent label;
+- the system dropdown is removed - it duplicated Prev/Next and spent a row naming the
+  system already in the heading above it. The arrows wrap, so the far end of an 18-system
+  hub is one Prev away. The freed row raised the visible-action limit from 7 to 8.
+
+v0.19.6 is a correctness release answering an external audit of the v0.19 archive.
+Every finding below was reproduced against the source before being changed, and each
+carries a regression test that fails without the fix:
+
+- DATA LOSS (Go): POST /v1/db/batch with transaction:false - which is also what a client
+  gets by omitting the field, since Go's zero value for a bool is false - returned HTTP 200
+  and then discarded every write. storage.Conn opens an implicit BEGIN before any
+  INSERT/UPDATE/DELETE/REPLACE and Conn.Close rolls back whatever is still open, and the
+  handler only committed when transaction:true. dbBatch now commits unconditionally, and
+  commits already-completed statements before reporting a mid-batch failure. Six new tests
+  in go_core/internal/server/server_batch_test.go; three of them fail on the old code with
+  "reported success but persisted 0 of 2 rows". The only in-repo caller passes
+  transaction=True, so shipped code was not losing data - but the endpoint contract was.
+- HIGH (dashboard): Discord snowflakes were serialized as JSON numbers. Every id is 17-19
+  digits, past Number.MAX_SAFE_INTEGER, so JSON.parse rounded them before any dashboard
+  JavaScript ran: 847706123456789012 arrived as 847706123456789000, went into
+  <option value="...">, and came back on the next admin action as a user who does not
+  exist - every teleport, currency grant, karma and fate change against that player failed
+  with "character not found". app/dashboard.py now emits out-of-range integers as decimal
+  strings at the single _send_json chokepoint, and app.js compares/prints ids as strings.
+- MEDIUM (Discord): clearing a channel message did not stay cleared. The cleared state was
+  stored as "", which is falsy, so `row.get("content") or DEFAULT` read it back as "not
+  configured" - the dashboard redisplayed the default and the next Full Setup/Repair
+  reposted the message. There are three states now (no row = default, text = custom,
+  "" = explicitly disabled) and Repair leaves a disabled slot alone. Clearing a message
+  whose channel is currently unbound also persists instead of being silently dropped.
+- MEDIUM (release integrity): RELEASE_MANIFEST.sha256 had drifted to 42 wrong hashes, 14
+  entries pointing at docs that had moved, and 22 packaged files listed nowhere - and
+  update.sh never checked it. It is generated by scripts/release_manifest.py now, verified
+  by update.sh before the running install is touched, and gated by a test.
+- MEDIUM (Go): backups were named to the second, so two taken in the same second - a
+  double-click, or an automated backup landing with a manual one - silently overwrote each
+  other. Names now carry milliseconds and are reserved with O_EXCL.
+- LOW (Discord): an existing #bugs forum adopted by setup never received the required tags,
+  while the dashboard advertised all five as available. Setup/Repair now adds missing tags
+  (keeping any the GM added), and the dashboard reports the forum's real tags plus anything
+  still missing.
+
+Also: the release stamp is now self-consistent and enforced. VERSION, app/version.py, the
+Dockerfile label, both docker-compose labels and .env.example all read 0.19.14, and the
+contract test derives the expected value from app/version.py rather than repeating a
+literal - the drift that let VERSION say 0.19 while everything else said 0.18 now fails
+against one source of truth.
+
+Schema: 26 (unchanged from v0.19)
+Migration: automatic supported-schema upgrade through v26; v25 adds the channel_messages table for
+GM-authored per-channel welcome messages (base channels + realm hubs), edited in place like the
+#xianxia-info guide; v26 adds a bugs_channel_id column for the new #bugs forum channel where players
+report issues as forum posts. No v0.19.x point release adds a migration: upgrading from v0.19 is
+a container replace with no database change.
+
+v0.19.5 is a GUI release on top of v0.19:
+- the interactive hub panel gains a Components V2 "action list" layout, where every action on a
+  system is a visible row with its own button rather than an entry hidden inside a dropdown;
+- running an action no longer overwrites the panel it was launched from - results post beneath the
+  card and the card stays live and reusable;
+- the layout is piloted on /character only; the other 15 player hubs and /admin are untouched and
+  still render the classic embed panel. LAYOUT_HUB_NAMES in app/bot/hubs.py is the whole rollout
+  switch, and the layout is feature-detected and falls back to the classic panel on any error;
+- the release stamp is corrected and made self-consistent: VERSION said 0.19 while app/version.py,
+  the Dockerfile and docker-compose.yml still said 0.18. All four are stamped from one source now
+  (0.19.14 as of this build), and the release contract test reads the expected value from
+  app/version.py instead of repeating a literal, so the same drift cannot recur silently;
+- two stale in-product version references removed: /me described itself as the "v0.18 player
+  dashboard" and the in-game realm guide referred to "the v0.18 scene engine".
+
+DEPLOY: replace the container/image and restart. No database migration and no config change. Verify
+with /character (the new panel is the visible change). Running Full Setup/Repair once is optional but
+recommended on this build: it is what adds the missing tags to an existing #bugs forum.
+
+v0.19 is a cultivation-depth audit and consistency pass on top of v0.18:
+- player old-age death is now actually enforced (was display-only in v0.18's patch line),
+  routed through the existing samsara/true-death pipeline;
+- fixed a rounds-based balance bias in Ancestral Dynasty conflicts that structurally
+  favored the opposition side the longer a conflict ran;
+- added a GM fate-grant path (fate.adjust had zero callers anywhere);
+- closed five dashboard coverage gaps (household threads/occupants, Party & Formations,
+  PvP, Conditions) and wired the orphaned npc.lifespan query into Discord;
+- fixed five real bugs found during a full realm-progression/tribulation/aptitude/
+  technique audit: an unscoped breakthrough-perfection bonus, a duplicate tribulation
+  fate grant, dual-cultivators unable to reach their body-path tribulation, risk-free
+  combat techniques, and a crashing /law technique command;
+- consolidated 19 redundant per-stage audit/validation docs into one build history file.
+
+See V019_RELEASE_NOTES.md for full detail.
+
+---
+
+Xianxia RP v0.18 RECOMMENDED RELEASE
+
+Release date: 2026-08-30
+Schema: 24
+Migration: automatic supported-schema upgrade through v24; v23 adds persistent Samsara dynasty history and v24 adds ancestral investigation, dynasty claims, and conflicts
+
+v0.18 completes the staged gameplay-authority cleanup:
+- canonical Go-owned game-time authority across authoritative gameplay operations;
+- Go-owned forage, craft, companion/artifact, lifespan, road, travel, and caravan mechanics;
+- unified player/NPC lifespan, bootstrap-age, and natural-death authority;
+- multi-hop road routing with canonical duration, cost, danger, encounters, discovery, and transit locks;
+- canonical caravan routing, ETA, operating cost, dispatch bounds, and living-actor checks;
+- dashboard-owned Discord channel/category setup with bot auto-provisioning removed;
+- obsolete Python lifespan/mechanical authority paths removed after migration;
+- release hardening for the Go HTTP boundary: loopback default bind, strict single-JSON decoding,
+  and bounded JSON request bodies on internal mutation/data endpoints.
+
+See V018_RELEASE_NOTES.md and V018_BUILD_HISTORY.md (consolidated validation/audit record).
+
+Ancestral dynasty patch:
+- ancestral archives, ruins, tombs, and surviving-retainer leads persist per Samsara transition;
+- investigation quests provide the evidence used by inheritance, restoration, revenge, and replacement-house claims;
+- extinct replacement houses never gain blood continuity from a successful legacy dispute;
+- revenge requires corroborated hostile-cause evidence rather than assuming a replacement house caused the extinction.
+
+Mortal capital discovery image patch:
+- packages Azure Crown Imperial City landmark art under assets/locations;
+- applies to every character regardless of birthplace: capital-born characters see it at creation because that is their first sight, while all other characters see it the first time exploration or authoritative travel reaches/passes through the capital;
+- uses existing canonical location-discovery state to avoid repeat image sends and does not change Go-owned world/discovery mechanics.
+Dashboard systems-coverage patch:
+- adds authenticated read-only API endpoints for cultivation, crafting/assets, exploration/travel, economy, and Samsara dynasty systems;
+- surfaces spiritual-root grade/purity/elements/refinement, bloodlines/physiques, Dao/law progress, tribulations, seclusion, alchemy, professions, beasts, artifacts, properties, formations, secret realms, caravans, auctions, black markets, crimes, reincarnation, ancestral investigations, claims, and dynasty conflicts in dedicated GM views;
+- adds /api/capabilities so the dashboard can report schema/API coverage for the newer system groups;
+- adds frontend/backend contract regression coverage so a dashboard fetch with no backend route, a backend view with no frontend consumer, or a nav entry with no loader fails tests;
+- adds authenticated HTTP smoke coverage for every dashboard view endpoint.
+
+
+Dynasty risk-resolution patch:
+- ancestral investigation quests now resolve with authoritative server-side 2d10 checks instead of guaranteed progress;
+- lead danger now controls the actual quest TN, and hard failures on physical ruin/tomb leads can cause setbacks and non-lethal vitality loss;
+- dynasty conflicts now use random player/opposition checks each round, with tactic-specific modifiers and roll-derived progress;
+- completing more ancestral investigation quests reduces claim opposition (55 at two quests, 50 at three, 45 at four);
+- Discord quest/conflict output now shows the authoritative rolls, TNs, outcomes, danger and consequences.
+```
+
+---
+
+## `V020_RELEASE_NOTES.md`
+
+## Xianxia RP Discord Bot — v0.20 release notes
+
+The v0.20 line closed at **v0.20.9**; the current release is in `docs/history/V021_RELEASE_NOTES.md`. The v0.19 line (v0.19 through v0.19.48) is in
+`docs/history/V019_RELEASE_NOTES.md`; the staged-authority migration before it in
+`docs/history/V018_RELEASE_NOTES.md`. v0.20.9 was stamped 0.20.9 in `app/version.py`,
+`VERSION`, the `Dockerfile` and `docker-compose.yml`, and carries schema 28
+(v0.20.6: `quest_definitions`; 27 since v0.19.29 before that).
+
+Release date: 2026-09-05 (v0.20.0, v0.20.1, v0.20.2) / 2026-09-06 (v0.20.3, v0.20.4, v0.20.5, v0.20.6, v0.20.7, v0.20.8, v0.20.9).
+
+### v0.20.0 — main.py split complete: phase 10, the final sweep
+
+v0.20.0 closes `docs/history/MAIN_SPLIT_PLAN.md`. Sixteen releases (v0.19.33 through
+v0.19.48) moved `app/bot/main.py` from 11,650 lines and 484 top-level
+definitions into thirty-two modules under `app/bot/`; this release moves the
+last of it and leaves `main.py` at 35 lines. No behaviour change, no schema
+change. The minor-version bump marks the end of the decomposition, not a
+gameplay change: a deployment that was on v0.19.48 upgrades exactly as any
+v0.19.x point release did.
+
+#### What moved
+
+- **`app/bot/surface.py`** (new, 517 lines) — the explicit Discord command
+  surface: `_GROUP_ACTION_ROOTS`, `_MIGRATED_ROOTS`, `_ROOT_ACTIONS` and the
+  import-time check that every migrated root registered, the sixteen hub
+  definitions and their status providers, the `/admin` panel root,
+  `on_app_command_error`, `register_command_surface()` and
+  `register_event_handlers()`. Cut verbatim. It imports every command
+  module directly — the twenty under `commands/` plus `admin/world_ops.py`
+  and `admin/inspect_sim.py` for their registration side effect — so it is
+  the one file that says what the bot is made of.
+- **`app/bot/main.py`** is now the composition root the plan asked for:
+  `logging.basicConfig`, `from .bot import XianxiaBot, bot`, the two wiring
+  calls, `run()`. It imports exactly five names. `app/bot/__init__.py`
+  still re-exports `XianxiaBot`, `bot`, `register_command_surface` and `run`
+  from it, so `python -m app.bot` and every external import are unchanged.
+
+#### What the sweep dropped
+
+`main.py` had accumulated imports nothing in it read - the rule for every
+move was "prune only what the move orphaned, never reorganise while moving",
+so they survived nine phases on purpose. The sweep is where they were
+decided:
+
+- Sixty-six unread imports (`app.aptitudes`, `app.creation_ui`,
+  `app.sect_recruitment`, `app.sect_manor`, `app.inscription`,
+  `app.advanced_runtime`, `app.game.World`, `GameEngineClient`,
+  `Database`, the equipment hub-option providers, `register_hub_option_hint`,
+  `PLAYER_PROPERTY_TYPES`, `_world_min_realm_index`, `admin_group`,
+  `_admin_command_option_summary`, `log_admin_command_invocation`,
+  `inventory`, ...). Every one was verified to have no reader in the wiring
+  and no registration side effect that some other module does not already
+  trigger (the phase-10 reachability guard below is what proves the second
+  half).
+- 646 blank lines left behind by the cuts.
+- `_tribulation_currency` in `commands/cultivation.py`: no caller anywhere
+  in the package since the Go engine took over tribulation costs; carried
+  through phase 9a explicitly so that the decision would be made here.
+
+#### Guards
+
+`surface.py` joins `MODULES` (name resolution, definition order, annotation
+imports, relative-import targets). `Phase10SplitTests` (6): `main.py`
+defines only `run`, imports exactly `SETTINGS`, `XianxiaBot`, `bot`,
+`register_command_surface`, `register_event_handlers`, and ends with the
+two wiring calls; `surface.py` owns the ten surface names and never imports
+`main`; every module under `app/bot/` is reachable from `main.py` by
+module-level imports (a command module nobody imports is a command that
+silently vanishes - this is the guard the `# noqa` side-effect imports have
+needed since phase 7); `surface.py` imports every `commands/*.py` directly;
+the dead tribulation helper is gone; the package `__init__` still gets its
+four names from `main`. Fourteen older guards of the form "main.py imports
+X back" now read the wiring file through a single `WIRING` constant, and
+`test_player_facing_command_hints.py` finds the hub tables with
+`bot_module_defining("_HUB_DEFINITIONS")` instead of a pinned path. Six
+mutants confirmed to fail: the `sense` side-effect import removed; the
+`inspect_sim` side-effect import removed; `register_event_handlers()` call
+dropped from `main.py`; `surface.py` taking the runtime from `main`; an
+extra name imported into `main.py`; `aptitude_group` imported from the
+wrong module.
+
+#### Verification
+
+Go untouched. Python full suite against v0.19.48: 672 tests versus 666
+(+6), identical failure set (the one stale-manifest failure fixed at
+packaging and the nine `httpcore[asyncio]` sandbox errors that pass under
+python3.11). `main.py`: 1,283 → 35 lines; 11,650 at v0.19.32.
+
+#### The split, end to end
+
+| Phase | Release | Out of main.py |
+|---|---|---|
+| 1 | v0.19.33 | test scaffolding, package-wide scanners |
+| 2 | v0.19.34 | `services.py`, `formatting.py` |
+| 3 | v0.19.35 | `locations.py` |
+| 4 | v0.19.39 | `channels.py`, `threads.py`, `discovery.py`, `character_state.py` |
+| 5 | v0.19.40 | `admin/core.py` |
+| 6 | v0.19.41 | `admin/channel_messages.py`, `bugs_forum.py`, `server_setup.py` |
+| 7 | v0.19.42 | `admin/world_ops.py`, `inspect_sim.py`, `pickers.py` |
+| 8 | v0.19.43 | `ui/event_scene.py`, `ui/creation.py`, `bot.py` |
+| 9a–9e | v0.19.44–48 | the eighteen player-command domains under `commands/` |
+| 10 | v0.20.0 | `surface.py`; `main.py` is the composition root |
+
+Zero deferred `from ..main import` hooks remain (ten at the start); no
+module below `main.py` imports it; the three back-edges the plan found
+resolve through `EVENT_HANDLERS`, each binding living beside the panel it
+names.
+
+### v0.20.1 — app/ grouped into packages
+
+The 43 flat modules beside `app/bot`, `app/database` and `app/simulation`
+are now four packages, grouped by role. No module was renamed except the
+two that would otherwise have been `app/dashboard/dashboard.py`; no
+function moved between files; no behaviour change, no schema change.
+
+| Package | Modules | Reads |
+|---|---|---|
+| `app/rules/` | advanced_catalog, advanced_runtime, alchemy, aptitudes, battle, birthfamily, black_market, creation_ui, effects, family, fate, game, inscription, npc_memory, progression_systems, quests, realm_hubs, samsara, seclusion, sect, sect_manor, sect_recruitment, sense, trade_receipt, worldtime | nothing above it; no Discord, HTTP or database import |
+| `app/ops/` | config, core_services, game_engine, health, healthcheck, http_limits, operations, performance | nothing above it; not `rules` |
+| `app/ai/` | ai_router, chat_monitor, narrator, narrator_context, rag | rules |
+| `app/database/` | (as before) + **bootstrap** (was `app/database_bootstrap.py`) | rules |
+| `app/dashboard/` | **server** (was `app/dashboard.py`), **contract** (was `app/dashboard_contract.py`), `__main__` | ops, rules, database |
+| `app/version.py` | stays at the root: `app/__init__.py` exposes `__version__` from it | — |
+
+`database_bootstrap` was first placed in `ops` and moved by the layering
+guard: it imports `Database`, and `ops` sits below `database`.
+
+#### What changed for a deployment
+
+- `docker-compose.yml`: the one-shot init runs `python -m app.database.bootstrap`
+  (was `app.database_bootstrap`); the bot healthcheck runs
+  `python -m app.ops.healthcheck` (was `app.healthcheck`), in the `Dockerfile`
+  too. `python -m app.bot` and `python -m app.dashboard` are unchanged —
+  `app/dashboard/__main__.py` starts the server.
+- Nothing else. The two modules that locate the repository from their own
+  path (`dashboard/server.py` for the static front-end and `content/`,
+  `database/bootstrap.py` for `data/`) went one directory deeper and now
+  use `parents[2]`; a guard resolves both against the tree.
+- No compatibility stubs at the old paths (chosen at the time). Anything
+  outside the repository that imported `app.<module>` needs the new path;
+  the table above is the whole mapping.
+
+#### How it was done
+
+One script: for every `ImportFrom`/`Import` under `app/`, `tests/` and
+`scripts/`, resolve what it named, map it through the table, and re-emit it
+relative to the importing file's *new* location — before moving the files,
+so the resolution used the old tree. 84 files rewritten, then 36 moved. The
+first attempt moved first and rewrote second, which resolved every
+relative import in a moved file against its new directory and produced
+lines like `from .server.http_limits import`; the tree was restored from
+the v0.20.0 archive and the script reordered. Path strings in tests
+(`"app" / "dashboard.py"`, `patch("app.samsara...")`) and comments were
+updated by a second pass; the layout guard's last test is what found the
+three the passes missed.
+
+#### Guards
+
+`tests/python/unit/test_app_layout.py` (8): no flat module beside the
+packages; each package holds exactly its modules and an `__init__`;
+`app.dashboard` still starts as a module; the entrypoints the containers
+run exist under the names the `Dockerfile`/compose file use; imports run
+down the tiers only ({rules, ops} ← ai ← database ← simulation ← dashboard
+← bot, and rules/ops never import each other); `rules` imports no Discord,
+HTTP or database library; the two `__file__`-relative roots resolve to the
+repository; and no source, test, script or container file names an old
+path — as an import, as a path string, or inside a `patch("...")` string.
+Six mutants confirmed to fail: `rules` importing `ai`; `ops` importing
+`rules`; `parents[2]` → `parents[1]`; the compose file naming the old
+bootstrap module; a `patch("app.samsara...")` string restored; a flat copy
+of `fate.py` left beside the packages.
+
+#### Verification
+
+Go untouched. Every module outside `app/bot` imports cleanly (with stubs
+standing in for the three third-party libraries the sandbox lacks); the
+bot package is covered by its own guards. Python full suite against
+v0.20.0: 680 tests versus 672 (+8), identical failure set.
+
+### v0.20.2 — top level: the release marker archived, the scripts stay
+
+The second half of the tidy-up. The plan was to move `startup.sh`,
+`stop.sh`, `update.sh` and `reset_database.sh` under `scripts/`; reading
+`update.sh` first said no:
+
+- the updater already installed on a NAS checks the *new* archive for
+  `startup.sh` and `stop.sh` at its root and refuses the install otherwise
+  (`for required in VERSION startup.sh stop.sh ...`);
+- it runs from a detached copy and, at its commit point, replaces
+  `$PROJECT_DIR/update.sh` — the root path — with the archive's copy;
+- `reset_database.sh` calls `./stop.sh` and `./startup.sh` by root path.
+
+So a release with the scripts moved could not be installed by the tool
+that installs releases, and the fix inside the archive cannot reach the
+installer that is refusing it (the same trap the v0.19.24 notes described
+for a broken `update.sh`). The four scripts are the deployment's entry
+points and stay at the root, where `sudo ./startup.sh` in the README
+expects them. A guard in `test_app_layout.py` pins that, with the reason.
+
+What did move: `RELEASE.txt`, a 57 KB release marker that still described
+v0.19.24 and had not been updated since, is
+`docs/history/V019_24_RELEASE.txt` now. `VERSIONS.md` and the
+per-line notes files are the release record; nothing read `RELEASE.txt`.
+
+No behaviour change, no schema change. Full suite against v0.20.1: 681
+tests versus 680 (+1), identical failure set.
+
+### v0.20.3 — the test suite audited: 70 files → 59, one bug found
+
+Every Python test file was read against every other for dead assertions,
+duplicated assertions and finished-migration names. 580 unittest cases
+remain of 681, plus the 22 pytest-style functions; nothing behavioural was
+dropped without a stronger twin named here. No app change beyond the one
+fix below; no schema change.
+
+#### The bug
+
+`app/dashboard/contract.py` still looked for `app/dashboard.py` — the one
+path-join form the v0.20.1 layout guard did not scan for — so
+`dashboard_implementation_issues()` had reported "missing dashboard
+contract file" since v0.20.1. Nothing noticed because the three tests that
+call it are pytest-style functions, which the sandbox's unittest runner
+never collected; CI runs pytest and would have. Fixed (`app/dashboard/
+server.py`), the guard now scans `/ "app" / "<old>.py"` joins too
+(mutation-tested), and a minimal pytest-style runner is part of the
+release check from here on (22/22).
+
+#### The bot-package guard, folded
+
+`tests/python/unit/test_bot_module_split.py` (1,664 lines, 106 tests, one
+class per split phase) is `test_bot_package.py` (980 lines, 26 tests),
+organised by invariant instead of by history:
+
+- name resolution, definition order, wrapping-decorator annotations,
+  relative-import targets — unchanged, now over every module discovered
+  under `app/bot` rather than a hand-kept list;
+- the import graph: a tier table for the whole package, an acyclicity
+  check, no `main` import anywhere below it, every module reachable from
+  `main.py`, and the composition root pinned to its five imports;
+- ownership: every top-level name defined exactly once package-wide (four
+  known pre-split duplicates allowlisted), sixty-odd load-bearing shared
+  names pinned to their module in one `OWNERS` table, the dead helper gone;
+- the command surface: every group, root and leaf pinned by name to its
+  module — 51 groups, 40 roots, 223 leaves — plus uniqueness and "every
+  group is wired or nested";
+- the three registry back-edges.
+
+Eleven of the split's historical mutants replayed against the new file;
+all killed. Every "main.py imports X back" test the phases accumulated is
+gone: with `surface.py` guarded by name resolution, a missing import-back
+is a `NameError` the generic check already reports.
+
+#### Merged, deleted, moved
+
+| Was | Now |
+|---|---|
+| `test_ai_router.py` | `test_ai_router_health.py` (two duplicates dropped; chain literals compared to the `DEFAULT_*` constants) |
+| `test_narrator_providers.py` | `test_narrator_context.py` (the "no Ollama attribute" check is test_config's) |
+| `test_family_homeland_playability.py` | `test_samsara_family_homeland.py`, deriving the 44 cities from `FAMILY_HOMELANDS` instead of a hand copy; the tautology dropped |
+| `test_completed_advanced_systems.py` | `test_startup_health.py::ObservabilityTests` (one surviving test; three seeded characters it never read) |
+| `test_advanced_forward_port.py` + `test_forbidden_arts.py` | `test_technique_catalog.py` |
+| `test_container_bootstrap.py` | `test_deployment_hardening.py` (its stray mid-file `__main__` removed too) |
+| `test_rag_v1.py` + `test_world_history_rag.py` | `test_rag_retrieval.py` (identical fixture) |
+| `test_sect_manor.py` | `test_sect.py::SectManorMathTests` (the table check is startup_health's) |
+| `test_core_mechanics_modules.py` | deleted — strictly weaker than `test_sense.py` |
+| `test_missing_systems.py` | deleted — no test methods |
+| `test_event_specific_gui.py` | deleted — its one assertion was `SCHEMA_VERSION == 27` |
+| `integration/test_sect_recruitment.py`, `test_world_access_scene_action.py`, `test_aptitudes.py` | `unit/`, with the seeded databases no test read removed (`test_profession_crossloops.py` likewise) |
+
+Inside kept files: the bare `assertEqual(SCHEMA_VERSION, 27)` copied into
+seven files (each named for the schema version it was written at, v6
+through v24) is gone — `test_startup_health` pins the migration by name
+and `test_dashboard_implementation` ties the dashboard review to it, which
+is the check that means something; a schema bump no longer edits eleven
+files. The `HubDefinition` AST walk three surface scans each carried is
+`tests/support.py::declared_hub_names()`. Five source-substring checks in
+`test_scene_action_surface.py` whose behavioural twins live in
+`test_scene_layout.py` are gone, as are single duplicated methods in
+`test_command_cleanup.py` (four), `test_dashboard.py`,
+`test_equipment_stat_parity.py` and `test_chat_monitor_contract.py`, each
+folded into the stronger copy.
+
+#### Verification
+
+Go untouched. Python full suite against v0.20.2: 580 tests versus 681,
+identical failure set; pytest-style 22/22 (was 20/22 - the bug above).
+
+### v0.20.4 — the release channel, and the roadmap to 1.0
+
+Until now a release was a ZIP handed over in a chat and dropped into
+`./updates`. From this release it is a GitHub Release on
+`RhaZenZ0/Xianxia-bot`, and three things know how to read it. No schema
+change; no gameplay change.
+
+#### The workflow
+
+`.github/workflows/release.yml` runs on a `v*` tag. It refuses a tag that
+does not match the stamped `VERSION` (the `-beta.N`/`-rc.N` suffix is
+dropped for the comparison; `VERSION` never carries it, so `update.sh`'s
+numeric compare and `test_release_version` keep working), runs ruff, pytest,
+`go vet`, `go test` and `release_manifest.py --verify`, builds
+`xianxia_rp_v<version>.zip` with exactly the exclusions the hand-built
+archives used (`.github/` stays in - the manifest lists it and the updater
+verifies the manifest), writes the `.sha256` sidecar, and attaches both to
+a release whose notes are the matching `VERSIONS.md` paragraph. A suffixed
+tag is a pre-release.
+
+#### The channel, in Python
+
+`app/ops/release_channel.py` is the one definition of "a newer release
+exists": parse the listing (drafts and asset-less entries skipped; a
+suffixed tag is a pre-release even if the checkbox was missed), pick the
+newest for a channel (`stable` = full releases, `beta` = everything),
+compare with the installed version, and write the announcement. Four new
+settings: `UPDATE_CHECK_ENABLED` (default on), `UPDATE_CHANNEL` (`stable`),
+`UPDATE_REPOSITORY`, `UPDATE_CHECK_HOURS` (24).
+
+#### The bot
+
+`XianxiaBot.update_check_worker` (`app/bot/bot.py`) checks a minute after
+the command sync and then every `UPDATE_CHECK_HOURS`, with the same
+per-iteration exception boundary as the health worker. A newer release is
+posted to the bot log channel through `post_server_log` once per process
+per version; an unreachable channel is a `release_channel` health check on
+`/healthz`, never an error out of the worker. The bot never downloads or
+installs anything.
+
+#### The updater
+
+`update.sh` gains `--check`, `--fetch` and `--upgrade`, with `--channel
+stable|beta` to override `.env` for one run. The default mode is renamed
+`--local` (bare `./update.sh` still means it) and is still offline; the
+three new modes are the only ones that touch the network. `--fetch`
+resolves the release exactly as the Python module does (`/releases/latest`
+for stable, the newest in the listing for beta), downloads the archive to
+`./updates/<name>.part`, downloads the sidecar, compares SHA-256
+(`sha256sum`, `shasum` or `openssl`, whichever the NAS has), checks the
+archive's `VERSION` against the tag, and only then renames it into place.
+A mismatch discards the download. `--upgrade` hands the verified archive to
+the existing install path - manifest check, engine-side backup, stop, swap,
+start, rollback on failure - unchanged. `curl` or `wget` alone is enough; no
+`jq`. Exercised end to end against a local fake of the GitHub API on both
+HTTP clients, including a tampered archive.
+
+#### The roadmap
+
+`docs/ROADMAP_1_0.md`: what 1.0 means (engine authority finished, hardened,
+gameplay-complete), six milestones with a named gate test each, and the
+inventory behind them taken from the tree rather than from the earlier
+authority roadmaps, which had drifted in both directions.
+
+#### Guards
+
+`tests/python/unit/test_release_channel.py` (26): version parsing and the
+suffix rule; listing parsing, channel selection, strict "newer than";
+announcement shape and length; settings defaults, overrides and rejection;
+the bot worker's start/cancel/once-per-version/never-raises shape; the
+updater's opt-in network (every `http_get` call sits in the two resolver
+functions, reachable only from the three modes), channel rule parity,
+verify-before-accept ordering, wget-only operation; the workflow's tag
+check, CI parity and asset names. Five mutants killed: the suffix rule
+dropped; `>=` for "newer"; the stable filter removed; announce-every-time;
+`.github/` excluded from the archive.
+
+#### Verification
+
+Go untouched. Python full suite against v0.20.3: 606 tests versus 580
+(+26), identical failure set; pytest-style 22/22.
+
+### v0.20.5 — the updater checks .env before it stops anything
+
+The first install of v0.20.4 on a NAS that had been on 0.19.20 ended like
+this:
+
+```
+Starting Xianxia RP 0.20.4...
+ERROR: ENGINE_AUTH_TOKEN must be at least 20 characters. Generate one with: ...
+Update failed; rolling back Xianxia RP 0.20.4 -> 0.19.20.
+```
+
+Everything worked as designed - the rollback restored code and database
+and restarted 0.19.20 - but the whole stop / fail / restore / restart cycle
+was for a one-line `.env` edit that could have been asked for before a
+container was touched. The installed `.env` predated `ENGINE_AUTH_TOKEN`,
+and `startup.sh` is the first thing that checks it.
+
+- `startup.sh --check-env [FILE]` validates a `.env` (the installed one by
+  default) against the release's requirements - `DISCORD_TOKEN`, `GUILD_ID`,
+  `ENGINE_AUTH_TOKEN` length, the narrator provider and its key, and
+  `DASHBOARD_TOKEN` when the dashboard is on - and exits 0 or 1 without
+  touching Docker and without creating a `.env`. The dashboard-token check
+  was hoisted above the start so it runs in check mode too.
+- `update.sh` runs the **staged** release's `startup.sh --check-env` against
+  the installed `.env` right after the manifest check and before
+  `ROLLBACK_ARMED=1`, so a missing key is a message ("Nothing was stopped or
+  changed") and the running stack keeps running. It only asks a package
+  whose `startup.sh` knows the flag; an older package would start the stack.
+
+This protects the *next* update, not this one: the preflight lives in the
+updater that runs, and a 0.19.20 install still runs 0.19.20's. The
+recovery for the failed install is the `.env` edit itself - generate a
+token with `python3 -c "import secrets; print(secrets.token_urlsafe(32))"`,
+add `ENGINE_AUTH_TOKEN=<token>`, make sure `DASHBOARD_TOKEN` is set or
+`DASHBOARD_ENABLED=false`, then `./update.sh --install` again.
+
+#### Guards
+
+`test_deployment_hardening.py::EnvPreflightTests` (4): a pre-0.19 `.env`
+is refused with the token hint and no `.env` is created; the dashboard
+token is checked in check mode; a complete `.env` passes with no Docker on
+`PATH`; `update.sh` preflights after the manifest check and before the
+rollback arm and `stop.sh`, using the staged copy. Two mutants killed:
+the Docker checks run in check mode; a missing file is silently accepted.
+The first-run guard was re-pointed to the new `$ENV_FILE` condition.
+
+No schema change; full suite 610 tests, identical failure set.
+
+### v0.20.6 (build A) — Quest Forge: quests from a story
+
+"AI can make quest from story." It can now, with a GM between the model and
+the players, and the engine between the quest and the tables.
+
+#### What a GM sees
+
+`/admin world questforge <story>` returns a draft quest as an embed with
+**Approve** and **Discard** buttons. Approved quests join every cultivator's
+`/quests`; discarded ones are kept for the audit trail and never served.
+`/admin world quests` lists the drafts (with the same buttons) and the
+approved set, and `retire:<key>` withdraws an approved quest from new takers
+without taking it from those who hold it. Every step audits (`quest.forge`,
+`quest.approved`, `quest.discarded`, `quest.retired`). The dashboard's
+Exploration view gains a "Forged Quests" table and a drafts count.
+
+With `QUEST_FORGE_AUTO=true` (default off - each draft is one routine-tier
+request against the free budget) the bot drafts a quest for each public
+world-history event at or above `QUEST_FORGE_MIN_SIGNIFICANCE` every
+`QUEST_FORGE_INTERVAL_HOURS`, at most three per pass, and posts "Quest
+drafts ready" to the log channel. Idempotent: an event is drafted once,
+whatever became of the draft.
+
+#### How a draft is made and why it cannot be a dead end
+
+`app/ai/quest_forge.py` asks the narrator's routine chain for one JSON
+object in the catalog shape, with a system prompt that lists exactly what a
+quest may name: the objective vocabulary the engine already tracks
+(`explore`, `talk`, `scene_action`, `sect_discovery`, `sect_trial`, with
+what each target must be), the public locations, the non-hidden NPCs, the
+scene-action kinds, the rewardable items, and the reward caps. The GM's
+story is fenced and declared data. The reply is parsed strictly and handed
+to `validate_quest_definition()` in `app/rules/quests.py`, which turns it
+into the catalog shape or returns every reason it cannot: an unknown
+location, NPC, scene action or item, a target on a type that takes none, a
+reward over budget, a reward item that is market-excluded or unique (the
+Bugslayer Sword class), an unknown reward key. Nothing is silently dropped -
+a quest pointing at a place that does not exist is the one thing the Forge
+must never produce. An invalid draft is retried once with the errors quoted
+back; a second failure, or an unavailable model, falls back to
+`procedural_quest_from_event()`, a deterministic draft (explore the place,
+talk to whoever is there, resolve a fitting scene action) that the same
+validator proves valid. The player-facing leak guard stays on for the
+call - only the chat monitor may opt out, and the contract test for that
+held.
+
+#### Storage, catalog, rewards
+
+Schema **28** adds `quest_definitions` (key, catalog fields, status
+`draft|approved|retired|discarded`, origin, story prompt, model, reviewer).
+`QuestService` now serves the static catalog plus approved forged
+definitions (a 15-second cache, refreshed on every approve/retire; a static
+quest always shadows a forged one with the same key). On completion the
+declared rewards are granted through the engine's existing
+`cultivation.reward` action with `event_type=quest_reward:<key>` - insight
+XP, low spirit stones and items - so a forged quest never writes a table
+from Python. The player is told what they earned. The dashboard review
+marker moved to 28 with the table registered under the Exploration view.
+
+#### Two dead ends found on the way
+
+- The shipped quest "A Road Toward a Sect" could never complete: its
+  `sect_trial` objective was reported nowhere. `/sect recruitment trial`
+  reports it now.
+- Quest rewards were declared (`insight_xp`) and never granted, and a
+  completed quest flipped to `completed` in silence. Both fixed above;
+  `announce_quest_progress` in `app/bot/character_state.py` tells the
+  player at all four progress sites.
+
+#### Settings
+
+`QUEST_FORGE_AUTO` (false), `QUEST_FORGE_MIN_SIGNIFICANCE` (80),
+`QUEST_FORGE_INTERVAL_HOURS` (6), `QUEST_REWARD_MAX_XP` (50),
+`QUEST_REWARD_MAX_STONES` (200), `QUEST_REWARD_MAX_ITEMS` (3), all
+documented in `.env.example`; none is required.
+
+#### Guards
+
+`tests/python/unit/test_quest_forge.py` (27): the validator (normalisation,
+every error class, the budget, the item exclusions, hidden masters and
+private locations refused, the static catalog passing its own validator,
+the procedural draft always validating, key slugs); the forge against a fake
+router (JSON found fenced/bare/in prose, first-attempt success, retry with
+errors quoted, fallback after two failures, fallback on a dead chain,
+zero calls without a model, the fallback event shaping the draft); the
+service and the table (draft-then-approve gating, unique keys, retire
+semantics, rewards granted through `cultivation.reward` with the right
+payload, no reward call when nothing completes, static shadows forged); and
+the Discord surface in source (commands admin-gated and auditing, nothing
+on the Discord side writing a gameplay table, the worker opt-in and
+idempotent, `sect_trial` reported, completions announced). Seven mutants
+killed: market-excluded items allowed; the budget cap ×100; an unknown
+location passed through; the retry removed; completion ignored; forged
+shadowing static; the idempotency check removed. The command-surface pin
+gained the two admin leaves (225), the admin action count 44.
+
+#### Verification
+
+Go untouched (the engine actions used - `quest.progress`,
+`cultivation.reward` - already existed). Python full suite against
+v0.20.5: 637 tests versus 610 (+27), identical failure set; pytest-style
+22/22. Migration replay from a schema-4 database to 28 passes.
+
+### v0.20.6 (build B) — the dashboard grant that could not be bound
+
+A player granted the Bugslayer Sword from the web dashboard could see it in
+`/inventory` — with no description, unlike every item beside it — but
+`/equipment → Bind` said there was nothing to bind, and `Equip` then said
+there was nothing bound. The inventory row was:
+
+```
+item_id = 'Bugslayer Sword'      -- every other row: spirit_herb, spirit_iron, ...
+```
+
+The dashboard's Adjust Inventory card is a free-text field, and the Go
+engine's `admin.player.adjust_item` is a plain signed delta that stores
+whatever string it is handed. The GM typed the display name; nothing between
+the text box and the `INSERT` knew the difference. The Discord path
+(`/admin player grant`) has always had the `target not in WORLD.items` guard
+and the one-per-character check for `unique` equipment — the dashboard had
+neither, so besides the phantom row it could also hand out a second Bugslayer
+Sword.
+
+#### The fix, at both ends
+
+- **`app/dashboard/server.py`** — `AdminDashboardController.resolve_item_id()`
+  runs on every `player.adjust_item` before the engine is called: the exact
+  id passes; otherwise the id or the display name matches case-insensitively
+  (so `Bugslayer Sword`, `bugslayer sword` and `BUGSLAYER_SWORD` all resolve
+  to `bugslayer_sword`); anything else is a `ValueError` — a 400 with up to
+  five suggested ids — and never reaches the engine. The catalog is read from
+  `content/world.json` once, the way `snapshot()` already reads locations,
+  rather than importing the rules tier into the dashboard process.
+- **`go_core/internal/game/actions.go`** — `adminAdjustItem` refuses a
+  positive delta on a unique item (`uniqueEquipmentIDsGo`, mirroring the
+  Python `unique` flag; the Bugslayer Sword today) when the result would
+  exceed one carried copy *or* the character already has one bound in
+  `equipment_instances`. Removal is never blocked — that is how a mistaken
+  grant is undone. This is the authoritative side: the dashboard is one
+  caller of `adjust_item`, not necessarily the last one to get it wrong.
+- `dashboard/app.js`: the field's placeholder says the name works too.
+
+#### Repairing an affected character
+
+Through the same Adjust Inventory card, so the change goes through the
+engine and is audited: item `Bugslayer Sword`, delta `-1` — the row is
+deleted at zero — then item `bugslayer_sword` (or the name; both resolve),
+delta `+1`. Then `/equipment → Bind`, and `Equip`.
+
+The first step works because of one rule in `_adjust_item_target()`: for a
+**negative** delta, a row that exists under the typed string exactly as
+typed is targeted as-is, before the resolver runs. Without it the resolver
+would have mapped `Bugslayer Sword` to `bugslayer_sword` and quietly removed
+nothing, leaving the phantom row unreachable from the card that made it.
+Grants never get that bypass, and a removal whose typed string matches no
+row still resolves like a grant.
+
+#### Guards
+
+`admin_actions_test.go`: `TestAdminAdjustItemRefusesSecondCopyOfUniqueEquipment`
+(second carried copy refused, a delta of 2 refused, removal still works) and
+`TestAdminAdjustItemRefusesUniqueEquipmentAlreadyBound` (a bound copy blocks
+a carried one; another character is unaffected). Both fail with the guard
+removed. `test_dashboard.py::test_dashboard_adjust_item_resolves_names_and_refuses_unknown_items`
+(four spellings resolve; an unknown name is refused with `bugslayer_sword`
+suggested; an empty id is refused; nothing unknown reaches the engine; other
+actions untouched) and `test_dashboard_adjust_item_removal_reaches_a_misspelt_row_as_typed`
+(a `-1` of a misspelt id that exists as a row reaches the engine as typed; a
+`+1` of the same string resolves; a removal with no such row resolves; an
+unknown removal is refused).
+
+No schema change. Go suite green; Python full suite 596 tests versus 594,
+identical failure set.
+
+### v0.20.7 — the two v0.20.6 builds, merged
+
+Two sessions each shipped a "v0.20.6" from v0.20.5 without seeing the
+other: build A added the Quest Forge (schema 28), build B fixed the
+dashboard item grant and taught `admin.player.adjust_item` the
+one-per-character rule for unique reward equipment. Their file sets
+overlap only in `app/dashboard/server.py`, `dashboard/app.js`,
+`tests/python/integration/test_dashboard.py` and the docs; a three-way
+merge against v0.20.5 applied cleanly for the code and the two release
+documents were resolved by keeping both sections. v0.20.7 is that merge
+with the version stamps moved on - no new behaviour beyond the two
+sections above, and either v0.20.6 zip is superseded by it.
+
+Schema 28 (from build A). Full suite and Go suite re-run on the merged
+tree; see the release status in `VERSIONS.md`.
+
+### v0.20.8 — update.sh stops dropping the .sha256 sidecar
+
+`resolve_release()` reads a release's assets out of a single-line GitHub API response by
+finding where the next top-level JSON object starts and cutting there. It matched on the
+bare pattern `{"url":...}` for that boundary, but every object in the release's own `assets`
+array also opens with its own `"url"` field. When the `.sha256` sidecar asset wasn't first
+in that array (true of v0.20.7's own GitHub Release, where the zip was listed before the
+sidecar), the truncation sliced the sidecar - and anything after it - out of the isolated
+release object before `RELEASE_SHA_URL` was ever extracted. `fetch_release` then refused the
+download: "Release vX has no .sha256 sidecar; refusing an unverifiable archive", even though
+the sidecar was attached and downloadable.
+
+`"assets_url"` is always the release object's second top-level key (right after `"url"`) and
+never appears on an asset object, so the truncation now anchors on the `"url":"...","assets_url"`
+pair instead - verified against the real `releases/latest` API response for this repository's
+v0.20.7 release (zip listed before the sidecar) and against a multi-release beta listing, both
+of which now resolve `RELEASE_TAG`, `RELEASE_ARCHIVE_URL` and `RELEASE_SHA_URL` correctly.
+Updater-only fix; no schema change, no gameplay change.
+
+### v0.20.9 — the updater against a tokened engine, and a mixed tree
+
+The first update attempted *from* a 0.20 engine (0.20.8 over 0.20.8, on
+the NAS) stopped at "Could not create a safe SQLite backup. Start the
+current stack and retry." with the stack running. Since v0.20.0 the
+engine requires `X-Xianxia-Engine-Token` on every `/v1/` route, and the
+updater's pre-update backup was an unauthenticated POST to
+`/v1/db/backups`; the 401 read as "no backup". The 0.19.20 → 0.20.4
+update had worked only because the old engine carried no token. The
+request is now assembled inside the engine container (`docker compose
+exec … sh -c '…$ENGINE_AUTH_TOKEN…'`), where the token already lives, so
+nothing on the host needs to read `.env`.
+
+The same NAS had earlier ended up with 0.20.8's `VERSION`, manifest and
+docs on pre-Quest-Forge code — `app/ai/quest_forge.py` absent, the GM
+panel showing schema 27 — after an install run by an account that did
+not own the project folder; the updater then answered "package 0.20.8 is
+not newer than installed 0.20.8". The commit loop now aborts into the
+rollback on any delete or copy that fails (naming ownership as the
+likely cause), and after the copy the whole tree is checked against
+`RELEASE_MANIFEST.sha256` before `startup.sh` is called: a tree that is
+not byte-for-byte the release never starts.
+
+The workflow's zip excludes `.pytest_cache/` and `.ruff_cache/` (0.20.8's
+archive carried both). Two contract tests pin the updater changes; both
+kill their mutants. No schema change; no gameplay change.
+
+---
+
+## `V021_RELEASE_NOTES.md`
+
+## Xianxia RP Discord Bot — v0.21 release notes
+
+Shipping as **v0.21.6**. The v0.20 line (v0.20.0 through v0.20.9) is in
+`docs/history/V020_RELEASE_NOTES.md`. The release is stamped 0.21.6 in `app/version.py`,
+`VERSION`, the `Dockerfile` and `docker-compose.yml`, and carries schema 28,
+unchanged since v0.20.6.
+
+v0.21 is the roadmap's **Authority I** milestone (`docs/ROADMAP_1_0.md`):
+the last handlers where Python decides a gameplay outcome and writes the
+tables itself each get an engine action. The milestone ships as point
+releases, one row at a time; its gate is the allowlist in
+`tests/python/contracts/test_authority_boundary.py` (`PLAYER_MUTATIONS`),
+which lists every remaining Python-side gameplay write and must be empty
+before v0.21 is tagged stable.
+
+Release dates: 2026-09-06 (v0.21.0 through v0.21.6).
+
+### v0.21.0 — the gate, and `item.use`
+
+**The gate.** `test_authority_boundary.py` now scans `app/database/` for
+every method that runs an INSERT/UPDATE/DELETE (64 of them) and every call
+to one of those from `app/bot/` and `app/ops/`. Each call site is either a
+`PLAYER_MUTATIONS` row - a gameplay write with the engine action that will
+replace it - or one of the `BOOKKEEPING_METHODS` (narration history, RAG
+memory, Discord channel and thread ids, ops telemetry, the GM's quest-draft
+review), which stay in Python. Anything else fails; a row whose write has
+gone fails too until the row is deleted. The scan started at 27 rows across
+the seven roadmap items and the test refuses to let it grow. Both directions
+are mutation-tested.
+
+**`item.use`.** The non-battle branch of `/use` ran five unguarded writes
+in Python: consume the item, restore Qi/vitality, add the permanent life
+extension, apply the item's effect, add pill toxicity and then re-derive the
+toxicity penalty effect. The battle branch beside it had gone through
+`combat.recovery_item` since v0.19; the rest never did. The Go engine now
+owns the whole sequence as one transaction, `item.use`
+(`go_core/internal/game/item_use_actions.go`), and the Discord handler is
+"call, then format" - 22 lines where there were 70.
+
+What moved, and what it preserved:
+
+- The "no implemented active use" refusal happens before anything is
+  consumed; storage treasures and array talismans keep their own actions.
+- A stack's last item deletes the inventory row instead of leaving a
+  zero-quantity row behind (Python's `consume_item` left the row; the
+  combat path already deleted it).
+- The restore clamps to the maxima and, if a battle is active, moves
+  `battles.player_hp` in lockstep - so `/use` mid-battle now behaves like
+  the battle panel's recovery option instead of taking a different path.
+- Effects are keyed by the content's `effect_key` (default: the item id),
+  sourced to the item, normalised to the same shape
+  `app/rules/effects.py` produces, and `duration_game_minutes: 0` means
+  the effect does not expire (a NULL end, as before).
+- The medicinal-residue value is derived exactly as
+  `app/rules/alchemy.py` did (24 for a lifespan pill, 18 risky, 12
+  cultivation, 10 mental, 7 with an instant restore, 8 otherwise;
+  `pill_toxicity` in the content overrides), the existing decay is
+  settled *before* the add, and the engine's own toxicity curve
+  (`settlePillToxicityEffectTx`, in place since v0.19) writes or clears the
+  penalty effect afterwards. The reply carries the band label, so Python
+  no longer computes it.
+- The Go catalog gained the item `use` fields (`effect`, `effect_key`,
+  `name`, `duration_game_minutes`, `lifespan_years`) and the optional
+  `pill_toxicity` override; the world file did not change.
+
+Seven Go tests cover the five steps, the penalty-band crossing, decay
+order, the lifespan pill, the talisman (no expiry, not a pill), the
+refusals, and the mid-battle HP bar; nine mutants (delete-at-zero, each
+toxicity constant, decay order, the duration-zero rule, the HP lockstep,
+the use gate, the stat-less modifier drop, the post-add settle) are all
+killed. `PLAYER_MUTATIONS` shrinks from 27 rows to 22.
+
+Still in Python after this release - the remaining v0.21 rows:
+`/alchemy purge` (→ `alchemy.purge`), `/sect shadow` (→ `sect.shadow`),
+`/law technique`'s self-applied effect, the toxicity sync in
+`character_state.py` (→ engine-owned; `/use` no longer calls it), the eight
+admin writes in `world_ops.py`, and the small ones (`set_gender`, abode
+`set_location`, `discover_sect`, `accept_quest`).
+
+Python full suite 641 tests, identical failure set; pytest-style 25/25 (the
+three new gate tests); Go suite green. No schema change.
+
+### v0.21.1 — typed play
+
+Outside the Authority I row-by-row work, but on the same principle: a model
+decides nothing. Design and the rest of the plan it belongs to:
+`docs/COMMISSIONS_DESIGN.md`.
+
+**What was wrong.** With `AUTO_NARRATE=true`, `on_message` sent every line in
+a hub channel, private scene thread or RP channel to `narrate_action` with no
+fixed roll. "I explore my location" produced a paragraph and no exploration -
+no encounter roll, no quest progress, no discovery, because the narrator is
+forbidden to grant anything. And every line was a call against a shared
+allowance of 50 a day; the path had no per-user limit at all.
+
+**The rule.** The narrator listens for a prefix, and the prefix means "this
+is an action, resolve it":
+
+- `> I explore the ravine` - the router (`app/bot/typed_play_router.py`)
+  turns it into the handler a hub button would run and the engine resolves
+  it. Roots with no parameters (`explore`, `hunt`, `cultivate`,
+  `breakthrough`), the eight scene actions (the whole line is the detail,
+  the named NPC or player is the target), and `/talk` (the named NPC).
+- An un-prefixed line that addresses a present NPC (name in the first two
+  words, or a question naming them) is `/talk`. An @mention is free
+  narration - an explicit "narrator, react".
+- Anything else is speech: recorded as history, no reply, no call.
+
+**The router** is three deterministic stages and never calls a model. A verb
+table in `content/typed_play.json` (whole-word alias phrases; a longer alias
+beats a shorter, one at the start of the line beats one in the middle, after
+the leading "I / I'll / let me / I try to" is stripped). Entity resolution
+against who is present - the same target list the `/action` panel offers -
+matching a full name, a name without titles, or one distinctive token, where a
+token two present targets share ("Feng") identifies neither. And a picker
+(`TypedPlayPicker`, owner-only) when two readings tie or nothing matches: the
+candidates, **Narrate it**, and **Just say it in character**. Naming an NPC
+who is not here is a refusal, not a guess.
+
+**No handler of its own.** `typed_play.py` reaches handlers only by registry:
+`ACTIONS.root()` / `handler_for()` for roots and `/talk`, and a new
+`EVENT_HANDLERS` binding `scene_action_resolve` (bound in `commands/scene.py`
+beside the function the `/action` modal submits to) for scene actions. A
+`MessageInteraction` adapter gives those handlers the interaction surface
+they expect (`response.defer/send_message`, `followup.send`, `user`, `id`,
+`edit_original_response`), replying to the typed line - the same idea as
+`HubInteractionProxy`. No engine call, no database write, nothing for the
+authority gate to allowlist; `PLAYER_MUTATIONS` is unchanged at 22.
+
+**The budget.** `app/ops/user_budget.py` is a per-user token bucket
+(`TYPED_PLAY_BURST` at once, refilling at `TYPED_PLAY_PER_MINUTE`; idle users
+evicted), instantiated in `runtime.py` as `TYPED_PLAY_BUDGET`. Every path out
+of `on_message` that can reach the engine or the narrator spends a token
+first; the picker's action and narrate buttons spend one on click; speech
+and "Just say it" are free. A refused line is answered with the wait and
+never queued. This is the v0.23 Hardened I "per-user command budget" item,
+pulled forward.
+
+**Settings.** `TYPED_PLAY_PREFIX` (default `>`; exactly one character, never
+a letter, digit or space - `_typed_play_prefix` in `config.py` refuses
+anything that would swallow speech), `TYPED_PLAY_BURST`, `TYPED_PLAY_PER_MINUTE`,
+`TYPED_PLAY_HINT` (once a day, when a player's un-prefixed line looked like an
+action, a self-deleting reply says how to make it one).
+
+**Smaller changes on the way.** Someone without a cultivator who merely
+speaks in a hub channel is no longer told to `/begin` on every line - only an
+attempt to act, or a mention, earns that. The same for the "this channel
+represents X, you are at Y" nudge. `narrate_action` moved from `on_message`
+into `XianxiaBot.narrate_freeform`, reachable only by mention or by the
+picker. A line that dispatches to a handler is not also recorded as speech,
+so the narrator's context never sees the same line twice.
+
+**Tests.** `tests/python/unit/test_typed_play_router.py` - a table of lines
+and what each becomes, the verb table validated against the registered roots
+(every root it names exists and takes no required parameter) and the scene
+action keys, no alias claimed twice. `tests/python/unit/test_user_budget.py` -
+the bucket, behaviourally, with a fake clock. `tests/python/contracts/
+test_typed_play_surface.py` - by reading the source: the un-prefixed branch
+of `on_message` reaches narrator or dispatch only behind `if mentioned` and
+`if npc is not None`, both budgeted; the prefixed branch spends before it
+routes; `typed_play.py` dispatches only through the registries and contains
+no engine call or write; both picker buttons that can act spend first;
+the prefix setting rejects letters, digits and spaces.
+`test_bot_package.py` gains the two modules in its tier table and the new
+registry binding. Eight mutants (speech narrates; mention door unbudgeted;
+budget always grants; ambiguity guessed; absent NPC not refused; picker acts
+before spending; prefix accepts a letter; any mention counts as addressing)
+are all killed.
+
+**Known limits, deliberately.** Root commands with parameters (`/travel`,
+`/use`, the group commands) are not in the verb table yet - a typed line
+carries no arguments, and the picker is the right place to grow that.
+Ephemeral replies cannot be sent from a message, so the dispatched handlers'
+"ephemeral" tidiness replies land publicly. The hint state is in memory and
+resets on restart. No schema change.
+
+### v0.21.2 — Teardown, and the realm capitals actually hidden
+
+**Teardown.** The dashboard's Discord tab had Fresh Start (delete and
+recreate the message-safe channels) and Reset World (delete tracked threads
+and announce), but no way to take the whole layout down. `teardown`
+(`dashboard_discord_control`, `app/bot/admin/server_setup.py`) is the
+inverse of Full Setup. In order: every thread the database tracks (the same
+set Reset World deletes); every *bound* channel - the seven base channels
+including `#player-homes`, `#expeditions` and `#event-scenes`, every
+realm-capital hub, the `#bugs` forum; the two Xianxia categories, only if
+nothing else is left inside them; then the ids the bot held, through a new
+bookkeeping write `Database.clear_discord_bindings` (server_config channel
+and message ids, `realm_hub_channels` rows, the posted `message_id` on
+channel messages - GM-authored *text* is kept so a later Setup reposts the
+GM's words). What a binding names is what is deleted: not by channel name,
+not by category membership, and never `RP_CHANNEL_IDS`, the realm roles, or
+anything the GM made that Setup did not bind. Nothing is recreated; the
+database is not reset - characters, sects and history survive and every
+thread owner recovers from a missing thread on next use, as after Reset
+World. Confirmation is the typed word `DELETE` (Fresh Start is `CLEAR`,
+Reset World is `RESET`; three different words on purpose), the action is
+audited, and the dashboard button refuses until the word is in its box.
+
+**Realm capitals were not hidden.** Setup created the `Xianxia • <world>`
+roles and `require_character` assigned them as a cultivator's realm
+unlocked - but no hub channel ever received a permission overwrite, so the
+"visibility gate" gated nothing and every capital was visible to everyone.
+`ensure_realm_hub_channels` now gates each hub it resolves on the
+dashboard-owned Setup/Repair path (`ensure_realm_hub_overwrites`,
+`app/bot/channels.py`): `@everyone` denied View Channel, the world's role
+allowed it, and an explicit allow for the bot itself. It runs for existing
+hubs too, not only on creation, because Fresh Start recreates hubs bare;
+it makes no API call when a hub is already gated; and it never denies
+`@everyone` when the role does not exist (that would be a lockout, not a
+gate - the roles need Manage Roles, which the permission diagnostics
+already flag). `realm_hub_visibility` (`app/rules/realm_hubs.py`, pure)
+says whether a hub is actually gated; the dashboard's Realm Capitals table
+gains a Visibility column, and a visible hub is no longer counted "ready",
+so Setup State reads ATTENTION until it is fixed. The `/admin` slash path
+stays validate-only.
+
+**Tests.** `tests/python/contracts/test_discord_teardown.py`: the typed
+word, the audit, delete order (threads, channels, categories, then ids),
+only-what-a-binding-names, categories only when empty, nothing recreated,
+permission checked first, the JS button refusing without the word, and a
+real-database test of `clear_discord_bindings` (forgets ids, keeps GM
+text, leaves other guilds alone, idempotent).
+`tests/python/contracts/test_realm_hub_visibility.py`: the hidden rule on
+every overwrite combination, the gate applied for existing hubs and only on
+the provisioning path, deny+allow+bot, idempotence, and the dashboard
+column. `clear_discord_bindings` joins `BOOKKEEPING_METHODS` in the
+authority gate; `PLAYER_MUTATIONS` is unchanged. Nine mutants (gate only on
+creation; hidden = deny only; deny with no role; confirm word CLEAR;
+bindings cleared before deletes; non-empty categories deleted; GM text
+wiped; every guild cleared; button fires without the word) are all killed.
+
+With `httpx` available the Python suite now collects in full: 738 passed,
+no failures. No schema change.
+
+### v0.21.3 — one manual on joining a sect, and a catalog both sides can read
+
+**How does a player get a manual?** Mostly, they could not. A manual is an
+item (`<manual_id>_manual`) that must be in the inventory before
+`/cultivation → Manuals & Techniques → Study` learns it through the engine's
+`manual.study`. The only sources were `/sect shadow` (one demonic manual on
+hidden-sect initiation) and the black market's forbidden stock - the six
+seed manuals. The other 142 - every righteous "Jade Manual" inheritance -
+were generated by `augment_advanced_catalog` in Python's memory when `World`
+loaded the file. The Go engine reads `content/world.json` raw, so it had
+never heard of them: it could not stock them, `manual.study` refused them as
+"unknown cultivation manual", and they appeared only in autocompletes.
+
+**The catalog on disk is the catalog.** `scripts/materialize_world_catalog.py`
+runs the same deterministic, idempotent expansion once and writes it back:
+148 manuals, 528 techniques, 187 items, plus the `world_rules` block and the
+hidden Heaven-Devouring Demon Sect the expansion also adds. `World` still
+calls the expansion at load; on a materialised file it is a no-op, and
+`tests/python/unit/test_world_catalog_materialised.py` fails the moment the
+file drifts from it (`--check` does the same from the shell). Two things had
+to change for that to be safe: the generated manual items are now
+`market_excluded` (an inheritance is given or found, never listed at
+`base_price` in every town market - which is what the file on disk would
+have done to the Go bootstrap), and the simulation's `Sect` gained `hidden`,
+which bootstrap honours so the hidden lineage gets no public politics row,
+no relations and no NPC faction (`TestBootstrapSkipsHiddenSectsAndKeepsManualsOffTheMarket`).
+`rewardable_items` in Quest Forge already excludes market-excluded items, so
+forged quests still cannot reward a manual - a deliberate follow-up, not an
+accident (commissions, `docs/COMMISSIONS_DESIGN.md`, is where that decision
+belongs).
+
+**One manual on joining.** Passing a sect's entrance trial (`pass` or
+`conditional_pass`) bestows the sect's entry inheritance, chosen and written
+by the engine inside the same transaction as the membership
+(`sectEntryManual`, `go_core/internal/game/sect_actions.go`) - so a new
+Outer Disciple never exists without it and a rolled-back trial never grants
+one. The rules, all on canon: alignment follows the sect (Orthodox →
+Orthodox; Neutral → Neutral, else Orthodox; Demonic → Demonic - a righteous
+sect never hands out a forbidden art); the character's own path first, any
+path of the right alignment only if theirs has nothing; the lowest tier
+within reach, or - for every fresh Mortal-realm disciple, since the catalog
+has no Orthodox manual at tier 0 - the lowest tier there is, to grow into
+(`manual.study` still enforces `min_realm_index` at study time); never one
+already learned or carried; ties on the manual id so the choice never
+depends on map order. The item lands in the inventory with an
+`item_provenance` row (`sect_entry`, clean or forbidden by the manual's
+alignment), and the result carries `granted_manual` so the Discord reply
+can say what was given and when it can be studied. Python grants nothing:
+`PLAYER_MUTATIONS` is unchanged, and `/sect shadow`'s older Python-side
+grant stays on the gate as the `sect.shadow` row it already was.
+
+**Tests.** Go: `TestSectTrialPassGrantsTheEntryManual` (pass → inventory,
+provenance, membership, and the gift is then studyable through the same
+catalog), `TestSectEntryManualSelectionRules` (alignment per sect, path
+first, reach beats out-of-reach, lowest tier, no duplicates, fallback path,
+deterministic across twenty runs), `TestSectTrialFailGrantsNothing`; seven
+mutants killed (orthodox may give demonic; grant on fail; duplicates; path
+ignored; highest tier; no inventory write; reach ignored). Python:
+`test_world_catalog_materialised.py` and `test_sect_entry_manual.py` (the
+handler reads the gift and makes none; the grant sits between membership
+and result in the engine; the selector's alignment table). Go suite green;
+Python 748 passed. No schema change.
+
+### v0.21.4 — every sect has a genuine tier-0 entry manual
+
+v0.21.3 exposed a content gap: the generated catalog has no Orthodox manual
+at tier 0, so a fresh Mortal-realm disciple - exactly who joins a sect -
+was handed a tier-2 manual to grow into. The fix is content, not a formula
+tweak: six **authored** entry inheritances in `content/world.json`, one per
+public sect, each marked with its `sect`:
+
+| Sect | Entry manual | Alignment |
+|---|---|---|
+| Azure Cloud Sect | Azure Cloud Foundation Sword Canon | Orthodox |
+| Crimson Furnace Sect | Crimson Furnace Ember-Tempering Record | Orthodox |
+| Frozen Moon Palace | Frozen Moon First-Frost Sutra | Orthodox |
+| Black Serpent Clan | Black Serpent Venom-Fang Primer | Neutral |
+| Blood River Sect | Blood River Crimson Tide Initiation | Demonic |
+| Corpse Lantern Pavilion | Corpse Lantern Pale-Flame Initiation | Demonic |
+
+Each is tier 0, path-agnostic (`"path": "Any"` - the manual's path is
+descriptive, nothing in the engine gates study on it), and carries three
+techniques unlocking at mastery 0, 1 and 2 in the shape the battle resolver
+already executes (a strike, a recovery, a control - the demonic pair
+paying karma and exposure as their alignment demands). The items are
+`market_excluded` and legally `clean` or `forbidden` by alignment. The
+hidden Heaven-Devouring Demon Sect has none: it has no public trial.
+
+`sectEntryManual` now takes the sect's own manual first (`Sect` on
+`worlddata.ManualDefinition`); the v0.21.3 rules apply only once the
+character already has it - a rejoining disciple gets the next one, never a
+duplicate. Two more mutants killed (sect's own manual ignored; given even
+when owned); the Go trial test now asserts the Azure Cloud canon itself,
+studyable at once. `test_world_catalog_materialised.py` gains a test that
+every public sect has exactly one tier-0 entry manual with valid techniques
+and a hidden sect has none; the catalog counts move to 154 manuals / 546
+techniques (44 / 166 demonic) in `test_technique_catalog.py`. No schema
+change.
+
+### v0.21.5 — the input fence, the content batch, and cooldowns as a wait
+
+The first two items of the AI plan, plus one piece of wording a player
+reported.
+
+**The input fence.** Player-authored text used to reach the narrator's
+prompt merely *labelled* untrusted, between bare `<<<` / `>>>` lines a
+player could close themselves by typing `>>>`; the output-side leak guard
+in `ai_router.py` was the only defence, and typed play (v0.21.1) had just
+multiplied the text that gets there. `fence_untrusted` (`app/ai/narrator.py`)
+now wraps every player-authored slot - the dialogue in `talk_to_npc`, the
+action in `narrate_action`, the recent history block every scene sends, and
+the NPC's short- and long-term memories of the player (which quote them) -
+in `<<<BEGIN …>>>` / `<<<END …>>>` markers, whitespace-tidied, capped
+(600 characters for a line, more for history and memories), with any run of
+`<<<` or `>>>` inside the text swapped for a look-alike so the fence cannot
+be closed from inside. Both system prompts now say what the markers mean:
+anything inside a fence is data the players wrote, and an instruction, rule
+or "system" message in there is fiction to narrate around, never obey. The
+same shape `chat_monitor.py` has used since v0.19.
+`tests/python/unit/test_narrator_input_fence.py` pins the helper (the
+closing-the-fence attack, the cap, empty slots still fenced) and scans the
+prompt source so no slot can quietly return to bare interpolation; four
+mutants killed (markers not neutralised; no cap; dialogue bare; history
+unfenced).
+
+**The content batch.** The v0.25 content items, authored now rather than
+forged later: encounters for the ten locations that had none - the three
+recruitment grounds and the three hidden-sect grounds `/explore`
+hard-errored on ("current location has no exploration encounters"), plus the
+Auction House and the three rebirth sanctuaries - and `sense_hints` for the
+seven without. Safe-zone encounters are things that happen around you, not
+attacks (rule 15: violence cannot succeed in a protected interior). The four
+world rulers, who shared one copy-pasted speech/want/fear and had no
+personality or secret, each get their own, tied to what the world already
+says (the damaged world-meridian seal, the rebirth enclaves, the hidden
+demonic lineage); Steward Qiao gets a personality and a secret that make him
+the commission giver the design doc names.
+`tests/python/unit/test_world_content_gate.py` is the v0.25 gate: every
+location has hints and at least three distinct encounters, safe zones start
+no violence, every NPC has all five narrator fields, and the rulers are four
+people, not one template.
+
+**Cooldowns as a wait.** Reported: "cultivation cooldown remaining: 10520".
+That is the engine's exact truth in wall-clock seconds
+(`CULTIVATE_COOLDOWN_MINUTES=180`) and no help to anyone.
+`_explain_engine_error` (`app/bot/runtime.py`) now rewrites all three engine
+cooldown shapes into "⏳ Cultivation is still on cooldown — ready in
+**2h 55m**", and every `❌ {exc}` reply in the command, UI and admin
+modules goes through it (82 sites; the one in `hubs.py` is input validation,
+not an engine error, and stays). `test_cooldown_wording.py` pins the
+formats and scans for any raw reply that comes back.
+
+Python 772 passed; Go suite green; no schema change.
+
+### v0.21.6 — realm capitals visible only while you are in the city
+
+Requested: "hide realm capitals until you are in the main city; make a
+role for it that we can add and remove based on player location; set up
+the perms needed."
+
+**The role.** One presence role per capital, `Xianxia • <capital name>`
+(`realm_presence_role_name`, `app/rules/realm_hubs.py`), created by
+Setup/Repair beside the realm-access roles with no guild permissions and
+not mentionable. It is distinct from `Xianxia • <world>` (earned by
+cultivation, v0.19), which stays for Sync Realm Roles and the diagnostics
+but no longer gates anything.
+
+**The sync.** `_sync_realm_presence_roles` (`app/bot/runtime.py`) gives a
+member exactly the presence role of the capital their character stands in -
+`presence_world_for` is an exact match on the hub's location, so a
+residence inside the city, a road, or a name that merely shares a prefix is
+not the capital - and removes any other. It runs from `require_character`
+(every command), from `on_message` (every line in a scene channel, because
+a road journey settles in the engine and the next thing a player does may
+be to type), and immediately after `/travel → Realm Capitals → Go`, which
+is instant. It makes no Discord call when nothing changed, and the bulk
+Sync Realm Roles action reconciles presence for every character too.
+
+**The permissions.** `ensure_realm_hub_overwrites` (`app/bot/channels.py`)
+now gates each capital on the presence role: `@everyone` denied View
+Channel; the presence role granted `REALM_HUB_MEMBER_PERMISSIONS` - view,
+send, send in threads, read history, add reactions, embed links, attach
+files, use application commands; the bot allowed view/send/manage
+messages/history for itself; and the v0.21.2 realm-access role's allow
+removed (`stale_roles`), so an unlocked-but-absent cultivator no longer
+sees the room. Idempotent - an already-correct hub makes no API call - and
+still never denies `@everyone` when the presence role is missing. Both
+role sets are checked against the bot's role hierarchy in the permission
+diagnostics; the bot needs Manage Roles and Manage Channels as before.
+**Run Repair once after upgrading**, then Sync Realm Roles, to apply the
+gate and put the presence role on everyone already standing in a capital.
+
+**The dashboard.** The Realm Capitals table's role column is now the
+presence role and Visibility reads "in-city only" or "VISIBLE TO ALL"; a
+visible hub is still not "ready".
+
+**Tests.** `test_realm_hub_visibility.py` grows presence rules (every
+capital maps to its world; nothing else does, prefixes and longer names
+included), the role names, the member permission set, the gate applying
+the presence role and stripping the old allow, the sync being called from
+all four places, and the sync's add/remove shape. Three mutants killed
+(presence never removed; prefix match; old allow kept). Python 778 passed;
+Go unchanged. No schema change.
+
+---
+
+## `V022_RELEASE_NOTES.md`
+
+## Xianxia RP Discord Bot — v0.22 release notes
+
+Shipping as **v0.22.5**. The v0.21 line (v0.21.0 through v0.21.6) is in
+`docs/history/V021_RELEASE_NOTES.md`. The release is stamped 0.22.5 in
+`app/version.py`, `VERSION`, the `Dockerfile` and `docker-compose.yml`, and
+carries **schema 31**.
+
+Release dates: 2026-09-06 (v0.22.0 through v0.22.5).
+
+### v0.22.0 — Commissions
+
+The design is `docs/COMMISSIONS_DESIGN.md`, written at v0.21.0 and built here
+minus its last producer (seeded invention, deliberately deferred — see "What
+this release does not do"). The player-facing shape is the design canvas from
+the same conversation: offer → accepted → progress check → abandon confirm /
+cooldown refusal → completed, plus the GM review tab.
+
+A commission is a quest a giver NPC offers you in character. Three things about
+it are engine facts, and all three now live in Go:
+
+- **You hold one at a time.** Not a cooldown — the slot. Completion rate is
+  what limits how much work the world hands out.
+- **The terms are fixed at accept.** Which set of terms you took and when it is
+  due are stored on your row, so a later edit to the definition cannot change
+  what a held commission pays.
+- **Four outcomes, one table.** `active → completed | failed | abandoned`, and
+  **failed and abandoned cost exactly the same**. Abandoning is allowed — it is
+  kinder than making someone carry work they do not want — but it must not be
+  the cheap reroll, so it costs what running out the clock costs.
+
+#### The engine
+
+`go_core/internal/game/commission_actions.go` is new and owns all of it.
+
+`commission.accept` (authoritative) **replaces `DB.accept_quest`**, which was
+the last v0.21 row on `ops/core_services.py`. It refuses a second commission,
+refuses during the giver's cooldown, refuses a commission already taken, and
+refuses another player's personal one with the same "unknown commission" it
+gives for a key that does not exist — the refusal does not confirm that someone
+else's commission exists. It then inserts the row with `commission=1`, the
+absolute deadline computed from the accepted variant, and the variant index.
+**Nothing is paid at accept**, which is what makes a GM retire free.
+
+It also accepts an ordinary quest: one with no giver, or one from the static
+catalog in `app/rules/quests.py` with no `quest_definitions` row at all. Those
+get `commission=0`, no deadline, and do not take the slot. One accept path for
+every quest in the game was the point of building on `accept_quest` rather than
+beside it.
+
+`commission.resolve` (authoritative) is the single place a commission leaves
+`active`. It sets the status and the resolved minute, pays the locked terms on
+`completed` and nothing otherwise, moves standing through the outcome table,
+sets the refusal cooldown for `failed`/`abandoned`, and bumps the per-outcome
+counter. `admin_retire: true` runs the same path with the charge switched off:
+the record still reads `abandoned`, the player pays nothing and receives
+nothing, and the slot is free.
+
+`quest.progress` now routes a completing commission through that same resolve
+path instead of flipping the status itself, so completion by objectives and
+completion by any other route cannot drift apart. Python no longer grants the
+reward for these — the transition carries what the engine already paid.
+
+`ExpireDueCommissions` runs on the world tick (`advancedMaintenance`) and fails
+every commission whose deadline has passed. It is the only path that makes
+`failed` exist without anyone pressing anything, and it reads the stored
+deadline rather than a timer, so a restart cannot lose one.
+
+Two GM actions, both audited: `admin.commission.review` (draft ↔ approved ↔
+retired ↔ discarded) and `admin.commission.retire` (end this player's held
+commission at no cost).
+
+#### Selection, and what the narrator is told
+
+`app/rules/commissions.py` is pure and decides nothing the engine owns. It runs
+the ladder from the design, in order, on stored state only:
+
+1. holding one → progress check
+2. on cooldown → refusal, with the reason
+3. a pool match within the standing-derived tier ceiling and the realm band →
+   offer, picked deterministically per player per world-day
+4. nothing → "he has nothing for you today"
+
+No model call happens for any branch, including the one that ends in an offer.
+`Narrator.talk_to_npc` gains a `commission_context` block rendered by
+`format_commission_block`: canonical, not fenced (unlike the player's dialogue
+and the channel history, every line of it was computed by the engine), and
+carrying the standing as a **band** rather than a number so the Steward cannot
+read a statistic aloud. The model narrates the block. It never decides whether
+there is work, what it pays, or how the last one ended.
+
+**The buttons come from the block, not from the reply.** The offer card is
+posted as its own message with the view attached, built from the definition;
+`app/bot/ui/commissions.py` imports nothing from `app.ai` and has no way to see
+what the narrator wrote. The accept payload names its terms by index.
+
+#### The player's side
+
+`/talk` to a giver runs the ladder and attaches the card. Accept has one button
+per approved set of terms (standard, harder terms, rushed) and a Decline that
+costs nothing. `/quests` marks a held commission, names its giver, shows the
+clock, and carries the abandon button — which opens a confirmation that states
+the cost in the same words failing gets, because they are the same thing.
+
+#### The GM's side
+
+A new **Commissions** tab (`/api/commissions`): what is waiting for approval,
+what players are carrying and how overdue it is, standing and outcome counters
+per giver, and the engine's outcome numbers shown read-only, because they are
+compiled constants rather than settings and a form that silently did nothing
+would be worse than no form. Approve / retire / discard and the per-player
+retire run through the two audited engine actions.
+
+#### Schema 29
+
+`quest_definitions` gains `giver_npc`, `realm_band`, `tier`, `owner_user_id`,
+`deadline_game_minutes`, `variants_json`, `seed_json`. `character_quests` gains
+`commission`, `deadline_game_minute`, `variant_index`, `resolved_game_minute`.
+`npc_relationships` gains `commission_cooldown_until_game_minute`, the three
+outcome counters and `last_commission_outcome`. Additive; existing rows keep
+the non-commission shape.
+
+#### Content
+
+Three givers — Steward Qiao at the Golden Pavilion (whose secret already said
+he ran a private board), Magistrate Xu Wenbo and Madam Pei Suyin in Greenriver
+— and nine authored commissions across tiers 1–3, every one of them validating
+against `validate_quest_definition` on every variant. They seed into
+`quest_definitions` at startup **insert-only**, so a GM's edits, approvals and
+retirements survive every restart.
+
+#### The gate
+
+- `PLAYER_MUTATIONS` in `test_authority_boundary.py` has lost the `accept_quest`
+  row and gained none. Python writes no `character_quests` row anywhere.
+- Go: accept stores the accepted variant's deadline (not the definition's);
+  refuses a second, refuses on cooldown, refuses a completed one; `failed` and
+  `abandoned` compared as whole values and again through the database; a GM
+  edit after acceptance does not change the payout; retire costs nothing and
+  frees the slot; expiry fires once and never on a deadline-free commission;
+  an ordinary quest does not take the slot; both GM actions audit.
+- Python: the ladder table-driven across every branch and its ordering, the
+  determinism of the daily pick, the voice block (band not number, no offer in
+  a refusal, `steward_initiates` only after a failure), and a source contract
+  that the surface cannot reach the narrator and every engine argument is state
+  it owns.
+- Content: every giver is a real NPC at the location the table claims, with the
+  five fields the voice call reads and no `hidden_master`; every commission has
+  a clock; rushed pays less for less time; harder pays more for the same time.
+
+**Python 819 passed. Go suite green.** Two pre-existing failures were fixed on
+the way: the bootstrap test still asserted 148 manual items after v0.21.4 added
+six authored ones (it now derives the count from the catalog, so it cannot
+drift again), and `gofmt` had been flagging `internal/worlddata/catalog.go`.
+
+#### What this release does not do
+
+- **No seeded invention.** The design's second producer is not built. The
+  columns exist (`owner_user_id`, `seed_json`), the visibility rule is enforced
+  and tested, and the dashboard already shows personal commissions with their
+  owner — but nothing writes one yet. The design says to see the pool and the
+  voice call read well first, and that is the right order.
+- No model decides eligibility, tier, variant or outcome.
+- No player text reaches any drafter.
+- No reward moves at accept.
+- No second commission while one is active — there is no override, not even for
+  a GM: retiring is how a slot is freed, and it is free for the player.
+
+#### Upgrading
+
+Additive schema; no action needed beyond the normal upgrade. The commission
+pool seeds itself on first start. Existing quests are unaffected: they accept
+through the new action with `commission=0` and behave exactly as before.
+
+
+### v0.22.1 — the rest of the givers
+
+Eleven givers instead of three, two of whom will not tell you what the work
+pays, and a board for every public sect that never appears in the quest
+journal.
+
+#### Undisclosed terms
+
+A commission may carry `reward_visibility: "hidden"`. That is a **presentation
+rule and nothing else**: the engine still locks exact terms at accept and pays
+exactly those, the deadline is never hidden, and completion states the payout
+in full. What changes is the offer card, which says *undisclosed — they will
+not say what it pays* and tells the player, in as many words, that it may be
+worth far more than it looks or far less. Taking work on trust is a gamble the
+player can see they are making; it is not the interface withholding something
+it knows.
+
+The narrator is handed the same fact and an explicit prohibition: **name no
+number, no item, no comparison, no promise about generosity**. A giver may
+refuse to discuss payment, be evasive, or change the subject — all in
+character. What he may not do is invent a price, in either direction. An
+authored `boast` line rides along for the givers who claim something grand;
+the model may echo it and may not make it specific.
+
+There is nothing to negotiate with someone who will not name a figure, so an
+undisclosed commission carries exactly one set of terms.
+
+#### Two old men in Greenriver
+
+**Old Beggar Chen** — who is, though nobody has established it, the Void Sword
+Venerable — hands out errands that look like nothing and pay like a great deal
+(150 stones, 40 insight and a pill for carrying a bowl across town without
+making a performance of it). **Old Gou**, the self-declared hidden expert with
+an aura-projection talisman, offers the recovery of a Nine-Yang Fragment that
+emperors have died for and pays **8 spirit stones**.
+
+From the offer card the two are indistinguishable — same undisclosed line,
+same shape, same street. That is the point. And Old Gou is not simply a wall:
+his *other* commission, the one he is embarrassed to describe, pays 70,
+because his rumours really are good. He is a fraud, not an enemy; standing
+with him still rises when you finish something, and the payout line is stated
+in full precisely when it is a disappointment.
+
+Neither old man is ever a quest *target* — `validate_quest_definition` refuses
+a hidden master as an objective, and sending a player back to one would tell
+them he mattered. Their commissions complete on the work itself.
+
+#### A board for every sect
+
+Each of the six public sects gets its gate NPC as its quest giver — Gate Elder
+Jian Mu, Furnace Examiner Huo Ren, Moon Warden Lin Yue, Handler She Ruo, Blood
+Gatekeeper Yan Luo, Lantern Registrar Wu Ming — with **two standing tasks
+each**, tiers 1 and 2, terms stated plainly. Sect work is not in `/quests`: the
+board is a person, and you have to be a disciple.
+
+`requires_sect` is checked **in the engine at accept**, not only by the offer
+ladder — the ladder decides what a giver raises, the engine decides what may be
+taken on, and a rival sect's disciple is refused by both. The refusal is
+distinguishable from "nothing today", so a member of the wrong sect is told
+why rather than left asking.
+
+#### Schema 30
+
+`quest_definitions` gains `requires_sect`, `reward_visibility` and `boast`.
+Additive.
+
+#### The gate
+
+Go: an outsider and a rival disciple are both refused sect work and a member
+takes it; hiding the terms changes neither the deadline nor the payout (the
+locked rushed terms still pay 24/5). Python: the ladder's sect branch and its
+distinct refusal, case-insensitive but not loose sect matching, hidden terms
+discarding the real figures, and a check that no number from a hidden reward
+reaches the prompt. Content: every public sect has a board whose giver belongs
+to it; both old men are hidden masters, are never their own target, and are a
+gamble in **both** directions — asserted, because if every hidden reward were
+bad it would be a trap and if every one were good it would be a free lunch.
+
+**Python 842 passed. Go suite green.**
+
+
+### v0.22.2 — the P0 concurrency and integrity findings
+
+An external review of v0.21.6 found four data-integrity defects, two of them
+reproduced under load. This release fixes the P0 set and the scheduled-time
+finding that sits next to them. No schema change; no gameplay change.
+
+Two of the findings were already closed by v0.22.0 and are recorded here so
+they are not fixed twice: **quest acceptance bypassing the authoritative
+ledger** (finding #7) went away with `commission.accept`, and **quest
+completion and reward in separate commits** (#3) was already one transaction
+for commissions. The ordinary-quest half of #3 was still open and is fixed
+below.
+
+#### The simulation could apply the same interval several times
+
+`RunDue` read every system's anchor at the top of the call and only then
+opened the write transaction that applied and advanced it. SQLite serialised
+the writes perfectly and it did not help: both callers had already decided,
+from the same stale anchor, that one interval was due. The reviewer measured
+the same interval applied **7 to 14 times** with 32 concurrent callers.
+
+The whole decide-and-apply cycle now happens inside one `BEGIN IMMEDIATE` per
+system (`runDueSystem`), so the read is under the lock that the write needs.
+The anchor update is additionally guarded on the value the decision was made
+from — `WHERE system=? AND last_game_minute=?` — so if this is ever broken
+again the run fails loudly instead of quietly doubling. `runSystem` remains
+for the GM's Force path, which legitimately stamps a caller-chosen minute.
+
+The regression test fires 32 concurrent `RunDue` calls at one due interval and
+asserts that exactly one caller claims it, that the anchor moved exactly one
+interval, and that the `runs` counter is 1. Reverting the fix makes it fail.
+
+#### A duplicate request in flight failed instead of replaying
+
+The authoritative contract is that the same `action_id` returns the same
+result. It held for a retry arriving after the original committed, and broke
+for one arriving while it was still in flight: both callers missed the receipt
+check, both queued for the write lock, and the loser re-ran the mutation and
+died on `UNIQUE constraint failed: domain_events.event_uid`. State stayed
+correct — the loser rolled back — but the caller got an error where the
+contract promises a result. The reviewer measured 10–23 failures out of 24.
+
+The receipt is now checked **again inside the transaction**, where the
+winner's receipt is visible. The cheap pre-lock check stays, because most
+duplicates are late retries that never need the lock at all.
+
+With 32 concurrent identical requests the test asserts the whole contract, not
+just the absence of an error: 1 original, 31 replays, every caller holding the
+same result, one `character_quests` row, one domain event, one receipt, and
+the actor's `state_version` incremented exactly once. A companion test checks
+the mirror — ten *distinct* actions do not collapse into each other — and a
+third that reusing an `action_id` across actors is still an error, because
+returning the first caller's result would be worse than failing.
+
+#### An ordinary quest could complete and never pay
+
+`quest.progress` committed the completion, then Python made a second engine
+call for `cultivation.reward`. Anything that interrupted the gap — a dropped
+connection, a restart, a killed worker — left a quest marked `completed` with
+no payout **and no way to recover**, because the next progress report only
+looks at active quests.
+
+The declared rewards now travel with every progress report and are granted by
+the same transaction that completes the quest, exactly as commissions have
+been since v0.22.0. `QuestService._grant_rewards` is gone; Python grants
+nothing. Because the rewards arrive from the caller's catalog, the engine
+keeps its own ceiling (2000 stones / 500 insight / 20 items — far above the
+GM budget) so that a bug or a compromised caller cannot mint an economy
+through the quest path, and negative values are clamped to zero rather than
+taking anything away.
+
+#### The world clock is not a request parameter
+
+`RunDue` accepted `game_minute` from the caller and caught up to it. The
+authoritative action path has rejected a caller-supplied `game_minute` since
+v0.18; the simulation now does the same, deriving the canonical minute in Go
+via the new `game.CanonicalWorldGameMinute`. The request field is kept for
+wire compatibility and ignored — a test asserts that a caller claiming minute
+50,000,000 changes neither the work done nor the anchor.
+
+#### The gate
+
+Both concurrency tests were verified against the defect, not just against the
+fix: reintroducing each bug makes its test fail. `go test -race` is green on
+`internal/game` and `internal/simulation`, which is worth stating plainly —
+these were transaction-ordering races, not Go memory races, so `-race` alone
+was never going to catch them.
+
+**Python 839 passed. Go suite green, including under `-race`.**
+
+#### Still open after v0.22.2
+
+Restore quiescence (#4) landed in v0.22.3, below. PvP revalidation on accept and
+on each action (#5), the engine credential split (#8) and graceful HTTP shutdown
+(#9) remain.
+
+
+### v0.22.3 — restore no longer loses acknowledged writes
+
+The review's finding #4, and the one with the worst failure shape on the list.
+
+Restore was careful about the things that are easy to be careful about — path
+traversal, a safety backup before touching the live file — and not about the
+one that mattered: nothing stopped ordinary traffic from committing while it
+worked. The window was:
+
+```
+restore:  take the safety backup      ← snapshot of the world
+action:   commit a reward, return 200 ← the player is told it happened
+restore:  overwrite the live database ← the reward is gone
+```
+
+Because the write landed *after* the snapshot, the safety backup that exists
+precisely to undo a bad restore did not contain it either. The player was told
+yes, and there was no copy of the yes anywhere.
+
+#### The barrier
+
+`internal/server/maintenance.go` adds a process-wide maintenance barrier: every
+request that can write takes it **shared**, restore and VACUUM take it
+**exclusively**. Shared holders do not contend with each other, so ordinary
+traffic runs exactly as concurrently as before; a restore waits for every
+in-flight request and holds off every new one.
+
+It is taken in the middleware, by path, rather than inside each handler —
+a new endpoint that forgets to take it is precisely the bug this exists to
+prevent, so everything under `/v1/` is treated as a possible writer unless it
+is on the short maintenance list. `/livez` and `/readyz` are deliberately
+outside it: a readiness probe that blocks for the length of a restore reads as
+an outage and gets the container killed. `/readyz` reports `maintenance`
+instead.
+
+The barrier is process-wide, which is the right scope. SQLite is the
+serialisation point *between* processes, and a second engine writing to the
+same file during a restore is a deployment mistake rather than a race this code
+can fix. What it can fix is its own traffic, and that was the leak.
+
+#### The order
+
+`dbRestore` now: barrier (exclusive) → close every db session, whose
+connections outlive the request that made them and can be sitting
+mid-transaction → **then** the safety backup, of a database nothing is writing
+to → then the restore. The safety backup moved from first to third, which is
+the whole fix.
+
+#### The gate
+
+The invariant is deliberately not "no write is ever discarded" — discarding
+writes is what a restore is *for*. It is: **an acknowledged write is never in
+neither place.** Either it finished before the barrier and is in the safety
+backup, or it ran after the restore and is in the live database.
+
+`TestARestoreNeverLosesAnAcknowledgedWrite` fires 24 concurrent writes through
+the real `Handler()` (the existing restore tests call handlers directly and so
+would never see the middleware), lands a restore in the middle of them,
+collects the labels the server answered 200 to, and asserts every one of them
+is in the live database or the safety backup. Against the old ordering it fails
+with 2–8 of 24 acknowledged writes in neither — the defect, reproduced. Three
+more tests cover the barrier's ordering directly, the path classification
+(including that health checks stay outside), and that a db session cannot
+survive a restore and write into the replaced database.
+
+`go test -race` green across `internal/server`, `internal/game` and
+`internal/simulation`.
+
+**Python 842 passed. Go suite green.** No schema change, no gameplay change.
+
+#### Still open after v0.22.3
+
+PvP revalidation (#5) landed in v0.22.4, below. The credential split (#8) and
+graceful HTTP shutdown (#9) remain.
+
+
+### v0.22.4 — a duel is checked all the way through
+
+The review's finding #5. Location, life status and safe-zone were checked when
+a challenge was *created* and never again — and a challenge lives five minutes,
+which is comfortably enough time to walk into a city:
+
+```
+A and B stand together outside a safe zone
+A challenges B
+B travels elsewhere
+B accepts
+the duel begins between two people in different places, one of them standing
+inside formations that are supposed to make this impossible
+```
+
+`go_core/internal/game/pvp_invariants.go` is one validator — both alive, both
+in the same place, that place not a safe zone, not the same person — called at
+all three gates: challenge, accept, and **every** action.
+
+#### What happens when a check fails mid-duel
+
+This is the half worth arguing about, and the review left it open. Returning an
+error on every action would leave the match permanently `active`, and since a
+player may hold only one duel at a time, both participants would be locked out
+of duelling forever. That is a worse bug than the one being fixed and the
+player has no way out of it.
+
+So a breached match is **resolved**, deterministically:
+
+- **Someone left** — they forfeit; the one who stayed wins. This is the shape
+  that matters, because walking away from a duel you are losing must not be
+  cheaper than losing it.
+- **Someone died** — the living one takes it.
+- **Both left, or both are dead, or the ground is a safe zone** — nobody is at
+  fault, so the duel is **void**: it ends with no winner.
+
+Neither a forfeit nor a void pays reputation. Reputation rewards an honourably
+fought duel; it should not reward one that ended because a participant walked
+off, and the existing `version > 0` rule for surrenders already draws that line.
+
+At accept, a failed check does not create a match at all: the challenge closes
+as `void` with a reason, rather than erroring (which would roll back and leave
+it pending for the next attempt) or starting an illegitimate duel.
+
+#### Schema 31
+
+`pvp_matches` gains `location`. A duel is fought *somewhere*, and nothing
+recorded where — so "are you both still here" had no `here`. Without it, two
+people who separately walked to the same distant city would still count as
+duelling in the street they left. Matches created before this migration have no
+recorded location and skip the location rule rather than failing every action;
+the life and safe-zone rules still apply to them.
+
+#### The player's side
+
+`/duel respond` reports a lapsed challenge in its own words instead of raising
+a `KeyError` on a `match_id` that was never created. `/duel act` reports a
+breach — forfeit or void — instead of building a damage line out of a result
+that has no roll in it.
+
+#### The gate
+
+Ten Go tests: accepting from elsewhere, from inside a safe zone, and after a
+death each fail to start a duel and close the challenge; an accepted duel
+records where it is fought; leaving forfeits in both directions; a death
+mid-duel resolves to the living participant; both leaving voids it with no
+winner; a breached match does not leave the participants locked out of duelling
+again; a legitimate duel is untouched; and a pre-schema-31 match still works.
+
+Verified against the defect: removing the two re-checks makes five of them
+fail, including a duel starting between Greenriver Town and the Cloudspine
+Foothills, and one starting inside the Golden Pavilion.
+
+**Python 842 passed. Go suite green.**
+
+#### Still open after v0.22.4
+
+Graceful shutdown (#9) landed in v0.22.5, below. Only the credential split (#8)
+remains.
+
+
+### v0.22.5 — the engine drains instead of severing
+
+The review's finding #9, and the last of its list bar the credential split.
+
+`httpServer.Close()` severs every open connection at once — including one whose
+transaction has already committed but whose response has not been written. The
+caller is then left unable to tell **"it did not happen"** from **"it happened
+and I did not hear"**, which for a mutation is the worse of the two.
+
+`server.Drain` replaces it: stop accepting connections, wait for the requests
+already running, and only then let the process go. The wait is bounded — a
+shutdown that waits forever is not a shutdown — and exceeding it is logged
+rather than swallowed, because that is the one remaining path that can still
+cut a response and an operator should see it happen.
+
+Two orderings matter and neither is obvious:
+
+- **Storage closes after the drain, not with it.** `http.Server.Shutdown`
+  makes `ListenAndServe` return as soon as it is *called*, so treating that
+  return as "everything has stopped" closes the database out from under
+  handlers that are still using it. `main` now waits on its own `drained`
+  channel before `engine.Close()`, and the `defer engine.Close()` that would
+  have fired too early is gone.
+- **The grace must fit inside the orchestrator's.** Docker's default is a 10s
+  SIGTERM-to-SIGKILL window, which would have killed a 20s drain two thirds of
+  the way through — and, since v0.22.3, could kill a *restore* halfway, because
+  a restore holds the maintenance barrier for its whole duration.
+  `docker-compose.yml` now gives the engine `stop_grace_period: 30s`.
+
+`ENGINE_SHUTDOWN_GRACE_SECONDS` tunes the wait, defaulting to 20 seconds; a
+value that will not parse falls back to the default rather than to zero,
+because a typo in a deployment variable should not cost a committed response.
+
+#### Context
+
+This was already the least dangerous item on the list by the time it was
+reached. Since v0.22.2 an interrupted authoritative action is recoverable —
+retrying with the same `action_id` replays the original result instead of
+failing — so the ambiguity had a cure. Legacy mutation paths have no receipt,
+which is why it was still worth not creating the ambiguity in the first place.
+
+#### The gate
+
+Four tests in `internal/server`: an in-flight request that has "committed" gets
+its full response written despite a shutdown beginning mid-flight; a new
+request is refused once draining has started; an over-running handler causes
+`Drain` to report the expired grace instead of hanging; and the grace knob is
+configurable and fails safe on garbage. A fifth reads `main.go` in source for
+the ordering no runtime test can observe — that storage is not closed until the
+drain has finished, and that nothing severs connections directly any more.
+
+Verified against the defect: swapping `Drain` back to `Close()` fails the first
+test with `Get "http://…/mutate": EOF` — the caller cut off mid-answer, which
+is precisely the reported bug.
+
+**Python 842 passed. Go suite green, including under `-race`.** No schema
+change, no gameplay change.
+
+#### Where the review ended
+
+Eight of the nine findings are closed. Two of them (#7, and the commission half
+of #3) were already gone before the review's fixes began, having been closed by
+v0.22.0; the other six each ship with a regression test that was verified
+against the defect rather than only against the fix.
+
+**#8, the credential split, is declined** — the operator's call, taken on
+2026-09-07 and recorded in `docs/ROADMAP_1_0.md` under v0.25 rather than left
+on a list as though it were pending. One `ENGINE_AUTH_TOKEN` continues to grant
+gameplay, arbitrary SQL, migrations, backup and restore. The reasoning both
+ways, and the cheaper middle option if it is ever wanted, are written down
+there.
+
+The next thing this code needs is not another finding. It is a test-server
+pass: v0.22.0 through v0.22.5 added three authoritative actions, three schema
+migrations, a request middleware and a changed shutdown path, all proven by
+tests and none of it by play.
+
+---
+
+## `V023_RELEASE_NOTES.md`
+
+## v0.23.0 — Authority I, closed
+
+`PLAYER_MUTATIONS` is empty. Nothing under `app/bot` or `app/ops` writes a
+gameplay table any more, and the gate that tracked the backlog now asserts the
+absence rather than counting down toward it: a new Python-side gameplay write
+fails `test_the_v0_21_backlog_stays_closed` rather than being added to a list.
+
+That milestone opened at 27 rows in v0.21.0 and stood at 21 after v0.22.0
+closed `accept_quest`. This release closes the remaining 21.
+
+### What replaced them
+
+| Engine action | Rows | Notes |
+|---|---|---|
+| `alchemy.purge` | 2 | The whole purge cycle in one transaction |
+| `admin.player.set_sect` | 2 | Already existed in Go; only the wiring was missing |
+| `admin.player.set_master` | 2 | Set and clear, with the cycle and cross-sect checks |
+| `admin.player.set_sect_rank` | 1 | |
+| `admin.player.master_attention` | 1 | |
+| `admin.player.grant_storage` | 1 | |
+| `admin.world.spawn_realm` | 1 | The engine mints the event key and the closing time |
+| `character.set_gender` | 1 | |
+| `sect.discover` | 2 | Batched, with per-sect source locations |
+| `sect.abode.enter` / `sect.abode.leave` | 1 | |
+| `law.technique` | 1 | The out-of-battle half |
+| `sect.shadow` | 4 | Status and initiation |
+| *(deleted)* | 2 | The Python mirror of the toxicity curve |
+
+### Why it mattered
+
+Not tidiness. Every one of these was a sequence of separate writes that could
+half-happen, over a process boundary, with no receipt:
+
+- **`/alchemy purge`** spent Qi, reduced toxicity, rewrote a shared effect row
+  and set an hour's cooldown as four round trips. An interruption anywhere in
+  the middle left a player who had paid for something they did not get, or the
+  reverse. One transaction now, with a receipt, so a retried click replays.
+- **`/sect shadow`** wrote a membership, an item and its provenance as three
+  calls — a failure between them left a Shadow Initiate holding a forbidden
+  manual with no record of where it came from.
+- **Every admin command** changed the world and then, separately, wrote the
+  audit row saying who did it. Rule 6 in `CLAUDE.md` exists to prevent exactly
+  the gap between those two writes. Each action now audits inside its own
+  transaction, and the tests assert both directions: the row exists after a
+  change, and a refused action leaves none.
+
+### Behaviour that changed, deliberately
+
+Five places where the old code was not merely in the wrong layer but wrong.
+Each is noted at its call site:
+
+- `set_gender` validated nothing and coerced an unrecognised value to
+  `"neutral"`, so a typo quietly changed the player's character.
+- `adjust_master_attention` updated nothing for a disciple with no master and
+  reported `0`, so a GM saw a success they had not had.
+- `set_master`'s lineage-cycle walk gave up **silently** after 64 links and
+  accepted an assignment it had not finished checking.
+- The pill-toxicity penalty was only recomputed when someone opened
+  `/alchemy status`, so a player who took a heavy dose and then waited kept the
+  full penalty on every cultivation attempt. The engine now settles the curve
+  wherever it reads the effect table.
+- `discover_sect`, called once per sect, could not tell a caller which sects
+  were new, so screens announced sects the player already knew.
+
+Everything else is transcribed unchanged, including formulas that could have
+been "improved" on the way past. `/alchemy purge` still reads `will` and
+`spirit` from stored attributes rather than canonical ones — toxicity applies a
+will penalty, so canonical attributes would make a heavy dose harder to purge
+in a way the old code never did. That is a balance decision and belongs in its
+own change.
+
+### Two older defects, found while testing this one
+
+**`fmt.Sprint` on a missing map key returns `<nil>`.** Every required-field
+guard written as `strings.TrimSpace(fmt.Sprint(p[key])) == ""` therefore passed
+on exactly the payload it existed to reject, and the action carried on with the
+four characters `<nil>` as a currency id, an event key or a location. 25 sites
+across `internal/game`; all now go through `stringField`, with a test pinning
+the behaviour.
+
+**The late-ack guard had a blind spot.** `test_ack_before_mutation` accepted an
+ack anywhere earlier in a handler than the mutation — including inside an
+`if ...: reply; return` branch, which never runs on the path that mutates.
+Three handlers had that shape: `use_item_command`, `sense_command`, and the
+character-creation modal's `on_submit`. All three acked on every path except
+the one that committed a gameplay write. They defer first now and reply through
+`respond()`; a second test walks the blocks enclosing the mutation from the
+inside out and requires an ack that dominates it, which is what "acked on the
+path that mutates" actually means. No exemption list — `require_character`'s
+`is_done()`-guarded defer passes on its merits.
+
+### Verification
+
+Every action's tests were verified against the defect, not the fix: the guard
+or write under test was temporarily removed and the test confirmed to fail,
+then restored. That caught three of my own mistakes during the release — a
+`sect.discover` de-duplication test that passed either way, an abode test whose
+name promised more than it checked, and a test filter that silently matched
+only half the cases it claimed to.
+
+- Python: 842 passed
+- Go: full suite green, including `-race`
+- `gofmt`, `go vet`, `ruff`: clean
+- Dashboard implementation gate: pass
+- No schema change (still 31)
+
+### What this does not prove
+
+None of v0.22.0 through v0.23.0 has run against a live Discord server. That is
+a dozen new engine actions, three schema migrations, a request middleware and a
+changed shutdown path, all proven by tests and none by play. A test-server pass
+is the next thing this code needs.
+
+---
+
+## `V023_1_REVIEW_FIXES.md`
+
+## v0.23.1 — the second review
+
+Eight logic errors, reported by an external review and each confirmed against
+the code before anything was changed. All eight were real.
+
+### The serious one: value crossing reincarnation
+
+Reincarnation wipes `inventory` and `currency_wallets` because they belong to
+one incarnation. Auctions, bids and caravans do not live in those tables. They
+are asynchronous records keyed by the persistent Discord id, settled later by
+the maintenance sweep, which pays whoever that id names **at settlement time**:
+
+```
+incarnation A lists a rare item on a long auction
+  → dies → reincarnates → inventory and wallets are wiped
+  → the auction closes
+  → the item, or its proceeds, arrive in incarnation B
+```
+
+Bids are the same in reverse: a bid escrows currency, and being outbid refunds
+it to whichever body holds the id when the refund fires. Caravans dispatch with
+cargo consumed from one incarnation and settle into another.
+
+**The fix is not a generation column.** The review suggested stamping an
+`incarnation_id` on every asynchronous record and checking it at settlement,
+and that would work — but it means every settlement path must remember to
+compare it, which is the same omission that caused this, relocated somewhere
+harder to see. Instead the escrow is resolved when the body dies
+(`resolveIncarnationEscrowTx`, called inside `true_death`'s transaction):
+
+- listings end, their current bidder is refunded, and the goods go to the corpse
+- the dead player's own bids are released and those lots revert to no bid — a
+  dead cultivator's offer must not keep pricing out the living
+- caravans on the road are lost with their owner
+- an active seclusion ends with reason `incarnation ended`
+
+Nothing here pays the dead: refunds land in the dead character's own rows,
+which the reincarnation wipe then clears. The point is that value leaves escrow
+while it still belongs to the incarnation that put it there.
+
+A missing table is tolerated — a database mid-migration must still be able to
+kill a character. The first draft of this fix broke every old-age death on a
+fixture without an `auctions` table, which the moderation suite caught.
+
+### The other seven
+
+| # | What was wrong | What it cost |
+|---|---|---|
+| 2 | `storage.upgrade` never compared the new container to the held one | 500 slots and a living world traded for 24 slots, pouch consumed |
+| 3 | `wealth <= 0` guarding a `MAX(0, wealth-cost)` subtraction | a family with 1 stone paid for a 20-stone package |
+| 4 | `seclusion_sessions` outside the incarnation wipe | an old body's retreat scored against a new body |
+| 5 | completion required whole-day accounting to reach a non-whole-day end | a 1500-minute seclusion never finished, ever |
+| 6 | the breach check sat behind the turn check | a duel deadlocked when the player holding the turn died |
+| 7 | a nil event target short-circuited the objective comparison | one untargeted "talk" completed every targeted talk objective |
+| 8 | no `quest_definitions` row meant both "static quest" and "not a quest" | the engine accepted any string as a quest |
+
+Two of these deserve their own note.
+
+**#6 is a hole in my own v0.22.4 fix.** That release added `checkPvpParticipants`
+on every act specifically so a breached match would resolve instead of stranding
+both players — and then placed it after the `turn_user_id` check, which is
+exactly the case it exists for. When the player holding the turn dies they
+cannot act; their opponent is told "it is not your turn" and never reaches the
+check; the match stays active; and `pvp.challenge` refuses a new duel while one
+is active. The survivor was locked out until the dead player reincarnated.
+
+This is the third time in two releases that a guard existed, was correct, and
+sat on a path the party it protected could not reach — the late-ack fix accepted
+an ack inside a branch that returns, and the toxicity settle only ran if a
+player opened a screen. So this one has a source-order contract test as well as
+a behavioural one, because "validate, then check whose turn it is" is an
+ordering a refactor can quietly reverse without failing anything else.
+
+**#8 needed content, not just a guard.** Static quests (`app/rules/quests.py`)
+had no `quest_definitions` row, so the engine could not distinguish
+`first_steps` from `totally_fake_foobar`. They are now seeded through
+`sync_commission_pool` with an empty `giver_npc` — still ordinary quests,
+occupying no commission slot — so that "no row" can mean "no such quest".
+
+### The test gap that explains all of it
+
+Before this release there were **no Go tests at all** referencing
+`family.support`, `storage.upgrade`, `seclusion.start` or `seclusion.settle`.
+The quest suite tested a *wrong* target (`Elder Oak` against `Elder Pine`) and
+never a missing one, which is precisely the case the wildcard bug needed.
+
+Every fix here ships with tests verified against the defect: the fix was
+temporarily reverted and the test confirmed to fail, then restored. That
+practice caught one of my own mistakes again this round — a first draft of the
+escrow fix that made death impossible on narrow fixtures.
+
+### Verification
+
+- Python: 845 passed
+- Go: full suite green, including `-race`
+- `gofmt`, `go vet`, `ruff`: clean
+- Dashboard implementation gate: pass
+- No schema change (still 31)
+
+### Still not proven by play
+
+Unchanged from v0.23.0, and now more true: this release touches death, the
+auction house, caravans, seclusion, PvP and quest acceptance. All of it is
+proven by tests and none by a live server. The test-server pass is overdue.
+
+---
+
+## `V024_RELEASE_NOTES.md`
+
+## v0.24.0 — The Quests workbench
+
+### What was wrong
+
+A quest definition could be created, and its status could be changed. That was the whole vocabulary.
+There was no edit anywhere in the system.
+
+So a forged draft was take-it-or-leave-it. If it was ninety per cent right — a good hook, one
+invented NPC, a reward twenty points over budget — the only move was to discard it and roll again,
+and hope. The GM could see exactly what was wrong with it and could not touch it.
+
+Two more symptoms sat on top of that:
+
+- **The same quest was reviewable on two screens, depending on whether it had a giver.** The
+  Commissions page queried `WHERE q.giver_npc<>''`, so a forged draft never appeared there. The
+  Exploration page listed forged quests read-only, so the only place to approve one was the embed
+  the Forge replied with in Discord, which offered Approve and Discard and nothing else. "What is
+  waiting for me?" required knowing which of three surfaces a quest happened to land on.
+- **Editing a definition rewrote deals that had already been struck.** Completion rewards were read
+  from the *current* definition at the moment a player finished. Change a quest's reward while four
+  people are carrying it and all four finish under the new one — up or down, without being told.
+
+That last one had a sharper edge than it looks. The objectives were read the same way, so changing
+an objective could take away work a player had already done, and retiring a definition froze every
+holder: Python sent progress only for quests in the approved catalog, so a retired quest could not
+be progressed, could not be completed, and could not be paid. The player held it for good.
+
+And underneath all of it: the objectives and the rewards reached the engine as fields of the
+caller's payload. Python was deciding what the work was and what it was worth. The engine took its
+word for it.
+
+### What changed
+
+#### Terms are pinned to the player who accepted them (schema 32)
+
+`character_quests.terms_json` records the objectives and rewards a quest was accepted under.
+`quest.progress` reads them off that row; the `objectives` and `rewards` fields are gone from its
+payload, and anything a caller still sends is ignored.
+
+A commission never had this problem — it has locked its variant and its deadline onto the player's
+row since v0.22.0, precisely so a later edit could not change what a held commission pays. This
+generalises that lock to every quest.
+
+Rows accepted before this release carry no pin. They are backfilled from the current definition the
+first time they are touched — which is exactly the deal they were already on — and pinned from then
+on.
+
+Two things follow immediately. Retiring a definition now means only what it says: nobody new may
+take it, and everybody holding it can still finish it and be paid. And the engine, not Python, is
+the authority on what a quest asks for and what it is worth.
+
+#### `admin.quest.save` — the missing verb
+
+A definition can be created and edited. Every save is held to `validate_quest_definition`, the same
+gate the Forge is held to, so a GM typing by hand and a model drafting cannot disagree about what a
+valid quest is: the objective types the engine can actually complete, targets that exist in the
+world, at most four objectives, and the reward budget.
+
+A hand-written quest is keyed `quest_…` rather than `forge_…`. The prefix is not decoration — the
+pool reads `forge_` as "a model wrote this", and it should not claim authorship the Forge never had.
+A new key is checked against the existing ones, because `admin.quest.save` treats a known key as an
+edit and a collision would silently overwrite a different quest.
+
+Saving does not approve. The two used to be the same column and the same write; keeping them apart
+is what stops "I fixed a typo" from putting something live.
+
+#### The hold policy
+
+Pinning makes editing a live quest a real decision, so the save action takes one:
+
+- **`keep`** — every holder stays on the terms they took. The new version is what anybody taking it
+  from now on gets. The default, and the only policy that cannot cost a player anything.
+- **`migrate`** — holders move onto the new terms. Progress carries across objective by objective
+  wherever the objective still means the same thing; progress on one that now asks for something
+  else is lost, and the count of what was lost comes back in the result so the GM is told rather
+  than finding out. A migrated **commission** keeps the payment its giver agreed to — only the work
+  moves, because the money was a promise a named person made.
+- **`revoke`** — the quest is taken back. The row is removed rather than closed, so the fixed
+  version can be accepted fresh; a closed row would leave "you have taken that quest before"
+  standing between the player and the repair.
+
+An unrecognised policy is refused rather than treated as the default: a typo must not silently keep
+or silently revoke.
+
+The holders are read **before** the definition is overwritten. A player who accepted before pinning
+existed has nothing on their row, so "keep them as they are" has to capture the old definition
+first — otherwise it quietly does the opposite of what it says.
+
+#### The Quests page
+
+One view of every definition a player can be given, whatever produced it:
+
+- **Needs your review** — the draft inbox, with objectives, rewards, origin and the review actions.
+- **Live pool** — filterable by origin, realm band and status, with how many hold each quest and how
+  many have completed it.
+- **The editor** — title, summary, giver, band, tier, deadline, objectives (type, target, count) and
+  rewards, with the pickers bound to the world's actual locations, NPCs, scene actions and items, so
+  a target the world does not have cannot be typed in the first place.
+- **Preview** — what the player is shown beside what the engine stores.
+- **Where the pool is thin** — realm bands, objective types, public locations no approved quest
+  sends anyone to, and any approved quest pointing at something that no longer exists.
+- **Forge a draft** — the Forge, from the dashboard, without going to Discord.
+
+`admin.quest.review` is the general name for the status change `admin.commission.review` was always
+performing — it never looked at whether the row had a giver. The old name keeps working.
+
+`quest_definitions` moves from the Exploration view's coverage registry to the Quests view's;
+`character_quests` stays with Commissions, which owns the player-side view of a held one.
+
+### Also in this release
+
+The Python suite runs about 150 more tests on a minimal machine. `httpx` is constructed at import
+time by `app/database/remote.py` and `app/ops/game_engine.py`, so on a machine without it
+`from app.database import Database` raised during collection and took roughly twenty files — every
+integration test above the transport — out of the run entirely. `tests/conftest.py` now installs a
+stub that refuses to send a request, so a test that actually reaches the network still fails; the
+two files that drive `httpx.MockTransport` skip with a reason instead of erroring.
+
+### Upgrading
+
+Schema 32 is one `ALTER TABLE`, applied on start like every other migration. Existing held quests
+need no attention: they are pinned to the terms they were already on the first time they are
+touched.
+
+Nothing changes for players except that the deal they accepted is now the deal they finish.
+
+---
+
+## `V025_RELEASE_NOTES.md`
+
+## v0.25.0 — The dashboard, remade
+
+Built from the design canvas approved before this release. No endpoint changed, no query changed,
+and no data was added or removed except one small new block on `/api/overview`.
+
+### What was wrong, measured
+
+Two numbers describe the whole problem:
+
+- **23 navigation tabs in a single flat row.** The row was `position:sticky`, and between roughly
+  900px and 1400px it wrapped onto three lines — so on a laptop it ate about 120px of every screen,
+  permanently, before any content was drawn.
+- **102 stacked full-width tables** across the views. Cultivation was eleven tables one under
+  another on one page. Crafting & Assets was eleven more. Exploration nine, Samsara eight,
+  Economy seven. Reaching the last one meant scrolling past the other ten every time, and nothing
+  on the page said what was down there.
+
+Everything else followed from those. Each of the 23 views hand-rolled its own markup, so a table on
+Economy and a table on Conflicts did not agree about padding, empty states, or whether a row was
+clickable. A view that failed took the whole page with it. And table headers used
+`position:sticky` inside a wrapper that had no height, which means **they have never once stuck** —
+a bug that survived four releases because nobody scrolled a long table and thought to check.
+
+### The two moves
+
+#### A grouped sidebar
+
+Twenty-three views in five groups — World, Players, Content & Economy, Systems, Admin — with a
+jump-to filter (`/` focuses it, Enter opens the first match). The two views that can change the
+world sit apart from the twenty-one that only read it.
+
+Below 1280px the sidebar collapses to a 52px icon rail; below 900px it becomes a drawer behind a
+menu button. The old stylesheet had one breakpoint, at 900px, and nothing between.
+
+#### One page template
+
+Every view now gets the same page: a header with the title, a sentence saying what the page is for,
+and a density toggle; then the metric strip; then — when a view has three or more sections — tabs;
+then the panels.
+
+`sectionize` is the whole mechanism, and it is worth describing because of what it does *not* do.
+It runs after a loader has rendered, and it **moves the nodes the loader produced** into a header
+and a set of sections. It never re-serialises them. That means every click handler a loader attached
+survives the reorganisation, and not one of the twenty-three loaders had to be rewritten to gain
+tabs. A section whose entire content is the metric strip is folded into the page summary rather than
+becoming an empty first tab.
+
+Cultivation is the proof: eleven tables became ten tabs and a summary strip, over the same single
+request.
+
+### Also in the rebuild
+
+- **One table component.** Sticky header that actually sticks, a row count under every table
+  (`5 rows`, or `showing 300 of 4,000` — those two used to be indistinguishable), horizontal scroll
+  for wide column sets, and empty states that say what would put something there.
+- **A density toggle**, comfortable or compact, remembered per browser. Compact swaps the cell
+  padding and font size wholesale through CSS variables, so a thirteen-column table tightens without
+  every table hard-coding two sets of numbers.
+- **A view that fails now fails alone**, in a panel with the error and a retry button, instead of
+  replacing the page.
+- **Deep links.** `#cultivation/4` opens Cultivation on its fifth tab.
+- **Page actions** are declared by a view through `#pageActions` and hoisted into the shared header,
+  so no view draws a second title bar of its own.
+
+### The one new thing: "Wants your attention"
+
+Overview gained a short list of conditions that already existed on other pages and that a GM had no
+reason to go looking for: quest drafts waiting for review, a simulation system that has missed its
+own tick, commissions past the deadline their giver set, and players frozen or muted with no reason
+recorded. Each row names the page it lives on and offers the obvious next action.
+
+It is deliberately boring. Nothing in it is new data. It reports only conditions with a clear next
+step, it never invents a severity the underlying row does not have, and anything it cannot read it
+simply omits — an attention feed that failed loudly on a missing table would be worse than the
+absence it is fixing.
+
+Two judgements are worth naming because they are the difference between a useful feed and a nagging
+one. **Lag is only reported when a system is further behind than its own interval** — a
+4,320-minute system 500 minutes behind is early, not late, and reporting raw lag would make the feed
+cry wolf on every slow system. And **a frozen player is only reported when no reason was recorded**;
+a GM who wrote down why does not need to be told about it every time they open the dashboard.
+
+### What deliberately did not change
+
+The palette, the serif headings and the drawer are exactly what they were — this should read as the
+same product, better organised, and if it looked like a different one that would be a bug. Every
+endpoint, every query and every column is unchanged. The coverage gate passes unchanged. The Quests
+workbench keeps its shape; it already followed this template and is what the rest was pulled toward.
+And nothing here touches the authority split: the dashboard still reads through Go-owned query
+sessions and every write is still an engine action.
+
+### Upgrading
+
+No schema change. Three files changed in `dashboard/` and one method was added to the dashboard
+store. Clear the browser cache if the old stylesheet is pinned.
