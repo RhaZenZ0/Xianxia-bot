@@ -144,11 +144,12 @@ sudo ./stop.sh                                            # removes containers, 
 ### 3. Set up the Discord server
 
 Open the GM dashboard at `http://<NAS LAN address>:8090`, go to **Discord Setup** and run
-**Full Setup**. It creates or repairs nine categories in a stated order — 🚪 Start Here,
-📣 Announcements, 🌌 Realm Capitals, 🌠 World Events, 🏮 Auction Houses, 🧺 Market Stalls,
-🗺️ Cultivation World, 🛠️ Feedback, 🔒 Admin — the base channels inside them, the realm-capital
-channels gated behind presence roles, the live-auction channels, one read-only market-stalls channel
-per world, `#bugs`, `#playtest`, `#updates` and the `#xianxia-info` guide. It is idempotent, and since v1.0.0-rc.59 it also **moves** a channel it finds in the wrong
+**Full Setup**. It creates or repairs ten categories in a stated order — 🚪 Start Here,
+📣 Announcements, 🌌 Realm Capitals, 🌠 World Events, ⚔️ Sect Wars, 🏮 Auction Houses,
+🧺 Market Stalls, 🗺️ Cultivation World, 🛠️ Feedback, 🔒 Admin — the base channels inside them, the
+realm-capital channels gated behind presence roles, the live-auction channels, one read-only
+war-front channel and one read-only market-stalls channel per world, `#bugs`, `#playtest`,
+`#updates` and the `#xianxia-info` guide. It is idempotent, and since v1.0.0-rc.59 it also **moves** a channel it finds in the wrong
 category rather than only placing a new one. See [Discord server setup](#discord-server-setup).
 
 ### Reset the world

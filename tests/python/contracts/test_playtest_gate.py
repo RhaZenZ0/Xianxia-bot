@@ -158,7 +158,7 @@ class TheChecklistSaysWhatTheSweepProved(unittest.TestCase):
         because nobody had ticked one.
         """
         module = _checklist_module()
-        loop = "| `/menu` opens every hub; Admin only for an administrator |"
+        loop = "| the weekend bonus is announced once in the announcement channel, and not again after a restart |"
         self.assertIn(loop, self.text, "the loop this test ticks is no longer on the checklist")
         # Drive the merge from a ticked old file to a blank fresh one, rather
         # than reading the checked-in state: since v1.0.0 the live pass is
