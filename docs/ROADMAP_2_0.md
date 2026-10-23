@@ -102,27 +102,52 @@ Three rows the inventory settles first, because a grep already asked the wrong q
 that a `prose` row gives a reason. The parser is asked for a rule it knows before any assertion
 runs (rc.57). The ledger joins the files `test_claude_md_stays_small.py` resolves pointers in.
 
+*Built after v1.39.0, on the branch that ships as the next minor — gate: `test_gate_ledger.py`.
+The inventory read every test behind the thirty-three rules, and writing the ledger found five
+things a gate could not see, four of them fixed in the same change: the world-exit gate read the
+literal `characters SET location=` and the rebirth's thirty-column `UPDATE` put `location=?` in the
+middle of its list, so it passed for nine releases (the gate reads every `SET` list now, and the
+rebirth is allowlisted with its reason); the decode gate walked three packages and only map
+targets, and `eventledger.Replay` decoded a stored receipt into `var result any`, so the second
+delivery of an action naming a member id answered with the id rounded (read through `UseNumber`
+now, like every stored object, and the gate walks every package and every `any`); the realm-capital gate still wrote three overwrites
+bare, replacing what a channel carried, where every other gate had merged since v1.0.11
+(`test_every_overwrite_is_merged.py` walks every writer now); and `gradeIndex` answered 0 for a
+grade the ladder does not carry, rc.55's own bottom rung, so an unknown root evolved from the
+bottom (refused now). The fifth is a row, not a fix: which rules are held by instance tests
+alone is the v1.41 list below.*
+
 ### v1.41 — The doors held by a walk (Classes II)
 
-Every `prose` row of the ledger whose rule has a class gets its reader. The shape exists: the
-clock's AST gate (rc.39), the insight XP's (rc.58), the catalogue lookup's (v1.7.0), the hub-refresh
-counting gate (v1.31.2), and the field, table and decode walks above. The candidates the inventory
-is expected to name, each one walk over its package:
+Every row of the ledger whose rule names a class and whose gates are instance tests gets its
+walk. The shape exists: the catalogue lookup's AST gate (v1.7.0), the place-floor walk (v1.33.0),
+the hub-refresh counting gate (v1.31.2), and the field, table, decode and overwrite walks. The
+ledger's inventory named these, each one walk over its package:
 
-- **The purse.** Every statement that writes a currency column goes through `walletDeltaTx`
-  (rc.43), read off the SQL strings in `internal/game` by AST rather than by searching for the
-  column name.
-- **The way out of a world.** Every statement that writes a character's place goes through
-  `moveCharacterTx` (rc.44), the same way.
-- **Hidden is hidden for every consumer.** Every Python reader of `world_history_events` and of the
-  deed tables passes its rows through the viewpoint filter before anything scores or prints them
-  (rc.24, v1.0.13), read by call graph from each consumer.
-- **A panel provider never raises.** Every provider registered for a panel line is wrapped by the
-  one function that costs the line and not the card (v1.0.10), read off the registrations.
-- **Record before the reply, tell after it.** Every command handler that writes a quest report does
-  so before its first reply (v1.0.5), read off the statement order.
-- **Collect before the engine commits.** Every door that deletes a person's rows calls the thread
-  collector first (v1.0.8, v1.7.0), read off the four leaving doors.
+- **The purse, the clock and insight XP** are held by text sweeps with a per-file allowlist
+  (`TestThePurseHasOneDoor`, `TestInsightXPHasOneDoor`, the anchor-arithmetic sweep), so a second
+  write inside an allowlisted file passes; and the Go side of the clock has no walk at all. Each
+  becomes an AST walk over the SQL strings and the arithmetic, allowlisted per site.
+- **Every comparison of two places** goes through `cityOf` / `city_of_place` (v1.0.9): no walk
+  reads the equality expressions between location values, and `world_of_location`'s "answers
+  None" is held at one function while every other site still defaults to the Mortal World.
+- **Hidden is hidden for every consumer.** Every reader of `world_history_events` and the deed
+  tables passes its rows through the viewpoint filter before anything scores or prints them
+  (rc.24, v1.0.13), read by call graph from each consumer; and every writer of a deed states its
+  visibility.
+- **A panel provider never raises.** Seven providers are each held by their own instance test;
+  the walk reads every provider registered for a panel line and asks for the wrap that costs the
+  line and not the card (v1.0.10).
+- **Every batch skips a bad row.** `RunDue` (the function the rule still calls `runSystems`)
+  returns on the first error, and no walk holds that a batch never returns an error over one
+  row's data; the walk reads every system's row loop for a `return err` inside it.
+- **Every lock on state only an action clears** self-clears (rc.56, v1.0.4): seclusion is held,
+  the class is not; the walk reads every refusal keyed on a stored deadline.
+- **Every door that deletes a person's rows** collects the threads first (v1.0.8): the three
+  levers are a hand list, and `TestEveryWayOutOfABodyLeavesThroughTheOneDoor` names three of the
+  four ways out. Both become walks over the callers.
+- **Every capped walk starts somewhere new**: the five rotating walks are each held; no walk reads
+  every `LIMIT` in `internal/simulation` and asks whether its order is a name or a priority.
 
 A candidate the walk shows already held is a row updated, not a gate written. A rule that has no
 class - "fix every site of a rule, not the one reported" is advice to the person, not a property
@@ -285,8 +310,8 @@ v0.28.0.
 
 | Milestone | Release | Status |
 |---|---|---|
-| v1.40 Gate ledger | — | open |
-| v1.41 Doors by a walk | — | open |
+| v1.40 Gate ledger | the next minor after v1.39.0 | built; gate: `tests/python/contracts/test_gate_ledger.py`; four gate gaps it found fixed with it |
+| v1.41 Doors by a walk | — | open; the list is the ledger's instance-only rows |
 | v1.42 Hardened III | — | open |
 | v1.43 A world at age | — | open |
 | v1.44 Content remainder | — | open; waits for the live pass |

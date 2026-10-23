@@ -514,7 +514,10 @@ func progressionProblems(target, action string, b AptitudeBundle, c mechanicsCha
 		if action != "evolve" {
 			return []string{"spiritual roots are awakened at birth; refine or evolve the root instead"}
 		}
-		idx := gradeIndex(catalog.SpiritualRootSystem, b.Root.Grade)
+		idx, known := gradeIndex(catalog.SpiritualRootSystem, b.Root.Grade)
+		if !known {
+			return []string{fmt.Sprintf("spiritual root grade %q is not on the ladder; a GM sets one the ladder carries", b.Root.Grade)}
+		}
 		if idx >= len(catalog.SpiritualRootSystem.Grades)-1 {
 			return []string{"spiritual root is already at the highest configured grade"}
 		}
@@ -772,7 +775,11 @@ func aptitudeEvolve(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 	switch p.Target {
 	case "root":
 		r := bundle.Root
-		idx := gradeIndex(catalog.SpiritualRootSystem, r.Grade) + 1
+		rung, known := gradeIndex(catalog.SpiritualRootSystem, r.Grade)
+		if !known {
+			return authoritativeMutation{}, fmt.Errorf("spiritual root grade %q is not on the ladder; a GM sets one the ladder carries", r.Grade)
+		}
+		idx := rung + 1
 		modifier := mods.value(c.Attributes["insight"], "insight") + maxI64(1, mods.value(c.Attributes["will"], "will")/2) + int64(r.Stability/25)
 		roll, err = roll2d10(modifier, int64(13+idx))
 		if err != nil {

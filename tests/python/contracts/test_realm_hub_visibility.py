@@ -143,10 +143,12 @@ class GateIsAppliedTests(unittest.TestCase):
 
     def test_gate_denies_everyone_allows_the_presence_role_fully_and_strips_the_old_allow(self):
         source = bot_function_source("ensure_realm_hub_overwrites")
-        self.assertIn("set_permissions(guild.default_role, view_channel=False", source)
-        self.assertIn("set_permissions(role, reason=", source)
-        self.assertIn("**REALM_HUB_MEMBER_PERMISSIONS", source)
-        self.assertIn("set_permissions(guild.me, view_channel=True", source)
+        # Each overwrite is merged into what the target already carries
+        # (v1.0.11); `test_every_overwrite_is_merged.py` holds every writer in
+        # the bot to that, this holds the three this gate writes.
+        self.assertIn("merge_overwrite(channel, guild.default_role, reason=reason, view_channel=False", source)
+        self.assertIn("merge_overwrite(channel, role, reason=reason, **REALM_HUB_MEMBER_PERMISSIONS", source)
+        self.assertIn("merge_overwrite(channel, guild.me, reason=reason, view_channel=True", source)
         self.assertIn("set_permissions(old, overwrite=None", source, "the v0.21.2 access-role allow is removed")
         # Never a deny without the allow available.
         self.assertIn('if role is None:\n        return "no-role"', source)

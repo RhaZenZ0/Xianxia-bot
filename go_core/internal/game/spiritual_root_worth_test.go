@@ -3,6 +3,7 @@ package game
 import (
 	"fmt"
 	"math"
+	"strings"
 	"testing"
 
 	"xianxia/core/internal/gamerng"
@@ -219,5 +220,24 @@ func TestARetreatCarriesWhatTheRootIsWorth(t *testing.T) {
 	}
 	if poorMult >= fineMult {
 		t.Fatalf("the retreat reported root_mult %v for a Mortal root and %v for an Immortal one", poorMult, fineMult)
+	}
+}
+
+// An unknown grade is refused, not read as the bottom rung (rc.55's rule,
+// held for `gradeIndex` itself since v1.40): a root whose grade the ladder no
+// longer names used to evolve from rung 0 and roll at the bottom's TN.
+func TestAnUnknownRootGradeIsRefusedNotTheBottomRung(t *testing.T) {
+	catalog := qiBodyCatalog(t)
+	if _, known := gradeIndex(catalog.SpiritualRootSystem, "Unheard-of"); known {
+		t.Fatal("a grade the ladder does not carry was given a rung")
+	}
+	bottom := catalog.SpiritualRootSystem.Grades[0].Name
+	if rung, known := gradeIndex(catalog.SpiritualRootSystem, bottom); !known || rung != 0 {
+		t.Fatalf("the ladder's own bottom rung reads as %d, known=%v", rung, known)
+	}
+	bundle := AptitudeBundle{Root: SpiritualRootState{Grade: "Unheard-of", RefinementProgress: 100}}
+	problems := progressionProblems("root", "evolve", bundle, mechanicsCharacter{}, catalog)
+	if len(problems) == 0 || !strings.Contains(problems[0], `"Unheard-of"`) {
+		t.Fatalf("an unknown grade was let through to evolve from the bottom: %v", problems)
 	}
 }
