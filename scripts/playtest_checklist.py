@@ -392,7 +392,6 @@ def build() -> str:
               "| the Discord sweep's log reads end to end: every refusal names what is missing, in words a player can act on | [ ] |",
               "| a live AI route narrates a scene (the sweep runs `NARRATOR_PROVIDER=procedural` and can never reach one) | [ ] |",
               "| an epic beat and an NPC reply both come back as prose, and a retired route falls through to the next | [ ] |",
-              "| `$ I explore` from a scene channel routes to /explore | [ ] |",
               "| `$ I travel to <known place>` and `$ I drink <carried item>` dispatch with the argument | [ ] |",
               "| a narration route changed on the dashboard applies without a restart (AI Routing page shows it) | [ ] |",
               "| a lot listed at a grand house appears in its channel; a bid updates the card; the tick strikes it | [ ] |",
@@ -400,26 +399,19 @@ def build() -> str:
               "| an event in the Spiritual World announces in #spiritual-world-events, not the global feed | [ ] |",
               "| the weekend gift still announces in #world-events, which no world owns | [ ] |",
               "| a cultivator who has not reached a world cannot see that world's events channel | [ ] |",
-              "| `/menu` opens every hub; Admin only for an administrator | [ ] |",
-              "| `/vote` prints the listing link and pays the gift once; a second claim names the wait | [ ] |",
-              "| the `/vote` gift names a material the character's craft or path uses, and doubles Fri-Sun | [ ] |",
+              "| `/tribute` pays the gift once; a second claim names the wait | [ ] |",
+              "| the `/tribute` gift names a material the character's craft or path uses, and doubles Fri-Sun in the operator's zone | [ ] |",
               "| the weekend bonus is announced once in the announcement channel, and not again after a restart | [ ] |",
-              "| `/cooldowns` lists a live wait and a ready action, and names where each ready one is done | [ ] |",
               "| `/admin player mute` for `30m` expires on its own; `/admin player inspect` shows it | [ ] |",
+              "| a simulation system that falls behind its own interval is flagged on the dashboard's attention feed, and one between two passes is not | [ ] |",
               "",
-              "### The surface regrouping (v1.0.0-rc.13)", "",
-              "The pages moved. These are the ones a player reaches differently than they did "
-              "last release, so they are worth one pass each even where the mechanic is untouched.", "",
+              "### The surface regrouping (v1.38.0)", "",
+              "Sixteen hubs became twelve and migration 83 rewrote every printed path in the quest terms "
+              "players already hold. The sweep presses every leaf of the new layout on a fresh guild; what "
+              "only a running world shows is what the players who were already in it see.", "",
               "| Loop | Live |", "|---|---|",
-              "| `/cultivation` opens on the way up (Perfection, Tribulation / Ascension); `/quests` is the other thing and still opens | [ ] |",
-              "| `/cultivation -> Perfection -> Start` asks Realm or Body, and the Body path still starts | [ ] |",
-              "| `/character -> Overview` shows sheet, lifespan, karma, Dao heart, standing, inheritances and soul in one read | [ ] |",
-              "| `/character -> Afflictions` shows a buff, a curse and a persistent injury together, and treats one | [ ] |",
-              "| `/character -> Consequences` shows an open crime, a bounty and a grudge | [ ] |",
-              "| `/world -> Almanac` answers era, calendar, rulers, laws and running events in one read | [ ] |",
-              "| `/sect` is four pages and every sect action is on exactly one of them | [ ] |",
+              "| a quest a player held before v1.38.0 names its objective's door by the new path (`**/world -> People -> Talk**`), and the button opens that page | [ ] |",
               "| a reply printing a hub path (`**/world -> Act -> Explore**`) still offers it as a button | [ ] |",
-              "| `/craft` makes an alchemy recipe (`/alchemy refine` is gone and nothing is unreachable) | [ ] |",
               "",
               "### The server layout (v1.0.0-rc.59)", "",
               "Four of these reach a server somebody is already running rather than a fresh guild, "
@@ -447,6 +439,7 @@ def build() -> str:
               "| the post-install manifest check passes, skipping the deferred updater | [ ] |",
               "| `./migrate_env.sh --dry-run` runs on the NAS with no missing command | [ ] |",
               "| the bot comes up on the schema the release ships (a duplicate column here is v1.0.0-rc.57's fault returning) | [ ] |",
+              "| the Admin Console's Server update card requests the newest release, `update_watch.sh` installs it, and the card reports the outcome; a second request while it runs says installing | [ ] |",
               "", f"_{total} actions across {len(_hubs(sources))} hubs._", ""]
     return "\n".join(lines)
 

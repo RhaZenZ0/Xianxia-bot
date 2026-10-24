@@ -18,6 +18,8 @@ describes what the engine has already decided, and the game keeps running when t
 - `VERSIONS.md` — the changelog, release by release, with the schema history.
 - `docs/CONFIGURATION.md` — every `.env` key explained; `.env.example` is the keys and defaults only.
 - `docs/TODO.md` — the punch list, every entry fixed or deferred with a reason.
+- `docs/ROADMAP_2_0.md` — what 2.0 means: three bars, the milestones on the way and the gate each
+  names, written at v1.39.0 from an inventory of the tree.
 - `docs/playtest/` — the live-server checklist for the current release.
 - `docs/TERMS.md` / `docs/PRIVACY.md` — what players agree to, and what the bot holds about them.
   The Discord Developer Portal wants a URL for each; these two files are those URLs.
@@ -142,11 +144,12 @@ sudo ./stop.sh                                            # removes containers, 
 ### 3. Set up the Discord server
 
 Open the GM dashboard at `http://<NAS LAN address>:8090`, go to **Discord Setup** and run
-**Full Setup**. It creates or repairs nine categories in a stated order — 🚪 Start Here,
-📣 Announcements, 🌌 Realm Capitals, 🌠 World Events, 🏮 Auction Houses, 🧺 Market Stalls,
-🗺️ Cultivation World, 🛠️ Feedback, 🔒 Admin — the base channels inside them, the realm-capital
-channels gated behind presence roles, the live-auction channels, one read-only market-stalls channel
-per world, `#bugs`, `#playtest`, `#updates` and the `#xianxia-info` guide. It is idempotent, and since v1.0.0-rc.59 it also **moves** a channel it finds in the wrong
+**Full Setup**. It creates or repairs ten categories in a stated order — 🚪 Start Here,
+📣 Announcements, 🌌 Realm Capitals, 🌠 World Events, ⚔️ Sect Wars, 🏮 Auction Houses,
+🧺 Market Stalls, 🗺️ Cultivation World, 🛠️ Feedback, 🔒 Admin — the base channels inside them, the
+realm-capital channels gated behind presence roles, the live-auction channels, one read-only
+war-front channel and one read-only market-stalls channel per world, `#bugs`, `#playtest`,
+`#updates` and the `#xianxia-info` guide. It is idempotent, and since v1.0.0-rc.59 it also **moves** a channel it finds in the wrong
 category rather than only placing a new one. See [Discord server setup](#discord-server-setup).
 
 ### Reset the world

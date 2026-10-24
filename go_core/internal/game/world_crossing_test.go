@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -402,17 +403,60 @@ func fmtArrayID(gate map[string]any) string {
 // statement that writes `characters.location` without going through it is a
 // door out of a world that keeps the money of the world behind - and which
 // half of a player's fortune survives would depend on how they travelled.
+// characterLocationWrites is every `UPDATE characters SET ...` statement in a
+// Go source whose SET list assigns `location`, wherever in the list it sits.
+// The first version of the gate below looked for the literal prefix
+// `characters SET location=`, which is how `moveCharacterTx` and the undo
+// spell it - and the rebirth's one statement, which rewrites thirty columns
+// and puts `location=?` in the middle of them, passed the gate for nine
+// releases because its spelling differed (the v1.40 gate ledger found it).
+// The clause is cut at WHERE so a `WHERE location=?` condition is not an
+// assignment, and the boundary refuses `current_location=` and
+// `physical_location=`, which are other columns.
+var characterUpdate = regexp.MustCompile("UPDATE characters SET([^`\"]*)")
+var locationAssignment = regexp.MustCompile(`(?:^|[,\s])location\s*=`)
+
+func characterLocationWrites(source string) []string {
+	var out []string
+	for _, match := range characterUpdate.FindAllStringSubmatch(source, -1) {
+		clause := match[1]
+		if at := strings.Index(clause, " WHERE"); at >= 0 {
+			clause = clause[:at]
+		}
+		if locationAssignment.MatchString(clause) {
+			out = append(out, "UPDATE characters SET"+clause)
+		}
+	}
+	return out
+}
+
+func TestTheWorldExitGateSeesALocationInsideASetList(t *testing.T) {
+	// The reader is asked for the shape it forbids before the tree is read
+	// (rc.57): the prefix the door uses, the rebirth's middle-of-the-list
+	// spelling, and the two shapes that must not count.
+	planted := "`UPDATE characters SET location=?,updated_at=? WHERE user_id=?`\n" +
+		"`UPDATE characters SET name=?,origin=?,realm_index=0,location=?,abode_level=1 WHERE user_id=?`\n" +
+		"`UPDATE characters SET current_location=?,physical_location=? WHERE user_id=?`\n" +
+		"`UPDATE characters SET spirit_stones=? WHERE location=?`\n"
+	writes := characterLocationWrites(planted)
+	if len(writes) != 2 {
+		t.Fatalf("the reader saw %d location writes in the planted source, wanted the prefix and the mid-list one: %q", len(writes), writes)
+	}
+}
+
 func TestAWorldIsLeftByOneDoor(t *testing.T) {
-	// The one write outside `moveCharacterTx`, with the reason it may.
+	// The writes outside `moveCharacterTx`, each with the reason it may.
 	allowed := map[string]string{
-		"world_crossing.go": "moveCharacterTx itself - the door every other path goes through",
-		"admin_undo.go":     "the reversal of a teleport audit row written before it carried a scene snapshot; a newer row goes home through moveCharacterTx",
+		"world_crossing.go":    "moveCharacterTx itself - the door every other path goes through",
+		"admin_undo.go":        "the reversal of a teleport audit row written before it carried a scene snapshot; a newer row goes home through moveCharacterTx",
+		"lifecycle_actions.go": "the rebirth: a new body is written whole at its birth household, and nothing of the old body is carried to convert - its purse closed with the life (v1.37.0) and a new one opens in that world's coin",
 	}
 	entries, err := os.ReadDir(".")
 	if err != nil {
 		t.Fatal(err)
 	}
 	offenders := []string{}
+	seen := 0
 	for _, entry := range entries {
 		name := entry.Name()
 		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
@@ -422,13 +466,20 @@ func TestAWorldIsLeftByOneDoor(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(string(body), "characters SET location=") {
+		writes := characterLocationWrites(string(body))
+		if len(writes) == 0 {
 			continue
 		}
+		seen += len(writes)
 		if _, ok := allowed[name]; ok {
 			continue
 		}
-		offenders = append(offenders, name)
+		for _, write := range writes {
+			offenders = append(offenders, name+": "+write)
+		}
+	}
+	if seen < 3 {
+		t.Fatalf("the walk saw only %d location writes; the reader is broken, not the tree", seen)
 	}
 	if len(offenders) > 0 {
 		t.Fatalf("these move a character without converting what they carry: %v — "+
@@ -439,7 +490,7 @@ func TestAWorldIsLeftByOneDoor(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s is named in `allowed` and does not exist: %v", name, err)
 		}
-		if !strings.Contains(string(body), "characters SET location=") {
+		if len(characterLocationWrites(string(body))) == 0 {
 			t.Fatalf("%s is named in `allowed` and no longer writes a location; remove the entry", name)
 		}
 	}

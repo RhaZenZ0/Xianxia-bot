@@ -141,21 +141,29 @@ func rollFamilyRoot(f BirthFamily, roots []string) (string, error) {
 	return roots[len(roots)-1], nil
 }
 
-func gradeIndex(system worlddata.RootSystem, grade string) int {
+// gradeIndex is a root grade's rung on the ladder, and whether the ladder
+// carries it at all. It answered 0 for a grade it did not know until v1.40 -
+// the bottom rung, which rc.55's rule forbids: an unknown key refuses or
+// answers 1, never the lowest value - so a root whose grade the content no
+// longer names evolved from the bottom and rolled at the bottom's TN. The two
+// callers refuse an unknown grade and say so.
+func gradeIndex(system worlddata.RootSystem, grade string) (int, bool) {
 	for i, g := range system.Grades {
 		if strings.EqualFold(g.Name, grade) {
-			return i
+			return i, true
 		}
 	}
-	return 0
+	return 0, false
 }
 func gradeDef(system worlddata.RootSystem, grade string) worlddata.RootGrade {
 	if len(system.Grades) == 0 {
 		return worlddata.RootGrade{Name: "Common", CultivationMult: 1}
 	}
-	i := gradeIndex(system, grade)
-	if i >= len(system.Grades) {
-		i = len(system.Grades) - 1
+	i, known := gradeIndex(system, grade)
+	if !known {
+		// A grade the ladder does not carry is worth nothing either way: a
+		// neutral multiplier and no bonus, never the bottom rung's (rc.55).
+		return worlddata.RootGrade{Name: grade, CultivationMult: 1}
 	}
 	return system.Grades[i]
 }
@@ -216,7 +224,8 @@ func generateRootProfile(baseRoot, path string, system worlddata.RootSystem, fam
 	if err != nil {
 		return SpiritualRootState{}, err
 	}
-	purity := clampInt(38+gradeIndex(system, grade)*10+n+talentEcho/8, 20, 100)
+	rung, _ := gradeIndex(system, grade) // rolled off the ladder above, so always on it
+	purity := clampInt(38+rung*10+n+talentEcho/8, 20, 100)
 	elements := []string{baseRoot}
 	candidates := []string{}
 	for _, v := range system.Elements {

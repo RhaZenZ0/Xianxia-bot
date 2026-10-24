@@ -229,12 +229,18 @@ async def ensure_realm_hub_overwrites(
         # harness found it the first time it was allowed to reach this path
         # (v1.0.0-rc.52 drives Full Setup over the control plane), because
         # SimCord deliberately grants the bot everything *except* administrator.
+        # Merged into whatever each target already carries, never written over
+        # it (v1.0.11): a bare `set_permissions(target, **perms)` replaces the
+        # overwrite, and this was the one gate still writing it that way - a
+        # `send_messages=False` somebody had put on @everyone here went with
+        # the first Full Setup (the v1.40 gate ledger found it).
+        reason = "Xianxia realm-capital visibility gate"
         if guild.me is not None and me_view is not True:
-            await channel.set_permissions(guild.me, view_channel=True, send_messages=True, manage_messages=True, read_message_history=True, reason="Xianxia realm-capital visibility gate")
+            await merge_overwrite(channel, guild.me, reason=reason, view_channel=True, send_messages=True, manage_messages=True, read_message_history=True)
         if state["everyone_view"] is not False:
-            await channel.set_permissions(guild.default_role, view_channel=False, reason="Xianxia realm-capital visibility gate")
+            await merge_overwrite(channel, guild.default_role, reason=reason, view_channel=False)
         if not member_ok:
-            await channel.set_permissions(role, reason="Xianxia realm-capital visibility gate", **REALM_HUB_MEMBER_PERMISSIONS)
+            await merge_overwrite(channel, role, reason=reason, **REALM_HUB_MEMBER_PERMISSIONS)
         for old in stale:
             await channel.set_permissions(old, overwrite=None, reason="Xianxia: capitals are gated by presence, not by realm")
     except (discord.Forbidden, discord.HTTPException):

@@ -250,6 +250,8 @@ first as `**fixed (v<version>)**`; a fixed entry moves across and is never delet
 `tests/python/contracts/test_playtest_gate.py` holds each file to its own status word.
 `tests/python/contracts/test_claude_md_stays_small.py` holds this file under 40,000 characters.
 Never `@import` either file and add no nested `CLAUDE.md`: both bring the weight back.
+**The road to 2.0 is `docs/ROADMAP_2_0.md`** (v1.39.0): three bars, the milestones on the way and
+the gate each names; a milestone that ships or is overtaken is updated there in the same release.
 
 ## Testing conventions
 

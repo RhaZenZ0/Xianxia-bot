@@ -236,8 +236,14 @@ func TestARetriedPurgeReplaysInsteadOfPurgingTwice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the retry failed instead of replaying: %v", err)
 	}
-	if fmt.Sprint(first) != fmt.Sprint(second) {
-		t.Fatalf("replay differs:\n %v\nvs\n %v", second, first)
+	// Compared as the client sees them, encoded: a replayed number is a
+	// json.Number read off the stored receipt (v1.40, so an id above 2^53
+	// survives the replay) while a fresh one is the handler's float64, and
+	// the two print differently and encode the same.
+	firstJSON, _ := json.Marshal(first)
+	secondJSON, _ := json.Marshal(second)
+	if string(firstJSON) != string(secondJSON) {
+		t.Fatalf("replay differs:\n %s\nvs\n %s", secondJSON, firstJSON)
 	}
 	if got := alchemyScalar(t, path, `SELECT qi FROM characters WHERE user_id=42`); got != qiAfterFirst {
 		t.Fatalf("qi=%d, want %d - the retry charged again", got, qiAfterFirst)

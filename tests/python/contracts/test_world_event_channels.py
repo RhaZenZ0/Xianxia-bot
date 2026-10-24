@@ -220,9 +220,12 @@ class TheBotKeepsItsOwnKeyToTheRoom(unittest.TestCase):
 
     def test_the_bot_allows_itself_before_it_denies_everyone(self):
         body = _code(CHANNELS, "ensure_realm_hub_overwrites")
-        me = body.index("set_permissions(guild.me")
-        everyone = body.index("set_permissions(guild.default_role")
-        role = body.index("set_permissions(role,")
+        # The three writes go through merge_overwrite since v1.40 (the gate
+        # over every writer, test_every_overwrite_is_merged.py); the order
+        # they are written in is what this holds.
+        me = body.index("merge_overwrite(channel, guild.me")
+        everyone = body.index("merge_overwrite(channel, guild.default_role")
+        role = body.index("merge_overwrite(channel, role,")
         self.assertLess(me, everyone, "the bot locks itself out before it can allow itself")
         self.assertLess(everyone, role, "the deny and the allow must still be in that order")
 

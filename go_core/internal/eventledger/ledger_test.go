@@ -1,7 +1,10 @@
 package eventledger
 
 import (
+	"encoding/json"
+	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"xianxia/core/internal/storage"
@@ -51,5 +54,51 @@ func TestVersionReceiptAndEvent(t *testing.T) {
 	}
 	if _, err := AdvanceActorVersion(conn, 42, 0, 2); err == nil {
 		t.Fatal("expected stale version error")
+	}
+}
+
+// A replayed receipt is the stored bytes, not a decode of them: `Replay` used
+// to unmarshal the result into `any`, which reads every number through
+// float64, so a result naming a Discord id (every member id is above 2^53)
+// came back rounded on the second delivery of the same action_id. The gate
+// over every decode in the engine (`TestNoPayloadIsDecodedIntoAPlainMap`)
+// walked only three packages and only map targets, and this was the one
+// `any` outside them.
+func TestAReplayedReceiptKeepsASnowflakeExact(t *testing.T) {
+	conn, _ := setup(t)
+	defer conn.Close()
+	if err := conn.ExecScript("BEGIN IMMEDIATE;"); err != nil {
+		t.Fatal(err)
+	}
+	stored := json.RawMessage(`{"partner_user_id":987654321098765432,"stones":25,"ratio":0.25}`)
+	if err := RecordReceipt(conn, Receipt{ActionID: "a2", ActorID: 42, Operation: "bond.propose", StateVersion: 1, Result: stored}, 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	replay, err := Replay(conn, "a2")
+	if err != nil || replay == nil {
+		t.Fatalf("replay=%v err=%v", replay, err)
+	}
+	object, ok := replay.Result.(map[string]any)
+	if !ok {
+		t.Fatalf("a replayed object result is %T, not the map a fresh result is", replay.Result)
+	}
+	if got := fmt.Sprint(object["partner_user_id"]); got != "987654321098765432" {
+		t.Fatalf("the replayed result rounded the partner's id: %s", got)
+	}
+	out, err := json.Marshal(replay.Result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(out), `"partner_user_id":987654321098765432`) {
+		t.Fatalf("the replayed result rounded the partner's id: %s", string(out))
+	}
+	if _, err := conn.Execute(`UPDATE authoritative_action_receipts SET result_json='{not json' WHERE action_id=?`, []any{"a2"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Replay(conn, "a2"); err == nil {
+		t.Fatal("a corrupt receipt replayed as a response")
 	}
 }

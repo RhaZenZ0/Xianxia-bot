@@ -35,6 +35,7 @@ FINDINGS_MD = PROJECT_ROOT / "docs" / "FINDINGS.md"
 ARCHITECTURE_MD = PROJECT_ROOT / "docs" / "ARCHITECTURE.md"
 TODO_MD = PROJECT_ROOT / "docs" / "TODO.md"
 TODO_FIXED_MD = PROJECT_ROOT / "docs" / "history" / "TODO_FIXED.md"  # the closed half of the punch list
+GATES_MD = PROJECT_ROOT / "docs" / "GATES.md"  # the gate ledger (v1.40): one row per standing rule
 
 # What the rest of the tree quotes from CLAUDE.md, and who quotes it. The citing files are held to
 # still saying it, so this table cannot go stale in the other direction: drop an entry when the
@@ -307,6 +308,7 @@ class ClaudeMdStaysSmallTests(unittest.TestCase):
         problems += pointer_problems(TODO_FIXED_MD.read_text(encoding="utf-8"), self.findings, "docs/history/TODO_FIXED.md")
         problems += pointer_problems(self.architecture, self.findings, "docs/ARCHITECTURE.md")
         problems += pointer_problems(self.claude, self.findings, "CLAUDE.md")
+        problems += pointer_problems(GATES_MD.read_text(encoding="utf-8"), self.findings, "docs/GATES.md")
         self.assertEqual(problems, [])
 
 

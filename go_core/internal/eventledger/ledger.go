@@ -59,10 +59,26 @@ func Replay(conn *storage.Conn, actionID string) (*Receipt, error) {
 	if len(row) < 4 {
 		return nil, errors.New("invalid authoritative action receipt")
 	}
-	var result any
-	text := fmt.Sprint(row[3])
-	if err := json.Unmarshal([]byte(text), &result); err != nil {
-		return nil, fmt.Errorf("decode action receipt: %w", err)
+	// The stored result is read back the way the engine reads every stored
+	// object: through UseNumber. Decoding it into a plain `any` read every
+	// number through float64 and rounded a Discord id above 2^53 (the class
+	// of v1.39.0; this was the one decode outside the gate's walk), so the
+	// second delivery of a `/bond propose` named a partner who did not
+	// exist. A json.Number re-encodes as the digits that were stored, and the
+	// result keeps the map shape every reader of a fresh result expects. A
+	// stored result that is not an object is handed back as its bytes.
+	text := strings.TrimSpace(fmt.Sprint(row[3]))
+	var result any = json.RawMessage(text)
+	if strings.HasPrefix(text, "{") {
+		decoder := json.NewDecoder(strings.NewReader(text))
+		decoder.UseNumber()
+		var object map[string]any
+		if err := decoder.Decode(&object); err != nil {
+			return nil, fmt.Errorf("decode action receipt: %w", err)
+		}
+		result = object
+	} else if !json.Valid([]byte(text)) {
+		return nil, errors.New("decode action receipt: stored result is not JSON")
 	}
 	return &Receipt{ActionID: actionID, ActorID: storage.ParseInt(row[0]), Operation: fmt.Sprint(row[1]), StateVersion: storage.ParseInt(row[2]), Result: result}, nil
 }

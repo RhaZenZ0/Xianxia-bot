@@ -61,13 +61,31 @@ func TestCanonicalisingAnEmptyPayloadStillWritesTheMinute(t *testing.T) {
 // request payload into a plain map goes through encoding/json's float64 and
 // rounds a snowflake. The one door is decodeMap, which decodes with
 // UseNumber; this walks every non-test file of the engine and refuses an
-// `Unmarshal(..., &m)` or a `Decode(&m)` whose target is a map[string]any,
-// unless the function also calls UseNumber. A struct target is fine: a
-// struct's int64 field decodes exactly.
+// `Unmarshal(..., &m)` or a `Decode(&m)` whose target is a map[string]any
+// or a bare `any`, unless the function also calls UseNumber. A struct
+// target is fine: a struct's int64 field decodes exactly.
+//
+// It walked three packages and only map targets until v1.40, when the gate
+// ledger found the one `any` outside them: `eventledger.Replay` decoded a
+// stored receipt into `var result any`, so the second delivery of an action
+// naming a member id answered with the id rounded. Every package under
+// internal/ is walked now, and a target declared `any` counts.
 func TestNoPayloadIsDecodedIntoAPlainMap(t *testing.T) {
+	// Decodes into a plain map that carry no id, each with the reason.
+	allowed := map[string]string{
+		"contentsync/contentsync.go:project": "a content entry from world.json, projected into typed columns; content carries no Discord id and nothing above 2^53",
+	}
+	packages, err := os.ReadDir("..")
+	if err != nil {
+		t.Fatal(err)
+	}
 	var offenders []string
 	checked := 0
-	for _, dir := range []string{".", "../server", "../simulation"} {
+	for _, pkg := range packages {
+		if !pkg.IsDir() {
+			continue
+		}
+		dir := filepath.Join("..", pkg.Name())
 		entries, err := os.ReadDir(dir)
 		if err != nil {
 			t.Fatal(err)
@@ -84,6 +102,9 @@ func TestNoPayloadIsDecodedIntoAPlainMap(t *testing.T) {
 			for _, decl := range file.Decls {
 				fn, ok := decl.(*ast.FuncDecl)
 				if !ok || fn.Body == nil {
+					continue
+				}
+				if _, ok := allowed[pkg.Name()+"/"+name+":"+fn.Name.Name]; ok {
 					continue
 				}
 				mapVars := plainMapVars(fn)
@@ -118,7 +139,7 @@ func TestNoPayloadIsDecodedIntoAPlainMap(t *testing.T) {
 					if sel.Sel.Name == "Decode" && usesNumber {
 						return true
 					}
-					offenders = append(offenders, fmt.Sprintf("%s/%s: %s decodes %q into a map[string]any through float64", dir, name, fn.Name.Name, ident.Name))
+					offenders = append(offenders, fmt.Sprintf("%s/%s: %s decodes %q into a plain map or any through float64", pkg.Name(), name, fn.Name.Name, ident.Name))
 					return true
 				})
 			}
@@ -128,14 +149,41 @@ func TestNoPayloadIsDecodedIntoAPlainMap(t *testing.T) {
 		t.Fatalf("the walk saw only %d decodes; the reader is broken, not the tree", checked)
 	}
 	if len(offenders) > 0 {
-		t.Fatalf("a snowflake would be rounded here - use decodeMap or a struct:\n%s", strings.Join(offenders, "\n"))
+		t.Fatalf("a snowflake would be rounded here - use decodeMap, a RawMessage or a struct:\n%s", strings.Join(offenders, "\n"))
+	}
+	for key := range allowed {
+		pkg, rest, _ := strings.Cut(key, "/")
+		file, fnName, _ := strings.Cut(rest, ":")
+		parsed, err := parser.ParseFile(token.NewFileSet(), filepath.Join("..", pkg, file), nil, 0)
+		if err != nil {
+			t.Fatalf("%s is named in `allowed` and cannot be read: %v", key, err)
+		}
+		found := false
+		for _, decl := range parsed.Decls {
+			if fn, ok := decl.(*ast.FuncDecl); ok && fn.Name.Name == fnName {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("%s is named in `allowed` and no longer exists; remove the entry", key)
+		}
 	}
 }
 
-// plainMapVars names every variable a function declares as map[string]any,
-// by `var x map[string]any` or `x := map[string]any{}`.
+// plainMapVars names every variable a function declares as map[string]any
+// or as a bare any, by `var x map[string]any`, `var x any` or
+// `x := map[string]any{}`: the targets a decode reads numbers into as float64.
 func plainMapVars(fn *ast.FuncDecl) map[string]bool {
 	out := map[string]bool{}
+	isAny := func(expr ast.Expr) bool {
+		switch v := expr.(type) {
+		case *ast.Ident:
+			return v.Name == "any"
+		case *ast.InterfaceType:
+			return v.Methods == nil || len(v.Methods.List) == 0
+		}
+		return false
+	}
 	isPlainMap := func(expr ast.Expr) bool {
 		m, ok := expr.(*ast.MapType)
 		if !ok {
@@ -145,20 +193,14 @@ func plainMapVars(fn *ast.FuncDecl) map[string]bool {
 		if !ok || key.Name != "string" {
 			return false
 		}
-		switch v := m.Value.(type) {
-		case *ast.Ident:
-			return v.Name == "any"
-		case *ast.InterfaceType:
-			return len(v.Methods.List) == 0
-		}
-		return false
+		return isAny(m.Value)
 	}
 	ast.Inspect(fn.Body, func(n ast.Node) bool {
 		switch node := n.(type) {
 		case *ast.DeclStmt:
 			if gen, ok := node.Decl.(*ast.GenDecl); ok {
 				for _, spec := range gen.Specs {
-					if vs, ok := spec.(*ast.ValueSpec); ok && vs.Type != nil && isPlainMap(vs.Type) {
+					if vs, ok := spec.(*ast.ValueSpec); ok && vs.Type != nil && (isPlainMap(vs.Type) || isAny(vs.Type)) {
 						for _, name := range vs.Names {
 							out[name.Name] = true
 						}
