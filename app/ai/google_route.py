@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
+from typing import Any, NamedTuple
 
 log = logging.getLogger("xianxia.ai_router.google")
 
@@ -104,6 +104,31 @@ def _first_text(value: Any) -> str:
     return "\n".join(chunks).strip()
 
 
+def _finish_reason(value: Any) -> str:
+    """Why the reply ended, as the SDK's own word in lowercase (v1.39.2).
+
+    `generate_content` says it on the first candidate (`MAX_TOKENS` when the
+    output budget cut the reply); the interactions surface, if it says it at
+    all, says it at the top. The enum's name is read and its class dropped,
+    so the router sees `max_tokens` from either. "" when the SDK did not say.
+    """
+    candidates = getattr(value, "candidates", None) or []
+    for node in (value, *list(candidates)[:1]):
+        for attribute in ("finish_reason", "stop_reason"):
+            reason = getattr(node, attribute, None)
+            if reason:
+                word = str(getattr(reason, "name", None) or reason)
+                return word.rsplit(".", 1)[-1].strip().lower()
+    return ""
+
+
+class GoogleReply(NamedTuple):
+    """What one call answered: the text, and why it stopped."""
+
+    text: str
+    finish_reason: str
+
+
 class GoogleAIStudioRoute:
     """Thin async adapter over google-genai for one narration call."""
 
@@ -161,7 +186,7 @@ class GoogleAIStudioRoute:
         max_output_tokens: int,
         temperature: float,
         timeout_seconds: float,
-    ) -> str:
+    ) -> GoogleReply:
         client = self._ensure_client()
         name = strip_prefix(model)
         call = self._interactions_call(client, name, system_prompt, prompt, max_output_tokens, temperature)
@@ -175,7 +200,7 @@ class GoogleAIStudioRoute:
         text = _first_text(response)
         if not text:
             raise RuntimeError("Google AI Studio returned an empty response")
-        return text
+        return GoogleReply(text, _finish_reason(response))
 
     # -- call shapes ------------------------------------------------------
     #

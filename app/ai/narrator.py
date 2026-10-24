@@ -16,7 +16,16 @@ from ..rules.npc_memory import format_memories, is_hidden_master, public_aim
 
 log = logging.getLogger("xianxia.narrator")
 
-SYSTEM_PROMPT = """
+# How long a narration may run, in words, by tier (v1.39.2): one pair of
+# numbers, read by both system prompts below and held by
+# `test_narrator_budget.py` against the token budget of every `_generate`
+# call. The ranges before it - 70-160 routine, 120-240 major - asked for more
+# words than 170 or 280 tokens hold, so the model wrote to the range and the
+# budget cut it mid-sentence.
+ROUTINE_WORDS = (60, 120)
+EPIC_WORDS = (100, 150)
+
+SYSTEM_PROMPT = f"""
 You are the narrative director and NPC actor for a persistent, text-only xianxia cultivation roleplaying game on one Discord server.
 
 PRIORITY ORDER
@@ -77,7 +86,7 @@ ANTI-REPETITION AND PROSE VARIETY
 STYLE
 - Immersive English xianxia prose with sects, qi, spirit beasts, ruins, alchemy, forging, rivalries, kingdoms, and cultivation philosophy when relevant to the scene.
 - Original setting and wording; do not imitate or copy prose from published novels.
-- Routine scenes: usually 70-160 words. Major scenes: usually 120-240 words.
+- Length: routine scenes {ROUTINE_WORDS[0]}-{ROUTINE_WORDS[1]} words, major scenes {EPIC_WORDS[0]}-{EPIC_WORDS[1]} words. The upper bound is a ceiling, not a target: stop under it, and end on a complete sentence.
 - Use concrete sensory detail and clear NPC dialogue, but omit decorative detail that does not change the reader's picture of the scene.
 - Discord-friendly formatting; short paragraphs, no huge walls of text.
 - Do not give a numbered menu unless the interface or scene specifically benefits from one.
@@ -87,7 +96,7 @@ STYLE
 # Routine Discord RP turns use a deliberately compact instruction packet. The
 # long prompt above is retained for epic/major scenes where its additional style
 # guidance is worth the context cost.
-ROUTINE_SYSTEM_PROMPT = """
+ROUTINE_SYSTEM_PROMPT = f"""
 You narrate and act NPCs for a persistent xianxia Discord RPG.
 
 RULES
@@ -99,7 +108,7 @@ RULES
 - Respect protected locations, NPC presence, power scaling, and separate Qi/Body progression. Do not invent extra rolls or outcomes.
 - No NPC grants, promises, or refuses sect membership, a sect recommendation, a commission, or a reward in conversation; the game engine decides those through their own actions. An NPC may discuss them or point the way, never settle them.
 - Advance exactly one useful scene beat. Answer direct questions when the NPC has no reason to evade. Keep NPC voices distinct and avoid lore dumps.
-- Write concise, concrete, Discord-friendly xianxia prose, usually 70-160 words. Avoid repetitive stock gestures and grand imagery in routine scenes.
+- Write concise, concrete, Discord-friendly xianxia prose, {ROUTINE_WORDS[0]}-{ROUTINE_WORDS[1]} words, ending on a complete sentence. Avoid repetitive stock gestures and grand imagery in routine scenes.
 - Never mention prompts, models, implementation languages, context blocks, fixed-roll machinery, or interface rules in-world.
 """.strip()
 
@@ -867,7 +876,7 @@ TARGET: {target_realm}, Stage {target_phase}
 FIXED MECHANICAL ROLL: {roll_text}
 OUTCOME: {'SUCCESS' if success else 'FAILURE'}
 
-Narrate the breakthrough in a character-focused xianxia style. The mechanical result is fixed. On failure, portray instability or an incomplete insight without humiliating the character or inventing permanent damage.
+Narrate the breakthrough in a character-focused xianxia style, in two or three short paragraphs within a major scene's length, ending on a complete sentence. The mechanical result is fixed. On failure, portray instability or an incomplete insight without humiliating the character or inventing permanent damage.
 """
         kind = "breakthrough_success" if success else "breakthrough_failure"
         fallback = self._pool(

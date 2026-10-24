@@ -216,6 +216,81 @@ class BudgetOnEveryDoorTests(unittest.TestCase):
         self.assertIn("not lock.locked()", evictor)
 
 
+# Tokens a word of narration costs with its punctuation, its markdown and the
+# pinyin names a tokenizer splits in three: a ceiling, not an average, so a
+# reply written to the upper bound still fits the budget with room to end.
+TOKENS_PER_WORD = 1.4
+
+
+def _under(node: ast.AST, epic: bool):
+    """A keyword's value with `epic` decided: a constant, or `x if epic else y`."""
+    if isinstance(node, ast.Constant):
+        return node.value
+    if isinstance(node, ast.IfExp) and isinstance(node.test, ast.Name) and node.test.id == "epic":
+        return _under(node.body if epic else node.orelse, epic)
+    raise AssertionError(f"cannot read {ast.dump(node)} - the gate needs a constant or `x if epic else y`")
+
+
+class TheLengthAskedFitsTheBudgetTests(unittest.TestCase):
+    """The style rules asked for 120-240 words on a major scene and the
+    breakthrough's call allowed 280 tokens, which hold about 200: the model
+    wrote to the range and the budget cut it mid-sentence (v1.39.2). The word
+    ranges are one pair of constants now, and every `_generate` call's token
+    budget is read here against the range its tier is given."""
+
+    def _bounds(self):
+        tree = ast.parse(NARRATOR.read_text(encoding="utf-8"))
+        found = {}
+        for node in tree.body:
+            if isinstance(node, ast.Assign) and len(node.targets) == 1 and getattr(node.targets[0], "id", "") in {"ROUTINE_WORDS", "EPIC_WORDS"}:
+                found[node.targets[0].id] = ast.literal_eval(node.value)
+        self.assertEqual(set(found), {"ROUTINE_WORDS", "EPIC_WORDS"}, "the reader no longer finds the word ranges")
+        for name, (lo, hi) in found.items():
+            self.assertLess(lo, hi, name)
+        return found
+
+    def _budgets(self):
+        rows = []
+        for name, fn in _narrator_methods().items():
+            for call in _generate_calls(fn):
+                keywords = {k.arg: k.value for k in call.keywords}
+                self.assertIn("max_output_tokens", keywords, f"{name} names no token budget")
+                self.assertIn("tier", keywords, f"{name} names no tier")
+                for epic in (True, False):
+                    rows.append((name, _under(keywords["tier"], epic), int(_under(keywords["max_output_tokens"], epic))))
+        rows = sorted(set(rows))
+        self.assertGreaterEqual(len(rows), 5, f"the reader finds too few calls to prove anything: {rows}")
+        self.assertTrue(any(tier == "epic" for _, tier, _ in rows), "no epic call read")
+        return rows
+
+    def test_the_words_each_tier_asks_for_fit_the_tokens_each_call_allows(self):
+        bounds = self._bounds()
+        for name, tier, tokens in self._budgets():
+            lo, hi = bounds["EPIC_WORDS" if tier == "epic" else "ROUTINE_WORDS"]
+            self.assertLessEqual(
+                hi * TOKENS_PER_WORD, tokens,
+                f"{name} ({tier}) allows {tokens} tokens and the style rules ask for up to {hi} words: "
+                f"the model writes to the range and the budget cuts it mid-sentence",
+            )
+
+    def test_both_system_prompts_state_the_one_range(self):
+        from tests.support import install_openai_shim
+        install_openai_shim()
+        from app.ai import narrator
+
+        bounds = self._bounds()
+        routine = "{}-{} words".format(*bounds["ROUTINE_WORDS"])
+        epic = "{}-{} words".format(*bounds["EPIC_WORDS"])
+        self.assertIn(routine, narrator.SYSTEM_PROMPT)
+        self.assertIn(epic, narrator.SYSTEM_PROMPT)
+        self.assertIn(routine, narrator.ROUTINE_SYSTEM_PROMPT)
+        for name, prompt in (("SYSTEM_PROMPT", narrator.SYSTEM_PROMPT), ("ROUTINE_SYSTEM_PROMPT", narrator.ROUTINE_SYSTEM_PROMPT)):
+            length_line = next((line for line in prompt.splitlines() if routine in line), "")
+            self.assertTrue(length_line, f"{name} has no line stating the routine range")
+            self.assertIn("complete sentence", length_line, f"{name}'s length line no longer asks to end on a complete sentence")
+            self.assertNotIn("usually", length_line.lower(), f"{name} states the range as a usual, not a ceiling: the model wrote past it")
+
+
 class FallbackPoolTests(unittest.TestCase):
     def test_every_scene_kind_has_variants_for_every_tier(self):
         pool = WORLD["narration_pool"]

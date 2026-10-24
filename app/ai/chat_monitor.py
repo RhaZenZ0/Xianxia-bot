@@ -532,6 +532,9 @@ def render_health(snapshot: dict[str, Any]) -> str:
         scratchpad = int(row.get("scratchpad_rejected", 0) or 0)
         if scratchpad:
             detail += f" • answered with its own reasoning **{scratchpad}×** (rejected)"
+        cut = int(row.get("cut_at_budget", 0) or 0)
+        if cut:
+            detail += f" • ran into its token budget **{cut}×** (trimmed to the last sentence)"
         streak = int(row.get("consecutive_failures", 0) or 0)
         if streak > 1:
             detail += f" • **{streak}** in a row, backing off {int(row.get('cooldown_seconds', 0) or 0)}s"
