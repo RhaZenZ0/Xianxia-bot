@@ -18,6 +18,11 @@ v1.34.0, when 135 of them outnumbered the 35 still open four to one.
 
 ## Open
 
+- **deferred (refactor)** — *The hand-rolled PBKDF2 in `backupcrypt`.* `deriveKey` writes out
+  PBKDF2-HMAC-SHA256 because the module predates `crypto/pbkdf2` (standard library since Go 1.24;
+  the module is on 1.26 now). Swapping the standard package in is behaviour-neutral only if it
+  derives the same key byte for byte, and every backup already written depends on that, so it waits
+  for a change that carries a golden-key test beside it rather than riding a comment pass (v1.39.2).
 - **deferred (design)** — *Permanent qi that a settle already took.* Every `qi_max_bonus` starts at 0:
   the qi a settle rebuilt over before v1.34.0 is in no column and cannot be told from the body's own
   figure. The honest repair is a GM `set_resource_caps` per player, or a one-off replay of completed
