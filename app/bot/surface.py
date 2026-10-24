@@ -1846,9 +1846,9 @@ async def _panel_gate(user: "discord.abc.User", path: str) -> str | None:
     """The hub panel's half of the two gates that refuse a press.
 
     Maintenance mode (v1.0.0-rc.41) and the closed-door lockout
-    (v1.0.0-rc.56). A panel lives fifteen minutes, so both can become true
-    under one that is already open; the check therefore belongs on the press
-    and not on the open. Registered here because `hubs` sits below `runtime`
+    (v1.0.0-rc.56). A panel stays open for the idle window `register_panel_idle`
+    is given (or for good), so both can become true under one that is already
+    open; the check therefore belongs on the press and not on the open. Registered here because `hubs` sits below `runtime`
     and cannot reach `DB` itself.
     """
     refusal = await maintenance.refuse(DB, user, command=path)
@@ -1861,7 +1861,7 @@ async def _panel_gate(user: "discord.abc.User", path: str) -> str | None:
 
 
 register_panel_gate(_panel_gate)
-# A refresh reads inside one database session (v1.31.2): every `DB.get_x()` the
+# A refresh reads inside one database session (v1.31.2): every `DB.get_*()` the
 # providers and the status card make reuses it instead of opening its own.
 register_read_scope(DB.reuse_connection)
 # How long a panel may sit idle (v1.0.12), injected because the layering puts

@@ -306,7 +306,7 @@ CELESTIAL_GATE_RENAMES_AT_V1_19_1: tuple[tuple[str, str], ...] = (
 
 # Every column whose whole value is a place, at schema 74: a renamed gate is
 # rewritten where it stands. `test_the_celestial_ring_turns.py` holds this list,
-# `PLACE_COLUMNS_KEYED` and `PLACE_COLUMNS_LEFT` together to every place-like
+# `PLACE_COLUMNS_KEYED` and its own `LEFT_ALONE` together to every place-like
 # column a fresh bootstrap makes, so a column nobody decided about fails there.
 PLACE_COLUMNS_AT_V1_19_1: tuple[tuple[str, str], ...] = (
     ("alchemy_batches", "location"),
@@ -2469,7 +2469,7 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             # foreign-keyed to `characters`, every Go connection sets
             # `PRAGMA foreign_keys=ON`, and no character has user id 0 - so the
             # INSERT is refused with "FOREIGN KEY constraint failed" every
-            # time. `runSystems` returns on the first error and
+            # time. The tick (`RunDue`) returns on the first error and
             # `npc_consignments` is fifth of eight, so `sect_politics`,
             # `clan_dynamics`, `autonomous_world_events` and the whole
             # `advancedMaintenance` bundle never ran either: commissions never
@@ -7147,6 +7147,7 @@ class Database:
 
     # ------------------------------------------------------------------
     # Innate aptitudes: spiritual roots, bloodlines and physiques
+    # ------------------------------------------------------------------
 
     @staticmethod
     def _decode_root(row: aiosqlite.Row | None) -> dict[str, Any] | None:
@@ -7191,7 +7192,7 @@ class Database:
             "physique": physique,
         }
 
-
+    # ------------------------------------------------------------------
     # Generic effects
     # ------------------------------------------------------------------
     async def get_active_effects(self, user_id: int, game_minute: int) -> list[dict[str, Any]]:
@@ -7673,7 +7674,7 @@ class Database:
     # GM-authored per-channel messages (schema 25) - one persistent, editable
     # welcome/orientation message per base channel or realm-hub, edited in
     # place the same way the #xianxia-info guide is (see ensure_channel_message
-    # in app/bot/main.py).
+    # in app/bot/admin/channel_messages.py).
     # ------------------------------------------------------------------
 
     async def get_channel_messages(self, guild_id: int) -> dict[str, dict[str, Any]]:

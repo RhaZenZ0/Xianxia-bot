@@ -694,7 +694,7 @@ func artifactAwakenAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 	}, nil
 }
 
-// beastRankLimit is how strong a beast may evolve in a world (v1.7.7, on the
+// beastRankLimits is how strong a beast may evolve in a world (v1.7.7, on the
 // owner's call): 25 in the Mortal World, 50 Spiritual, 75 Immortal, and
 // 100 in the Celestial World, which is the highest rank a beast can reach. Evolving adds
 // one rank and nothing else bounded it. A beast already above the limit keeps

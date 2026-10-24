@@ -36,7 +36,7 @@ var manualGradeMultipliers = map[string]float64{
 // is a defined thing.
 var manualGradeOrder = []string{"Mortal", "Earth", "Spirit", "Heaven", "Immortal", "Dao"}
 
-// masteryGathering is what practice adds on top of the grade: three percent a
+// masteryGatheringShare is what practice adds on top of the grade: three percent a
 // mastery level, so a perfected method is worth a further twelfth.
 const masteryGatheringShare = 0.03
 

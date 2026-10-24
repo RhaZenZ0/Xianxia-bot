@@ -2,9 +2,10 @@
 realm-hub channels/roles, the server log.
 
 Phase 4 of the main.py split (v0.19.39, docs/history/MAIN_SPLIT_PLAN.md).
-_resolve_text_channel has 17 call sites and post_server_log is what the hubs
-report failures through, so this sits below every command module and below
-threads.py. Reads runtime, app.realm_hubs and discord; never main.py.
+_resolve_text_channel is called from most command modules and post_server_log
+is what the hubs report failures through, so this sits below every command
+module and below threads.py. Reads runtime, app.rules.realm_hubs and discord;
+never main.py.
 Definition order is the order these had in main.py.
 """
 from __future__ import annotations

@@ -458,8 +458,6 @@ func TestTheWorldsOwnSectsSueWhenTheirMoraleBreaks(t *testing.T) {
 	}
 }
 
-// --- from world_feedback_gates_test.go ---
-
 // callsIn answers, for each named function in a file, the names of the
 // functions it calls in source order - a plain identifier or a selector's
 // last part.

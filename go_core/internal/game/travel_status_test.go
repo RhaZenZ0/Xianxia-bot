@@ -174,8 +174,6 @@ func TestTravelStatusReflectsInTransitJourneyWithRealTimestamp(t *testing.T) {
 	}
 }
 
-// --- from travel_preview_test.go ---
-
 // The trip before it is taken (v1.26.0). The preview answers through
 // planTravelTx, the planner exploration.travel itself walks, so these hold the
 // two to the same road and the same toll, and the preview to costing nothing.

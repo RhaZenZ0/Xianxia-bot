@@ -72,7 +72,7 @@ func roadFacingNeighbour(catalog worlddata.Catalog, city, node string) string {
 	return node
 }
 
-// roadSiteOnRoadOfKind says whether a site kind stands on the road itself
+// roadSiteOnTheRoad says whether a site kind stands on the road itself
 // (seen by everyone who walks the leg) or off it (found one time in two).
 func roadSiteOnTheRoad(kind string) bool {
 	return kind == "waystation" || kind == "shrine"
@@ -172,7 +172,7 @@ func discoverRoadSitesTx(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	return found, nil
 }
 
-// roadSiteCandidatesTx lists the sites on the roads out of every city the
+// roadSiteCandidates lists the sites on the roads out of every city the
 // character knows that they have not found yet - what exploring a city can
 // turn up beside the next city along.
 func roadSiteCandidates(catalog worlddata.Catalog, known map[string]bool, world string, realmIndex int64) []string {
@@ -197,7 +197,7 @@ func roadSiteCandidates(catalog worlddata.Catalog, known map[string]bool, world 
 	return out
 }
 
-// huntingGroundBonus is the edge a hunting ground gives: the beasts are
+// huntingGroundRollBonus is the edge a hunting ground gives: the beasts are
 // there to be found, so the roll is easier and the spoils richer.
 const huntingGroundRollBonus int64 = 2
 

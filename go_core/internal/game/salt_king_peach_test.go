@@ -126,8 +126,6 @@ func TestTheOrdinaryRoomsPayTheSameWhicheverWayTheRareRollGoes(t *testing.T) {
 	}
 }
 
-// --- from permanent_treasure_test.go ---
-
 // A realm's treasure is kept (v1.0.0-rc.54).
 //
 // `ItemUse.DurationGameMinutes` has meant "0 does not expire" since v0.21.0 and

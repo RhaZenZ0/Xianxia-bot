@@ -99,7 +99,7 @@ EQUIPMENT_DEFINITIONS: dict[str, dict[str, Any]] = {
     },
     # A one-of-a-kind GM reward granted via /admin player grant, never crafted
     # or bought (content/world.json marks it market_excluded). "indestructible"
-    # and "unique" are read by app/bot/main.py's grant/equipment-status code;
+    # and "unique" are read by the quest objective ceiling in app/rules/quests.py;
     # the Go engine enforces the durability side via its own Indestructible
     # field on equipmentDefinitionsGo, which must stay in sync with the four
     # combat stats below (also mirrored into combat_actions.go's equipDefs -

@@ -110,8 +110,6 @@ func TestFromRankTenEveryLevelCostsCores(t *testing.T) {
 	}
 }
 
-// --- from beast_grandfather_test.go ---
-
 func grandfatherBeast(t *testing.T, cores int64, rank int64) (int64, int64, int64) {
 	return grandfatherBeastAt(t, cores, rank, -1)
 }

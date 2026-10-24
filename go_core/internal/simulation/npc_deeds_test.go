@@ -104,7 +104,7 @@ func deedScalar(t *testing.T, path, sql string, args ...any) int64 {
 	return i64(res.Rows[0][0])
 }
 
-// runCrimes drives the criminal half for `ticks` world days, committing each.
+// runCrimesFrom drives the criminal half for `ticks` world days, committing each.
 //
 // `from` is the world minute the first tick happens at and every tick after it
 // advances. That is not decoration: a deed's source_key carries the minute, so

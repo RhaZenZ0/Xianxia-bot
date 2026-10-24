@@ -1264,16 +1264,16 @@ func applyAuthoritativeQuery(databasePath, worldPath string, req ActionRequest) 
 	return ActionResponse{}, fmt.Errorf("unsupported authoritative query: %s", req.Operation)
 }
 
+// newLifeStartingAge is the age, in years, every first life begins at; the
+// schema's own default for age_at_creation_years says the same.
+const newLifeStartingAge = int64(18)
+
 // characterCreatePayload is what a new cultivator says about themselves. The
 // age a life starts at and the echo of a past life's talent used to ride here
 // too (v1.36.0): the age was read by nothing, and the echo was read straight
 // into the aptitude roll, so a forged request could open a first life with a
 // perfect echo. The echo is soul_legacy's (soulTalentEchoTx) and the age is
 // the schema's default.
-// newLifeStartingAge is the age, in years, every first life begins at; the
-// schema's own default for age_at_creation_years says the same.
-const newLifeStartingAge = int64(18)
-
 type characterCreatePayload struct {
 	DiscordName    string `json:"discord_name"`
 	Name           string `json:"name"`

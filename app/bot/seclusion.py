@@ -9,7 +9,7 @@ noticed because nothing was ever locked. What enforced it was half a gate, in
 * it covered only the ~141 handlers wearing that decorator, so every **read**
   passed;
 * its exemption was a **function-name prefix**, `seclusion_`, which is nothing
-  structural - a future `seclusion_anything` would have inherited it;
+  structural - a future `seclusion_*` would have inherited it;
 * a **hub press** was already deferred by `_acknowledge_hub_action` before the
   wrapper ran, so the refusal took a different path from every other gate's;
 * **typed play** and free narration never reached it at all;

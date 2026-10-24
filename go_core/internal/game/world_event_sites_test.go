@@ -324,8 +324,6 @@ func TestWorldEventCastNamesDoNotCollideAcrossEvents(t *testing.T) {
 	}
 }
 
-// --- from world_event_authority_test.go ---
-
 func TestWorldEventActWithdrawIsGoAuthoritativeAndPersistent(t *testing.T) {
 	path := setupBatch5AuthorityDB(t)
 	world := batch4WorldPath(t)

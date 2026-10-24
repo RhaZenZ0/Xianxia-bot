@@ -158,8 +158,6 @@ CREATE TABLE hidden_sect_membership(user_id INTEGER PRIMARY KEY, sect_name TEXT 
 	}
 }
 
-// --- from sendoff_backfill_reputation_test.go ---
-
 // The backfill reports the connections it raises (v1.12.3).
 //
 // `householdReputationTx` runs ahead of the heirloom's once-guard so a
@@ -189,8 +187,6 @@ func TestABackfilledHouseholdReportsTheContactsItRaised(t *testing.T) {
 		t.Fatalf("a floor already met was reported again: %v", again)
 	}
 }
-
-// --- from underworld_contacts_test.go ---
 
 // Underworld Contacts had one source, a trade at a black-market post, and a
 // trade needed the very trust it was meant to earn - so the door by reputation

@@ -159,8 +159,6 @@ func TestCultivationRewardCapsProgressAndCommitsWalletItemsAndEvent(t *testing.T
 	}
 }
 
-// --- from first4_registry_test.go ---
-
 func TestFirstFourMigrationOperationsRegisteredAuthoritative(t *testing.T) {
 	operations := []string{
 		"craft.resolve",

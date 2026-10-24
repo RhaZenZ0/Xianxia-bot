@@ -1,8 +1,8 @@
 """Small pure formatters shared across command modules.
 
-Phase 2 of the main.py split (v0.19.34, docs/history/MAIN_SPLIT_PLAN.md). roll_line has
-21 call sites and human_duration 12, spread over most of the command blocks;
-keeping them in main.py forced every module split out to either duplicate
+Phase 2 of the main.py split (v0.19.34, docs/history/MAIN_SPLIT_PLAN.md). roll_line and
+human_duration are called from most of the command blocks; keeping them in
+main.py forced every module split out to either duplicate
 them or import main.py at call time. Nothing here touches Discord or the
 database. Definition order is the order these had in main.py.
 """

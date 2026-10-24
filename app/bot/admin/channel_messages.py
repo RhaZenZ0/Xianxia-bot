@@ -707,7 +707,7 @@ async def ensure_base_xianxia_channels(
             announcement_channel_id=channels["world-events"].id,
             # Retired, and deliberately still written: a server that bound one
             # before rc.59 keeps the binding, so teardown can still delete the
-            # channel and `_event_scene_parent` can still fall back to it.
+            # channel and `event_scene_parent` can still fall back to it.
             event_scene_channel_id=_bound_id("event-scenes"),
             home_scene_channel_id=_bound_id("player-homes"),
             log_channel_id=_bound_id("bot-logs"),

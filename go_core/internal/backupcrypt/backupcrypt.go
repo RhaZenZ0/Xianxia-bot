@@ -57,8 +57,10 @@ func IsEncryptedName(name string) bool { return strings.HasSuffix(name, Suffix) 
 func deriveKey(passphrase string, salt []byte) []byte {
 	// PBKDF2-HMAC-SHA256 (RFC 8018 §5.2) with one block, since 32 bytes is
 	// exactly one SHA-256 output. Written out rather than imported because the
-	// module pins Go 1.23, which has no crypto/pbkdf2, and x/crypto is not a
-	// dependency this engine otherwise needs.
+	// module predates crypto/pbkdf2 (standard library since Go 1.24) and
+	// x/crypto is not a dependency this engine otherwise needs. Swapping the
+	// standard package in is deferred in docs/TODO.md: it must derive the same
+	// key byte for byte, or every backup already written stops opening.
 	prf := hmac.New(sha256.New, []byte(passphrase))
 	prf.Write(salt)
 	prf.Write([]byte{0, 0, 0, 1})

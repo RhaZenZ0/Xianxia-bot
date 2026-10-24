@@ -2,8 +2,8 @@
 moderation verbs (mute/unmute/freeze/unfreeze/ban/unban), /admin family,
 /admin npc, /admin simulation, /admin server backup and audit.
 
-Phase 7 of the main.py split (v0.19.42, docs/history/MAIN_SPLIT_PLAN.md). Reads core,
-runtime, services, locations, pickers, formatting and app.*; never main.py.
+Phase 7 of the main.py split (v0.19.42, docs/history/MAIN_SPLIT_PLAN.md). Reads the
+bot package's modules below it, world_ops beside it and app.*; never main.py.
 Definition order is the order these had in main.py.
 """
 from __future__ import annotations

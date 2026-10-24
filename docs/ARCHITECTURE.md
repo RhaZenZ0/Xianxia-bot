@@ -47,7 +47,7 @@ Emptiness is `claimed_game_minute`, never `claimed_by_user_id` — the latter an
 
 ### One system's error ends the tick (`npc_consignments`, schema 50)
 
-`runSystems` walks `orderedSystems` and `return`s on the first error, so a batch that throws does
+`RunDue` walks `orderedSystems` and `return`s on the first error, so a batch that throws does
 not merely fail — it takes every batch ordered after it, and the whole `advancedMaintenance` bundle,
 with it. `npc_consignments` is fifth of eight.
 

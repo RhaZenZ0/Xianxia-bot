@@ -138,7 +138,7 @@ ledger's inventory named these, each one walk over its package:
 - **A panel provider never raises.** Seven providers are each held by their own instance test;
   the walk reads every provider registered for a panel line and asks for the wrap that costs the
   line and not the card (v1.0.10).
-- **Every batch skips a bad row.** `RunDue` (the function the rule still calls `runSystems`)
+- **Every batch skips a bad row.** `RunDue` (which the rule called `runSystems` until v1.39.2)
   returns on the first error, and no walk holds that a batch never returns an error over one
   row's data; the walk reads every system's row loop for a `return err` inside it.
 - **Every lock on state only an action clears** self-clears (rc.56, v1.0.4): seclusion is held,

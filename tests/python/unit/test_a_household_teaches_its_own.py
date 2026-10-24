@@ -3,7 +3,7 @@
 Eight of the thirteen birth households handed a child **another sect's** entry
 canon as the family's own teaching - a fallen martial clan teaching the Azure
 Cloud Sect's sword canon, a tomb-watch clan teaching the Jade Meridian Sect's -
-and `sect_actions.py`'s one reader of `manual.sect` is the sect-inheritance
+and `sect_actions.go`'s one reader of `manual.sect` is the sect-inheritance
 redemption list, so those ids are literally that sect's material. The other five
 handed out a procedurally generated manual with its catalogue index in the title
 ("Starfall Scripture - Sword Cultivator 25"), and two of those named a Sword

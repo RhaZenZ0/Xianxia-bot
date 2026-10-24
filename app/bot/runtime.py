@@ -25,7 +25,7 @@ import discord
 
 # NOT UNUSED, and it must never be trimmed as such.
 #
-# serialized_user_action below wraps ~119 command callbacks that live in other
+# serialized_user_action below wraps the command callbacks that live in other
 # modules. functools.wraps copies __name__ and __doc__ but CANNOT copy
 # __globals__ - that belongs to the code object's defining module - so the
 # wrapper discord.py receives carries THIS module's globals. main.py uses
@@ -131,11 +131,12 @@ async def character_location_display(character: dict[str, Any]) -> str:
         if family and location == f"birth_family:{int(family.get('family_id') or 0)}":
             return f"{family.get('family_name') or 'Birth Family'} Household"
     return location
-# Shared by /storage (main.py) and /sect -> Contribute/Redeem (commands/sect.py).
-# It is referenced as a bare `@app_commands.autocomplete(item=carried_item_autocomplete)`
-# argument in both, which evaluates at module-IMPORT time rather than call time -
-# a deferred `from ..main import` (the pattern used for names like SIM below)
-# cannot reach it, so it lives here instead of being duplicated.
+# Shared by /storage (commands/economy.py) and /sect -> Contribute/Redeem
+# (commands/sect.py). It is referenced as a bare
+# `@app_commands.autocomplete(item=carried_item_autocomplete)` argument in both,
+# which evaluates at module-IMPORT time rather than call time - a deferred
+# `from ..main import` (the pattern the split phases used for names like SIM)
+# could not reach it, so it lives here instead of being duplicated.
 async def carried_item_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
     inv = await DB.get_inventory(interaction.user.id); needle = current.casefold().strip(); out = []
     for item_id, qty in inv.items():

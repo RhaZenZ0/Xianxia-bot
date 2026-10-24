@@ -95,7 +95,7 @@ func RegisterNPCTx(conn *storage.Conn, npc RegisteredNPC, gameMinute int64) (boo
 	// into silence rather than an error - every clash check passing, and the
 	// world free to register somebody already in the content file. The guard
 	// stays (a database mid-migration has no content tables yet), which is
-	// why `TestARegisteredNameNeverShadowsTheContentFile` asserts the refusal
+	// why `TestTheContentFileKeepsItsNames` asserts the refusal
 	// against a real content_npcs row rather than trusting the branch.
 	if tableExistsTx(conn, "content_npcs") {
 		clash, err := conn.Execute(`SELECT 1 FROM content_npcs WHERE name=?`, []any{name})

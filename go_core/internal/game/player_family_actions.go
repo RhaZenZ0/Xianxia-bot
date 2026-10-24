@@ -80,7 +80,7 @@ type playerFamilyPayload struct {
 	Gender        string `json:"gender"`
 }
 
-// livingCharacter is the one check every one of these shares.
+// livingCharacterName is the one check every one of these shares.
 func livingCharacterName(conn *storage.Conn, userID int64) (string, error) {
 	res, err := conn.Execute(
 		`SELECT name FROM characters WHERE user_id=? AND life_status='alive'`, []any{userID})

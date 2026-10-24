@@ -224,14 +224,6 @@ func recordProfessionExamTx(conn *storage.Conn, userID int64, rec professionExam
 	return err
 }
 
-// teachRankRecipesTx teaches the trade's recipes at exactly this rank, and
-// says how many were new.
-//
-// Exactly this rank, not every rank up to it: an examination certifies what a
-// candidate has just become, and the ranks below it were certified by their own
-// examinations or bought a slip at a time. Idempotent, like
-// `teachTradeMethodsTx` - a method already known is left alone, so somebody who
-// bought the slip early keeps their earlier `learned_game_minute`.
 // worldOffers is everything the content says can be had inside one world
 // without luck (v1.3.0): a shelf in that world, a guaranteed item in a room of
 // a realm standing in it, the world's own tier materials, and the tier-flat
@@ -299,6 +291,14 @@ func rankRecipesWhereTheyCanBeMade(catalog worlddata.Catalog, trade string, rank
 	return teachable, withheld
 }
 
+// teachRankRecipesTx teaches the trade's recipes at exactly this rank, and
+// says how many were new.
+//
+// Exactly this rank, not every rank up to it: an examination certifies what a
+// candidate has just become, and the ranks below it were certified by their own
+// examinations or bought a slip at a time. Idempotent, like
+// `teachTradeMethodsTx` - a method already known is left alone, so somebody who
+// bought the slip early keeps their earlier `learned_game_minute`.
 func teachRankRecipesTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, trade string, rank, gameMinute int64, now float64, world string) ([]string, []string, error) {
 	names, withheld := rankRecipesWhereTheyCanBeMade(catalog, trade, rank, world)
 	taught := make([]string, 0, len(names))

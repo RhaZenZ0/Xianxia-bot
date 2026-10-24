@@ -3,11 +3,13 @@ the two thread spawners that post it.
 
 Phase 8 of the main.py split (v0.19.43, docs/history/MAIN_SPLIT_PLAN.md). The panel
 launches commands that live in many modules; it has always reached them
-through the EVENT_HANDLERS registry rather than by import, and main.py fills
-that registry at import time. The three helpers it used to call directly
-(_scene_action_targets, scene_action_panel, _battle_panel - the plan's
-"five back-edges") now go through the same registry, so this module reads
-nothing from main.py. Definition order is the order these had in main.py.
+through the EVENT_HANDLERS registry rather than by import, and the command
+modules fill that registry when they are imported (surface.py registers the
+commands, commands/scene.py and commands/battle.py their panels). The three
+helpers it used to call directly (_scene_action_targets, scene_action_panel,
+_battle_panel - the plan's "five back-edges") go through the same registry,
+so this module reads nothing above it. Definition order is the order these
+had in main.py.
 """
 from __future__ import annotations
 
@@ -515,11 +517,11 @@ class EventSceneView(CardView):
     async def _open_scene_actions(self, interaction: discord.Interaction, *, default_action: str) -> None:
         character=await self._character_here(interaction)
         if character is None:return
-        # Phase 8 (v0.19.43): the scene-action and battle panels are still
-        # defined in main.py (they move with their commands in phase 9), so
-        # this view reaches them the way it already reaches every command it
-        # launches - through the EVENT_HANDLERS registry main.py fills at
-        # import - rather than importing main.py.
+        # Phase 8 (v0.19.43): the scene-action and battle panels are defined
+        # with their commands (commands/scene.py, commands/battle.py), so this
+        # view reaches them the way it reaches every command it launches -
+        # through the EVENT_HANDLERS registry those modules fill at import -
+        # rather than importing them.
         npcs = await EVENT_HANDLERS.invoke("scene_action_targets", character)
         _view, kwargs = await EVENT_HANDLERS.invoke(
             "scene_action_panel",

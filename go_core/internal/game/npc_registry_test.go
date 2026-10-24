@@ -171,8 +171,6 @@ func TestTheShippedTraitPoolsAreRealProse(t *testing.T) {
 	}
 }
 
-// --- from npc_whereabouts_edges_test.go ---
-
 // The two edges where the Python twin (`current_npc_location`) disagreed with
 // this resolver (v1.12.3). The engine is authoritative, so these pin what it
 // answers and `tests/python/contracts/test_who_is_here.py` holds the twin to

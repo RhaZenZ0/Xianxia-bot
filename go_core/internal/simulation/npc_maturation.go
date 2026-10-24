@@ -20,8 +20,8 @@ package simulation
 // `npc_registry` so `/talk` can find them, and rows in the two simulation
 // tables so every tick that reads `WHERE status='alive'` starts offering them.
 // From that moment they are an ordinary NPC - the romance step can court them,
-// the deeds step can send them out, and `npcNaturalDeaths` will eventually
-// bury them.
+// the deeds step can send them out, and the old-age sweep in `npcLife` will
+// eventually bury them.
 
 import (
 	"fmt"

@@ -702,7 +702,7 @@ async def _confirm_note(interaction: discord.Interaction, action: "HubAction") -
 
 # One database session for a whole panel refresh (v1.31.2). A refresh asked the
 # hidden-action providers, the curriculum and the status card in turn, and every
-# `DB.get_x()` each of them made bought its own engine session - open, one
+# `DB.get_*()` each of them made bought its own engine session - open, one
 # statement, close - so a press on most hubs cost thirty-two sessions for
 # thirty-two one-row reads, three HTTP round trips apiece. The surface registers
 # `Database.reuse_connection`, which is the opt-in scope the narrator's context
@@ -2557,7 +2557,7 @@ class HubResultActionButton(discord.ui.Button):
 # Injected rather than read, because `test_bot_package` puts `hubs` and
 # `runtime` in one tier and refuses an import between them - the same reason
 # `app/rules/feature_unlocks.py` takes its roster and `describe_era` takes its
-# cycle. `surface.py` registers it at import, beside the four gates it already
+# cycle. `surface.py` registers it at import, beside the other hooks it already
 # registers here.
 #
 # The default is the fifteen minutes this was before the setting existed, so a

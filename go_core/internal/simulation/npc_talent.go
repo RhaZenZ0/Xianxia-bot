@@ -15,7 +15,7 @@ package simulation
 // who do not stop worth writing about.
 //
 // It is derived rather than stored, off `hash64(name)`, which is the same seed
-// `bootstrapNPCs` already draws wealth, influence and ambition from and the
+// `bootstrapCoreState` already draws wealth, influence and ambition from and the
 // same idiom `bootstrap_households.go` uses so that the same content makes the
 // same world twice. Nothing is written, no column is added, and asking twice
 // gives the same answer forever.
@@ -74,7 +74,7 @@ func npcTalentBand(name, profession string) int64 {
 		strings.Contains(p, "steward"), strings.Contains(p, "auctioneer"):
 		bands = talentMundane
 	}
-	// A distinct slice of the seed from the three `bootstrapNPCs` already
+	// A distinct slice of the seed from the three `bootstrapCoreState` already
 	// spends, so talent does not correlate with how rich somebody started.
 	roll := int64((hash64(name, "talent") / 13) % 100)
 	for i, cutoff := range bands.cutoffs {

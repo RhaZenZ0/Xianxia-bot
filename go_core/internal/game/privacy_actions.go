@@ -211,18 +211,6 @@ type erasureSweep struct {
 	RowsAnonymised int64
 }
 
-// applyErasureTargets is the one statement of how a person's rows are removed.
-// Both callers walk the same targets in the same order: `admin.player.erase`,
-// which honours a data-protection request, and `character.reset`, which is a
-// player abandoning a life they have only just begun (v1.0.1). They must not
-// drift - the whole reason `erasureTargets` reads the live schema is that a
-// hand-written list of 104 tables goes stale, and two hand-written loops over
-// it would go stale against each other as well.
-//
-// `keep` is the one thing that varies: the reset keeps the engine's own record
-// of a request, and its own record that it happened. It is an extra SQL
-// predicate per "table.column", ANDed onto the DELETE. Erasure passes nil,
-// because a data-protection request keeps nothing.
 // erasedOwnerKey is what caravans.owner_key becomes for an erased owner: the
 // column is TEXT NOT NULL and outside erasureSubjectColumns, so the schema walk
 // never sees it, and the settlement (payCaravanOwner) and the collect already
@@ -260,6 +248,18 @@ func eraseUnwalkedLinksTx(conn *storage.Conn, userID int64, now float64) (map[st
 	return out, nil
 }
 
+// applyErasureTargets is the one statement of how a person's rows are removed.
+// Both callers walk the same targets in the same order: `admin.player.erase`,
+// which honours a data-protection request, and `character.reset`, which is a
+// player abandoning a life they have only just begun (v1.0.1). They must not
+// drift - the whole reason `erasureTargets` reads the live schema is that a
+// hand-written list of 104 tables goes stale, and two hand-written loops over
+// it would go stale against each other as well.
+//
+// `keep` is the one thing that varies: the reset keeps the engine's own record
+// of a request, and its own record that it happened. It is an extra SQL
+// predicate per "table.column", ANDed onto the DELETE. Erasure passes nil,
+// because a data-protection request keeps nothing.
 func applyErasureTargets(conn *storage.Conn, userID int64, targets []erasureTarget, keep map[string]string) (erasureSweep, error) {
 	sweep := erasureSweep{Deleted: map[string]any{}, Anonymised: map[string]any{}}
 	for _, target := range targets {

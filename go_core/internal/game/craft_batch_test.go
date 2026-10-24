@@ -202,8 +202,6 @@ func TestCraftIsAllOrAQuantityNotBoth(t *testing.T) {
 	}
 }
 
-// --- from whole_roll_test.go ---
-
 // A result that reports a roll reports the whole roll (v1.0.3).
 //
 // `/craft` raised `AttributeError: no attribute 'die1'` on every craft that got

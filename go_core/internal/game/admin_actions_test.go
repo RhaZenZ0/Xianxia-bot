@@ -1524,8 +1524,6 @@ func TestAFindThroughTheSwitchPathPersists(t *testing.T) {
 	}
 }
 
-// --- from admin_narration_test.go ---
-
 // The narration chain is presentation, not canonical mechanics, so the engine
 // stores and audits it without ever reading it back: which slugs are real, and
 // which are free, is Python's question. What Go owns here is that the choice
@@ -1616,8 +1614,6 @@ func TestNarrationChainRejectsAnUnknownSlot(t *testing.T) {
 		t.Fatalf("a rejected write must store nothing, got %v", got)
 	}
 }
-
-// --- from snowflake_payload_test.go ---
 
 // A Discord id is too big for a float, and the payload was decoded into one
 // (v1.0.12).
