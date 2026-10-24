@@ -150,9 +150,12 @@ class AppLayoutTests(unittest.TestCase):
             self.assertTrue((PROJECT_ROOT / name).is_file(), name)
         update = (PROJECT_ROOT / "update.sh").read_text(encoding="utf-8")
         self.assertIn('for required in VERSION startup.sh stop.sh docker-compose.yml go_core app content;', update)
-        # The stale release marker (it described v0.19.24) is history now.
+        # The stale release marker (it described v0.19.24) is history now: a
+        # section of the merged point-release notes, under its old filename.
         self.assertFalse((PROJECT_ROOT / "RELEASE.txt").exists())
-        self.assertTrue((PROJECT_ROOT / "docs" / "history" / "V019_24_RELEASE.txt").is_file())
+        notes = PROJECT_ROOT / "docs" / "history" / "RELEASE_NOTES_0_19_TO_0_25.md"
+        self.assertTrue(notes.is_file())
+        self.assertIn("## `V019_24_RELEASE.txt`", notes.read_text(encoding="utf-8"))
 
     def test_nothing_in_the_repository_names_an_old_path(self):
         # Sources, tests, scripts and the container files. Docs are history.

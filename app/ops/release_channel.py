@@ -1,7 +1,7 @@
 """The release channel: what "a newer release exists" means, in one place.
 
 Releases are GitHub Releases on the project repository (v0.20.4,
-docs/history/V020_RELEASE_NOTES.md). Each carries `xianxia_rp_v<version>.zip` and a
+docs/history/RELEASE_NOTES_0_19_TO_0_25.md). Each carries `xianxia_rp_v<version>.zip` and a
 `.sha256` sidecar, built by the release job in .github/workflows/ci.yml from
 the tag. Two
 channels:
