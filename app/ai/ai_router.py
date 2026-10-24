@@ -478,6 +478,66 @@ def _response_provider(response: Any) -> str:
     return str(value or "").strip()
 
 
+# What a provider says when the reply ran into `max_tokens` instead of ending
+# itself. OpenRouter normalises every upstream to "length" and carries the
+# upstream's own word beside it as `native_finish_reason` (Anthropic says
+# "max_tokens"); Google's candidate says MAX_TOKENS.
+_CUT_AT_BUDGET_REASONS = frozenset({"length", "max_tokens", "max_output_tokens"})
+
+# Where a sentence ends: a terminator, then any closing quote or markdown mark
+# the model put after it, then whitespace or the end of the reply.
+_SENTENCE_END_RE = re.compile(r"[.!?…](?:[\"'”’*_)\]]+)?(?=\s|$)")
+
+
+def _reason_word(value: Any) -> str:
+    """A finish reason as one lowercase word, whatever shape the SDK gave it.
+
+    OpenAI hands a plain string; google-genai hands an enum whose `str()` is
+    `FinishReason.MAX_TOKENS`, so the name is read and the class dropped.
+    """
+    word = str(getattr(value, "name", None) or value or "").strip().lower()
+    return word.rsplit(".", 1)[-1]
+
+
+def _finish_reason(choice: Any) -> str:
+    """Why the choice ended, read off the choice or its extras."""
+    for attribute in ("finish_reason", "native_finish_reason"):
+        value = getattr(choice, attribute, None)
+        if value is None:
+            extra = getattr(choice, "model_extra", None)
+            if isinstance(extra, dict):
+                value = extra.get(attribute)
+        if value:
+            return _reason_word(value)
+    return ""
+
+
+def _cut_at_budget(reason: str) -> bool:
+    return _reason_word(reason) in _CUT_AT_BUDGET_REASONS
+
+
+def _trim_to_last_sentence(text: str) -> str:
+    """The reply up to the last sentence the model finished (v1.39.2).
+
+    A reply that hit its token budget ends wherever the budget ran out - in
+    the middle of a word, a name, a line of dialogue - and shipped that way for
+    as long as the router has existed, because the finish reason was never
+    read: a breakthrough's narration reached the player as "The Core
+    Disciple's crimson sash catches". The cut is made after the last
+    terminator the model wrote, with any closing quote or markdown mark after
+    it. A reply with no finished sentence at all is kept and marked with an
+    ellipsis rather than thrown away: a torn opening still reads better than
+    the procedural line that an empty reply would be replaced with.
+    """
+    value = str(text or "").rstrip()
+    last = None
+    for match in _SENTENCE_END_RE.finditer(value):
+        last = match
+    if last is None:
+        return value + "…"
+    return value[: last.end()].rstrip()
+
+
 def _response_error(response: Any) -> str:
     """Describe the error OpenRouter can attach to a 200 with no `choices`.
 
@@ -1089,6 +1149,9 @@ class AITaskRouter:
                 "empty_responses": 0,
                 "reasoning_salvaged": 0,
                 "scratchpad_rejected": 0,
+                # v1.39.2: replies that ran into `max_tokens` and were
+                # trimmed to their last finished sentence.
+                "cut_at_budget": 0,
                 "skipped_route_limit": 0,
                 # None until the route has been probed at all: "not yet asked"
                 # and "asked, answered" must not render the same way.
@@ -1451,6 +1514,7 @@ class AITaskRouter:
                     ),
                     "reasoning_salvaged": int(row["reasoning_salvaged"]),
                     "scratchpad_rejected": int(row["scratchpad_rejected"]),
+                    "cut_at_budget": int(row["cut_at_budget"]),
                     "consecutive_failures": int(row["consecutive_failures"]),
                     "cooldown_seconds": float(row["cooldown_seconds"]),
                     "last_provider": str(row["last_provider"]),
@@ -1585,7 +1649,7 @@ class AITaskRouter:
                     # goes through _validate_generated_text below exactly like
                     # an OpenRouter reply, so a scratchpad or a prompt leak is
                     # rejected and the chain falls through to OpenRouter.
-                    raw_text = await self.google_route.complete(
+                    reply = await self.google_route.complete(
                         model=model,
                         system_prompt=system_prompt,
                         prompt=prompt,
@@ -1593,7 +1657,11 @@ class AITaskRouter:
                         temperature=temperature,
                         timeout_seconds=timeout_seconds,
                     )
-                    text = _google_validated(raw_text, leak_guard, self._model_row(model))
+                    text = _google_validated(reply.text, leak_guard, self._model_row(model))
+                    if _cut_at_budget(reply.finish_reason):
+                        text = _trim_to_last_sentence(text)
+                        self._model_row(model)["cut_at_budget"] += 1
+                        log.info("AI_CUT_AT_BUDGET model=%s budget=%s", model, output_tokens)
                     success_row = self._model_row(model)
                     success_row["successes"] += 1
                     success_row["last_success_at"] = time.time()
@@ -1631,6 +1699,7 @@ class AITaskRouter:
                         else "OpenRouter returned no choices and no error body"
                     )
                 message = response.choices[0].message
+                finish_reason = _finish_reason(response.choices[0])
                 raw_text = _extract_text(getattr(message, "content", None))
                 if not raw_text:
                     # Empty content is a different failure from a 429 and is
@@ -1646,6 +1715,14 @@ class AITaskRouter:
                     self._model_row(model)["scratchpad_rejected"] += 1
                     log.info("AI_SCRATCHPAD_REJECTED model=%s", model)
                     raise
+                if _cut_at_budget(finish_reason):
+                    # The budget cut the reply, not the model: ship it to the
+                    # last sentence it finished, and count it where the
+                    # dashboard's route table can show a budget that is too
+                    # small for the length the prompt asks.
+                    text = _trim_to_last_sentence(text)
+                    self._model_row(model)["cut_at_budget"] += 1
+                    log.info("AI_CUT_AT_BUDGET model=%s budget=%s", model, output_tokens)
                 success_row = self._model_row(model)
                 success_row["successes"] += 1
                 success_row["last_success_at"] = time.time()

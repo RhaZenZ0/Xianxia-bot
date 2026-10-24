@@ -316,6 +316,16 @@ still passes through `_validate_generated_text`, so it is not trusted more than 
 `google-genai` is an optional, lazily imported dependency: absent or incompatible, the route is left
 out of the chain and `ai_status` reports why.
 
+A reply that ran into its token budget is trimmed, not shipped torn (v1.39.2). Every reply carries a
+finish reason - OpenRouter's `length`, Google's `MAX_TOKENS` on the first candidate - and
+`generate()` reads it on both transports: a reply the budget cut is trimmed by
+`_trim_to_last_sentence` to the last terminator the model wrote (closing quote or markdown mark
+included), one with no finished sentence at all is kept with an ellipsis, and the cut is counted per
+route as `cut_at_budget` (the *Cut short* column of the dashboard's Routes table, a line in the
+monitor's narration report). The length the prompts ask for is one pair of constants in
+`narrator.py` (`ROUTINE_WORDS`, `EPIC_WORDS`), and `test_narrator_budget.py` holds every
+`_generate` call's budget to the range its tier is given, at 1.4 tokens a word.
+
 Every `ROUTE_AUDIT_HOURS` (v0.27.0, default 24, `0` off) `audit_routes()` pings each configured route
 with the cheapest call the API takes — one character in, `max_tokens=1`, reply discarded unread — and
 retires the ones that answer `401`/`403`/`404`. A `400` is not a verdict but a family of causes, so

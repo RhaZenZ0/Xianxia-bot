@@ -169,11 +169,11 @@ class SdkShapeTests(unittest.TestCase):
     def test_the_interactions_api_is_used_when_present(self):
         calls = install_genai_shim([NARRATION], shape="interactions")
         route = GoogleAIStudioRoute("k")
-        text = asyncio.run(route.complete(
+        reply = asyncio.run(route.complete(
             model=DEFAULT_GOOGLE_MODEL, system_prompt="sys", prompt="user",
             max_output_tokens=200, temperature=0.7, timeout_seconds=5,
         ))
-        self.assertEqual(text, NARRATION)
+        self.assertEqual(reply.text, NARRATION)
         self.assertEqual(calls[0]["surface"], "interactions")
         self.assertEqual(calls[0]["model"], "gemini-3.8-flash")
         self.assertEqual(calls[0]["input"], "user")
@@ -181,11 +181,11 @@ class SdkShapeTests(unittest.TestCase):
     def test_generate_content_is_used_when_interactions_is_absent(self):
         calls = install_genai_shim([NARRATION], shape="generate_content")
         route = GoogleAIStudioRoute("k")
-        text = asyncio.run(route.complete(
+        reply = asyncio.run(route.complete(
             model=DEFAULT_GOOGLE_MODEL, system_prompt="sys", prompt="user",
             max_output_tokens=200, temperature=0.7, timeout_seconds=5,
         ))
-        self.assertEqual(text, NARRATION)
+        self.assertEqual(reply.text, NARRATION)
         self.assertEqual(calls[0]["surface"], "generate_content")
         self.assertEqual(calls[0]["contents"], "user")
 
@@ -214,6 +214,49 @@ class SdkShapeTests(unittest.TestCase):
         snapshot = router.health_snapshot()["google_route"]
         self.assertTrue(snapshot["configured"])
         self.assertFalse(snapshot["available"])
+
+
+class BudgetCutTests(unittest.TestCase):
+    """The same trim as the OpenRouter side (v1.39.2): a candidate that says
+    MAX_TOKENS was cut by the budget, not ended by the model."""
+
+    def tearDown(self):
+        uninstall_genai_shim()
+
+    def test_a_reply_google_cut_at_its_budget_ends_on_a_sentence_and_is_counted(self):
+        from types import SimpleNamespace
+
+        torn = "Rain finds the courtyard first. The disciples do not move, and the eldest of them lifts"
+        install_genai_shim([SimpleNamespace(text=torn, candidates=[SimpleNamespace(finish_reason="MAX_TOKENS")])], shape="generate_content")
+        router = AITaskRouter(api_key="sk-or-test", google_api_key="k")
+        result = _generate(router)
+        self.assertTrue(is_aistudio_route(result.model))
+        self.assertEqual(result.text, "Rain finds the courtyard first.")
+        row = next(r for r in router.health_snapshot()["models"] if is_aistudio_route(r["model"]))
+        self.assertEqual(row["cut_at_budget"], 1)
+
+    def test_the_enum_the_sdk_hands_is_read_by_its_name(self):
+        from enum import Enum
+        from types import SimpleNamespace
+
+        class FinishReason(Enum):
+            STOP = "STOP"
+            MAX_TOKENS = "MAX_TOKENS"
+
+        install_genai_shim([SimpleNamespace(text="One sentence. Then a torn", candidates=[SimpleNamespace(finish_reason=FinishReason.MAX_TOKENS)])])
+        route = GoogleAIStudioRoute("k")
+        reply = asyncio.run(route.complete(
+            model=DEFAULT_GOOGLE_MODEL, system_prompt="s", prompt="p",
+            max_output_tokens=200, temperature=0.7, timeout_seconds=5,
+        ))
+        self.assertEqual(reply.finish_reason, "max_tokens")
+
+    def test_a_reply_the_model_ended_itself_is_left_whole(self):
+        from types import SimpleNamespace
+
+        install_genai_shim([SimpleNamespace(text="One sentence. Then a torn", candidates=[SimpleNamespace(finish_reason="STOP")])])
+        router = AITaskRouter(api_key="sk-or-test", google_api_key="k")
+        self.assertEqual(_generate(router).text, "One sentence. Then a torn")
 
 
 def _router_with_openrouter_reply(text, *, google_key=None):
