@@ -1,6 +1,6 @@
 package game
 
-// A doc comment names the declaration it sits on (v1.39.2).
+// A doc comment names the declaration it sits on (v1.39.3).
 //
 // A comment pass over the whole tree found no dead code, no debris and no
 // typos, and about thirty comments that had quietly stopped being true. The

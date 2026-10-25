@@ -9051,7 +9051,51 @@ refuse (rc.46), politely. The engine's `merchant.status` already says who is `me
 offers those and nobody else, and a `register_hub_option_hint` says where the rest walk when none
 is within reach.
 
-### The comments say what the code says (v1.39.2)
+### A reply cut at its budget (v1.39.2)
+
+Reported as *"Too much text"*, with the breakthrough's narration pasted: nine lines of mechanics, then
+four paragraphs ending *"The Core Disciple's crimson sash catches"*. Two faults in one paste, and
+neither was the model's.
+
+The second fault first, because it is the class. Every provider says why a reply ended - OpenRouter
+normalises it to `finish_reason: "length"` when `max_tokens` cut it, Google's candidate says
+`MAX_TOKENS` - and in the whole life of the router nothing read it. A reply the budget cut was
+validated, counted as served and shipped wherever the budget ran out: mid-word, mid-name, mid-line of
+dialogue. The scratchpad guard, the leak guard and the thinking-block strip all read the *content* of
+a reply; none asked whether the reply was finished, and the Google transport returned a bare string
+with the response - and its finish reason - dropped on the floor. `generate()` reads it now on both
+transports (`_finish_reason` on the choice and its extras, `GoogleReply.finish_reason` from the
+candidate's enum by name) and a cut reply is trimmed to the last sentence the model finished, closing
+quote or markdown mark included; a reply with no finished sentence at all is kept with an ellipsis
+rather than raised as empty, since the procedural line it would be replaced with is worse than a torn
+opening. The count is per route (`cut_at_budget`), on the dashboard's Routes table as *Cut short*
+and in the monitor's narration report, because a route that is cut often is a budget too small for
+its prompt and nobody could see it. One door: the five narrator scenes, the Quest Forge and the chat
+monitor all answer through `generate()`, so one read of the reason covers every caller - which is
+what *"look for the same cut-off in different systems"* came to: every slice the bot makes at a
+Discord limit (`[:4096]`, `[:1024]`) sits far above what 280 tokens can reach, so the token budget was
+the one cut a player hits, and it had one door.
+
+The first fault is why the budget was hit at all. `SYSTEM_PROMPT` said *"Major scenes: usually
+120-240 words"* and the breakthrough's call allowed 280 tokens, which hold about 200 words of this
+prose (a pinyin name is three tokens; a bold mark is one); the routine rule said 70-160 words against
+calls of 170 to 190 tokens, which hold about 120. The model did what it was told and wrote to the
+range, and the budget did what it was set to and cut it - rc.56's *promise a setting can falsify*,
+with the prompt as the promise and `max_output_tokens` as the setting, and no test reading one
+against the other. The ranges are one pair of constants now (`ROUTINE_WORDS = (60, 120)`,
+`EPIC_WORDS = (100, 150)`), stated in both prompts as a ceiling with *"end on a complete sentence"*
+and never as *usually*, the breakthrough asks for two or three short paragraphs, and
+`TheLengthAskedFitsTheBudgetTests` reads every `_generate` call's `max_output_tokens` and `tier` by
+AST (through `x if epic else y`) and holds `hi * 1.4 <= tokens` for the range the tier is given. Its
+drills: restore the old 240 and it prints *"narrate_breakthrough (epic) allows 280 tokens and the
+style rules ask for up to 240 words: the model writes to the range and the budget cuts it
+mid-sentence"*; put *usually* back and the prompt test says the range is a ceiling, not a usual.
+`CutAtBudgetTests` and `BudgetCutTests` drill the trim on each transport: a torn reply with
+`finish_reason="length"` comes back whole to its last sentence and counted, the same text with
+`"stop"` comes back untouched and uncounted, and a cut reply with no terminator comes back marked,
+not empty.
+
+### The comments say what the code says (v1.39.3)
 
 A pass over every comment in the tree, asked for as a clean-up, found the comments in good shape
 in every way a linter could measure - no commented-out code, no TODO or FIXME debris, no doubled

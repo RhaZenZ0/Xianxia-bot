@@ -602,6 +602,7 @@ async function loadAiRouting(){
    ['Why it failed',why],
    ['Skipped',r=>n(Number(r.skipped_cooling||0)+Number(r.skipped_route_limit||0)+Number(r.skipped_probe_retired||0))],
    ['Scratchpad',r=>r.scratchpad_rejected?pill(r.scratchpad_rejected,'warn'):'0'],
+   ['Cut short',r=>r.cut_at_budget?pill(r.cut_at_budget,'warn'):'0'],
    ['Probe',r=>r.probe_ok===null||r.probe_ok===undefined?'<span class="muted">not probed</span>':(r.probe_ok?pill('ok','good'):pill('failed','bad'))],
    ['Served by','last_provider'],
    ['Own key',r=>r.byok===null||r.byok===undefined?'—':(r.byok?pill('yes','good'):pill('shared pool','warn'))],

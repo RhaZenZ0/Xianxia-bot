@@ -1,4 +1,4 @@
-"""A comment that names code names code that exists (v1.39.2).
+"""A comment that names code names code that exists (v1.39.3).
 
 A pass over every comment in the tree found no dead code, no debris and no
 typos, and about forty comments that had quietly stopped being true. They had

@@ -35,6 +35,8 @@ from app.ai.ai_router import (
     PROBE_400_UNCONFIRMED,
     NARRATION_SLOTS,
     _error_status,
+    _finish_reason,
+    _trim_to_last_sentence,
 )
 
 
@@ -1527,3 +1529,66 @@ class FreeCatalogueTests(unittest.TestCase):
         result = asyncio.run(router.fetch_free_catalogue())
         self.assertEqual(result["models"], [])
         self.assertIn("OPENROUTER_API_KEY", result["error"])
+
+
+# ---------------------------------------------------------------------------
+# A reply cut at its budget (v1.39.2)
+
+
+TORN = (
+    "A furnace coughs, its roar dropping an octave. *Stage 3. The soul's architecture firms.*\n\n"
+    "Deng Tian leans on his rail. The Core Disciple's crimson sash catches"
+)
+WHOLE = "A furnace coughs, its roar dropping an octave. *Stage 3. The soul's architecture firms.*\n\nDeng Tian leans on his rail."
+
+
+def _choice(content, **extra):
+    return _RawResponse(choices=[SimpleNamespace(message=SimpleNamespace(content=content), **extra)])
+
+
+class CutAtBudgetTests(unittest.TestCase):
+    """The finish reason was never read, so a reply that ran into `max_tokens`
+    shipped wherever the budget ran out: a breakthrough reached its player as
+    "The Core Disciple's crimson sash catches". A reply the budget cut is
+    trimmed to the last sentence the model finished and counted on the route;
+    one the model ended itself is never touched, torn or not."""
+
+    def test_a_reply_cut_at_its_budget_ends_on_its_last_finished_sentence(self):
+        router = _router([_choice(TORN, finish_reason="length")])
+        result = _generate(router)
+        self.assertEqual(result.text, WHOLE)
+        row = next(r for r in router.health_snapshot()["models"] if r["model"] == result.model)
+        self.assertEqual(row["cut_at_budget"], 1)
+        self.assertEqual(row["successes"], 1, "a trimmed reply is still a served reply")
+
+    def test_a_reply_the_model_ended_itself_is_not_trimmed(self):
+        # The same torn text with finish_reason=stop is what the model chose
+        # to say; the router has no business second-guessing it.
+        router = _router([_choice(TORN, finish_reason="stop")])
+        result = _generate(router)
+        self.assertEqual(result.text, TORN)
+        row = next(r for r in router.health_snapshot()["models"] if r["model"] == result.model)
+        self.assertEqual(row["cut_at_budget"], 0)
+
+    def test_the_reason_is_read_from_the_extras_and_the_upstreams_own_word(self):
+        self.assertEqual(_finish_reason(SimpleNamespace(finish_reason="length")), "length")
+        self.assertEqual(_finish_reason(SimpleNamespace(model_extra={"finish_reason": "length"})), "length")
+        self.assertEqual(_finish_reason(SimpleNamespace(finish_reason=None, native_finish_reason="MAX_TOKENS")), "max_tokens")
+        self.assertEqual(_finish_reason(SimpleNamespace()), "")
+        router = _router([_choice(TORN, finish_reason=None, native_finish_reason="max_tokens")])
+        self.assertEqual(_generate(router).text, WHOLE)
+
+    def test_a_cut_reply_with_no_finished_sentence_is_kept_and_marked(self):
+        # Trimming to nothing would raise as an empty reply and the player
+        # would read the procedural line instead of the opening the model wrote.
+        router = _router([_choice("The forge terraces at the hour the night shift", finish_reason="length")])
+        self.assertEqual(_generate(router).text, "The forge terraces at the hour the night shift…")
+
+    def test_the_trim_keeps_a_closing_quote_or_mark_after_the_terminator(self):
+        self.assertEqual(_trim_to_last_sentence('He says, "Enough." Then he'), 'He says, "Enough."')
+        self.assertEqual(_trim_to_last_sentence("*Stage 3.* The soul's"), "*Stage 3.*")
+        self.assertEqual(_trim_to_last_sentence("Is it done?! Nobody"), "Is it done?!")
+        self.assertEqual(_trim_to_last_sentence("It fades…  and then a"), "It fades…")
+        self.assertEqual(_trim_to_last_sentence("Clean end.  "), "Clean end.")
+        # A terminator inside a number or a name is not a sentence end.
+        self.assertEqual(_trim_to_last_sentence("He paid 3.5 stones to Mr"), "He paid 3.5 stones to Mr…")
