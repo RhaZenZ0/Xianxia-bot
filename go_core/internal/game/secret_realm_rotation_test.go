@@ -187,8 +187,6 @@ func TestTheRotationIsAQueryTheDashboardCanAsk(t *testing.T) {
 	}
 }
 
-// --- from rc2_views_test.go ---
-
 // v1.0.0-rc.2: the realm rotation rides on secret_realm.status, and the
 // dashboard can void an open trade offer with an audit row.
 
@@ -255,8 +253,6 @@ INSERT INTO trade_offers(from_user_id,to_user_id,location,give_json,status,creat
 		t.Fatalf("a second void should be refused, got %v", err)
 	}
 }
-
-// --- from spatial_key_test.go ---
 
 // The spatial keys (v1.0.0-rc.15). Three items carried `spatial_key` blocks
 // that `spatial_key.use` reads, and every one of them named a secret realm

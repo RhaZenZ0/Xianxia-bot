@@ -9094,3 +9094,76 @@ mid-sentence"*; put *usually* back and the prompt test says the range is a ceili
 `finish_reason="length"` comes back whole to its last sentence and counted, the same text with
 `"stop"` comes back untouched and uncounted, and a cut reply with no terminator comes back marked,
 not empty.
+
+### The comments say what the code says (v1.39.3)
+
+A pass over every comment in the tree, asked for as a clean-up, found the comments in good shape
+in every way a linter could measure - no commented-out code, no TODO or FIXME debris, no doubled
+words, no typos (codespell's hundred and twenty hits were ore, Rin and discreet) - and about forty
+of them false. None was carelessly written. Each had been true the day it was written and the code
+had moved underneath it, in four shapes:
+
+- **A function renamed, its doc not.** `roadSiteOnRoadOfKind says whether...` sat on
+  `roadSiteOnTheRoad`; nine more (`adminCommissionReview` over `adminQuestReview`,
+  `livingCharacter` over `livingCharacterName`, `vitalityRecoveryDefaults` over
+  `vitalityRecoverySettings`, the test helpers `setWorldClock`, `runCrimes`, `seedCondition`).
+- **A declaration inserted between a doc and its type.** `BirthFamilySendoff`'s six-line story sat
+  above `type CommissionGiver struct`, which godoc then documented twice while the sendoff type had
+  no doc at all; eleven of those, three in `catalog.go` alone, three docs piled on
+  `eraModifiersOrNone` where two functions between had been cut, and `cityOf`'s doc on `CityOf`.
+- **A name nothing declares.** `PLACE_COLUMNS_LEFT` (the test's list is `LEFT_ALONE`),
+  `tests/python/unit/test_the_ghost_ground_twin.py` (a class in `test_v131_engine_wires.py`),
+  `TestARegisteredNameNeverShadowsTheContentFile`, `bootstrapNPCs`, `npcNaturalDeaths`,
+  `era_modifier_vocabulary_test.go`, and `runSystems` three times - two comments and the Standing
+  rule in CLAUDE.md itself, for a function that has been `RunDue` since the clock moved.
+- **A fact that aged.** The `main.py` split's headers (v0.19.3x) still said the event-scene
+  commands "stay in main.py until phase 8" and the bot class "still lives in main.py", twenty
+  releases after `main.py` became a thirty-line composition root; `require_admin has 44 call
+  sites` (56), `~119 command callbacks` (165), `A panel lives fifteen minutes` (a setting since
+  v1.31), `jsonText is wrapped in esc() at all five of its call sites` (seven), the `45% discovery
+  roll` (`discoveryChancePercent` is 70), `the module pins Go 1.23, which has no crypto/pbkdf2`
+  (the module is on 1.26 and the package has been in the standard library since 1.24), and four of
+  six `file.go:NNN` pointers off by twenty to forty lines.
+
+Beside them, twenty-seven `// --- from abode_upgrade_currency_test.go ---` banners in twenty-three
+test files, each naming a test file merged away; a `core.py` banner split by a section inserted
+inside it; and `core_services.py`'s docstring written after its imports, so Python never saw it as
+the module's.
+
+**Why the gates missed it.** They are built not to see it. rc.52's rule is read code by AST, not
+by searching text, and every reader in the tree strips comments and docstrings first
+(`tests/support.code_only`, the Go parsers at mode 0) precisely so that prose cannot satisfy a gate
+about code. The cost is the mirror image: nothing holds prose to code, so a comment can name a
+function for twenty releases after the function is gone and no test goes red. Forty comments is
+what that costs over a year.
+
+**The gates.** Two readers, one per language, each the narrowest rule that catches the shapes
+above without touching the house style. `TestADocCommentNamesTheDeclarationItSitsOn`
+(`go_core/internal/game/doc_comments_test.go`) parses every file under `go_core` with comments and
+asks of every doc's first paragraph whether its opening word is identifier-shaped - camelCase, or a
+name the package declares - and not the declaration's own; a plain English opener ("An era belongs
+to one world") passes, a test function's doc is exempt because it rightly opens with the function
+it drives, and a later paragraph may open with a parameter or a helper. Its first cut flagged a
+hundred and four sites and was wrong about eighty of them (release labels, table names opening a
+sentence, tests' docs), which is how the rule got its three exemptions; the second cut flagged
+twenty-two, every one a defect, two of them (`seedCondition`, `setupEscrowDB`) the survey had not
+found. `test_a_comment_names_what_exists.py` tokenizes every comment and docstring under `app/`
+and `scripts/` and reads every `//` line of production Go for backticked tokens, and holds a file
+name to the tree and an identifier to a vocabulary built from code alone: Python names and
+non-docstring strings (f-strings included - 3.12 tokenizes them apart, which is why a first draft
+missed `Harvested`), Go words off non-comment lines, the content file, compose and the dashboard.
+Its first draft put docstrings in the vocabulary and so passed `PLACE_COLUMNS_LEFT` - the gate's own
+docstring, naming the things it hunts, had vouched for them. Prose is out of the vocabulary now, and
+`docs/FINDINGS.md` with it, or this section would vouch for every old name above. Each dated
+tombstone (`eraCycle` stood here until v1.0.7) and third-party name (google-genai's `ClientError`,
+discord.py's `ConnectionState.parse_interaction_create`) is in `ALLOWED` by file and token with a
+reason of twenty characters, and an entry no comment spells any more fails.
+
+**The drills.** `road_site_actions.go` restored from v1.39.1: three lines, each
+`the doc comment on roadSiteOnTheRoad opens a paragraph with "roadSiteOnRoadOfKind"`.
+`app/database/core.py` restored from v1.39.1: `` `PLACE_COLUMNS_LEFT` names PLACE_COLUMNS_LEFT,
+which no code in the tree spells `` and the same for `runSystems`. Both readers fail outright, not
+skip, below a floor of files, declarations and tokens seen. What neither reads is meaning: a
+comment naming the right function and the wrong behaviour passes, and the main.py-split headers
+would have passed both. That half was found by reading, and this release's answer to it is to say a
+thing without the number where the number will drift.

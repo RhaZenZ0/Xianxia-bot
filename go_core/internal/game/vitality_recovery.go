@@ -22,7 +22,7 @@ import (
 // same number of world days at every realm and what changes with cultivation
 // is what that share is worth.
 
-// vitalityRecoveryDefaults is what an unreadable or unauthored content block
+// vitalityRecoverySettings is what an unreadable or unauthored content block
 // answers: **no recovery**, not a rate of this function's invention. A
 // fallback that looks like a value is not a sentinel (the `seller_user_id=0`
 // lesson), and a healing rate nobody authored is exactly the kind of number

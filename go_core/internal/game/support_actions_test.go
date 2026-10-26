@@ -24,13 +24,6 @@ import (
 func setupSupportVoteDB(t *testing.T) string {
 	t.Helper()
 	path := setupBatch4AuthorityDB(t)
-	// The base fixture predates the money column the sheet reads; every test
-	// that pays a cultivator adds it the same way (batch5_authority_test.go:22).
-	conn, err := storage.Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer conn.Close()
 	batch4SetCanonicalGameMinute(t, path, 5000)
 	return path
 }

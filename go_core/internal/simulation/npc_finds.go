@@ -265,7 +265,7 @@ func (r *Runner) smuggleToNightMarket(conn *storage.Conn, world, itemID string, 
 }
 
 // blackMarketCurrency is the world's own tier-1 coin, the same one the
-// rotation stocks a post in (`worldCurrency`, bootstrap.go:91).
+// rotation stocks a post in (`worldCurrency`, in bootstrap.go).
 func (r *Runner) blackMarketCurrency(world string) string {
 	return r.worldCurrency(world)
 }

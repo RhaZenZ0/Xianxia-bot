@@ -1237,7 +1237,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     #
     # `npc_consignments` consigned an NPC's find with `seller_user_id=0` into a
     # column that is NOT NULL and foreign-keyed to `characters`, so SQLite
-    # refused every one of them. `runSystems` returns on the first error and
+    # refused every one of them. The tick (`RunDue`) returns on the first error and
     # that system is fifth of eight, so `sect_politics`, `clan_dynamics`,
     # `autonomous_world_events` and the whole maintenance bundle never ran
     # either - commissions never expired, auctions never settled, merchants

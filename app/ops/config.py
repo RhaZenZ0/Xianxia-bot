@@ -436,9 +436,9 @@ class Settings:
         # sent to the engine in every request payload. They are the engine's
         # own now (`actionCooldowns` in go_core/internal/game/cooldown_rules.go),
         # read from the same `.env` keys through compose, because a bound that
-        # lives in the client is not a bound. The AI-route and monitor
-        # cooldowns below are a different thing and stay: they meter
-        # OpenRouter, not a player.
+        # lives in the client is not a bound. The OpenRouter failure cooldown
+        # and the alert cooldown above are a different thing and stay: they
+        # meter OpenRouter and the alert webhook, not a player.
 
         update_channel = (os.getenv("UPDATE_CHANNEL") or "stable").strip().lower()
         if update_channel not in ("stable", "beta"):

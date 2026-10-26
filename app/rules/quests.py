@@ -267,8 +267,8 @@ def static_quest_seed_rows(definitions: dict[str, dict] | None = None) -> list[d
     They are seeded so the engine can tell a real quest key from an invented
     one. `commission.accept` decides "is this a commission?" by looking for a
     `quest_definitions` row with a giver; before v0.23.1 it decided "does this
-    quest exist?" the same way, so a key with no row - `first_steps` and
-    `totally_fake` alike - was accepted as an ordinary quest.
+    quest exist?" the same way, so a key with no row - `first_steps` and a
+    made-up key alike - was accepted as an ordinary quest.
 
     `giver_npc` is deliberately empty: these are not commissions, they occupy
     no commission slot and carry no deadline. The row exists to be found.

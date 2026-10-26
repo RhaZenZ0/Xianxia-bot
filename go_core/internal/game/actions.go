@@ -2072,13 +2072,12 @@ func adminSetSect(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (a
 	return map[string]any{"user_id": uid, "name": charRow["name"], "sect_name": sectName, "rank_name": rankName, "rank_level": rankLevel}, nil
 }
 
-// adminSetRealmPerfection directly sets progress (0-100) on a player's
-// cultivation (realm_perfection) or body (body_realm_perfection) perfection
-// track for one realm_index. Upserts - the row may not exist yet if the
-// player never started that realm's perfection quests, and forcing the GM
-// to pre-create it first would defeat the purpose of a direct override.
-// adminSetRealmPerfection sets one realm's perfection progress. Since v1.23.1
-// a progress of 100 is the whole path, not the number alone: the trial's gate
+// adminSetRealmPerfection sets one realm's perfection progress (0-100) on a
+// player's cultivation (realm_perfection) or body (body_realm_perfection)
+// track. It upserts: the row may not exist yet if the player never started
+// that realm's perfection quests, and forcing the GM to pre-create it first
+// would defeat the purpose of a direct override. Since v1.23.1 a progress of
+// 100 is the whole path, not the number alone: the trial's gate
 // is every quest completed *and* progress 100 (perfectionTrialAction), so a
 // lever that wrote the number and nothing else showed a GM a full bar over a
 // trial still refusing "final trial is locked". At 100 every quest is marked
@@ -2595,7 +2594,7 @@ func adminSetTribulation(conn *storage.Conn, adminUserID int64, raw json.RawMess
 // adminClearCondition resolves one or every active character_conditions row
 // for a player, mirroring the exact resolve semantics progression_actions.go
 // already uses when a condition clears through ordinary gameplay
-// (cultivationCondition's "cleared" branch): state='resolved', severity
+// (conditionTreatAction's "cleared" branch): state='resolved', severity
 // zeroed, resolved_game_minute stamped from the canonical world clock. A
 // condition_id targets one specific row (the dashboard lists real row IDs,
 // so this is unambiguous even though a character can hold several active

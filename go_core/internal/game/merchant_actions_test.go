@@ -541,8 +541,6 @@ func TestAMerchantWinningAnNPCLotPaysTheFinderNotUserZero(t *testing.T) {
 	}
 }
 
-// --- from auction_size_test.go ---
-
 // A smaller city has a smaller house (v0.33.1): the floor holds only so many
 // lots at once and none for longer than its limit. Both come from content,
 // so a house without them is uncapped - which is what every fixture before

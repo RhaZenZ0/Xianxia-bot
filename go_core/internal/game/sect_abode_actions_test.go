@@ -155,7 +155,6 @@ func TestARetriedAbodeMoveReplays(t *testing.T) {
 	}
 }
 
-// --- from sect_abode_column_test.go ---
 // A sect residence's facility column is spliced into its SQL, because a
 // column name cannot be a bound parameter (v1.12.0). Every caller passes a
 // constant; the lookup holds the name to the table's own facility columns

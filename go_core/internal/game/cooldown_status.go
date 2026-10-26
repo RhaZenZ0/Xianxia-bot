@@ -108,7 +108,7 @@ func optionalRows(conn *storage.Conn, sql string, args []any) (storage.Result, e
 
 // cooldownSeconds coerces a stored timestamp to seconds. SQLite hands a REAL
 // back as float64 and an integral one as int64, and cooldownRemaining already
-// has to make the same choice (aptitude_actions.go:222).
+// has to make the same choice (in aptitude_actions.go).
 func cooldownSeconds(value any) float64 {
 	switch typed := value.(type) {
 	case float64:

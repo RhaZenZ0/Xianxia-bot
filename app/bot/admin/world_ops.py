@@ -2,11 +2,11 @@
 /admin server maintenance.
 
 Phase 7 of the main.py split (v0.19.42, docs/history/MAIN_SPLIT_PLAN.md). Everything
-here reads core, runtime, services, pickers and app.*; never main.py. The
+here reads the bot package's modules below it and app.*; never main.py. The
 three /admin world commands that open or close event scenes (events,
-spawnrealm, closeevent) are NOT here: they read spawn_event_thread and the bot
-instance, which stay in main.py until phase 8. Definition order is the order
-these had in main.py.
+spawnrealm, closeevent) read spawn_event_thread and the bot instance, so they
+joined this module in phase 8, once those had left main.py. Definition order
+is the order these had in main.py.
 """
 from __future__ import annotations
 

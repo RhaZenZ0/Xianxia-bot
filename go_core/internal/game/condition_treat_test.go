@@ -19,7 +19,7 @@ import (
 // worse it was the less anybody could cure it. These run on the defeat-survival
 // fixture, which carries production's foreign keys.
 
-// seedCondition gives the fixture's cultivator a condition exactly as the game
+// seedTreatableCondition gives the fixture's cultivator a condition exactly as the game
 // writes one - the character_conditions row *and* its active_effects row,
 // through the same helper a Force deviation uses - plus the medicine for it.
 func seedTreatableCondition(t *testing.T, path, key string, severity int64, item string, quantity int64) {

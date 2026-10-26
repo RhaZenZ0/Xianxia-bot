@@ -62,11 +62,8 @@ func stonesPerCoin(t *testing.T, catalog worlddata.Catalog) map[string]*big.Int 
 	return out
 }
 
-// worldArbitrageCeilings is every price at which something in the world buys
-// an item off a cultivator, in stones: a keeper at the top rank of the trade
-// (tradeRankSellPrice), a market counter however high its base (marketUnitPrice
-// selling), the town at a stall (NPCStallCeiling) and a sect's points for a
-// donation (sectDonationCap, in points a stone buys).
+// arbitrageCeiling is one price at which something in the world buys an item
+// off a cultivator: who pays it, in which coin, and what that is in stones.
 type arbitrageCeiling struct {
 	who    string
 	amount int64
@@ -74,6 +71,11 @@ type arbitrageCeiling struct {
 	stones *big.Int
 }
 
+// arbitrageCeilings is every price at which something in the world buys an
+// item off a cultivator, in stones: a keeper at the top rank of the trade
+// (tradeRankSellPrice), a market counter however high its base (marketUnitPrice
+// selling), the town at a stall (NPCStallCeiling) and a sect's points for a
+// donation (sectDonationCap, in points a stone buys).
 func arbitrageCeilings(t *testing.T, catalog worlddata.Catalog, itemID string, value map[string]*big.Int, coins []string) []arbitrageCeiling {
 	t.Helper()
 	var out []arbitrageCeiling

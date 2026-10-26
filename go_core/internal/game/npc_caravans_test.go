@@ -13,8 +13,8 @@ import (
 // 'npc' and nothing ever wrote one, so the resolver's non-player branch was
 // unreachable and the roads carried only what players put on them.
 
-// setupEscrowDB already ships `caravans`; these are the two tables beside it
-// that a dispatch also writes.
+// npcCaravanTestTables is the two tables beside `caravans` (which setupEscrowDB
+// already ships) that a dispatch also writes.
 const npcCaravanTestTables = `
 CREATE TABLE caravan_operations(
 	caravan_id INTEGER PRIMARY KEY, escort_strength INTEGER NOT NULL DEFAULT 0, concealment INTEGER NOT NULL DEFAULT 0,

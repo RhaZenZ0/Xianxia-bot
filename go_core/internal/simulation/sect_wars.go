@@ -2,9 +2,9 @@ package simulation
 
 // Sects that want a thing go and take it.
 //
-// `territory_wars` has one writer in the whole codebase - `territory.claim`
-// (`game/territory_actions.go:119`) - and it always makes the *acting player's*
-// sect the attacker. So the siege resolver beside it, with its scores, morale,
+// `territory_wars` had one writer in the whole codebase - `territory.claim`,
+// through what is today `game.DeclareWarTx` - and it always made the *acting
+// player's* sect the attacker. So the siege resolver beside it, with its scores, morale,
 // occupations and era war-pressure modifier, only ever ran on wars a player
 // started. Thirteen sects in the world and not one of them could ever move on
 // another's ground: the map was only ever contested by people at keyboards.

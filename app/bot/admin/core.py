@@ -2,14 +2,14 @@
 /admin command groups every admin module registers into.
 
 Phase 5 of the main.py split (v0.19.40, docs/history/MAIN_SPLIT_PLAN.md).
-require_admin has 44 call sites and audit_admin 27, all in the /admin
-handlers that phases 6-7 move into this package - 85 of the edges between
-those handlers and the rest of main.py were just these names. Reads
-runtime and channels; never main.py. Definition order is the order these
-had in main.py.
+require_admin and audit_admin are called from every /admin handler, which
+phases 6-7 moved into this package - most of the edges between those
+handlers and the rest of main.py were just these two names. Reads runtime
+and channels; never main.py. Definition order is the order these had in
+main.py.
 
 The eight Group objects are defined here and registered with Discord by
-main.py's register_command_surface (only the single /admin root is ever
+surface.py's register_command_surface (only the single /admin root is ever
 added to the tree; the sub-groups are hub metadata).
 """
 from __future__ import annotations

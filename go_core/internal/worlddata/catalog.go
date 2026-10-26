@@ -414,7 +414,7 @@ type LawSystem struct {
 
 // EraTemplate is one age of one world: how long it lasts and what it does
 // while it does. `Modifiers` is deliberately a bare map rather than named
-// fields - the vocabulary is held by `era_modifier_vocabulary_test.go`, which
+// fields - the vocabulary is held by `era_vocabulary_test.go`, which
 // requires every key to be *fetched* by a rule, and a struct would instead
 // silently drop a key no field matched (the "silent when wrong" widening
 // schema 51 refused for the content tables).
@@ -720,18 +720,18 @@ type BirthFamilyLesson struct {
 	Story    string `json:"story"`
 }
 
-// BirthFamilySendoff is what a household puts in a child's hands on the day
-// they leave it (v1.0.0-rc.15). Every archetype has one and no two share an
-// item: which flying artifact a family owns *is* the family - a tomb-watch
-// clan folds a burnt offering that will carry the living too, a weapon-smith's
-// child leaves on the blade they proved on the anvil, and a fallen clan has
-// only the cracked ancestral sword nobody would buy.
 // CommissionGiver is what the content says about somebody who posts work.
 type CommissionGiver struct {
 	Location string `json:"location"`
 	Title    string `json:"title"`
 }
 
+// BirthFamilySendoff is what a household puts in a child's hands on the day
+// they leave it (v1.0.0-rc.15). Every archetype has one and no two share an
+// item: which flying artifact a family owns *is* the family - a tomb-watch
+// clan folds a burnt offering that will carry the living too, a weapon-smith's
+// child leaves on the blade they proved on the anvil, and a fallen clan has
+// only the cracked ancestral sword nobody would buy.
 type BirthFamilySendoff struct {
 	Item string `json:"item"`
 	Line string `json:"line"`
@@ -966,9 +966,6 @@ type SectDefinition struct {
 	RighteousEnemy   int64             `json:"righteous_enemy"`
 }
 
-// DeathQiSystem (v1.0.0-rc.8) is the ghost road: the one cultivation path a
-// character must be born to, the ground and hours it reads the other way
-// round, what the residue costs, and what it makes of the body.
 type DeathQiGround struct {
 	RoadSites   map[string]float64 `json:"road_sites"`
 	Districts   map[string]float64 `json:"districts"`
@@ -1008,6 +1005,9 @@ type VitalityRecovery struct {
 	MinutesPerGameDay int64  `json:"minutes_per_game_day"`
 }
 
+// DeathQiSystem (v1.0.0-rc.8) is the ghost road: the one cultivation path a
+// character must be born to, the ground and hours it reads the other way
+// round, what the residue costs, and what it makes of the body.
 type DeathQiSystem struct {
 	Path        string             `json:"path"`
 	Families    []string           `json:"families"`
@@ -1018,10 +1018,6 @@ type DeathQiSystem struct {
 	GhostForms  []GhostForm        `json:"ghost_forms"`
 }
 
-// ElementalQiSystem (v1.0.0-rc.9) is the five-phase cycle and what it is worth
-// to a cultivator's absorption: which element each method draws, which phase
-// every root element stands with, and what each relation between the two does
-// to a gathering session.
 type ElementRelation struct {
 	Mult                      float64 `json:"mult"`
 	Label                     string  `json:"label"`
@@ -1029,6 +1025,10 @@ type ElementRelation struct {
 	DeviationSurchargePercent int     `json:"deviation_surcharge_percent"`
 }
 
+// ElementalQiSystem (v1.0.0-rc.9) is the five-phase cycle and what it is worth
+// to a cultivator's absorption: which element each method draws, which phase
+// every root element stands with, and what each relation between the two does
+// to a gathering session.
 type ElementalQiSystem struct {
 	Description string                     `json:"description"`
 	Phases      []string                   `json:"phases"`

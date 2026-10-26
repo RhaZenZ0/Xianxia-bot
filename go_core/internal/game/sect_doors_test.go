@@ -550,7 +550,6 @@ func TestACaravanLeavesFromTheCityWhoseGateYouStandAt(t *testing.T) {
 	}
 }
 
-// --- from sect_trial_tuning_test.go ---
 // A sect's trial reads what the sect authored (v1.2.4): `base_tn`,
 // `path_bonuses`, `root_affinities`, `family_archetype_bonus` and
 // `karma_preference` were in the content and in the notes the bot printed,

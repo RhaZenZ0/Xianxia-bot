@@ -1,7 +1,7 @@
 """Landmark discovery art: which locations have a picture, and showing it once.
 
 Phase 4 of the main.py split (v0.19.39, docs/history/MAIN_SPLIT_PLAN.md). Leaf module:
-reads runtime (ROOT, WORLD, log) and discord, nothing else. Definition order is
+reads runtime (ROOT, WORLD, log), cards and discord, nothing else. Definition order is
 the order these had in main.py.
 """
 from __future__ import annotations

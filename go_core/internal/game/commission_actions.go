@@ -722,7 +722,7 @@ func ExpireDueCommissions(conn *storage.Conn, catalog worlddata.Catalog, gameMin
 // is a player's own move - the dashboard runs them as the GM.
 // ---------------------------------------------------------------------------
 
-// adminCommissionReview approves, retires or discards a commission definition.
+// adminQuestReview approves, retires or discards a commission definition.
 // Retiring hides it from new takers; the players already holding it keep the
 // terms they accepted, which is why this touches only quest_definitions.
 func adminQuestReview(conn *storage.Conn, adminUserID int64, raw json.RawMessage, auditAction string) (any, error) {

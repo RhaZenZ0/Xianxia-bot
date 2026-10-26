@@ -215,8 +215,6 @@ INSERT INTO character_birth_family(user_id,family_id) VALUES(42,1);
 	}
 }
 
-// --- from interlinks_v127_test.go ---
-
 // v1.27.0: a player's claim on neutral ground wrote no history, while the
 // world's own sects wrote `territory_claimed` for theirs. One statement now.
 func TestAPlayersClaimIsHeardLikeASects(t *testing.T) {

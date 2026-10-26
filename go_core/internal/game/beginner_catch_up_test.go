@@ -104,8 +104,6 @@ func TestAGraduateReportingProgressIsHandedTheStagesAddedAfterThem(t *testing.T)
 	_ = fmt.Sprint
 }
 
-// --- from beginner_retired_test.go ---
-
 // A definition that is not approved is not handed over (v1.12.3). The catch-up
 // runs on every action and follows `follow_on` off a completed quest, so a
 // chain pointing at a quest a GM retired handed it over again on the next

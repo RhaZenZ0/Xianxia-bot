@@ -184,8 +184,6 @@ func TestCombatStartAbandonsAnyPriorActiveBattleForSameUser(t *testing.T) {
 	}
 }
 
-// --- from combat_recovery_item_test.go ---
-
 func setupCombatRecoveryItemDB(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "combat_recovery_item.sqlite3")

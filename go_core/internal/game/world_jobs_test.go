@@ -302,8 +302,6 @@ func TestARaidIsPaidInTheMoneyOfItsWorld(t *testing.T) {
 	}
 }
 
-// --- from history_world_test.go ---
-
 const historyWorldDDL = `
 CREATE TABLE world_history_events (
 	history_id INTEGER PRIMARY KEY AUTOINCREMENT,

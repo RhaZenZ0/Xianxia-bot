@@ -32,9 +32,10 @@ is the mirror image: it is DEFINED here but used once outside this module (in
 main.py's `/explore` road-discovery flow), so main.py imports it back, exactly
 as it already does for ``sect_group`` itself.
 
-Update, split phases 2-4 (v0.19.34-v0.19.39): all five of those names now live
-below main.py (``SIM`` in services.py, the two location helpers in
-locations.py, the two sect-abode helpers in threads.py) and are ordinary
+Update, split phases 2-4 (v0.19.34-v0.19.39): those four names and the
+autocomplete now live below main.py (``SIM`` in services.py,
+``current_npc_location`` in locations.py, the two sect-abode helpers in
+threads.py, ``carried_item_autocomplete`` in runtime.py) and are ordinary
 module-level imports. This module no longer imports main.py at all.
 """
 

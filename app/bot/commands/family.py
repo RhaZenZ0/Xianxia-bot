@@ -8,8 +8,8 @@ shaped to avoid:
   Everything here is a function or a literal, in the order it had in main.py.
 
 * **Annotation resolution through ``functools.wraps``.** v0.19.13 died with
-  ``NameError: name 'app_commands' is not defined``. Eight of the handlers below
-  are wrapped by ``serialized_user_action``, which lives in runtime.py, and
+  ``NameError: name 'app_commands' is not defined``. The handlers below are
+  wrapped by ``serialized_user_action``, which lives in runtime.py, and
   ``wraps`` cannot copy ``__globals__`` - so discord.py evaluates their
   annotation STRINGS against runtime.py's namespace, not this file's. Every
   annotation used here (``discord.Interaction``, ``app_commands.Choice[str]``,

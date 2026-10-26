@@ -160,8 +160,6 @@ func TestARewardIsPaidInTheMoneyOfTheWorldItIsEarnedIn(t *testing.T) {
 	}
 }
 
-// --- from abode_upgrade_currency_test.go ---
-
 // A homestead may be founded in any world, and its upgrade charged the Mortal
 // stone in all four (v1.2.1) - so above the Mortal World, where every reward
 // is paid in that world's crystal (rc.44), no upgrade could ever be afforded.
@@ -187,8 +185,6 @@ func TestAnUpgradeIsPaidInTheMoneyOfTheWorldTheHomeStandsIn(t *testing.T) {
 		t.Fatalf("crystal balance=%d want 150: the upgrade was not charged in the world's own money", got)
 	}
 }
-
-// --- from admin_grant_mirror_test.go ---
 
 // The sheet's mirror follows the base currency of the world the target stands
 // in (rc.44). The GM's grant compared the id to the Mortal stone by name

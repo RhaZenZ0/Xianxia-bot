@@ -239,8 +239,6 @@ func TestAGraduateOfThePathIsHandedTheStageAtTheDoor(t *testing.T) {
 	}
 }
 
-// --- from household_lesson_roster_test.go ---
-
 // Every household a send-off names has a lesson the action can give (v1.12.3).
 // familyLessonActionGo looks the lesson up by the household's archetype and
 // refuses "this household has no lesson to give" without one, and thirty-three

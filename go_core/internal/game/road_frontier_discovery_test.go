@@ -51,7 +51,7 @@ func TestExploreDiscoveryStaysOnTheRoadFrontierNotAnywhereInTheWorld(t *testing.
 	pickIdx := 2 // force the 3rd (0-indexed) candidate if unfiltered - i.e. would land past the real frontier if the bug were still there
 	locationDiscoveryIntn = func(n int) (int, error) {
 		if n == 100 {
-			return 0, nil // always pass the 45% discovery roll
+			return 0, nil // always pass the discoveryChancePercent-in-a-hundred discovery roll
 		}
 		idx := pickIdx % n
 		pickIdx++
@@ -125,8 +125,6 @@ func TestExploreDiscoveryExpandsTheFrontierAsCitiesAreCharted(t *testing.T) {
 		t.Fatalf("expected %q (a road neighbor of the already-known Riverguard City) to become discoverable", secondRingOnly)
 	}
 }
-
-// --- from wilds_test.go ---
 
 // A place in the wilds of a city is found by exploring from that city
 // (v1.7.7). Moonfen Marsh and Cloudspine Foothills carried no road and no

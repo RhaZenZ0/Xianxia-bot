@@ -4,8 +4,9 @@ The twin of `deathQiGroundMultiplier` in `go_core/internal/game/death_qi.go`,
 read off the same `death_qi_system.ground` block, so the panel can hide the
 harvest where the engine would refuse it and the rites where they would be
 refused. The engine stays the refusal; this is advertising, never a bound.
-`tests/python/unit/test_the_ghost_ground_twin.py` holds the two floors to the
-Go constants and the multiplier to the Go rule over every catalogue place.
+`TheGhostGroundTwin` in `tests/python/unit/test_v131_engine_wires.py` holds the
+two floors to the Go constants and the multiplier to the Go rule over every
+catalogue place.
 """
 from __future__ import annotations
 

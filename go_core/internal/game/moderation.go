@@ -243,7 +243,7 @@ func adminSetModeration(conn *storage.Conn, adminUserID int64, raw json.RawMessa
 	return result, nil
 }
 
-// moderationSnapshot is the shape of both audit halves and of the action's
+// moderationSnapshotResult is the shape of both audit halves and of the action's
 // reply: every moderation column, so undo restores the lot.
 func moderationSnapshotResult(muted int64, mutedUntil float64, frozen int64, frozenUntil float64, banned int64, reason any) map[string]any {
 	r := fmt.Sprint(reason)

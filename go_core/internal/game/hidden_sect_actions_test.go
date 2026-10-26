@@ -324,8 +324,6 @@ func TestAnUnknownShadowModeIsRefused(t *testing.T) {
 	}
 }
 
-// --- from every_path_has_a_method_test.go ---
-
 // Every cultivation path the world offers can be practised (v1.0.3).
 //
 // `content/world.json` offers seven paths and `app/rules/advanced_catalog.py`

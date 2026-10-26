@@ -299,8 +299,8 @@ func TestARootedTradeFindsAlmostNothing(t *testing.T) {
 // `seller_user_id` is foreign-keyed to `characters`, so there is no integer
 // that can stand for "one of the world's own people" - 0 is refused like any
 // other id nobody holds. From rc.15 to rc.28 the consignment wrote 0 anyway,
-// so every call raised FOREIGN KEY constraint failed; and because runSystems
-// returns on the first error and this batch is fifth of eight, sect_politics,
+// so every call raised FOREIGN KEY constraint failed; and because the tick
+// (`RunDue`) returns on the first error and this batch is fifth of eight, sect_politics,
 // clan_dynamics, autonomous_world_events and the whole advanced-maintenance
 // bundle never ran on any tick that reached it. Schema 50 makes the column
 // nullable and NULL the sentinel. storage.ParseInt(nil) is 0, so every reader

@@ -123,8 +123,6 @@ func TestUndoingAFullBarPutsThePathBack(t *testing.T) {
 	}
 }
 
-// --- from perfection_majority_test.go ---
-
 // The final Perfection trial passes on a majority of its checks (v1.23.2, on
 // the owner's call): two of the shipped three. It used to fail on any one
 // check, so a cultivator holding Meridian Stability and Heart-Demon Resolve

@@ -315,14 +315,13 @@ func TestABreakthroughNeedsTheMeansForIt(t *testing.T) {
 // npc_disciple_bonds had no writer while world_status_queries.go *queried* it,
 // so "who is whose disciple" was a question the world always answered empty.
 //
-// The hall is deliberately full. Taking a disciple is one `gamerng` roll per
-// candidate pair at `discipleChance` (20 in 100), and this test asserts that
-// *somebody* is taken - which with the fifteen youths it first had was a false
-// failure once in every 28 runs (0.8^15 = 3.5%), and duly failed a CI run that
-// had nothing to do with it. Seventy puts that at one run in six million
-// (0.8^70), which is the same bargain `TestTheWorldsPeopleConsignWhatTheyFind`
-// makes with its thirty grave-robbers. The production roll is untouched: the
-// sample was too small to ask the question, not the odds wrong.
+// The hall is deliberately full - seventy youths against `discipleCap` - and
+// the dice are lent (`gamerng.UseRoller`) so every `discipleChance` roll
+// lands, which is what lets the test ask for the cap exactly. It once asked
+// only that *somebody* was taken, off the real dice: a false failure once in
+// every 28 runs with the fifteen youths it first had (0.8^15 = 3.5%), which
+// duly failed a CI run that had nothing to do with it. The production roll is
+// untouched; the dice gate (v1.0.0-rc.42) is why the test no longer rolls them.
 func TestMastersTakeDisciples(t *testing.T) {
 	path := livesDB(t)
 	r := livesRunner()

@@ -6,14 +6,14 @@ channel messages.
 Phase 6 of the main.py split (v0.19.41, docs/history/MAIN_SPLIT_PLAN.md). Imports
 channel_messages and bugs_forum (never the reverse), core, channels,
 services, runtime; never main.py. The two dashboard entry points used to be
-annotated with main.py's XianxiaBot class; they take the same object and
-are annotated with its discord.ext base class here, since the bot class
-still lives in main.py until phase 8. Definition order is the order these
+annotated with the XianxiaBot class; they take the same object and are
+annotated with its discord.ext base class here, since the bot class
+(app/bot/bot.py) sits above this module. Definition order is the order these
 had in main.py.
 
-The three /admin server commands not here (maintenance, backup, audit)
-live further down main.py with the other admin operations and move in
-phase 7.
+The three /admin server commands not here (maintenance, backup, audit) live
+with the other admin operations: maintenance in world_ops.py, backup and
+audit in inspect_sim.py.
 """
 from __future__ import annotations
 

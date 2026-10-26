@@ -1,14 +1,14 @@
+"""The Python-side service layer the bot's command modules delegate to.
+
+Introduced for the 0.7 architecture so that Discord callbacks delegate state
+decisions here instead of duplicating game rules. The module has no discord.py
+dependency; the authoritative mechanics it once computed sit behind the Go
+engine now (`app.ops.game_engine`), and what stays is the orchestration over
+its answers, constructed once in `app/bot/services.py`.
+"""
 from __future__ import annotations
 
 import time
-
-"""Core service layer introduced for the 0.7 architecture.
-
-Discord callbacks should increasingly delegate state decisions to these services instead
-of duplicating game rules.  The module intentionally has no discord.py dependency so
-it can later move behind a Go/Rust service boundary without changing game semantics.
-"""
-
 from dataclasses import dataclass
 from typing import Any
 

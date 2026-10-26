@@ -7,7 +7,7 @@ out (family, sect) had to reach back into main.py with call-time imports. Now
 they live below main.py, where any module can import them normally.
 
 Why a separate module rather than growing runtime.py: constructing NARRATOR,
-AI_ROUTER and SIM pulls in app.narrator, app.ai_router and app.simulation.
+AI_ROUTER and SIM pulls in app.ai.narrator, app.ai.ai_router and app.simulation.
 runtime.py's value is that it is light and cycle-free; this module imports it
 and it never imports this one.
 

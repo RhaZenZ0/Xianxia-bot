@@ -51,7 +51,7 @@ func cooldownFamiliesIn(rows []map[string]any) map[string]map[string]any {
 	return out
 }
 
-// setWorldClock writes an anchor the conversion can actually use. The shared
+// setRunningWorldClock writes an anchor the conversion can actually use. The shared
 // fixture pins scale 0 (a stopped world), which is the frozen case rather than
 // the ordinary one.
 func setRunningWorldClock(t *testing.T, path string, gameMinute int64, scale int64) {

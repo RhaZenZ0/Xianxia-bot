@@ -43,20 +43,6 @@ func stablePercent(parts ...any) int64 {
 // `modifiers_json` map. `game.ActiveEra` returns `map[string]float64` already,
 // so there is nothing left to coerce.
 
-// eraModifiersByWorld reads every world's age once, for the loops that then ask
-// per row.
-//
-// Per row would be correct and is what the three sweeps below want; per row
-// *with a query each* would turn one read per tick into one per open bounty,
-// war and arriving caravan, which is the shape rc.28 removed from the scene
-// draw. There are four worlds, so four reads cover every row there can be.
-// eraChance is a percentage chance moved by the age of the world it is rolled
-// in (v1.29.0). The era modifiers reached a player's rules and three sweeps -
-// a hunter's pursuit, a siege and a caravan - and nothing the world's own
-// people did: "Hundred Sects Strife - open territorial war" changed no
-// sect's appetite for ground, and "the hungry take to the passes" put no
-// more of them on the road. The floor keeps a damping era from ending a
-// thing outright.
 // eraModifiersOrNone is eraModifiersByWorld for a roll that must not fail
 // over the age of the world: an unreadable era - a fixture or a world with no
 // `world_eras` yet - is no era term at all, never an error.
@@ -71,10 +57,24 @@ func (r *Runner) eraModifiersOrNone(conn *storage.Conn) map[string]map[string]fl
 	return byWorld
 }
 
+// eraChance is a percentage chance moved by the age of the world it is rolled
+// in (v1.29.0). The era modifiers reached a player's rules and three sweeps -
+// a hunter's pursuit, a siege and a caravan - and nothing the world's own
+// people did: "Hundred Sects Strife - open territorial war" changed no
+// sect's appetite for ground, and "the hungry take to the passes" put no
+// more of them on the road. The floor keeps a damping era from ending a
+// thing outright.
 func (r *Runner) eraChance(byWorld map[string]map[string]float64, location, key string, base int64) int64 {
 	return int64(math.Round(float64(base) * r.eraTermFor(byWorld, location, key, .25)))
 }
 
+// eraModifiersByWorld reads every world's age once, for the loops that then ask
+// per row.
+//
+// Per row would be correct and is what the three sweeps below want; per row
+// *with a query each* would turn one read per tick into one per open bounty,
+// war and arriving caravan, which is the shape rc.28 removed from the scene
+// draw. There are four worlds, so four reads cover every row there can be.
 func (r *Runner) eraModifiersByWorld(conn *storage.Conn) (map[string]map[string]float64, error) {
 	out := map[string]map[string]float64{}
 	seen := map[string]bool{}
