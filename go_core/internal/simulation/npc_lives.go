@@ -122,16 +122,19 @@ func (r *Runner) npcChildbirth(conn *storage.Conn, steps, gm int64) (int64, erro
           AND l.relationship_status='married' AND l.spouse_name<>''
           AND l.health>=? AND l.children_count<?
           AND l.npc_name < l.spouse_name
-        ORDER BY l.npc_name LIMIT 150`, []any{childbirthMinHealth, childbirthMaxKids})
+        ORDER BY l.npc_name`, []any{childbirthMinHealth, childbirthMaxKids})
 	if err != nil {
 		return 0, err
 	}
 	now := nowFloat()
 	born := int64(0)
-	// The cap of six is cut from a roster of up to a hundred and fifty
-	// couples, so the tick starts somewhere new each time (rosterTurn,
-	// v1.36.0); a birth does move a couple down the list, but the first six
-	// names by the alphabet were still the first six to bear every tick.
+	// The cap of six is cut from the whole roster of couples, so the tick
+	// starts somewhere new each time (rosterTurn, v1.36.0); a birth does move
+	// a couple down the list, but the first six names by the alphabet were
+	// still the first six to bear every tick. The query carried `LIMIT 150`
+	// until v1.41, cut in name order *before* the turn, so the roster turned
+	// inside its first hundred and fifty names and a couple past them never
+	// bore at all.
 	for _, row := range rosterTurn(res.Rows, gm) {
 		if born >= childbirthCap {
 			break

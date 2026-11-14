@@ -1,10 +1,6 @@
 package game
 
 import (
-	"os"
-	"path/filepath"
-	"regexp"
-	"strings"
 	"testing"
 
 	"xianxia/core/internal/storage"
@@ -31,63 +27,12 @@ import (
 // cannot reach. That is the fixture rule in CLAUDE.md, and this is the gate for
 // the other half: a write outside the one door has to be named here with the
 // reason it is allowed to be.
-var purseWritersAllowed = map[string]string{
-	"migration_helpers.go": "walletDeltaTx itself - the one door, which writes the purse and sets the mirror from the new balance",
-	"lifecycle_actions.go": "character creation and samsara write the whole row from scratch, purse and mirror together, before any door exists to go through",
-	"authoritative.go":     "the twenty-five stones a new character starts with, inserted beside the creation row above",
-	"admin_undo_levers.go": "an undo of the GM's grant takes back the amount it gave, clamped at zero rather than refused when play has spent below it, and sets the mirror the way the grant did; walletDeltaTx would refuse the overdraft and leave the lever un-undoable",
-	"actions.go":           "the GM's grant and bulk grant clamp the mirror at zero rather than refusing an overdraft, which is the lever's designed behaviour and not a player's",
-}
-
-var (
-	sheetWriteRE = regexp.MustCompile(`UPDATE characters SET[^` + "`" + `]*spirit_stones`)
-	purseWriteRE = regexp.MustCompile(`(INSERT INTO|UPDATE) currency_wallets`)
-)
-
-func TestThePurseHasOneDoor(t *testing.T) {
-	roots := []string{".", filepath.Join("..", "simulation")}
-	offenders := []string{}
-	seen := map[string]bool{}
-	for _, root := range roots {
-		entries, err := os.ReadDir(root)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, entry := range entries {
-			name := entry.Name()
-			if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-				continue
-			}
-			raw, err := os.ReadFile(filepath.Join(root, name))
-			if err != nil {
-				t.Fatal(err)
-			}
-			src := string(raw)
-			if !sheetWriteRE.MatchString(src) && !purseWriteRE.MatchString(src) {
-				continue
-			}
-			seen[name] = true
-			if _, allowed := purseWritersAllowed[name]; allowed {
-				continue
-			}
-			offenders = append(offenders, filepath.Join(root, name))
-		}
-	}
-	if len(offenders) > 0 {
-		t.Fatalf("these write a player's money without going through walletDeltaTx, so the purse and the\n"+
-			"sheet's mirror of it can drift apart. Move them onto walletDeltaTx, or name the file in\n"+
-			"purseWritersAllowed with the reason it may write directly:\n  %s",
-			strings.Join(offenders, "\n  "))
-	}
-	for name, reason := range purseWritersAllowed {
-		if !seen[name] {
-			t.Errorf("purseWritersAllowed names %q, which no longer writes money at all", name)
-		}
-		if len(strings.TrimSpace(reason)) < 20 {
-			t.Errorf("purseWritersAllowed[%q] needs a reason worth reading", name)
-		}
-	}
-}
+//
+// The gate itself, TestThePurseHasOneDoor, is in one_door_walks_test.go since
+// v1.41: it walks every function by AST and allowlists per function
+// (purseWritersAllowed there), where the text sweep that stood here
+// allowlisted per file and could not see a DELETE or an INSERT INTO
+// characters.
 
 // The bug itself. With the old two bare UPDATEs restored this fails on the
 // purse, which never moved at all.

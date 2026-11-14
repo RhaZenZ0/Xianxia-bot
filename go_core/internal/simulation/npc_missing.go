@@ -113,7 +113,11 @@ func (r *Runner) npcDisappearances(conn *storage.Conn, gm int64) (int64, int64, 
 		return 0, died, err
 	}
 	vanished := int64(0)
-	for _, row := range res.Rows {
+	// One vanishes a tick at three in a hundred each, walked in name order
+	// until v1.41: the hundredth wanderer by the alphabet had a twentieth of
+	// the first one's chance of ever being the one (rosterTurn, the
+	// capped-walk gate).
+	for _, row := range rosterTurn(res.Rows, gm) {
 		if vanished >= missingCap {
 			break
 		}

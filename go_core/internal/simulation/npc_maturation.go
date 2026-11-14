@@ -57,13 +57,20 @@ func (r *Runner) npcMaturation(conn *storage.Conn, gm int64) (int64, error) {
 	res, err := conn.Execute(`SELECT child_name,parent_a,parent_b,birth_game_minute,spiritual_root,realm_index,phase
         FROM npc_descendants
         WHERE status='alive' AND generated_as_npc=0 AND birth_game_minute>0 AND birth_game_minute<=?
-        ORDER BY birth_game_minute,child_name LIMIT ?`, []any{grown, maturityCap})
+        ORDER BY birth_game_minute,child_name`, []any{grown})
 	if err != nil {
 		return 0, err
 	}
 	now := nowFloat()
 	matured := int64(0)
 	for _, row := range res.Rows {
+		// The cap counts who came of age, not who was read. It was a SQL
+		// LIMIT until v1.41, and a child with no household is left in place
+		// below, so six orphans at the head of the oldest-first list filled
+		// the window every tick and nobody born after them ever grew up.
+		if matured >= maturityCap {
+			break
+		}
 		name := fmt.Sprint(row[0])
 		parentA, parentB := fmt.Sprint(row[1]), fmt.Sprint(row[2])
 		birth := i64(row[3])

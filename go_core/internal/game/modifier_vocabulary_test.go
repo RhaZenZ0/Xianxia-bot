@@ -486,42 +486,11 @@ func TestInsightGainMultipliesThroughTheOneDoor(t *testing.T) {
 }
 
 // insight_xp has one door, and every other writer is a named, deliberate
-// absolute. `TestThePurseHasOneDoor` is the shape.
-func TestInsightXPHasOneDoor(t *testing.T) {
-	// Each entry is a statement that writes `characters.insight_xp` without
-	// going through `grantInsightXPTx`, with the reason it may.
-	insightWritersAllowed := map[string]string{
-		"admin_player_levers.go": "admin.player.cultivation_reward is a GM lever (v1.37.0, cultivation.reward until then): a grant is the number the GM typed, the same exemption purseWritersAllowed makes for admin.player.grant_currency",
-		"cultivation_actions.go": "rewardMasterGo pays a *disciple's* breakthrough to a third party, and the reroll is a spend; reading the master's own effect rows inside a disciple's action is a different rule",
-		"law_actions.go":         "a spend - a multiplier must never touch a debit",
-		"cultivation_stance.go":  "the insight gate's spend, as above",
-		"qi_body.go":             "the channel-mending spend, as above",
-		"lifecycle_actions.go":   "samsara resets the column to 0 outright; an absolute write, not a grant",
-		"authoritative.go":       "character creation starts the column at 0; an absolute write, not a grant",
-		"effect_authority.go":    "the door itself",
-	}
-	var offenders []string
-	for _, path := range productionGoFiles(t) {
-		body, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !strings.Contains(string(body), "insight_xp=insight_xp") &&
-			!strings.Contains(string(body), "insight_xp=0") {
-			continue
-		}
-		base := filepath.Base(path)
-		if _, allowed := insightWritersAllowed[base]; !allowed {
-			offenders = append(offenders, base)
-		}
-	}
-	if len(offenders) > 0 {
-		t.Fatalf("insight_xp is written outside its one door by: %s", strings.Join(offenders, ", "))
-	}
-	if len(insightWritersAllowed) == 0 {
-		t.Fatal("the allowlist is empty; this gate would pass on anything")
-	}
-}
+// absolute. The gate, TestInsightXPHasOneDoor, is in one_door_walks_test.go
+// since v1.41: it walks every function by AST and allowlists per function
+// (insightWritersAllowed there), where the substring sweep that stood here
+// allowlisted per file, could not see an INSERT, and never failed a stale
+// entry.
 
 func insightAfterGrant(t *testing.T, path string, base int64) (int64, error) {
 	t.Helper()

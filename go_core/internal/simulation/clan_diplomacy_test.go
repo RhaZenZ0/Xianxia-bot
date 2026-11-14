@@ -300,10 +300,22 @@ func TestARelationWithNoOpeningScoreIsRefused(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn.Close()
-	err = clanRunner().signClanRelation(conn,
+	// Refused as "not signed" and never as an error: an error over one pair
+	// would end the tick (the batch-refusal gate, v1.41).
+	signed, err := clanRunner().signClanRelation(conn,
 		clanHouse{id: a, name: "Wei"}, clanHouse{id: b, name: "Zhao"}, "concordat", 0, 0)
-	if err == nil {
+	if err != nil {
+		t.Fatalf("a relation with no opening score ended the step instead of being skipped: %v", err)
+	}
+	if signed {
 		t.Fatal("a relation the opening-score map does not carry was written anyway")
+	}
+	res, err := conn.Execute(`SELECT COUNT(*) FROM martial_clan_relations`, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if i64(res.Rows[0][0]) != 0 {
+		t.Fatalf("%d relation row(s) written for a type with no opening score", i64(res.Rows[0][0]))
 	}
 }
 

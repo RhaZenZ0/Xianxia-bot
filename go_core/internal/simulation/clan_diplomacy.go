@@ -191,8 +191,12 @@ func (r *Runner) clanDiplomacy(conn *storage.Conn, gm int64) (int64, error) {
 			if int64(roll) >= chance {
 				continue
 			}
-			if err := r.signClanRelation(conn, a, b, relation, gm, now); err != nil {
+			signed, err := r.signClanRelation(conn, a, b, relation, gm, now)
+			if err != nil {
 				return made, err
+			}
+			if !signed {
+				continue
 			}
 			paired[clanPairKey(a.id, b.id)] = true
 			made++
@@ -201,22 +205,25 @@ func (r *Runner) clanDiplomacy(conn *storage.Conn, gm int64) (int64, error) {
 	return made, nil
 }
 
-// signClanRelation writes the treaty from both sides and records it once.
-func (r *Runner) signClanRelation(conn *storage.Conn, a, b clanHouse, relation string, gm int64, now float64) error {
+// signClanRelation writes the treaty from both sides and records it once. It
+// answers whether a treaty was signed.
+func (r *Runner) signClanRelation(conn *storage.Conn, a, b clanHouse, relation string, gm int64, now float64) (bool, error) {
 	// A map miss answers 0, and 0 is not a sentinel here - it is a treaty that
 	// `family.support`'s `relation_score>0` reads as worthless and the drift
 	// can never lift, because nothing re-types a row. The `seller_user_id=0`
 	// lesson: refuse the relation rather than store a number that looks like
-	// one.
+	// one. The refusal is "not signed", never an error: this is called once a
+	// pair inside the scan, and an error over one pair ends the whole tick
+	// and every system ordered after it (the batch-refusal gate, v1.41).
 	score, ok := clanRelationOpeningScore[relation]
 	if !ok {
-		return fmt.Errorf("clan relation %q has no opening score", relation)
+		return false, nil
 	}
 	for _, side := range [2][2]clanHouse{{a, b}, {b, a}} {
 		if _, err := conn.Execute(`INSERT INTO martial_clan_relations(
 family_id,partner_family_id,partner_name,relation_type,relation_score,active,started_game_minute,updated_at)
 VALUES(?,?,?,?,?,1,?,?)`, []any{side[0].id, side[1].id, side[1].name, relation, score, gm, now}); err != nil {
-			return err
+			return false, err
 		}
 	}
 	// One row for one treaty, written from the lower id so the pair's
@@ -225,7 +232,7 @@ VALUES(?,?,?,?,?,1,?,?)`, []any{side[0].id, side[1].id, side[1].name, relation, 
 	if b.id < a.id {
 		actor, partner = b, a
 	}
-	return recordClanRelationHistory(conn, actor.id, actor.name, partner.name, relation, score, gm, now)
+	return true, recordClanRelationHistory(conn, actor.id, actor.name, partner.name, relation, score, gm, now)
 }
 
 // clanHouses reads the active households, ordered so a run is reproducible.

@@ -317,11 +317,15 @@ func (r *Runner) npcSectChanges(conn *storage.Conn, steps, gm int64) (int64, int
 			args = append(args, sect)
 		}
 		leavers, err := conn.Execute(`SELECT npc_name,current_location,faction FROM npc_civilization_state
-            WHERE status='alive' AND faction IN (`+strings.Join(names, ",")+`) ORDER BY npc_name LIMIT 120`, args)
+            WHERE status='alive' AND faction IN (`+strings.Join(names, ",")+`) ORDER BY npc_name`, args)
 		if err != nil {
 			return joined, left, err
 		}
-		for _, row := range leavers.Rows {
+		// Twelve leave a tick, and until v1.41 they were the first twelve by
+		// name whose roll landed: the alphabet's head deserted a crumbling
+		// sect and its tail stayed loyal for no reason of its own
+		// (rosterTurn, the capped-walk gate).
+		for _, row := range rosterTurn(leavers.Rows, gm) {
 			if left >= sectChangeCap {
 				break
 			}

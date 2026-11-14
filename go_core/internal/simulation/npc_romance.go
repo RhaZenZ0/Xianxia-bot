@@ -379,7 +379,7 @@ func (r *Runner) beginCourtships(conn *storage.Conn, steps, gm int64, now float6
         JOIN npc_life_state l ON l.npc_name=c.npc_name
         WHERE c.status='alive' AND l.health>0
           AND l.relationship_status IN ('single','widowed')
-        ORDER BY c.npc_name LIMIT 1000`, nil)
+        ORDER BY c.npc_name`, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -418,7 +418,10 @@ func (r *Runner) beginCourtships(conn *storage.Conn, steps, gm int64, now float6
 	chance := min64(int64(courtshipChance)*max1(min64(3, steps)), 75)
 	taken := map[string]bool{}
 	started := int64(0)
-	for _, courter := range people {
+	// Eight courtships open a tick, walked in name order until v1.41, so the
+	// alphabet's head always chose first and took the best match in town
+	// (rosterTurn, the capped-walk gate).
+	for _, courter := range rosterTurn(people, gm) {
 		if started >= courtshipStartCap {
 			break
 		}

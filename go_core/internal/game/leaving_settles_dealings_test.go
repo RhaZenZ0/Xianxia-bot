@@ -294,36 +294,103 @@ func TestTheLeavingDoorSettlesTheDealings(t *testing.T) {
 	}
 }
 
-// The reset and the erasure go through the same door; this pins their call
-// sites so the three ways out of a body cannot quietly become two.
-func TestEveryWayOutOfABodyLeavesThroughTheOneDoor(t *testing.T) {
-	want := map[string]string{
-		"death_escrow.go":    "resolveIncarnationEscrowTx",
-		"character_reset.go": "characterResetAction",
-		"privacy_actions.go": "adminErasePlayer",
+// waysOutOfABody reads a file for the class the leaving door is for: every
+// function that ends a life (a SQL string writing `life_status='deceased'`)
+// or releases a person's rows (a call to `applyErasureTargets`, which the
+// reset and the erasure share). For each it says whether the same function
+// also calls the leaving door - `resolveLeavingEscrowTx`, or
+// `resolveIncarnationEscrowTx`, which TestTheLeavingDoorSettlesTheDealings
+// holds to calling it. The hand list this replaced (v1.37.0) named three
+// functions; a fourth way out written later would not have been on it, which
+// is the shape v1.36.0's rule warns of (the v1.41 walk).
+func waysOutOfABody(src string) (ways map[string]bool, err error) {
+	parsed, err := parser.ParseFile(token.NewFileSet(), "", src, 0)
+	if err != nil {
+		return nil, err
 	}
-	for file, fnName := range want {
-		parsed, err := parser.ParseFile(token.NewFileSet(), file, nil, 0)
+	ways = map[string]bool{}
+	for _, decl := range parsed.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Body == nil {
+			continue
+		}
+		isWayOut, callsDoor := false, false
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			switch node := n.(type) {
+			case *ast.BasicLit:
+				if node.Kind == token.STRING && strings.Contains(node.Value, "life_status='deceased'") &&
+					strings.Contains(node.Value, "UPDATE characters") {
+					isWayOut = true
+				}
+			case *ast.CallExpr:
+				if id, ok := node.Fun.(*ast.Ident); ok {
+					switch id.Name {
+					case "applyErasureTargets":
+						isWayOut = true
+					case "resolveLeavingEscrowTx", "resolveIncarnationEscrowTx":
+						callsDoor = true
+					}
+				}
+			}
+			return true
+		})
+		if isWayOut {
+			ways[fn.Name.Name] = callsDoor
+		}
+	}
+	return ways, nil
+}
+
+func TestTheWaysOutReaderSeesTheShapeItForbids(t *testing.T) {
+	planted := "package game\n" +
+		"func dies(conn C) { conn.Execute(`UPDATE characters SET life_status='deceased' WHERE user_id=?`); resolveIncarnationEscrowTx(conn) }\n" +
+		"func forgets(conn C) { applyErasureTargets(conn, 1, nil, nil) }\n" +
+		"func revives(conn C) { conn.Execute(`UPDATE characters SET life_status='alive' WHERE user_id=?`) }\n"
+	ways, err := waysOutOfABody(planted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ways) != 2 || !ways["dies"] || ways["forgets"] {
+		t.Fatalf("the reader saw %v; wanted dies through the door, forgets not, and the revive not a way out", ways)
+	}
+}
+
+// Every way out of a body leaves through the one door, read over the class
+// rather than a hand list: every function in the package that ends a life or
+// releases a person's rows calls the leaving door in the same body.
+func TestEveryWayOutOfABodyLeavesThroughTheOneDoor(t *testing.T) {
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	var open []string
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		body, err := os.ReadFile(filepath.Clean(name))
 		if err != nil {
 			t.Fatal(err)
 		}
-		found := false
-		for _, decl := range parsed.Decls {
-			fn, ok := decl.(*ast.FuncDecl)
-			if !ok || fn.Name.Name != fnName {
-				continue
+		ways, err := waysOutOfABody(string(body))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		for fn, callsDoor := range ways {
+			seen[name+": "+fn] = true
+			if !callsDoor {
+				open = append(open, name+": "+fn)
 			}
-			ast.Inspect(fn, func(n ast.Node) bool {
-				if call, ok := n.(*ast.CallExpr); ok {
-					if id, ok := call.Fun.(*ast.Ident); ok && id.Name == "resolveLeavingEscrowTx" {
-						found = true
-					}
-				}
-				return true
-			})
 		}
-		if !found {
-			t.Errorf("%s: %s does not call resolveLeavingEscrowTx; that way out of a body leaves its dealings open", file, fnName)
+	}
+	for _, want := range []string{"lifecycle_actions.go: recordTrueDeathAuthoritative", "character_reset.go: characterResetAction", "privacy_actions.go: adminErasePlayer"} {
+		if !seen[want] {
+			t.Fatalf("the walk did not see %s; the reader is broken, not the tree (saw %v)", want, seen)
 		}
+	}
+	if len(open) > 0 {
+		t.Fatalf("these end a life or release a person's rows without the leaving door, so that way out leaves its dealings open: %v", open)
 	}
 }
